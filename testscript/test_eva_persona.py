@@ -3,7 +3,6 @@ testscript/test_eva_persona.py
 Tests for Eva CTO and Kavya Intake personas, voice configs, and meeting behavior rules.
 """
 
-import pytest
 from alpha_voice.gemini_live import GeminiLiveSession
 
 

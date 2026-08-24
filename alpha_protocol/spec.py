@@ -1,21 +1,22 @@
-from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
+
 from .enums import ApprovalStatus
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Requirement(BaseModel):
     req_id: str
     title: str
-    raw_quote: Optional[str] = Field(default=None, description="Direct quote from meeting transcript or client message")
+    raw_quote: str | None = Field(default=None, description="Direct quote from meeting transcript or client message")
     description: str
-    acceptance_criteria: List[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
     priority: str = Field(default="medium", description="must_have, should_have, nice_to_have")
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class Decision(BaseModel):
@@ -23,7 +24,7 @@ class Decision(BaseModel):
     topic: str
     decision: str
     rationale: str
-    alternatives_considered: List[str] = Field(default_factory=list)
+    alternatives_considered: list[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=utc_now)
 
 
@@ -33,7 +34,7 @@ class OpenQuestion(BaseModel):
     context: str
     owner: str = "founder"  # founder or client
     resolved: bool = False
-    answer: Optional[str] = None
+    answer: str | None = None
 
 
 class SpecVersion(BaseModel):
@@ -41,19 +42,19 @@ class SpecVersion(BaseModel):
     project_id: str
     title: str
     summary: str
-    requirements: List[Requirement] = Field(default_factory=list)
-    decisions: List[Decision] = Field(default_factory=list)
-    open_questions: List[OpenQuestion] = Field(default_factory=list)
-    architecture_overview: Optional[str] = None
+    requirements: list[Requirement] = Field(default_factory=list)
+    decisions: list[Decision] = Field(default_factory=list)
+    open_questions: list[OpenQuestion] = Field(default_factory=list)
+    architecture_overview: str | None = None
     status: ApprovalStatus = ApprovalStatus.PENDING
     founder_approved: bool = False
     client_approved: bool = False
     created_at: datetime = Field(default_factory=utc_now)
-    approved_at: Optional[datetime] = None
+    approved_at: datetime | None = None
 
 
 class SpecDocument(BaseModel):
     project_id: str
     active_version: int = 1
-    versions: List[SpecVersion] = Field(default_factory=list)
+    versions: list[SpecVersion] = Field(default_factory=list)
     updated_at: datetime = Field(default_factory=utc_now)

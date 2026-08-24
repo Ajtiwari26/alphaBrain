@@ -1,11 +1,14 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import (
-    AsyncSession,
     AsyncEngine,
-    create_async_engine,
+    AsyncSession,
     async_sessionmaker,
+    create_async_engine,
 )
+
 from alpha_core.config import settings
+
 from .models import Base
 
 _engine: AsyncEngine | None = None

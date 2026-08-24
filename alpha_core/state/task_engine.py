@@ -1,26 +1,24 @@
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Tuple
-from sqlalchemy import select, update, and_, or_
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alpha_core.db.models import (
+    AttemptRecord,
+    AuditEventRecord,
+    ProjectRecord,
+    TaskRecord,
+)
 from alpha_protocol import (
     TaskEnvelope,
     TaskResult,
     TaskStatus,
-    GateResult,
-    AuditEvent,
-)
-from alpha_core.db.models import (
-    ProjectRecord,
-    TaskRecord,
-    AttemptRecord,
-    AuditEventRecord,
 )
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class TaskEngine:
@@ -107,8 +105,8 @@ class TaskEngine:
     async def lease_next_task(
         session: AsyncSession,
         worker_id: str,
-        preferred_agent: Optional[str] = None,
-    ) -> Optional[Tuple[TaskRecord, TaskEnvelope]]:
+        preferred_agent: str | None = None,
+    ) -> tuple[TaskRecord, TaskEnvelope] | None:
         """Atomically leases the next available queued task."""
         query = select(TaskRecord).where(TaskRecord.status == TaskStatus.QUEUED.value)
         if preferred_agent:

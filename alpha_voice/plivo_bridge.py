@@ -1,8 +1,8 @@
-import json
 import base64
-from typing import Dict, Any, Optional
+import json
+
 from alpha_protocol import CallJob, PersonaType
-from alpha_core.config import settings
+
 from .gemini_live import GeminiLiveSession
 
 
@@ -24,8 +24,8 @@ You are calling to welcome the client, capture requirements, or schedule a techn
 
     def __init__(self, job: CallJob):
         self.job = job
-        self.stream_id: Optional[str] = None
-        self.call_uuid: Optional[str] = None
+        self.stream_id: str | None = None
+        self.call_uuid: str | None = None
 
         system_prompt = (
             self.EVA_SYSTEM_PROMPT if job.persona == PersonaType.EVA else self.KAVYA_SYSTEM_PROMPT
@@ -38,7 +38,7 @@ You are calling to welcome the client, capture requirements, or schedule a techn
             system_instruction=system_prompt,
         )
 
-    def handle_plivo_media_message(self, message_str: str) -> Optional[bytes]:
+    def handle_plivo_media_message(self, message_str: str) -> bytes | None:
         """Parses inbound Plivo WebSocket message and extracts raw audio bytes."""
         try:
             msg = json.loads(message_str)

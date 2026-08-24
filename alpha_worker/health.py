@@ -1,6 +1,6 @@
 import subprocess
-import shutil
-from typing import Dict, Any, Tuple
+from typing import Any
+
 from alpha_protocol.enums import WorkerHealth
 
 
@@ -8,7 +8,7 @@ class HardwareHealthChecker:
     """Monitors macOS battery, thermal state, and lid closure to prevent broken builds."""
 
     @staticmethod
-    def get_battery_and_power() -> Tuple[bool, int]:
+    def get_battery_and_power() -> tuple[bool, int]:
         """Returns (is_on_ac_power, battery_percentage)."""
         try:
             res = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True)
@@ -44,7 +44,7 @@ class HardwareHealthChecker:
             return "nominal"
 
     @classmethod
-    def evaluate_worker_health(cls) -> Tuple[WorkerHealth, Dict[str, Any]]:
+    def evaluate_worker_health(cls) -> tuple[WorkerHealth, dict[str, Any]]:
         is_ac, battery_pct = cls.get_battery_and_power()
         thermal_state = cls.check_thermal_and_load()
 

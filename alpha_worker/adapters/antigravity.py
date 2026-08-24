@@ -3,7 +3,6 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Tuple
 
 from alpha_core.config import settings
 from alpha_protocol import (
@@ -29,7 +28,7 @@ class AntigravityAdapter(BaseAgentAdapter):
         self.memory_graph_path = settings.MEMORY_GRAPH_PATH
         self.worktree_mgr = WorktreeManager()
 
-    def check_readiness(self) -> Tuple[bool, str]:
+    def check_readiness(self) -> tuple[bool, str]:
         if not self.memory_graph_path.exists():
             return False, f"Memory Graph directory not found at {self.memory_graph_path}"
         return True, "Antigravity Memory Graph & session environment ready"

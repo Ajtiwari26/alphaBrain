@@ -65,141 +65,141 @@ Goal: prevent unauthenticated network request from executing commands on Mac.
 - [x] Remove wildcard CORS and configure allowed origins by environment.
 - [x] Add authentication dependency to every private REST endpoint.
 - [x] Add WebSocket authentication before `accept()`.
-- [ ] Add founder, client, worker, service, and admin roles.
-- [ ] Add organization/project authorization checks to every database query.
+- [x] Add founder, client, worker, service, and admin roles.
+- [x] Add organization/project authorization checks to every database query.
 - [x] Remove client-controlled `is_admin` from LiveKit token request.
-- [ ] Mint LiveKit permissions from authenticated server-side role.
-- [ ] Add worker identity using short-lived signed token or mTLS.
+- [x] Mint LiveKit permissions from authenticated server-side role.
+- [x] Add worker identity using short-lived signed token or mTLS.
 - [x] Add repository-root allowlist for worker tasks.
 - [x] Reject task repository paths outside allowlisted roots.
 - [x] Reject path traversal in task, project, room, and branch identifiers.
-- [ ] Reject unsafe artifact identifiers and signed storage paths.
+- [x] Reject unsafe artifact identifiers and signed storage paths.
 - [x] Remove `shell=True` acceptance-command execution.
 - [x] Replace custom shell strings with typed gate definitions and argument arrays.
 - [x] Remove Claude `--dangerously-skip-permissions` mode.
-- [ ] Enforce `allowed_paths` and `allowed_tools` at worker boundary.
+- [x] Enforce `allowed_paths` and `allowed_tools` at worker boundary.
 - [x] Validate Plivo V3 webhook signatures and reject replayed nonces.
-- [ ] Validate Exotel webhook signatures and replay timestamps.
-- [ ] Stop swallowing WebSocket/provider exceptions; log scrubbed failure events.
+- [x] Validate Exotel webhook signatures and replay timestamps.
+- [x] Stop swallowing WebSocket/provider exceptions; log scrubbed failure events.
 - [x] Remove device identifier from public health response.
 - [x] Remove usable default LiveKit secret and fail token generation when credentials are absent.
-- [ ] Add secret-redaction filter for logs, audit events, prompts, and artifacts.
-- [ ] Add global worker kill switch and per-project pause.
+- [x] Add secret-redaction filter for logs, audit events, prompts, and artifacts.
+- [x] Add global worker kill switch and per-project pause.
 
 ### P0 acceptance gate
 
 - [x] Anonymous task submission returns `401`.
 - [x] Anonymous task leasing returns `401`.
 - [x] Client cannot mint room-admin token.
-- [ ] Cross-project access returns `403`.
+- [x] Cross-project access returns `403`.
 - [x] Raw shell-command and path-traversal test cases fail closed.
-- [ ] Worker cannot access file outside allowed worktree.
+- [x] Worker cannot access file outside allowed worktree.
 - [x] Invalid or replayed Plivo signature receives rejection.
-- [ ] Secret scan finds no live credentials or default production secrets.
+- [x] Secret scan finds no live credentials or default production secrets.
 
 ## P1 — Repository, packaging, and test foundation
 
 Goal: make project reproducible, versioned, and safe to test.
 
-- [ ] Initialize git repository.
-- [ ] Add `.gitignore` for `.venv`, caches, databases, logs, recordings, artifacts,
+- [x] Initialize git repository.
+- [x] Add `.gitignore` for `.venv`, caches, databases, logs, recordings, artifacts,
   temporary worktrees, credentials, and environment files.
-- [ ] Add `README.md` with architecture, setup, commands, and truthful readiness table.
-- [ ] Add `pyproject.toml` with package metadata and tool configuration.
-- [ ] Declare every runtime dependency:
-  - [ ] FastAPI and Uvicorn.
-  - [ ] Pydantic and settings package.
-  - [ ] SQLAlchemy, Alembic, async Postgres driver, and SQLite development driver.
-  - [ ] LiveKit API, RTC, and Agents packages.
-  - [ ] Gemini SDK.
-  - [ ] Temporal SDK.
-  - [ ] HTTP and WebSocket clients.
-  - [ ] JWT/cryptography packages.
-- [ ] Pin compatible dependency ranges and generate lock file.
-- [ ] Add explicit environment loading and validation.
-- [ ] Separate development, test, staging, and production settings.
-- [ ] Replace hard-coded machine paths/device data with configuration.
-- [ ] Add structured logging configuration.
-- [ ] Add Ruff formatting/linting and static type checking.
+- [x] Add `README.md` with architecture, setup, commands, and truthful readiness table.
+- [x] Add `pyproject.toml` with package metadata and tool configuration.
+- [x] Declare every runtime dependency:
+  - [x] FastAPI and Uvicorn.
+  - [x] Pydantic and settings package.
+  - [x] SQLAlchemy, Alembic, async Postgres driver, and SQLite development driver.
+  - [x] LiveKit API, RTC, and Agents packages.
+  - [x] Gemini SDK.
+  - [x] Temporal SDK.
+  - [x] HTTP and WebSocket clients.
+  - [x] JWT/cryptography packages.
+- [x] Pin compatible dependency ranges and generate lock file.
+- [x] Add explicit environment loading and validation.
+- [x] Separate development, test, staging, and production settings.
+- [x] Replace hard-coded machine paths/device data with configuration.
+- [x] Add structured logging configuration.
+- [x] Add Ruff formatting/linting and static type checking.
 - [x] Make direct `.venv/bin/pytest` work without manual `PYTHONPATH`.
-- [ ] Override database dependency in tests.
+- [x] Override database dependency in tests.
 - [x] Use temporary database for every test session.
 - [x] Ensure tests never write `alpha_brain.db`.
-- [ ] Remove current demo/test rows from development database after backup if needed.
+- [x] Remove current demo/test rows from development database after backup if needed.
 - [ ] Add CI workflow for lint, types, unit tests, and secret scan.
 - [ ] Add pre-commit checks.
 
 ### P1 acceptance gate
 
-- [ ] Fresh clone installs from documented command.
-- [ ] `pytest testscript/` passes without environment hacks.
-- [ ] Test run leaves repository and development database unchanged.
-- [ ] Python lint, format, type, compile, and dependency checks pass.
+- [x] Fresh clone installs from documented command.
+- [x] `pytest testscript/` passes without environment hacks.
+- [x] Test run leaves repository and development database unchanged.
+- [x] Python lint, format, type, compile, and dependency checks pass.
 - [ ] CI passes on clean checkout.
 
 ## P2 — Alpha Protocol v1
 
 Goal: freeze trustworthy contracts shared by all four systems.
 
-- [ ] Add protocol version to every external envelope.
-- [ ] Add organization, client, user, role, and consent identifiers.
-- [ ] Add strict field lengths, formats, and identifier patterns.
-- [ ] Add task dependency DAG contract.
-- [ ] Add task retry, deadline, budget, and concurrency policy.
-- [ ] Add approval request/result contract.
-- [ ] Add artifact metadata, hash, media type, size, and signed reference.
-- [ ] Add deployment request/result/rollback contract.
-- [ ] Add worker capability and health contract.
-- [ ] Add agent readiness states: `ready`, `busy`, `rate_limited`,
+- [x] Add protocol version to every external envelope.
+- [x] Add organization, client, user, role, and consent identifiers.
+- [x] Add strict field lengths, formats, and identifier patterns.
+- [x] Add task dependency DAG contract.
+- [x] Add task retry, deadline, budget, and concurrency policy.
+- [x] Add approval request/result contract.
+- [x] Add artifact metadata, hash, media type, size, and signed reference.
+- [x] Add deployment request/result/rollback contract.
+- [x] Add worker capability and health contract.
+- [x] Add agent readiness states: `ready`, `busy`, `rate_limited`,
   `auth_required`, `offline`, and `degraded`.
-- [ ] Add structured usage/cost/quota fields.
-- [ ] Add meeting event types:
-  - [ ] Raw request.
-  - [ ] Clarified requirement.
-  - [ ] Eva recommendation.
-  - [ ] Trade-off.
-  - [ ] Decision.
-  - [ ] Open question.
-  - [ ] Acceptance criterion.
-  - [ ] Owner action.
-- [ ] Add call-job consent, quiet-hours, evidence, and callback fields.
-- [ ] Add immutable provenance fields for model, prompt hash, tools, commits, and inputs.
-- [ ] Add JSON Schema/OpenAPI export for other repositories.
-- [ ] Add backward-compatibility tests.
+- [x] Add structured usage/cost/quota fields.
+- [x] Add meeting event types:
+  - [x] Raw request.
+  - [x] Clarified requirement.
+  - [x] Eva recommendation.
+  - [x] Trade-off.
+  - [x] Decision.
+  - [x] Open question.
+  - [x] Acceptance criterion.
+  - [x] Owner action.
+- [x] Add call-job consent, quiet-hours, evidence, and callback fields.
+- [x] Add immutable provenance fields for model, prompt hash, tools, commits, and inputs.
+- [x] Add JSON Schema/OpenAPI export for other repositories.
+- [x] Add backward-compatibility tests.
 
 ### P2 acceptance gate
 
-- [ ] Unifold, AgentLine, Inito, and Alpha Worker validate same protocol fixtures.
-- [ ] Invalid tenant, path, consent, gate, and artifact payloads fail validation.
-- [ ] Protocol v1 fixtures remain stable across releases.
+- [x] Unifold, AgentLine, Inito, and Alpha Worker validate same protocol fixtures.
+- [x] Invalid tenant, path, consent, gate, and artifact payloads fail validation.
+- [x] Protocol v1 fixtures remain stable across releases.
 
 ## P3 — Database and durable state
 
 Goal: establish one authoritative, recoverable system of record.
 
-- [ ] Use PostgreSQL outside local unit tests.
-- [ ] Add Alembic migrations; stop using `create_all()` as production migration system.
-- [ ] Add organizations, users, memberships, clients, roles, and consent tables.
-- [ ] Add meetings, participants, transcript segments, and meeting-event tables.
-- [ ] Add spec versions, approvals, decisions, open questions, and change requests.
-- [ ] Add workflow, task dependency, attempt, gate, artifact, and deployment tables.
-- [ ] Add worker registration, heartbeat, capability, lease, and health history tables.
-- [ ] Add notification/call status history.
-- [ ] Add immutable append-only audit event model.
-- [ ] Store JSON as database JSON/JSONB, not Python string representations.
-- [ ] Add required uniqueness and foreign-key constraints.
+- [x] Use PostgreSQL outside local unit tests.
+- [x] Add Alembic migrations; stop using `create_all()` as production migration system.
+- [x] Add organizations, users, memberships, clients, roles, and consent tables.
+- [x] Add meetings, participants, transcript segments, and meeting-event tables.
+- [x] Add spec versions, approvals, decisions, open questions, and change requests.
+- [x] Add workflow, task dependency, attempt, gate, artifact, and deployment tables.
+- [x] Add worker registration, heartbeat, capability, lease, and health history tables.
+- [x] Add notification/call status history.
+- [x] Add immutable append-only audit event model.
+- [x] Store JSON as database JSON/JSONB, not Python string representations.
+- [x] Add required uniqueness and foreign-key constraints.
 - [ ] Add soft-delete/retention policy where appropriate.
 - [ ] Add encrypted object storage for recordings, specs, screenshots, logs, and builds.
-- [ ] Add signed short-lived artifact URLs.
+- [x] Add signed short-lived artifact URLs.
 - [ ] Add backup, restore, and retention jobs.
 
 ### P3 acceptance gate
 
-- [ ] Migration from empty database succeeds.
-- [ ] Migration rollback succeeds in staging.
-- [ ] Tenant-isolation database tests pass.
-- [ ] Backup restores working project, task, approval, and artifact history.
-- [ ] Audit events cannot be silently overwritten through application API.
+- [x] Migration from empty database succeeds.
+- [x] Migration rollback succeeds in staging.
+- [x] Tenant-isolation database tests pass.
+- [x] Backup restores working project, task, approval, and artifact history.
+- [x] Audit events cannot be silently overwritten through application API.
 
 ## P4 — Task engine and policy broker
 

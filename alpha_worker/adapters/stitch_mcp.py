@@ -1,6 +1,4 @@
-import json
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Any
 
 from alpha_core.config import settings
 
@@ -11,7 +9,7 @@ class StitchMCPAdapter:
     def __init__(self, model_id: str = "gemini-3.1-pro"):
         self.model_id = model_id or settings.STITCH_MODEL_ID
 
-    def check_readiness(self) -> Tuple[bool, str]:
+    def check_readiness(self) -> tuple[bool, str]:
         return True, f"Stitch MCP ready with model {self.model_id}"
 
     def build_generate_screen_payload(
@@ -20,7 +18,7 @@ class StitchMCPAdapter:
         screen_name: str,
         prompt: str,
         device_type: str = "DESKTOP",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Constructs compliant Stitch MCP payload with Gemini 3.1 Pro model ID."""
         return {
             "projectId": project_id,
@@ -35,7 +33,7 @@ class StitchMCPAdapter:
         project_id: str,
         screen_ids: list[str],
         prompt: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Constructs edit screens payload with Gemini 3.1 Pro model ID."""
         return {
             "projectId": project_id,

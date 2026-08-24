@@ -4,10 +4,8 @@ WebSocket live duplex audio streaming bridge between Browser and Gemini Live API
 """
 
 import json
-import base64
-import asyncio
 import logging
-from typing import Optional
+
 from fastapi import WebSocket, WebSocketDisconnect
 
 from alpha_core.config import settings
@@ -60,13 +58,13 @@ class LiveMeetAudioBridge:
                     # Direct query to Eva
                     query_text = msg.get("text", "")
                     speaker = msg.get("speaker", "Ajay")
-                    
+                    topic = f" regarding '{query_text}'" if query_text else ""
                     reply_text = (
-                        f"Understood, {speaker}. As DeployMate CTO, I recommend structuring our architecture "
+                        f"Understood, {speaker}{topic}. As DeployMate CTO, I recommend structuring our architecture "
                         f"with Next.js on the frontend, FastAPI services with async SQLite/Postgres for state, "
                         f"and Stitch MCP using Gemini 3.1 Pro for high-fidelity Apple Glass UI generation."
                     )
-                    
+
                     await self.websocket.send_json({
                         "type": "transcript",
                         "speaker": "Eva (CTO)",

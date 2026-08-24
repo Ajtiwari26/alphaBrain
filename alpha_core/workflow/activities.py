@@ -1,14 +1,14 @@
 import asyncio
-from typing import Dict, Any, List
+from typing import Any
+
+from alpha_core.db.connection import get_session_factory
+from alpha_core.state.task_engine import TaskEngine
 from alpha_protocol import (
-    TaskEnvelope,
-    TaskStatus,
-    SpecVersion,
     CallJob,
     PersonaType,
+    TaskEnvelope,
+    TaskStatus,
 )
-from alpha_core.state.task_engine import TaskEngine
-from alpha_core.db.connection import get_session_factory
 from alpha_voice.extractor import SpecExtractor
 
 
@@ -16,7 +16,7 @@ class SDLCActivities:
     """Activities invoked by the durable Temporal SDLC workflow."""
 
     @staticmethod
-    async def extract_specification(transcript_text: str, project_id: str, title: str) -> Dict[str, Any]:
+    async def extract_specification(transcript_text: str, project_id: str, title: str) -> dict[str, Any]:
         """Extracts requirements and decisions from a meeting transcript."""
         # Simulated extraction for testing & fallback
         spec = SpecExtractor.parse_extraction_json(
@@ -48,7 +48,7 @@ class SDLCActivities:
         return spec.model_dump()
 
     @staticmethod
-    async def dispatch_task(task_envelope_data: Dict[str, Any]) -> str:
+    async def dispatch_task(task_envelope_data: dict[str, Any]) -> str:
         """Submits task envelope to the database queue."""
         envelope = TaskEnvelope.model_validate(task_envelope_data)
         session_factory = get_session_factory()
@@ -66,6 +66,7 @@ class SDLCActivities:
         while (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
             async with session_factory() as session:
                 from sqlalchemy import select
+
                 from alpha_core.db.models import TaskRecord
                 res = await session.execute(select(TaskRecord).where(TaskRecord.id == task_id))
                 task = res.scalar_one_or_none()
@@ -81,7 +82,7 @@ class SDLCActivities:
         project_id: str,
         founder_phone: str,
         preview_url: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Creates a CallJob for Eva to notify the founder of a verified preview."""
         job = CallJob(
             notification_id=f"ntf_sdlc_{project_id}",

@@ -1,15 +1,26 @@
-import json
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+"""
+Alpha Brain Database Models
+============================
+Authoritative SQLAlchemy ORM models for all durable state:
+organizations, users, projects, specifications, tasks, attempts,
+gates, artifacts, deployments, meetings, workers, calls, and audit events.
+
+Uses JSON columns for structured data instead of stringified Python representations.
+"""
+
+from datetime import UTC, datetime
+
 from sqlalchemy import (
-    Column,
-    String,
-    Integer,
     Boolean,
+    Column,
     DateTime,
-    Text,
+    Float,
     ForeignKey,
     Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -17,13 +28,50 @@ Base = declarative_base()
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
+
+# ---------------------------------------------------------------------------
+# Organization & User Models
+# ---------------------------------------------------------------------------
+
+class OrganizationRecord(Base):
+    __tablename__ = "organizations"
+
+    id = Column(String(64), primary_key=True)
+    name = Column(String(255), nullable=False)
+    slug = Column(String(64), unique=True, nullable=False)
+    status = Column(String(32), default="active")
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    members = relationship("UserRecord", back_populates="organization")
+    projects = relationship("ProjectRecord", back_populates="organization")
+
+
+class UserRecord(Base):
+    __tablename__ = "users"
+
+    id = Column(String(64), primary_key=True)
+    org_id = Column(String(64), ForeignKey("organizations.id"), nullable=True)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    role = Column(String(32), nullable=False, default="client")  # founder, admin, client
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    organization = relationship("OrganizationRecord", back_populates="members")
+
+
+# ---------------------------------------------------------------------------
+# Project Model
+# ---------------------------------------------------------------------------
 
 class ProjectRecord(Base):
     __tablename__ = "projects"
 
     id = Column(String(64), primary_key=True)
+    org_id = Column(String(64), ForeignKey("organizations.id"), nullable=True)
     name = Column(String(255), nullable=False)
     repo_path = Column(String(512), nullable=False)
     active_spec_version = Column(Integer, default=1)
@@ -31,9 +79,20 @@ class ProjectRecord(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
+    organization = relationship("OrganizationRecord", back_populates="projects")
     specs = relationship("SpecVersionRecord", back_populates="project", cascade="all, delete-orphan")
     tasks = relationship("TaskRecord", back_populates="project", cascade="all, delete-orphan")
+    meetings = relationship(
+        "MeetingRecord", back_populates="project", cascade="all, delete-orphan"
+    )
+    deployments = relationship(
+        "DeploymentRecord", back_populates="project", cascade="all, delete-orphan"
+    )
 
+
+# ---------------------------------------------------------------------------
+# Specification Models
+# ---------------------------------------------------------------------------
 
 class SpecVersionRecord(Base):
     __tablename__ = "spec_versions"
@@ -43,36 +102,73 @@ class SpecVersionRecord(Base):
     version = Column(Integer, nullable=False)
     title = Column(String(255), nullable=False)
     summary = Column(Text, nullable=False)
-    spec_json = Column(Text, nullable=False)  # Serialized SpecVersion Pydantic model
+    spec_json = Column(Text, nullable=False)  # Full SpecVersion Pydantic JSON
     status = Column(String(32), default="pending")
     founder_approved = Column(Boolean, default=False)
     client_approved = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=utc_now)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
 
     project = relationship("ProjectRecord", back_populates="specs")
+    approvals = relationship(
+        "ApprovalRecord", back_populates="spec", cascade="all, delete-orphan"
+    )
 
+    __table_args__ = (
+        UniqueConstraint("project_id", "version", name="uq_spec_project_version"),
+    )
+
+
+class ApprovalRecord(Base):
+    __tablename__ = "approvals"
+
+    id = Column(String(64), primary_key=True)
+    spec_id = Column(String(64), ForeignKey("spec_versions.id"), nullable=True)
+    task_id = Column(String(64), ForeignKey("tasks.id"), nullable=True)
+    deployment_id = Column(String(64), ForeignKey("deployments.id"), nullable=True)
+    approval_type = Column(String(32), nullable=False)  # spec, task, deployment
+    status = Column(String(32), default="pending")
+    decided_by = Column(String(64), nullable=True)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+
+    spec = relationship("SpecVersionRecord", back_populates="approvals")
+
+
+# ---------------------------------------------------------------------------
+# Task & Attempt Models
+# ---------------------------------------------------------------------------
 
 class TaskRecord(Base):
     __tablename__ = "tasks"
 
     id = Column(String(64), primary_key=True)
     project_id = Column(String(64), ForeignKey("projects.id"), nullable=False)
+    org_id = Column(String(64), nullable=True)
     repo = Column(String(512), nullable=False)
     base_commit = Column(String(128), default="HEAD")
     objective = Column(Text, nullable=False)
-    details_json = Column(Text, nullable=False)  # Serialized TaskEnvelope
+    details_json = Column(Text, nullable=False)  # Full TaskEnvelope JSON
     risk_class = Column(String(32), default="low")
     preferred_agent = Column(String(32), default="antigravity")
     status = Column(String(32), default="queued")
+    attempt_count = Column(Integer, default=0)
+    max_attempts = Column(Integer, default=3)
     lease_token = Column(String(128), nullable=True)
     leased_at = Column(DateTime(timezone=True), nullable=True)
     lease_expires_at = Column(DateTime(timezone=True), nullable=True)
     worker_id = Column(String(128), nullable=True)
+    depends_on_json = Column(Text, default="[]")  # JSON array of dependency task IDs
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     project = relationship("ProjectRecord", back_populates="tasks")
     attempts = relationship("AttemptRecord", back_populates="task", cascade="all, delete-orphan")
+    gates = relationship("GateEvidenceRecord", back_populates="task", cascade="all, delete-orphan")
+    artifacts = relationship(
+        "ArtifactRecord", back_populates="task", cascade="all, delete-orphan"
+    )
 
 
 class AttemptRecord(Base):
@@ -87,11 +183,215 @@ class AttemptRecord(Base):
     result_commit = Column(String(128), nullable=True)
     files_changed_json = Column(Text, default="[]")
     gate_result_json = Column(Text, nullable=True)
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    duration_seconds = Column(Float, default=0.0)
+    estimated_cost_usd = Column(Float, default=0.0)
     started_at = Column(DateTime(timezone=True), default=utc_now)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     task = relationship("TaskRecord", back_populates="attempts")
 
+
+class GateEvidenceRecord(Base):
+    __tablename__ = "gate_evidence"
+
+    id = Column(String(64), primary_key=True)
+    task_id = Column(String(64), ForeignKey("tasks.id"), nullable=False)
+    attempt_id = Column(String(64), nullable=False)
+    gate_type = Column(String(32), nullable=False)
+    passed = Column(Boolean, nullable=False)
+    summary = Column(Text, nullable=False)
+    output_log = Column(Text, default="")
+    metrics_json = Column(Text, default="{}")
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    task = relationship("TaskRecord", back_populates="gates")
+
+
+# ---------------------------------------------------------------------------
+# Artifact Model
+# ---------------------------------------------------------------------------
+
+class ArtifactRecord(Base):
+    __tablename__ = "artifacts"
+
+    id = Column(String(64), primary_key=True)
+    project_id = Column(String(64), ForeignKey("projects.id"), nullable=False)
+    task_id = Column(String(64), ForeignKey("tasks.id"), nullable=True)
+    attempt_id = Column(String(64), nullable=True)
+    media_type = Column(String(128), nullable=False)
+    filename = Column(String(255), nullable=False)
+    size_bytes = Column(Integer, default=0)
+    sha256_hash = Column(String(64), nullable=False)
+    storage_path = Column(String(512), nullable=False)
+    tags_json = Column(Text, default="[]")
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    created_by = Column(String(64), nullable=False)
+
+    task = relationship("TaskRecord", back_populates="artifacts")
+
+
+# ---------------------------------------------------------------------------
+# Deployment Model
+# ---------------------------------------------------------------------------
+
+class DeploymentRecord(Base):
+    __tablename__ = "deployments"
+
+    id = Column(String(64), primary_key=True)
+    project_id = Column(String(64), ForeignKey("projects.id"), nullable=False)
+    task_id = Column(String(64), nullable=False)
+    attempt_id = Column(String(64), nullable=True)
+    target_environment = Column(String(32), nullable=False)
+    source_commit = Column(String(128), nullable=False)
+    previous_commit = Column(String(128), nullable=True)
+    status = Column(String(32), default="requested")
+    deploy_url = Column(String(512), nullable=True)
+    smoke_test_passed = Column(Boolean, nullable=True)
+    requires_approval = Column(Boolean, default=True)
+    requested_by = Column(String(64), nullable=False)
+    approved_by = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    deployed_at = Column(DateTime(timezone=True), nullable=True)
+
+    project = relationship("ProjectRecord", back_populates="deployments")
+
+
+# ---------------------------------------------------------------------------
+# Meeting Models
+# ---------------------------------------------------------------------------
+
+class MeetingRecord(Base):
+    __tablename__ = "meetings"
+
+    id = Column(String(64), primary_key=True)
+    project_id = Column(String(64), ForeignKey("projects.id"), nullable=False)
+    room_name = Column(String(128), nullable=False)
+    status = Column(String(32), default="active")
+    consent_recorded = Column(Boolean, default=False)
+    started_at = Column(DateTime(timezone=True), default=utc_now)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+
+    project = relationship("ProjectRecord", back_populates="meetings")
+    participants = relationship(
+        "MeetingParticipantRecord", back_populates="meeting", cascade="all, delete-orphan"
+    )
+    transcript_segments = relationship(
+        "TranscriptSegmentRecord", back_populates="meeting", cascade="all, delete-orphan"
+    )
+    meeting_events = relationship(
+        "MeetingEventRecord", back_populates="meeting", cascade="all, delete-orphan"
+    )
+
+
+class MeetingParticipantRecord(Base):
+    __tablename__ = "meeting_participants"
+
+    id = Column(String(64), primary_key=True)
+    meeting_id = Column(String(64), ForeignKey("meetings.id"), nullable=False)
+    identity = Column(String(128), nullable=False)
+    name = Column(String(255), nullable=False)
+    role = Column(String(32), default="client")
+    is_eva = Column(Boolean, default=False)
+    joined_at = Column(DateTime(timezone=True), default=utc_now)
+    left_at = Column(DateTime(timezone=True), nullable=True)
+
+    meeting = relationship("MeetingRecord", back_populates="participants")
+
+
+class TranscriptSegmentRecord(Base):
+    __tablename__ = "transcript_segments"
+
+    id = Column(String(64), primary_key=True)
+    meeting_id = Column(String(64), ForeignKey("meetings.id"), nullable=False)
+    speaker_identity = Column(String(128), nullable=False)
+    speaker_name = Column(String(255), nullable=False)
+    text = Column(Text, nullable=False)
+    is_eva = Column(Boolean, default=False)
+    timestamp = Column(DateTime(timezone=True), default=utc_now)
+
+    meeting = relationship("MeetingRecord", back_populates="transcript_segments")
+
+    __table_args__ = (
+        Index("ix_transcript_meeting_ts", "meeting_id", "timestamp"),
+    )
+
+
+class MeetingEventRecord(Base):
+    __tablename__ = "meeting_events"
+
+    id = Column(String(64), primary_key=True)
+    meeting_id = Column(String(64), ForeignKey("meetings.id"), nullable=False)
+    event_type = Column(String(32), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    raw_quote = Column(Text, nullable=True)
+    speaker_identity = Column(String(128), nullable=True)
+    is_inference = Column(Boolean, default=False)
+    confidence = Column(Float, default=1.0)
+    tags_json = Column(Text, default="[]")
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    meeting = relationship("MeetingRecord", back_populates="meeting_events")
+
+
+# ---------------------------------------------------------------------------
+# Worker Models
+# ---------------------------------------------------------------------------
+
+class WorkerRecord(Base):
+    __tablename__ = "workers"
+
+    id = Column(String(64), primary_key=True)
+    hostname = Column(String(255), nullable=False)
+    platform = Column(String(64), default="macos-arm64")
+    capability_json = Column(Text, default="{}")
+    status = Column(String(32), default="online")
+    last_heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+    registered_at = Column(DateTime(timezone=True), default=utc_now)
+
+    health_reports = relationship(
+        "WorkerHealthRecord", back_populates="worker", cascade="all, delete-orphan"
+    )
+    leases = relationship(
+        "WorkerLeaseRecord", back_populates="worker", cascade="all, delete-orphan"
+    )
+
+
+class WorkerHealthRecord(Base):
+    __tablename__ = "worker_health_history"
+
+    id = Column(String(64), primary_key=True)
+    worker_id = Column(String(64), ForeignKey("workers.id"), nullable=False)
+    battery_percent = Column(Integer, nullable=True)
+    ac_power = Column(Boolean, nullable=True)
+    thermal_pressure = Column(String(32), nullable=True)
+    cpu_load_percent = Column(Float, nullable=True)
+    disk_free_gb = Column(Float, nullable=True)
+    active_task_count = Column(Integer, default=0)
+    reported_at = Column(DateTime(timezone=True), default=utc_now)
+
+    worker = relationship("WorkerRecord", back_populates="health_reports")
+
+
+class WorkerLeaseRecord(Base):
+    __tablename__ = "worker_leases"
+
+    id = Column(String(64), primary_key=True)
+    worker_id = Column(String(64), ForeignKey("workers.id"), nullable=False)
+    task_id = Column(String(64), nullable=False)
+    lease_token = Column(String(128), nullable=False)
+    leased_at = Column(DateTime(timezone=True), default=utc_now)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    released_at = Column(DateTime(timezone=True), nullable=True)
+
+    worker = relationship("WorkerRecord", back_populates="leases")
+
+
+# ---------------------------------------------------------------------------
+# Call / Notification Models
+# ---------------------------------------------------------------------------
 
 class CallJobRecord(Base):
     __tablename__ = "call_jobs"
@@ -100,6 +400,8 @@ class CallJobRecord(Base):
     notification_id = Column(String(64), nullable=False)
     persona = Column(String(32), default="kavya")
     recipient_phone = Column(String(32), nullable=False)
+    recipient_name = Column(String(255), nullable=True)
+    project_id = Column(String(64), nullable=True)
     purpose = Column(String(128), nullable=False)
     script_facts_json = Column(Text, default="{}")
     status = Column(String(32), default="queued")
@@ -109,14 +411,42 @@ class CallJobRecord(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    status_history = relationship(
+        "CallStatusRecord", back_populates="call_job", cascade="all, delete-orphan"
+    )
+
+
+class CallStatusRecord(Base):
+    __tablename__ = "call_status_history"
+
+    id = Column(String(64), primary_key=True)
+    call_job_id = Column(String(64), ForeignKey("call_jobs.id"), nullable=False)
+    status = Column(String(32), nullable=False)
+    provider_call_id = Column(String(128), nullable=True)
+    details_json = Column(Text, default="{}")
+    recorded_at = Column(DateTime(timezone=True), default=utc_now)
+
+    call_job = relationship("CallJobRecord", back_populates="status_history")
+
+
+# ---------------------------------------------------------------------------
+# Audit Model (Immutable, Append-Only)
+# ---------------------------------------------------------------------------
 
 class AuditEventRecord(Base):
     __tablename__ = "audit_events"
 
     id = Column(String(64), primary_key=True)
     event_type = Column(String(64), nullable=False)
+    org_id = Column(String(64), nullable=True)
     project_id = Column(String(64), nullable=True)
     task_id = Column(String(64), nullable=True)
     actor = Column(String(64), nullable=False)
+    actor_role = Column(String(32), nullable=True)
     details_json = Column(Text, default="{}")
     timestamp = Column(DateTime(timezone=True), default=utc_now)
+
+    __table_args__ = (
+        Index("ix_audit_project_ts", "project_id", "timestamp"),
+        Index("ix_audit_type_ts", "event_type", "timestamp"),
+    )

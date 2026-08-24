@@ -2,7 +2,7 @@
 alpha_worker: Local macOS execution daemon, isolated worktree manager, and agent adapters.
 """
 
-from .worktree import WorktreeManager
 from .health import HardwareHealthChecker
+from .worktree import WorktreeManager
 
-__all__ = ["WorktreeManager", "HardwareHealthChecker"]
+__all__ = ["HardwareHealthChecker", "WorktreeManager"]

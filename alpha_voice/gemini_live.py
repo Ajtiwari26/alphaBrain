@@ -1,7 +1,7 @@
-import json
 import base64
-import asyncio
-from typing import AsyncGenerator, Callable, Optional, Dict, Any
+import json
+from typing import Any
+
 from alpha_core.config import settings
 
 
@@ -30,16 +30,16 @@ You welcome clients, capture high-level requirements, and coordinate technical r
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "gemini-2.0-flash-exp",
         persona: str = "eva",  # "eva" or "kavya"
-        voice_name: Optional[str] = None,
-        system_instruction: Optional[str] = None,
+        voice_name: str | None = None,
+        system_instruction: str | None = None,
     ):
         self.api_key = api_key or settings.GEMINI_API_KEY
         self.model = model
         self.persona = persona.lower()
-        
+
         if voice_name:
             self.voice_name = voice_name
         elif self.persona == "eva":
@@ -56,7 +56,7 @@ You welcome clients, capture high-level requirements, and coordinate technical r
 
         self.is_active = False
 
-    def build_initial_setup_payload(self) -> Dict[str, Any]:
+    def build_initial_setup_payload(self) -> dict[str, Any]:
         """Constructs setup payload for the Gemini Live WebSocket session."""
         return {
             "setup": {
@@ -77,7 +77,7 @@ You welcome clients, capture high-level requirements, and coordinate technical r
             }
         }
 
-    def format_realtime_audio_chunk(self, pcm_bytes: bytes, mime_type: str = "audio/pcm;rate=16000") -> Dict[str, Any]:
+    def format_realtime_audio_chunk(self, pcm_bytes: bytes, mime_type: str = "audio/pcm;rate=16000") -> dict[str, Any]:
         """Encodes raw PCM audio chunk to base64 JSON payload."""
         encoded = base64.b64encode(pcm_bytes).decode("utf-8")
         return {
@@ -91,10 +91,10 @@ You welcome clients, capture high-level requirements, and coordinate technical r
             }
         }
 
-    def parse_server_message(self, raw_json_str: str) -> Dict[str, Any]:
+    def parse_server_message(self, raw_json_str: str) -> dict[str, Any]:
         """Parses server event (audio chunk, transcription, or tool call)."""
         data = json.loads(raw_json_str)
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "has_audio": False,
             "audio_bytes": b"",
             "transcript": "",

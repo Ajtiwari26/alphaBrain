@@ -13,7 +13,7 @@ venv_dir = Path(__file__).resolve().parent / ".venv"
 if venv_dir.exists() and sys.prefix != str(venv_dir):
     venv_python = venv_dir / "bin" / "python"
     os.environ["PYTHONPATH"] = str(Path(__file__).resolve().parent)
-    os.execv(str(venv_python), [str(venv_python)] + sys.argv)  # noqa: S606
+    os.execv(str(venv_python), [str(venv_python), *sys.argv])
 
 import argparse
 import asyncio

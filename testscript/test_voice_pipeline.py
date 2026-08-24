@@ -3,12 +3,13 @@ testscript/test_voice_pipeline.py
 Automated tests for Gemini Live session payloads, Plivo audio bridge, and SpecExtractor.
 """
 
-import json
 import base64
+import json
+
 from alpha_protocol import CallJob, PersonaType
+from alpha_voice.extractor import SpecExtractor
 from alpha_voice.gemini_live import GeminiLiveSession
 from alpha_voice.plivo_bridge import PlivoVoiceBridge
-from alpha_voice.extractor import SpecExtractor
 
 
 def test_gemini_live_session_setup_payload():

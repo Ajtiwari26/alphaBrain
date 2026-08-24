@@ -2,7 +2,6 @@ import re
 import shutil
 import subprocess
 from pathlib import Path, PurePath
-from typing import List, Optional
 
 from alpha_core.config import settings
 
@@ -12,7 +11,7 @@ class WorktreeManager:
 
     TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
-    def __init__(self, base_worktree_dir: Optional[Path] = None):
+    def __init__(self, base_worktree_dir: Path | None = None):
         self.base_dir = (base_worktree_dir or settings.WORKTREE_BASE_DIR).expanduser().resolve()
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -49,11 +48,11 @@ class WorktreeManager:
         return path
 
     @staticmethod
-    def find_disallowed_changes(changed_files: List[str], allowed_paths: List[str]) -> List[str]:
+    def find_disallowed_changes(changed_files: list[str], allowed_paths: list[str]) -> list[str]:
         if "." in allowed_paths:
             return []
         allowed = [PurePath(path) for path in allowed_paths]
-        violations: List[str] = []
+        violations: list[str] = []
         for changed_file in changed_files:
             changed_path = PurePath(changed_file)
             if changed_path.is_absolute() or ".." in changed_path.parts:
@@ -102,7 +101,7 @@ class WorktreeManager:
 
         return worktree_path
 
-    def get_changed_files(self, worktree_path: Path, base_commit: str = "HEAD") -> List[str]:
+    def get_changed_files(self, worktree_path: Path, base_commit: str = "HEAD") -> list[str]:
         """Returns list of modified or untracked files in the worktree."""
         res = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -129,7 +128,7 @@ class WorktreeManager:
         )
         return res.stdout.strip()
 
-    def commit_changes(self, worktree_path: Path, message: str) -> Optional[str]:
+    def commit_changes(self, worktree_path: Path, message: str) -> str | None:
         """Stages all changes and commits them, returning the new commit hash."""
         subprocess.run(["git", "add", "-A"], cwd=str(worktree_path), check=True)
         res = subprocess.run(
@@ -157,8 +156,7 @@ class WorktreeManager:
             subprocess.run(
                 ["git", "worktree", "remove", "--force", str(worktree_path)],
                 cwd=str(validated_repo),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
             )
             # Extra cleanup if directory lingers
             if worktree_path.exists():
@@ -167,6 +165,5 @@ class WorktreeManager:
         subprocess.run(
             ["git", "worktree", "prune"],
             cwd=str(validated_repo),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
         )

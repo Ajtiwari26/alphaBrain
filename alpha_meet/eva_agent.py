@@ -1,14 +1,13 @@
-import re
 import json
 import logging
-import subprocess
-import urllib.request
+import re
 import urllib.error
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone
+import urllib.request
+from datetime import UTC, datetime
+from typing import Any
 
-from alpha_voice.gemini_live import GeminiLiveSession
 from alpha_core.config import settings
+from alpha_voice.gemini_live import GeminiLiveSession
 
 logger = logging.getLogger("EvaMeetingAgent")
 
@@ -31,13 +30,13 @@ Your persona:
     def __init__(self, room_name: str = "deploymate-main"):
         self.room_name = room_name
         self.live_session = GeminiLiveSession(persona="eva")
-        self.transcript_history: List[Dict[str, str]] = []
+        self.transcript_history: list[dict[str, str]] = []
 
-    def append_turn(self, speaker: str, text: str) -> Dict[str, str]:
+    def append_turn(self, speaker: str, text: str) -> dict[str, str]:
         turn = {
             "speaker": speaker,
             "text": text,
-            "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+            "timestamp": datetime.now(UTC).strftime("%H:%M:%S"),
         }
         self.transcript_history.append(turn)
         return turn
@@ -112,7 +111,7 @@ Your persona:
         # 5. General Context-Aware CTO Response
         return f"Understood, {speaker}. Regarding '{user_text}', I am incorporating this into our technical specifications and verifying the implementation against our quality gates."
 
-    def generate_presentation_slide(self, project_name: str, tech_stack: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def generate_presentation_slide(self, project_name: str, tech_stack: dict[str, str] | None = None) -> dict[str, Any]:
         """Generates dynamic architecture slide data for Eva's Screen Share."""
         default_stack = {
             "frontend": "Next.js / Vite (Apple Glass UI)",
@@ -131,5 +130,5 @@ Your persona:
                 {"name": "Emerald", "hex": "#10B981", "label": "Verified Gates"},
             ],
             "verified_gates": ["Lint Check", "Unit Tests", "Browser Smoke Test", "Security Scan"],
-            "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+            "timestamp": datetime.now(UTC).strftime("%H:%M:%S UTC"),
         }

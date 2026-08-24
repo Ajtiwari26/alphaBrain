@@ -75,7 +75,7 @@ async def test_plivo_incoming_xml():
     signature = base64.b64encode(
         hmac.new(
             settings.PLIVO_AUTH_TOKEN.encode("utf-8"),
-            f"{uri}{nonce}".encode("utf-8"),
+            f"{uri}{nonce}".encode(),
             hashlib.sha256,
         ).digest()
     ).decode("ascii")

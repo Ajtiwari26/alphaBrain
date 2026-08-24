@@ -1,12 +1,11 @@
 import json
 import re
-from typing import List, Dict, Any, Optional
+
 from alpha_protocol import (
-    Requirement,
     Decision,
     OpenQuestion,
+    Requirement,
     SpecVersion,
-    CallTranscript,
 )
 
 

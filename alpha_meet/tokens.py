@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from alpha_core.config import settings
 
@@ -49,7 +49,7 @@ class LiveKitTokenGenerator:
             # Fallback using standard PyJWT
             import jwt
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             payload = {
                 "sub": participant_identity,
                 "name": participant_name or participant_identity,

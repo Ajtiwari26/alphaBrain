@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from alpha_protocol import (
     AcceptancePlan,
@@ -12,7 +12,7 @@ from alpha_protocol import (
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SDLCWorkflowRunner:
@@ -23,7 +23,7 @@ class SDLCWorkflowRunner:
         self.repo_path = repo_path
         self.founder_phone = founder_phone
         self.state = "INTAKE"
-        self.spec: Optional[Dict[str, Any]] = None
+        self.spec: dict[str, Any] | None = None
         self.spec_approved = False
         self.preview_accepted = False
 
@@ -35,7 +35,7 @@ class SDLCWorkflowRunner:
         """Signal sent by founder when preview URL is tested and approved."""
         self.preview_accepted = accepted
 
-    async def run(self, transcript_text: str) -> Dict[str, Any]:
+    async def run(self, transcript_text: str) -> dict[str, Any]:
         from .activities import SDLCActivities
 
         # 1. Intake & Specification Extraction

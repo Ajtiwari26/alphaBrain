@@ -2,7 +2,6 @@ import shutil
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple
 
 from alpha_core.config import settings
 from alpha_protocol import (
@@ -21,7 +20,7 @@ class BaseAgentAdapter(ABC):
         self.agent_type = agent_type
 
     @abstractmethod
-    def check_readiness(self) -> Tuple[bool, str]:
+    def check_readiness(self) -> tuple[bool, str]:
         """Returns (is_ready, reason/details)."""
         pass
 
@@ -42,7 +41,7 @@ class BaseAgentAdapter(ABC):
         attempt_id: str,
     ) -> GateResult:
         """Runs typed allowlisted commands and proves every required gate."""
-        evidence_items: List[GateEvidence] = []
+        evidence_items: list[GateEvidence] = []
         allowed_executables = set(settings.ALLOWED_GATE_EXECUTABLES)
 
         for command in task.acceptance_plan.commands:
@@ -97,7 +96,7 @@ class BaseAgentAdapter(ABC):
                         evidence_id=f"evi_{len(evidence_items)+1}",
                         gate_type=command.gate_type,
                         passed=False,
-                        summary=f"Command '{command_label}' failed with exception: {str(e)}",
+                        summary=f"Command '{command_label}' failed with exception: {e!s}",
                     )
                 )
 

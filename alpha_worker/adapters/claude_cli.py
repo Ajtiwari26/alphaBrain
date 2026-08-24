@@ -2,7 +2,6 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
-from typing import Tuple
 
 from alpha_core.config import settings
 from alpha_protocol import (
@@ -25,7 +24,7 @@ class ClaudeCLIAdapter(BaseAgentAdapter):
         super().__init__(AgentType.CLAUDE_CODE)
         self.worktree_mgr = WorktreeManager()
 
-    def check_readiness(self) -> Tuple[bool, str]:
+    def check_readiness(self) -> tuple[bool, str]:
         claude_bin = shutil.which("claude")
         if not claude_bin:
             return False, "claude binary not found in system PATH"
@@ -112,7 +111,7 @@ class ClaudeCLIAdapter(BaseAgentAdapter):
                 agent=self.agent_type,
                 model="claude-code-cli",
                 base_commit=base_commit,
-                blockers=[f"Claude CLI execution failed: {str(e)}"],
+                blockers=[f"Claude CLI execution failed: {e!s}"],
             )
 
         # Run acceptance gates

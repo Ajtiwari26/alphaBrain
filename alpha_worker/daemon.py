@@ -1,23 +1,21 @@
-import os
-import time
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alpha_protocol import (
-    TaskEnvelope,
-    TaskResult,
-    TaskStatus,
-    AgentType,
-    WorkerHealth,
-)
 from alpha_core.db.connection import get_session_factory
 from alpha_core.state.task_engine import TaskEngine
-from .worktree import WorktreeManager
-from .health import HardwareHealthChecker
+from alpha_protocol import (
+    AgentType,
+    TaskResult,
+    TaskStatus,
+    WorkerHealth,
+)
+
 from .adapters.antigravity import AntigravityAdapter
 from .adapters.claude_cli import ClaudeCLIAdapter
+from .health import HardwareHealthChecker
+from .worktree import WorktreeManager
 
 logger = logging.getLogger("alpha_worker")
 
@@ -41,7 +39,7 @@ class AlphaWorkerDaemon:
     async def execute_task_cycle(self, session: AsyncSession) -> bool:
         """Runs a single polling and execution cycle. Returns True if a task was processed."""
         # 1. Health & Power Check
-        health, metrics = self.health_checker.evaluate_worker_health()
+        health, _metrics = self.health_checker.evaluate_worker_health()
         if health == WorkerHealth.DRAINING:
             logger.warning("Worker health is DRAINING (low battery / thermal). Pausing task intake.")
             return False
@@ -77,7 +75,7 @@ class AlphaWorkerDaemon:
             logger.info(f"Completed task {envelope.task_id} with status {result.status.value}")
 
         except Exception as e:
-            logger.error(f"Error executing task {envelope.task_id}: {str(e)}", exc_info=True)
+            logger.error(f"Error executing task {envelope.task_id}: {e!s}", exc_info=True)
             failed_result = TaskResult(
                 attempt_id=f"att_{envelope.task_id}_err",
                 task_id=envelope.task_id,
@@ -113,5 +111,5 @@ class AlphaWorkerDaemon:
                 if not processed:
                     await asyncio.sleep(poll_interval_seconds)
             except Exception as e:
-                logger.error(f"Worker loop exception: {str(e)}")
+                logger.error(f"Worker loop exception: {e!s}")
                 await asyncio.sleep(poll_interval_seconds)

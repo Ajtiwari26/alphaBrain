@@ -1,12 +1,14 @@
-from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
+
 from pydantic import BaseModel, Field
+
 from .enums import PersonaType
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class CallStatus(str, Enum):
@@ -30,9 +32,9 @@ class CallTranscriptItem(BaseModel):
 
 class CallTranscript(BaseModel):
     call_id: str
-    items: List[CallTranscriptItem] = Field(default_factory=list)
-    extracted_summary: Optional[str] = None
-    action_items: List[str] = Field(default_factory=list)
+    items: list[CallTranscriptItem] = Field(default_factory=list)
+    extracted_summary: str | None = None
+    action_items: list[str] = Field(default_factory=list)
 
 
 class CallJob(BaseModel):
@@ -40,14 +42,14 @@ class CallJob(BaseModel):
     notification_id: str
     persona: PersonaType = PersonaType.KAVYA
     recipient_phone: str
-    recipient_name: Optional[str] = None
-    project_id: Optional[str] = None
+    recipient_name: str | None = None
+    project_id: str | None = None
     purpose: str = Field(description="e.g. founder_preview_review, client_milestone_update")
-    script_facts: Dict[str, Any] = Field(default_factory=dict, description="Verified facts model is allowed to state")
-    evidence_refs: List[str] = Field(default_factory=list, description="IDs of passing gates or preview URLs")
+    script_facts: dict[str, Any] = Field(default_factory=dict, description="Verified facts model is allowed to state")
+    evidence_refs: list[str] = Field(default_factory=list, description="IDs of passing gates or preview URLs")
     idempotency_key: str
     status: CallStatus = CallStatus.QUEUED
-    call_id: Optional[str] = None
+    call_id: str | None = None
     duration_seconds: int = 0
     created_at: datetime = Field(default_factory=utc_now)
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None

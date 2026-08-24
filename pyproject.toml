@@ -77,6 +77,7 @@ select = [
 ignore = [
     "B008", # Do not perform function call in argument defaults (FastAPI Depends)
     "E501", # Line too long (handled by formatter)
+    "UP042", # Allow str, Enum for Pydantic schema serialization
 ]
 
 [tool.ruff.lint.isort]

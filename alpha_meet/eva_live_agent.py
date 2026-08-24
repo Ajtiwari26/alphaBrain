@@ -134,12 +134,16 @@ class EvaRoomManager:
             except Exception:
                 logger.exception("Could not publish Eva participant link for %s", identity)
 
+        _bg_tasks: set[asyncio.Task[Any]] = set()
+
         def choose_participant(identity: str) -> None:
             runtime.active_speaker = identity
             linked_room_io = getattr(session, "_room_io", None)
             if linked_room_io is not None:
                 linked_room_io.set_participant(identity)
-                asyncio.create_task(publish_linked_participant(identity))
+                task = asyncio.create_task(publish_linked_participant(identity))
+                _bg_tasks.add(task)
+                task.add_done_callback(_bg_tasks.discard)
 
         def on_participant_connected(participant: rtc.RemoteParticipant) -> None:
             nonlocal initial_join_timeout, empty_room_timeout
