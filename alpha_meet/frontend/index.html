@@ -54,7 +54,7 @@
       </div>
 
       <label class="block text-xs font-semibold text-neutral-700">Your Name
-        <input id="identity-input" required maxlength="128" value="Ajay Tiwari" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black focus:outline-none focus:ring-1 focus:ring-black"/>
+        <input id="identity-input" required maxlength="128" value="Ajay (Founder)" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black focus:outline-none focus:ring-1 focus:ring-black"/>
       </label>
 
       <label class="block text-xs font-semibold text-neutral-700">Room ID
@@ -107,7 +107,7 @@
       <div class="h-full w-px bg-black"></div>
       <div class="flex items-center gap-2 px-6 text-black">
         <span class="material-symbols-outlined text-[18px]">group</span>
-        <span id="participant-count" class="font-mono-tech text-xs font-semibold">4</span>
+        <span id="participant-count" class="font-mono-tech text-xs font-semibold">1</span>
       </div>
       <div class="h-full w-px bg-black"></div>
       <button onclick="copyClientInvite()" class="flex items-center gap-2 px-6 h-full text-black hover:bg-neutral-50 transition-colors font-mono-tech text-xs uppercase font-semibold" title="Copy Invite Link">
@@ -117,82 +117,79 @@
     </div>
   </header>
 
-  <!-- Main Meeting Content Grid -->
+  <!-- Main Meeting Content Area -->
   <main class="flex-1 flex overflow-hidden">
     
-    <!-- Stage Area (Left Hero + Stack) -->
-    <div class="flex-1 p-5 flex gap-4 overflow-hidden">
+    <!-- Stage Area: Dynamically adapts layout based on participant count -->
+    <div class="flex-1 p-5 overflow-hidden">
       
-      <!-- Hero Primary Focus Stage (Left) -->
-      <div id="local-tile" class="flex-[2] video-tile-container relative flex items-center justify-center bg-black">
-        <!-- Live Video Element -->
-        <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+      <div id="stage-grid" class="stage-grid layout-2">
         
-        <!-- Screen Share Picture-In-Picture Overlay Card -->
-        <div id="screen-share-stage" class="absolute bottom-6 left-6 w-64 pip-share-card p-3 z-20">
-          <div class="flex items-center justify-between border-b border-black/10 pb-1.5 mb-2">
-            <span class="font-mono-tech text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
-            <span class="font-mono-tech text-[9px] uppercase font-bold text-[#E6391E]">SYSTEM ONLINE</span>
-          </div>
-          <div id="slide-content" class="flex items-center gap-2.5">
-            <!-- Mini preview box -->
-            <div class="w-20 h-12 border border-black/20 bg-neutral-100 flex flex-col p-1 justify-between shrink-0">
-              <span class="text-[6px] font-mono text-black font-bold">Q2 Roadmap Overview</span>
-              <div class="h-1 bg-black/20 w-full"></div>
+        <!-- Tile 1: Founder (Local) -->
+        <div id="local-tile" class="video-tile-container relative flex items-center justify-center bg-black">
+          <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+          
+          <!-- Screen Share Floating PIP Card (Shown only when sharing) -->
+          <div id="screen-share-stage" class="absolute bottom-6 left-6 w-64 pip-share-card p-3 z-20 hidden">
+            <div class="flex items-center justify-between border-b border-black/10 pb-1.5 mb-2">
+              <span class="font-mono-tech text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
+              <span class="font-mono-tech text-[9px] uppercase font-bold text-[#E6391E]">LIVE</span>
             </div>
-            <div class="flex flex-col justify-between flex-1">
-              <div>
-                <div class="text-[10px] font-mono text-black font-bold">Q2_Roadmap.pdf</div>
-                <div class="text-[9px] text-neutral-500">You are presenting</div>
-              </div>
-              <button onclick="toggleScreenShare()" class="mt-1 border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-1.5 hover:bg-black hover:text-white transition-colors w-fit">
-                STOP PRESENTING
+            <div id="slide-content" class="flex items-center justify-between">
+              <div class="text-[10px] font-mono text-black font-bold">Screen active</div>
+              <button onclick="toggleScreenShare()" class="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-2 hover:bg-black hover:text-white transition-colors">
+                STOP
               </button>
             </div>
           </div>
-        </div>
 
-        <!-- Speaker Name Tag -->
-        <div class="speaker-badge">
-          <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
-          <span id="local-name">Ethan Brooks</span>
-        </div>
-      </div>
-
-      <!-- Secondary Participant Stack (Right) -->
-      <div id="video-grid" class="flex-1 flex flex-col gap-3.5 h-full">
-        
-        <!-- Tile 2: Client / Participant 1 (Maya Chen) -->
-        <div id="remote-human-tile" class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
-          <div id="remote-human-placeholder" class="text-white/40 flex flex-col items-center">
-            <span class="material-symbols-outlined text-[32px]">person</span>
-          </div>
+          <!-- Speaker Name Tag -->
           <div class="speaker-badge">
-            <span id="remote-human-name">Maya Chen</span>
-            <span id="remote-human-mic" class="material-symbols-outlined text-[13px] text-white/60 ml-1">mic</span>
+            <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+            <span id="local-name">Ajay (Founder)</span>
           </div>
         </div>
 
-        <!-- Tile 3: Eva AI Architect (Active Speaker with Red Waveform) -->
-        <div id="eva-tile" class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
-          <!-- Audio waveform top right -->
-          <div class="absolute top-3 right-3 z-10">
+        <!-- Tile 2: Eva AI Architect (Gemini Live Audio) -->
+        <div id="eva-tile" class="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center">
+          <!-- Active Waveform Indicator -->
+          <div id="eva-wave" class="absolute top-4 right-4 z-10 hidden">
             <div class="active-wave">
               <span></span>
               <span></span>
               <span></span>
+              <span></span>
             </div>
           </div>
+
+          <!-- Subtle Center Graphic for Eva -->
+          <div class="flex flex-col items-center gap-3 text-neutral-400">
+            <div class="w-16 h-16 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
+              <span class="material-symbols-outlined text-[28px] text-[#E6391E]">graphic_eq</span>
+            </div>
+            <div class="font-mono-tech text-[11px] uppercase tracking-widest text-neutral-400">
+              Gemini Live Voice Active
+            </div>
+          </div>
+
+          <!-- Speaker Tag -->
           <div class="speaker-badge">
-            <span id="eva-status-text">Jordan Pierce</span>
-            <span class="font-mono-tech text-[9px] text-[#E6391E] ml-1">EVA AI</span>
+            <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+            <span id="eva-status-text">Eva (AI Architect)</span>
           </div>
         </div>
 
-        <!-- Tile 4: Participant 3 (Sophie Lane) -->
-        <div class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
-          <div class="speaker-badge">
-            <span>Sophie Lane</span>
+        <!-- Remote Participants Container (Dynamic stack for when external clients join) -->
+        <div id="remote-stack" class="flex flex-col gap-3.5 h-full hidden">
+          <!-- Remote Human Client Tile -->
+          <div id="remote-human-tile" class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+            <div id="remote-human-placeholder" class="text-white/40 flex flex-col items-center">
+              <span class="material-symbols-outlined text-[32px]">person</span>
+            </div>
+            <div class="speaker-badge">
+              <span id="remote-human-name">Client</span>
+              <span id="remote-human-mic" class="material-symbols-outlined text-[13px] text-white/60 ml-1">mic</span>
+            </div>
           </div>
         </div>
 
@@ -200,78 +197,26 @@
 
     </div>
 
-    <!-- Live Notes / Transcript Drawer (Far Right) -->
+    <!-- Live Notes / Real-Time Transcript Drawer (Far Right) -->
     <aside id="transcript-drawer" class="w-80 border-l border-black flex flex-col h-full bg-white shrink-0">
       <!-- Live Notes Header -->
-      <div class="p-5 border-b border-black">
+      <div class="p-4 border-b border-black flex items-center justify-between">
         <h2 class="font-mono-tech text-xs uppercase font-bold tracking-wider text-black">LIVE NOTES</h2>
+        <span class="font-mono text-[10px] text-neutral-400">PCM 24kHz</span>
       </div>
 
-      <!-- Chronological Transcript Items -->
+      <!-- Real-Time Transcript Feed -->
       <div id="transcript-list" class="flex-1 overflow-y-auto divide-y divide-black/10 text-xs">
-        
-        <!-- Entry 1 -->
-        <div class="p-4 flex gap-3">
-          <span class="font-mono text-neutral-400 font-medium shrink-0">00:02</span>
-          <div class="space-y-1">
-            <div class="font-mono font-bold text-black">Maya Chen</div>
-            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
-              Kicking off the meeting. Thanks everyone.
-            </p>
-          </div>
+        <div id="transcript-empty" class="p-6 text-center font-mono text-neutral-400 text-xs">
+          Speech will transcribe here live...
         </div>
-
-        <!-- Entry 2 -->
-        <div class="p-4 flex gap-3">
-          <span class="font-mono text-neutral-400 font-medium shrink-0">00:15</span>
-          <div class="space-y-1">
-            <div class="font-mono font-bold text-black">Ethan Brooks</div>
-            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
-              Reviewed Q2 roadmap highlights.
-            </p>
-          </div>
-        </div>
-
-        <!-- Entry 3 -->
-        <div class="p-4 flex gap-3">
-          <span class="font-mono text-neutral-400 font-medium shrink-0">00:47</span>
-          <div class="space-y-1">
-            <div class="font-mono font-bold text-black">Jordan Pierce</div>
-            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
-              Discussing engineering resourcing and timelines.
-            </p>
-          </div>
-        </div>
-
-        <!-- Entry 4 -->
-        <div class="p-4 flex gap-3">
-          <span class="font-mono text-neutral-400 font-medium shrink-0">01:10</span>
-          <div class="space-y-1">
-            <div class="font-mono font-bold text-black">Sophie Lane</div>
-            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
-              Marketing campaign update and next steps.
-            </p>
-          </div>
-        </div>
-
-        <!-- Entry 5 -->
-        <div class="p-4 flex gap-3">
-          <span class="font-mono text-neutral-400 font-medium shrink-0">01:21</span>
-          <div class="space-y-1">
-            <div class="font-mono font-bold text-black">Maya Chen</div>
-            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
-              Aligning on priorities and action items.
-            </p>
-          </div>
-        </div>
-
       </div>
 
-      <!-- Chat input for promptEva -->
+      <!-- Chat / Prompt Input Form -->
       <div class="p-3 border-t border-black bg-neutral-50">
         <form onsubmit="handleSendChat(event)" class="flex gap-2">
-          <input id="chat-input" type="text" placeholder="Type notes or ask Eva..." class="flex-1 border border-black px-3 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black bg-white"/>
-          <button type="submit" class="border border-black px-3 py-1.5 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800">
+          <input id="chat-input" type="text" placeholder="Type message or ask Eva..." class="flex-1 border border-black px-3 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black bg-white"/>
+          <button type="submit" class="border border-black px-3 py-1.5 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800 transition-colors">
             ADD
           </button>
         </form>
@@ -293,14 +238,14 @@
       <button id="transcript-btn" onclick="toggleTranscriptDrawer()" class="control-btn-circle" title="Toggle Captions / Live Notes">
         <span class="material-symbols-outlined">closed_caption</span>
       </button>
-      <button onclick="promptEva()" class="control-btn-circle" title="Raise Hand / Ask Eva">
+      <button onclick="promptEva()" class="control-btn-circle" title="Ask Eva / Prompt">
         <span class="material-symbols-outlined">front_hand</span>
       </button>
       <button id="screen-btn" onclick="toggleScreenShare()" class="control-btn-circle" title="Present Screen">
         <span class="material-symbols-outlined">upload</span>
       </button>
-      <button class="control-btn-circle" title="More Options">
-        <span class="material-symbols-outlined">more_vert</span>
+      <button onclick="copyClientInvite()" class="control-btn-circle" title="Invite Client">
+        <span class="material-symbols-outlined">person_add</span>
       </button>
       
       <!-- Divider -->
@@ -316,7 +261,7 @@
     <div class="flex items-center h-full">
       <div class="h-full w-px bg-black mr-6"></div>
       <div id="session-timer" class="font-mono text-sm font-semibold tracking-wider text-black">
-        01:24:38
+        00:00:00
       </div>
     </div>
   </footer>

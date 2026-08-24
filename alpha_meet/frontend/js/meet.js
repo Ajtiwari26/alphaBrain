@@ -126,33 +126,57 @@ function readLobbyContext() {
   }
 }
 
+function updateStageLayout() {
+  const grid = document.getElementById("stage-grid");
+  const remoteStack = document.getElementById("remote-stack");
+  if (!grid) return;
+  const humanRemotes = room ? Array.from(room.remoteParticipants.values()).filter(p => p.identity !== EVA_IDENTITY) : [];
+  const hasEva = room ? room.remoteParticipants.has(EVA_IDENTITY) : false;
+  
+  if (humanRemotes.length > 0) {
+    grid.className = "stage-grid layout-3";
+    remoteStack?.classList.remove("hidden");
+  } else if (hasEva || room) {
+    grid.className = "stage-grid layout-2";
+    remoteStack?.classList.add("hidden");
+  } else {
+    grid.className = "stage-grid layout-1";
+    remoteStack?.classList.add("hidden");
+  }
+}
+
 function updateParticipantCount() {
   if (!room) {
-    setText("participant-count", "Not connected");
+    setText("participant-count", "1");
     return;
   }
   const total = room.remoteParticipants.size + 1;
-  setText("participant-count", `${total} connected`);
+  setText("participant-count", String(total));
+  updateStageLayout();
 }
 
 function setEvaState(state) {
   const normalized = String(state || "connected");
   const labels = {
-    ready: "Eva ready — say ‘Eva’",
-    listening: "Eva listening",
-    thinking: "Eva thinking",
-    speaking: "Eva speaking",
-    idle: "Eva ready — say ‘Eva’",
-    connected: "Eva connected",
-    reconnecting: "Eva reconnecting",
-    failed: "Eva unavailable",
+    ready: "Eva (AI Architect)",
+    listening: "Eva (Listening...)",
+    thinking: "Eva (Thinking...)",
+    speaking: "Eva (Speaking)",
+    idle: "Eva (AI Architect)",
+    connected: "Eva (AI Architect)",
+    reconnecting: "Eva (Reconnecting...)",
+    failed: "Eva (Unavailable)",
   };
-  const label = labels[normalized] || `Eva ${normalized}`;
+  const label = labels[normalized] || `Eva (${normalized})`;
   setText("eva-status-text", label);
   setText("voice-runtime-status", label);
+  
+  const isSpeaking = normalized === "speaking";
+  const waveEl = document.getElementById("eva-wave");
+  if (waveEl) waveEl.classList.toggle("hidden", !isSpeaking);
+  
   const tile = document.getElementById("eva-tile");
-  tile?.classList.toggle("ring-2", normalized === "speaking");
-  tile?.classList.toggle("ring-cyan-400", normalized === "speaking");
+  tile?.classList.toggle("border-[#E6391E]", isSpeaking);
 }
 
 function attachLocalCamera() {
@@ -187,35 +211,30 @@ function attachRemoteTrack(track, participant) {
   video.dataset.participantIdentity = participant.identity;
   tile?.prepend(video);
   document.getElementById("remote-human-placeholder")?.classList.add("hidden");
+  updateStageLayout();
 }
 
 function showScreenTrack(track) {
   const stage = document.getElementById("screen-share-stage");
-  const blueprint = document.getElementById("main-blueprint-stage");
-  if (!stage || !blueprint) return;
-  stage.replaceChildren();
-  const video = track.attach();
-  video.autoplay = true;
-  video.playsInline = true;
-  video.className = "w-full h-full object-contain rounded-xl";
-  stage.appendChild(video);
+  if (!stage) return;
   stage.classList.remove("hidden");
-  blueprint.classList.add("hidden");
+  const button = document.getElementById("screen-btn");
+  button?.classList.add("active-on");
 }
 
 function hideScreenTrack() {
   const stage = document.getElementById("screen-share-stage");
-  const blueprint = document.getElementById("main-blueprint-stage");
-  if (!stage || !blueprint) return;
-  stage.querySelectorAll("video").forEach((video) => video.remove());
+  if (!stage) return;
   stage.classList.add("hidden");
-  blueprint.classList.remove("hidden");
+  const button = document.getElementById("screen-btn");
+  button?.classList.remove("active-on");
 }
 
 function renderRemoteHuman(participant) {
   if (participant.identity === EVA_IDENTITY) return;
-  setText("remote-human-name", participant.name || participant.identity);
+  setText("remote-human-name", participant.name || participant.identity || "Client");
   setText("remote-human-mic", participant.isMicrophoneEnabled ? "mic" : "mic_off");
+  updateStageLayout();
 }
 
 function clearRemoteParticipant(participant) {
@@ -225,9 +244,10 @@ function clearRemoteParticipant(participant) {
   if (participant.identity === EVA_IDENTITY) {
     setEvaState("reconnecting");
   } else {
-    setText("remote-human-name", "Waiting for client");
+    setText("remote-human-name", "Client");
     setText("remote-human-mic", "mic_off");
     document.getElementById("remote-human-placeholder")?.classList.remove("hidden");
+    updateStageLayout();
   }
 }
 
@@ -252,6 +272,10 @@ function startMeetingTimer() {
 function appendTranscript(speaker, text, isEva = false, segmentId = "") {
   const list = document.getElementById("transcript-list");
   if (!list || !text) return;
+  
+  // Remove initial empty placeholder if present
+  document.getElementById("transcript-empty")?.remove();
+
   let item = segmentId ? transcriptElements.get(segmentId) : null;
   if (!item) {
     item = document.createElement("div");
