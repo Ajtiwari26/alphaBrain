@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alpha-brain"
+version = "1.0.0"
+description = "Central orchestrator, policy broker, and multi-agent SDLC engine for DeployMate"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Ajay Tiwari", email = "tiwariajay033@gmail.com" }
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.10.0",
+    "python-dotenv>=1.0.0",
+    "sqlalchemy>=2.0.36",
+    "aiosqlite>=0.20.0",
+    "psycopg>=3.2.0",
+    "livekit-api>=0.8.0",
+    "livekit>=0.18.0",
+    "livekit-agents>=0.12.0",
+    "livekit-plugins-google>=0.8.0",
+    "google-genai>=0.1.0",
+    "httpx>=0.28.0",
+    "cryptography>=43.0.0",
+    "temporalio>=1.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "alembic>=1.14.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["alpha_core*", "alpha_meet*", "alpha_protocol*", "alpha_voice*", "alpha_worker*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["testscript"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "testscript/scratch",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "B008", # Do not perform function call in argument defaults (FastAPI Depends)
+    "E501", # Line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["alpha_core", "alpha_meet", "alpha_protocol", "alpha_voice", "alpha_worker"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
