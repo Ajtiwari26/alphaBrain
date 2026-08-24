@@ -1,0 +1,630 @@
+<!-- markdownlint-disable MD013 -->
+
+# Alpha Brain Development TODO
+
+Status: foundation prototype  
+Target: secure, durable, evidence-backed system connecting Unifold, Alpha Brain,
+AgentLine, Inito, and local Mac execution worker.
+
+Latest verified progress: 25 August 2026 — P0 security tranche 1 plus real P8
+LiveKit/Gemini Live meeting slice completed; 33 tests, focused Ruff, provider RTC
+smoke, and browser join/audio/transcript flow passing.
+
+## How to use this file
+
+- Complete phases in order unless dependency explicitly allows parallel work.
+- Mark item complete only after listed acceptance proof passes.
+- Store every new test under `testscript/`.
+- Never mark integration complete from mocked payload, model text, or compilation alone.
+- Keep product repositories separate. Connect them through versioned Alpha Protocol.
+- Production side effects require policy plus human approval.
+
+## Current implementation baseline
+
+### Implemented foundation
+
+- [x] Alpha Protocol task, gate, specification, call, audit, and enum schemas.
+- [x] SQLAlchemy project, specification, task, attempt, call, and audit models.
+- [x] SQLite development database connection.
+- [x] Basic task submission, leasing, heartbeat, result, and timeout functions.
+- [x] FastAPI health, meeting, task, specification, and Plivo routes.
+- [x] Git worktree create, inspect, commit, and cleanup helper.
+- [x] Claude CLI adapter skeleton.
+- [x] Antigravity Memory Graph session skeleton.
+- [x] Stitch MCP request payload using `gemini-3.1-pro`.
+- [x] LiveKit token generator.
+- [x] Meeting UI with real LiveKit camera, microphone, remote tracks, and screen-share control.
+- [x] Gemini Live setup/audio message formatter and parser.
+- [x] Plivo media message formatter and parser.
+- [x] Basic Mac battery/load health check.
+- [x] Twenty-four prototype tests pass with explicit `PYTHONPATH=.`.
+
+### Not production-complete
+
+- [ ] Authentication and authorization.
+- [ ] Tenant isolation.
+- [ ] Safe command/tool execution.
+- [ ] Real Temporal workflow.
+- [ ] Real Antigravity execution.
+- [ ] Codex and Gemini worker adapters.
+- [x] Real LiveKit room connection.
+- [x] Real Gemini Live duplex audio through Vertex AI.
+- [ ] Real meeting specification extraction.
+- [ ] Real AgentLine call-job integration.
+- [ ] Inito Node Keeper integration.
+- [ ] Client tracking portal.
+- [ ] Deployment and rollback pipeline.
+- [ ] Production security, reliability, and privacy validation.
+
+## P0 — Stop unsafe execution
+
+Goal: prevent unauthenticated network request from executing commands on Mac.
+
+- [x] Change server default host from `0.0.0.0` to `127.0.0.1`.
+- [x] Default `DEBUG=false`; enable reload only through explicit local-development flag.
+- [x] Remove wildcard CORS and configure allowed origins by environment.
+- [x] Add authentication dependency to every private REST endpoint.
+- [x] Add WebSocket authentication before `accept()`.
+- [ ] Add founder, client, worker, service, and admin roles.
+- [ ] Add organization/project authorization checks to every database query.
+- [x] Remove client-controlled `is_admin` from LiveKit token request.
+- [ ] Mint LiveKit permissions from authenticated server-side role.
+- [ ] Add worker identity using short-lived signed token or mTLS.
+- [x] Add repository-root allowlist for worker tasks.
+- [x] Reject task repository paths outside allowlisted roots.
+- [x] Reject path traversal in task, project, room, and branch identifiers.
+- [ ] Reject unsafe artifact identifiers and signed storage paths.
+- [x] Remove `shell=True` acceptance-command execution.
+- [x] Replace custom shell strings with typed gate definitions and argument arrays.
+- [x] Remove Claude `--dangerously-skip-permissions` mode.
+- [ ] Enforce `allowed_paths` and `allowed_tools` at worker boundary.
+- [x] Validate Plivo V3 webhook signatures and reject replayed nonces.
+- [ ] Validate Exotel webhook signatures and replay timestamps.
+- [ ] Stop swallowing WebSocket/provider exceptions; log scrubbed failure events.
+- [x] Remove device identifier from public health response.
+- [x] Remove usable default LiveKit secret and fail token generation when credentials are absent.
+- [ ] Add secret-redaction filter for logs, audit events, prompts, and artifacts.
+- [ ] Add global worker kill switch and per-project pause.
+
+### P0 acceptance gate
+
+- [x] Anonymous task submission returns `401`.
+- [x] Anonymous task leasing returns `401`.
+- [x] Client cannot mint room-admin token.
+- [ ] Cross-project access returns `403`.
+- [x] Raw shell-command and path-traversal test cases fail closed.
+- [ ] Worker cannot access file outside allowed worktree.
+- [x] Invalid or replayed Plivo signature receives rejection.
+- [ ] Secret scan finds no live credentials or default production secrets.
+
+## P1 — Repository, packaging, and test foundation
+
+Goal: make project reproducible, versioned, and safe to test.
+
+- [ ] Initialize git repository.
+- [ ] Add `.gitignore` for `.venv`, caches, databases, logs, recordings, artifacts,
+  temporary worktrees, credentials, and environment files.
+- [ ] Add `README.md` with architecture, setup, commands, and truthful readiness table.
+- [ ] Add `pyproject.toml` with package metadata and tool configuration.
+- [ ] Declare every runtime dependency:
+  - [ ] FastAPI and Uvicorn.
+  - [ ] Pydantic and settings package.
+  - [ ] SQLAlchemy, Alembic, async Postgres driver, and SQLite development driver.
+  - [ ] LiveKit API, RTC, and Agents packages.
+  - [ ] Gemini SDK.
+  - [ ] Temporal SDK.
+  - [ ] HTTP and WebSocket clients.
+  - [ ] JWT/cryptography packages.
+- [ ] Pin compatible dependency ranges and generate lock file.
+- [ ] Add explicit environment loading and validation.
+- [ ] Separate development, test, staging, and production settings.
+- [ ] Replace hard-coded machine paths/device data with configuration.
+- [ ] Add structured logging configuration.
+- [ ] Add Ruff formatting/linting and static type checking.
+- [x] Make direct `.venv/bin/pytest` work without manual `PYTHONPATH`.
+- [ ] Override database dependency in tests.
+- [x] Use temporary database for every test session.
+- [x] Ensure tests never write `alpha_brain.db`.
+- [ ] Remove current demo/test rows from development database after backup if needed.
+- [ ] Add CI workflow for lint, types, unit tests, and secret scan.
+- [ ] Add pre-commit checks.
+
+### P1 acceptance gate
+
+- [ ] Fresh clone installs from documented command.
+- [ ] `pytest testscript/` passes without environment hacks.
+- [ ] Test run leaves repository and development database unchanged.
+- [ ] Python lint, format, type, compile, and dependency checks pass.
+- [ ] CI passes on clean checkout.
+
+## P2 — Alpha Protocol v1
+
+Goal: freeze trustworthy contracts shared by all four systems.
+
+- [ ] Add protocol version to every external envelope.
+- [ ] Add organization, client, user, role, and consent identifiers.
+- [ ] Add strict field lengths, formats, and identifier patterns.
+- [ ] Add task dependency DAG contract.
+- [ ] Add task retry, deadline, budget, and concurrency policy.
+- [ ] Add approval request/result contract.
+- [ ] Add artifact metadata, hash, media type, size, and signed reference.
+- [ ] Add deployment request/result/rollback contract.
+- [ ] Add worker capability and health contract.
+- [ ] Add agent readiness states: `ready`, `busy`, `rate_limited`,
+  `auth_required`, `offline`, and `degraded`.
+- [ ] Add structured usage/cost/quota fields.
+- [ ] Add meeting event types:
+  - [ ] Raw request.
+  - [ ] Clarified requirement.
+  - [ ] Eva recommendation.
+  - [ ] Trade-off.
+  - [ ] Decision.
+  - [ ] Open question.
+  - [ ] Acceptance criterion.
+  - [ ] Owner action.
+- [ ] Add call-job consent, quiet-hours, evidence, and callback fields.
+- [ ] Add immutable provenance fields for model, prompt hash, tools, commits, and inputs.
+- [ ] Add JSON Schema/OpenAPI export for other repositories.
+- [ ] Add backward-compatibility tests.
+
+### P2 acceptance gate
+
+- [ ] Unifold, AgentLine, Inito, and Alpha Worker validate same protocol fixtures.
+- [ ] Invalid tenant, path, consent, gate, and artifact payloads fail validation.
+- [ ] Protocol v1 fixtures remain stable across releases.
+
+## P3 — Database and durable state
+
+Goal: establish one authoritative, recoverable system of record.
+
+- [ ] Use PostgreSQL outside local unit tests.
+- [ ] Add Alembic migrations; stop using `create_all()` as production migration system.
+- [ ] Add organizations, users, memberships, clients, roles, and consent tables.
+- [ ] Add meetings, participants, transcript segments, and meeting-event tables.
+- [ ] Add spec versions, approvals, decisions, open questions, and change requests.
+- [ ] Add workflow, task dependency, attempt, gate, artifact, and deployment tables.
+- [ ] Add worker registration, heartbeat, capability, lease, and health history tables.
+- [ ] Add notification/call status history.
+- [ ] Add immutable append-only audit event model.
+- [ ] Store JSON as database JSON/JSONB, not Python string representations.
+- [ ] Add required uniqueness and foreign-key constraints.
+- [ ] Add soft-delete/retention policy where appropriate.
+- [ ] Add encrypted object storage for recordings, specs, screenshots, logs, and builds.
+- [ ] Add signed short-lived artifact URLs.
+- [ ] Add backup, restore, and retention jobs.
+
+### P3 acceptance gate
+
+- [ ] Migration from empty database succeeds.
+- [ ] Migration rollback succeeds in staging.
+- [ ] Tenant-isolation database tests pass.
+- [ ] Backup restores working project, task, approval, and artifact history.
+- [ ] Audit events cannot be silently overwritten through application API.
+
+## P4 — Task engine and policy broker
+
+Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
+
+- [ ] Implement atomic lease using PostgreSQL row locking or atomic update/returning.
+- [ ] Validate lease token, worker identity, status, and expiry on heartbeat/result.
+- [ ] Reject result whose URL task ID differs from body task ID.
+- [ ] Add idempotent result submission and duplicate-attempt handling.
+- [ ] Prevent re-submission from resetting verified task without explicit retry/version.
+- [ ] Schedule expired-lease recovery continuously.
+- [ ] Add exponential retry policy and maximum attempts.
+- [ ] Add blocked, cancelled, waiting-approval, and superseded transitions.
+- [ ] Enforce legal state-transition table.
+- [ ] Implement dependency-aware DAG scheduling.
+- [ ] Add per-project and per-worker concurrency limits.
+- [ ] Add risk-based approval policies.
+- [ ] Build typed action broker for shell, files, browser, deployment, MCP, and calls.
+- [ ] Add deny-by-default tool policy.
+- [ ] Require human approval for:
+  - [ ] Production deployment.
+  - [ ] Database migration.
+  - [ ] DNS changes.
+  - [ ] Destructive commands.
+  - [ ] Payments or purchases.
+  - [ ] External email/message/call.
+- [ ] Validate every required gate has matching passing evidence.
+- [ ] Make zero-evidence gate result fail.
+- [ ] Use separate evidence types for lint, tests, build, browser, security, and review.
+- [ ] Scrub logs before persistence/upload.
+- [ ] Require reviewer different from implementer for high-risk tasks.
+
+### P4 acceptance gate
+
+- [ ] Concurrent workers never lease same task.
+- [ ] Worker crash leads to safe requeue after lease expiry.
+- [ ] Late/stolen lease cannot submit result.
+- [ ] Duplicate result produces no duplicate side effect.
+- [ ] Missing required gate prevents verification.
+- [ ] Illegal state transitions fail.
+- [ ] High-risk action waits for correct approval.
+
+## P5 — Alpha Mac Worker and Node Keeper
+
+Goal: run approved tasks safely and recover across restarts/network loss.
+
+- [ ] Make worker poll cloud control plane outbound; remove direct production DB access.
+- [ ] Add worker registration, signed identity, heartbeat, and capability report.
+- [ ] Install worker with launchd under dedicated non-admin macOS user.
+- [ ] Add graceful startup, shutdown, pause, and drain.
+- [ ] Add network, disk, AC power, battery, and real thermal-pressure monitoring.
+- [ ] Add idle-sleep assertion only while eligible work runs.
+- [ ] Add low-battery and thermal drain thresholds.
+- [ ] Add worktree disk quota and cleanup policy.
+- [ ] Validate repository cleanliness and exact base commit before worktree creation.
+- [ ] Sanitize branch and task identifiers.
+- [ ] Stop force-deleting existing branches.
+- [ ] Preserve result branch/commit until merge or explicit rejection.
+- [ ] Store worker credentials in Keychain.
+- [ ] Add FileVault/non-admin-worker setup documentation.
+- [ ] Add local kill-switch command.
+- [ ] Integrate Node Keeper status with Inito UI without weakening privacy guard.
+- [ ] Document supported operating mode:
+  - [ ] Lid open, AC power, screen locked/off.
+  - [ ] Supported clamshell hardware when required.
+  - [ ] External camera when closed-display owner detection is required.
+
+### P5 acceptance gate
+
+- [ ] Reboot/login starts worker automatically.
+- [ ] Network outage pauses and resumes without duplicate execution.
+- [ ] Low battery drains task safely.
+- [ ] Thermal pressure stops new heavy tasks.
+- [ ] Worker cannot escape worktree or use undeclared credentials.
+- [ ] Eight-hour and overnight soak tests pass.
+
+## P6 — Real coding-agent adapters
+
+Goal: execute development through supported, observable agent interfaces.
+
+### Shared adapter requirements
+
+- [ ] Structured readiness response.
+- [ ] Structured event stream.
+- [ ] Timeout, cancellation, retry, and rate-limit handling.
+- [ ] Scoped worktree, tools, credentials, and allowed paths.
+- [ ] Capture agent/model/session/provenance.
+- [ ] Check process exit status.
+- [ ] Return changed files, diff, commit, blockers, and artifacts.
+- [ ] Run declared gates after execution.
+- [ ] Never infer success from quiet period or “done” text.
+
+### Antigravity
+
+- [ ] Replace Memory Graph-only adapter with supported Antigravity SDK/CLI invocation.
+- [ ] Keep Memory Graph as context/provenance, not execution proof.
+- [ ] Add structured completion result and cancellation.
+- [ ] Keep private IDE/process scraping disabled in production.
+
+### Codex
+
+- [ ] Add Codex SDK or CLI/MCP adapter.
+- [ ] Use workspace-write sandbox for normal implementation tasks.
+- [ ] Use read-only sandbox for reviews/research.
+- [ ] Support thread continuation for retries and review feedback.
+
+### Claude Code
+
+- [ ] Use headless structured JSON/stream output.
+- [ ] Configure allowed/disallowed tools.
+- [ ] Configure maximum turns and permission mode.
+- [ ] Treat nonzero CLI exit as failure.
+- [ ] Remove unrestricted permission bypass.
+
+### Gemini
+
+- [ ] Add Gemini/Antigravity supported adapter.
+- [ ] Add model and quota configuration.
+- [ ] Use Gemini 3.1 Pro for Stitch MCP requests.
+
+### Router
+
+- [ ] Route by task capability, repository benchmark, tool need, cost, quota,
+  availability, and verified historical quality.
+- [ ] Do not permanently hard-code frontend/backend model ownership.
+- [ ] Select independent reviewer from different agent/model family.
+- [ ] Prevent unsupported agent enum from silently falling back to Antigravity.
+
+### P6 acceptance gate
+
+- [ ] Each adapter completes same benchmark and returns same result schema.
+- [ ] Agent failure, timeout, rate limit, and auth failure map to correct task state.
+- [ ] Unsupported agent request fails clearly.
+- [ ] Model cannot alter files outside allowed paths.
+- [ ] Reviewer detects seeded defect from another agent.
+
+## P7 — Temporal SDLC workflow
+
+Goal: make meeting-to-production workflow survive crashes and human waiting periods.
+
+- [ ] Install Temporal SDK and choose Temporal Cloud or managed deployment.
+- [ ] Implement real workflow and activity workers.
+- [ ] Replace local mutable booleans with durable signals/queries.
+- [ ] Persist workflow IDs and run IDs.
+- [ ] Add durable states:
+  - [ ] Intake.
+  - [ ] Discovery.
+  - [ ] Spec draft.
+  - [ ] Founder review.
+  - [ ] Client review.
+  - [ ] Approved.
+  - [ ] Design.
+  - [ ] Build.
+  - [ ] Verify.
+  - [ ] Preview.
+  - [ ] Founder acceptance.
+  - [ ] Client acceptance.
+  - [ ] Release candidate.
+  - [ ] Production approval.
+  - [ ] Deployed.
+  - [ ] Monitoring.
+- [ ] Wait for actual spec approval; remove auto-approval.
+- [ ] Wait for verified task result; remove immediate call trigger.
+- [ ] Use real deployment record; remove fake localhost preview.
+- [ ] Wait for founder/client decision; remove auto-acceptance.
+- [ ] Add cancellation, change request, rollback, and supersede paths.
+- [ ] Add retry/backoff for agents, providers, deployments, and notifications.
+- [ ] Add workflow query API for client portal.
+
+### P7 acceptance gate
+
+- [ ] Restart workflow worker during build; workflow resumes correctly.
+- [ ] Disconnect Mac; workflow reports waiting/offline without losing state.
+- [ ] Reject spec; no build task starts.
+- [ ] Reject preview; refinement task is created.
+- [ ] Failed deployment never becomes `DEPLOYED`.
+- [ ] Duplicate signal does not duplicate task, deployment, or call.
+
+## P8 — Unifold Meet and Eva
+
+Goal: deliver real three-participant room: founder, client, Eva.
+
+### Room and media
+
+- [ ] Add authenticated lobby and waiting room.
+- [ ] Generate short-lived role-scoped LiveKit tokens.
+- [x] Connect browser using LiveKit RTC client.
+- [x] Publish microphone and camera tracks without blocking room join on device failure.
+- [x] Subscribe/render remote participant tracks.
+- [x] Implement real browser screen sharing through LiveKit `setScreenShareEnabled()`.
+- [ ] Add device selection, mute, camera, screen, reconnect, and end-call states.
+- [ ] Add room lock, participant removal, and rate limits.
+- [ ] Add TURN/restricted-network verification.
+- [ ] Add recording/transcription consent before capture.
+- [ ] Add Egress recording to object storage when consented.
+
+### Eva Gemini Live agent
+
+- [x] Join Eva as LiveKit agent participant.
+- [x] Open real Gemini Live session through Vertex AI.
+- [x] Stream browser/room audio to Gemini using LiveKit 24 kHz mono agent input.
+- [x] Stream Gemini audio back into room.
+- [x] Add input/output transcription using legacy events and `lk.transcription` streams.
+- [x] Add Gemini Live interruption and barge-in configuration.
+- [ ] Add session resumption and context compression.
+- [x] Add speaking policy: addressed, clarification needed, or critical risk.
+- [ ] Load versioned DeployMate knowledge instead of static marketing claims.
+- [x] Prevent Eva from claiming unimplemented security, deployment, or gates.
+
+### Meeting state and safety
+
+- [ ] Replace global Eva transcript with room-scoped durable sessions.
+- [x] Escape rendered participant and transcript content through DOM `textContent`.
+- [ ] Add content-security policy.
+- [ ] Add participant consent, retention, export, and deletion controls.
+- [ ] Record raw transcript separately from AI interpretation.
+
+### P8 acceptance gate
+
+- [ ] Founder and client join from different networks.
+- [ ] Both see/hear each other and Eva.
+- [ ] Real screen share appears remotely.
+- [ ] Eva handles interruption and reconnect.
+- [ ] Two simultaneous rooms never share transcript/context.
+- [ ] Recording never starts without consent.
+- [ ] HTML/script injection fixtures render as text.
+
+## P9 — Specification intelligence
+
+Goal: turn meeting conversation into traceable, editable, approved build specification.
+
+- [ ] Store timestamped raw transcript with speaker identity.
+- [ ] Run structured extraction through configured model.
+- [ ] Validate extraction against Alpha Protocol schema.
+- [ ] Preserve raw quote/evidence reference for every requirement and decision.
+- [ ] Separate client request from Eva recommendation.
+- [ ] Label inference and assumptions explicitly.
+- [ ] Capture functional requirements.
+- [ ] Capture UX/theme/color/design requirements.
+- [ ] Capture integrations, APIs, data, security, performance, and accessibility.
+- [ ] Capture feasibility, trade-offs, risks, and open questions.
+- [ ] Generate versioned documents:
+  - [ ] Discovery brief.
+  - [ ] Product requirements specification.
+  - [ ] Design-system brief.
+  - [ ] Architecture and data model.
+  - [ ] API/integration contract.
+  - [ ] Acceptance plan.
+  - [ ] Security/privacy checklist.
+  - [ ] Risk register.
+  - [ ] Decision log.
+- [ ] Add founder edit/review/approval.
+- [ ] Add client edit/review/approval.
+- [ ] Bind workflow to exact approved spec version.
+- [ ] Add change request and impact analysis.
+- [ ] Prevent build when unresolved blocking question exists.
+
+### P9 acceptance gate
+
+- [ ] Ten representative meeting fixtures produce traceable specs.
+- [ ] Every requirement links to source transcript or labeled inference.
+- [ ] Client correction creates new version without rewriting raw history.
+- [ ] Build cannot begin before exact version approval.
+
+## P10 — AgentLine integration
+
+Goal: make Kavya/Eva calls accurate, consented, idempotent, and auditable.
+
+- [ ] Add authenticated internal call-job endpoint or Temporal task queue.
+- [ ] Persist call jobs and complete status history.
+- [ ] Pass persona, recipient, project, purpose, evidence, and script facts end to end.
+- [ ] Connect job to AgentLine rather than local parser-only bridge.
+- [ ] Select Eva or Kavya inside real voice pipeline.
+- [ ] Add provider call ID and timestamps.
+- [ ] Add provider status callback handling.
+- [ ] Add no-answer, retry, declined, failed, and completed states.
+- [ ] Add idempotency and duplicate-call prevention.
+- [ ] Add channel consent and quiet hours.
+- [ ] Add exact evidence-based call language.
+- [ ] Send matching portal/email approval link.
+- [ ] Add action callbacks with pending/succeeded/failed status.
+- [ ] Never report action success before callback proof.
+
+### P10 acceptance gate
+
+- [ ] Eva calls founder with correct project and verified preview facts.
+- [ ] Kavya remains support/onboarding persona.
+- [ ] Replayed job never creates second call.
+- [ ] No-answer/failure appears in workflow.
+- [ ] Call cannot state fact absent from verified `script_facts`/evidence.
+
+## P11 — Client tracking portal
+
+Goal: give client evidence-backed Amazon-style project visibility.
+
+- [ ] Add authenticated organization/project dashboard.
+- [ ] Show current workflow phase and dependency-aware progress.
+- [ ] Show approved scope/spec version.
+- [ ] Show verified milestones and gate evidence.
+- [ ] Show preview links and artifacts through signed URLs.
+- [ ] Show open questions and blockers.
+- [ ] Add founder/client approval actions.
+- [ ] Add change requests and scope impact.
+- [ ] Add deployment and incident history.
+- [ ] Add ETA range with confidence and explanation.
+- [ ] Stream updates through SSE/WebSocket from audit/workflow events.
+- [ ] Hide model reasoning, secrets, credentials, unsafe logs, and other tenants.
+- [ ] Add accessible mobile layout.
+
+### P11 acceptance gate
+
+- [ ] Client sees correct project changes in near real time.
+- [ ] Cross-tenant access suite passes.
+- [ ] Signed links expire and cannot cross project boundary.
+- [ ] Portal never reports completion before required gates/approvals.
+
+## P12 — Deployment, monitoring, and rollback
+
+Goal: make release state provider-confirmed and recoverable.
+
+- [ ] Add deterministic Vercel/Render/cloud deployment adapters.
+- [ ] Return provider deployment ID, commit, environment, URL, and status.
+- [ ] Add preview deployment for every eligible change.
+- [ ] Run endpoint smoke tests.
+- [ ] Run browser user-flow checks.
+- [ ] Run security scan and dependency audit.
+- [ ] Require production approval.
+- [ ] Add database migration plan and backup reference.
+- [ ] Add rollback action and previous-good deployment reference.
+- [ ] Add logs, traces, metrics, alerts, and SLOs.
+- [ ] Add provider outage and partial-failure handling.
+- [ ] Add per-project model/infrastructure cost reporting.
+
+### P12 acceptance gate
+
+- [ ] Failed build/deploy never produces ready URL/status.
+- [ ] Browser flow passes against deployed preview.
+- [ ] Production promotion requires valid approval.
+- [ ] Rollback restores previous-good version.
+- [ ] Alert fires for worker, workflow, meeting, call, or deployment failure.
+
+## P13 — Privacy, compliance, and production hardening
+
+Goal: prepare system for real clients and continuous operation.
+
+- [ ] Complete threat model and data-flow diagram.
+- [ ] Complete privacy notice and recording/transcription disclosure.
+- [ ] Add consent withdrawal.
+- [ ] Add data export and deletion.
+- [ ] Add retention schedules by data class.
+- [ ] Add encrypted transport and storage checks.
+- [ ] Add credential rotation procedure.
+- [ ] Add incident response and breach runbook.
+- [ ] Add telephony consent/UCC/DLT/provider compliance review.
+- [ ] Add dependency, container, and secret scanning.
+- [ ] Add penetration test before public pilot.
+- [ ] Add load, chaos, network-loss, provider-outage, and restore tests.
+- [ ] Add operational runbooks for Mac offline, model quota, meeting outage,
+  call failure, deployment failure, and rollback.
+
+### P13 acceptance gate
+
+- [ ] No unresolved critical/high security finding.
+- [ ] Backup restoration drill passes.
+- [ ] Consent, export, deletion, and retention tests pass.
+- [ ] Incident and rollback drills pass.
+- [ ] One internal pilot completes.
+- [ ] One friendly-client pilot completes with recorded defects and fixes.
+
+## First vertical slice
+
+Complete before adding multiple-project autonomy:
+
+- [ ] Founder creates one website project.
+- [ ] Founder and client join authenticated Unifold room.
+- [x] Eva participates through real Gemini Live audio.
+- [ ] Meeting produces traceable specification.
+- [ ] Founder and client approve exact spec version.
+- [ ] Alpha Brain creates small dependency DAG.
+- [ ] Mac worker executes one task through supported Codex or Antigravity adapter.
+- [ ] Independent agent reviews result.
+- [ ] Lint, tests, build, browser, and security gates produce evidence.
+- [ ] Preview deployment returns provider-confirmed URL.
+- [ ] Eva calls founder through AgentLine with verified facts.
+- [ ] Founder accepts or requests refinement.
+- [ ] Client portal shows truthful timeline and preview.
+- [ ] Workflow survives worker restart, network loss, failed test, rejected preview,
+  duplicate signal, and failed call.
+
+## Alpha Brain v1 definition of done
+
+- [ ] Full meeting-to-spec-to-build-to-preview-to-approval-to-deployment flow works.
+- [ ] No simulated success path remains enabled in production.
+- [ ] Every state transition is durable and auditable.
+- [ ] Every completion claim has machine-verifiable evidence.
+- [ ] Every external side effect has policy and required approval.
+- [ ] Mac worker is outbound-only, least-privileged, restartable, and drainable.
+- [ ] Client and organization data remain isolated.
+- [ ] Meetings and calls have explicit consent and retention controls.
+- [ ] System recovers from Mac sleep/offline, service restart, model rate limit,
+  network loss, failed deployment, and provider outage.
+- [ ] Security review, backup restore, internal pilot, and friendly-client pilot pass.
+- [ ] Documentation and runbooks let operator understand exact live state.
+
+## Recommended work order
+
+1. P0 security containment.
+2. P1 repository/test foundation.
+3. P2 protocol v1 and P3 database.
+4. P4 task engine and P5 Mac Worker.
+5. P6 real agent adapters.
+6. P7 Temporal workflow.
+7. P8 real meeting/Eva.
+8. P9 specification intelligence.
+9. P10 AgentLine integration.
+10. P11 client portal.
+11. P12 deployment/monitoring.
+12. P13 hardening and pilots.
+
+## Defer until first vertical slice passes
+
+- [ ] Self-hosting LiveKit.
+- [ ] Multiple concurrent heavy local-model workers.
+- [ ] Automatic production deployment without human approval.
+- [ ] Complex model marketplace or dynamic bidding.
+- [ ] Cosmetic meeting UI redesign.
+- [ ] Multi-region infrastructure.
+- [ ] Claims of one-night delivery or bug-free completion.

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>DeployMate Alpha Brain — Enterprise Meet</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <style>
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* Apple Glassmorphism Utilities */
+    .glass-panel {
+      background: rgba(19, 19, 19, 0.45);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .glass-panel-elevated {
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(60px);
+      -webkit-backdrop-filter: blur(60px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .glass-button {
+      background: rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.2s ease;
+    }
+    
+    .glass-button:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .mesh-gradient-bg {
+      background-color: #050505;
+      background-image: 
+        radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+        radial-gradient(at 50% 0%, hsla(225,39%,30%,0.1) 0, transparent 50%), 
+        radial-gradient(at 100% 0%, hsla(339,49%,30%,0.1) 0, transparent 50%);
+    }
+
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#050505] text-[#f8fafc] font-['Inter'] min-h-screen overflow-hidden mesh-gradient-bg">
+
+  <div id="meeting-lobby" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-2xl flex items-center justify-center p-6">
+    <form id="join-form" class="glass-panel-elevated w-full max-w-md rounded-3xl p-8 space-y-5">
+      <div>
+        <div class="text-xs uppercase tracking-[0.22em] text-cyan-400 font-semibold">DeployMate Meet</div>
+        <h1 class="text-2xl font-bold mt-2">Join with Eva CTO</h1>
+        <p class="text-sm text-slate-400 mt-2">Real LiveKit video meeting with Gemini Live duplex voice.</p>
+      </div>
+      <label class="block text-xs text-slate-300">Your name
+        <input id="identity-input" required maxlength="128" value="Ajay (Founder)" class="mt-2 w-full rounded-xl bg-black/50 border-white/10 text-white"/>
+      </label>
+      <label class="block text-xs text-slate-300">Room
+        <input id="room-input" required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}" value="deploymate-main" class="mt-2 w-full rounded-xl bg-black/50 border-white/10 text-white"/>
+      </label>
+      <label id="api-token-field" class="block text-xs text-slate-300">Alpha Brain access token
+        <input id="api-token-input" type="password" autocomplete="off" class="mt-2 w-full rounded-xl bg-black/50 border-white/10 text-white"/>
+      </label>
+      <p id="join-error" class="hidden text-sm text-rose-300" role="alert"></p>
+      <button id="join-btn" type="submit" class="w-full rounded-xl py-3 bg-cyan-500 text-slate-950 font-semibold hover:bg-cyan-400 disabled:opacity-50">Join meeting</button>
+    </form>
+  </div>
+
+  <!-- Background WebGL Ambient Mesh Shader -->
+  <div class="absolute inset-0 w-full h-full -z-10" style="display:block;">
+    <canvas id="shader-canvas" style="display:block;width:100%;height:100%"></canvas>
+    <script>
+      (function() {
+        const canvas = document.getElementById('shader-canvas');
+        function syncSize() {
+          const w = canvas.clientWidth || 1280;
+          const h = canvas.clientHeight || 720;
+          if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+          }
+        }
+        if (typeof ResizeObserver !== 'undefined') {
+          new ResizeObserver(syncSize).observe(canvas);
+        }
+        syncSize();
+
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return;
+        const vs = `attribute vec2 a_position;
+        varying vec2 v_texCoord;
+        void main() {
+          v_texCoord = a_position * 0.5 + 0.5;
+          gl_Position = vec4(a_position, 0.0, 1.0);
+        }`;
+        const fs = `precision highp float;
+        varying vec2 v_texCoord;
+        uniform float u_time;
+        void main() {
+            vec2 uv = v_texCoord;
+            float dist = distance(uv, vec2(0.5 + 0.2 * sin(u_time * 0.4), 0.5 + 0.2 * cos(u_time * 0.3)));
+            float glow = smoothstep(0.8, 0.0, dist) * 0.12;
+            vec3 color = vec3(0.02, 0.02, 0.03);
+            color += vec3(0.1, 0.25, 0.55) * glow;
+            gl_FragColor = vec4(color, 1.0);
+        }`;
+        function cs(type, src) {
+          const s = gl.createShader(type);
+          gl.shaderSource(s, src);
+          gl.compileShader(s);
+          return s;
+        }
+        const prog = gl.createProgram();
+        gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+        gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(prog);
+        gl.useProgram(prog);
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+        const pos = gl.getAttribLocation(prog, 'a_position');
+        gl.enableVertexAttribArray(pos);
+        gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+        const uTime = gl.getUniformLocation(prog, 'u_time');
+
+        function render(t) {
+          if (typeof ResizeObserver === 'undefined') syncSize();
+          gl.viewport(0, 0, canvas.width, canvas.height);
+          if (uTime) gl.uniform1f(uTime, t * 0.001);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+          requestAnimationFrame(render);
+        }
+        render(0);
+      })();
+    </script>
+  </div>
+
+  <!-- Top Apple Glass Navigation Bar -->
+  <header class="fixed top-0 w-full z-40 bg-[#0e0e0e]/40 backdrop-blur-[40px] border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex justify-between items-center px-10 h-16 text-white text-sm">
+    <div class="flex items-center gap-4">
+      <span class="text-lg font-bold tracking-tight text-white">DEPLOYMATE</span>
+      <div class="h-4 w-px bg-white/20 mx-1"></div>
+      <div class="flex items-center gap-2 text-slate-300 text-xs">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+        <span>Live WebRTC</span>
+      </div>
+      <div class="flex items-center gap-1.5 text-slate-400 text-xs">
+        <span class="material-symbols-outlined text-[14px]">lock</span>
+        <span>Encrypted 256-bit</span>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 bg-white/5 rounded-full px-3.5 py-1.5 border border-white/10 text-xs font-medium">
+        <span class="material-symbols-outlined text-[16px] text-cyan-400">group</span>
+        <span id="participant-count">Not connected</span>
+      </div>
+      <div class="flex items-center gap-3 text-slate-400">
+        <span class="material-symbols-outlined hover:text-white cursor-pointer transition-colors text-[18px]">signal_cellular_alt</span>
+        <span class="material-symbols-outlined hover:text-white cursor-pointer transition-colors text-[18px]">timer</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Stage Layout -->
+  <main class="pt-20 px-8 pb-28 h-screen flex gap-6">
+    
+    <!-- Central Stage Area -->
+    <div class="flex-1 flex flex-col gap-5 h-full">
+      
+      <!-- Screen Share / Architectural Presentation Deck -->
+      <div id="screen-share-stage" class="flex-1 glass-panel rounded-2xl flex flex-col p-8 relative overflow-hidden hidden">
+        <div id="slide-content">
+          <!-- Populated by meet.js -->
+        </div>
+      </div>
+
+      <!-- Main Stage View (Interactive Architectural Blueprint) -->
+      <div id="main-blueprint-stage" class="flex-1 glass-panel rounded-2xl flex flex-col justify-between p-8 relative overflow-hidden border border-white/10">
+        <div class="flex justify-between items-start z-10">
+          <div>
+            <div class="text-xs uppercase tracking-widest text-cyan-400 font-semibold mb-1">Architecture Blueprint</div>
+            <h2 class="text-2xl font-bold tracking-tight text-white">DeployMate Alpha Brain — Multi-Tenant Core</h2>
+          </div>
+          <div class="flex gap-2">
+            <span class="glass-panel px-3 py-1 rounded-full text-xs font-medium text-slate-300 border border-white/10">FastAPI</span>
+            <span class="glass-panel px-3 py-1 rounded-full text-xs font-medium text-slate-300 border border-white/10">Next.js</span>
+            <span class="glass-panel px-3 py-1 rounded-full text-xs font-medium text-cyan-400 border border-cyan-500/30">Stitch (Gemini 3.1 Pro)</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 z-10 my-auto">
+          <div class="glass-panel p-5 rounded-xl border border-white/5">
+            <div class="text-xs text-slate-400 mb-1">Master Orchestrator</div>
+            <div class="text-base font-semibold text-white">PostgreSQL + Temporal</div>
+            <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px]">check_circle</span>
+              <span>Planned — not yet active</span>
+            </div>
+          </div>
+          <div class="glass-panel p-5 rounded-xl border border-white/5">
+            <div class="text-xs text-slate-400 mb-1">Execution Engine</div>
+            <div class="text-base font-semibold text-white">Antigravity + Claude CLI</div>
+            <div class="text-xs text-cyan-400 mt-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px]">bolt</span>
+              <span>Security foundation verified</span>
+            </div>
+          </div>
+          <div class="glass-panel p-5 rounded-xl border border-white/5">
+            <div class="text-xs text-slate-400 mb-1">Real-Time Voice</div>
+            <div class="text-base font-semibold text-white">Gemini Live + Plivo</div>
+            <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px]">record_voice_over</span>
+              <span id="voice-runtime-status">Waiting to join</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center z-10 text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[16px] text-cyan-400">verified</span>
+            <span>Meeting runtime status shown live</span>
+          </div>
+          <div>Session ID: <span id="room-name-label" class="text-slate-300 font-mono">deploymate-main</span></div>
+        </div>
+      </div>
+
+      <!-- 3-Way Video Tiles Row -->
+      <div id="video-grid" class="h-56 grid grid-cols-3 gap-5 shrink-0">
+        
+        <!-- Tile 1: Host (Ajay) -->
+        <div id="local-tile" class="glass-panel rounded-2xl relative overflow-hidden border border-white/10 shadow-lg">
+          <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+          <div class="absolute bottom-3 left-3 glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2 backdrop-blur-[20px] border border-white/10 text-xs">
+            <span id="local-name" class="font-medium text-white">You</span>
+            <span class="material-symbols-outlined text-[14px] text-cyan-400">mic</span>
+          </div>
+        </div>
+
+        <!-- Tile 2: Client -->
+        <div id="remote-human-tile" class="glass-panel rounded-2xl relative overflow-hidden border border-white/10 shadow-lg flex items-center justify-center bg-slate-900/40">
+          <div id="remote-human-placeholder" class="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400">
+            <span class="material-symbols-outlined text-[28px]">person</span>
+          </div>
+          <div class="absolute bottom-3 left-3 glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2 backdrop-blur-[20px] border border-white/10 text-xs">
+            <span id="remote-human-name" class="font-medium text-white">Waiting for client</span>
+            <span id="remote-human-mic" class="material-symbols-outlined text-[14px] text-slate-400">mic_off</span>
+          </div>
+        </div>
+
+        <!-- Tile 3: Eva AI CTO -->
+        <div id="eva-tile" class="glass-panel-elevated rounded-2xl relative overflow-hidden border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center transition-all duration-300">
+          <div class="w-14 h-14 rounded-full border border-cyan-400/50 flex items-center justify-center bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+            <span class="material-symbols-outlined text-[28px] text-cyan-400">graphic_eq</span>
+          </div>
+          <div class="absolute bottom-3 left-3 glass-panel px-3 py-1.5 rounded-lg flex items-center gap-2 backdrop-blur-[20px] border border-cyan-500/30 text-xs">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span id="eva-status-text" class="font-medium text-cyan-400">Eva not connected</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Right Side Transcript & Notes Drawer -->
+    <aside id="transcript-drawer" aria-label="Live meeting transcript" class="fixed md:static inset-x-4 top-20 bottom-24 z-40 w-auto md:w-84 shrink-0 hidden md:flex flex-col md:h-full glass-panel rounded-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden">
+      <!-- Drawer Header -->
+      <div class="p-5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
+        <div class="text-xs uppercase font-semibold text-white tracking-wider">Live Transcript</div>
+        <button type="button" onclick="toggleTranscriptDrawer(false)" class="md:hidden text-slate-400 hover:text-white" aria-label="Close transcript">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+        <span class="material-symbols-outlined text-[16px] text-slate-400 hidden md:inline">notes</span>
+      </div>
+
+      <!-- Transcript Messages -->
+      <div id="transcript-list" class="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-hide text-xs">
+        <div class="flex flex-col gap-1 pl-3 border-l-2 border-cyan-400 relative">
+          <div class="flex items-baseline gap-2">
+            <span class="font-semibold text-cyan-400">Eva (CTO)</span>
+            <span class="text-[10px] text-slate-500">Live</span>
+          </div>
+          <p class="text-slate-200 leading-relaxed">
+            Join meeting, then say “Eva” when you want technical guidance.
+          </p>
+        </div>
+      </div>
+
+      <!-- Spoken Query Input -->
+      <div class="p-4 border-t border-white/10 bg-black/40">
+        <form onsubmit="handleSendChat(event)" class="relative flex items-center">
+          <input id="chat-input" class="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 pl-4 pr-10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors" placeholder="Ask Eva or type message..." type="text"/>
+          <button type="submit" class="absolute right-3 text-slate-400 hover:text-cyan-400 transition-colors">
+            <span class="material-symbols-outlined text-[18px]">send</span>
+          </button>
+        </form>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Floating Bottom Apple Glass Command Pill -->
+  <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-full px-6 py-3 bg-[#131313]/60 backdrop-blur-[50px] border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.6)] flex items-center gap-3 z-50">
+    <button id="mic-btn" onclick="toggleAudio()" class="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-white" title="Toggle Microphone">
+      <span class="material-symbols-outlined text-[20px]">mic</span>
+    </button>
+    <button id="cam-btn" onclick="toggleVideo()" class="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-white" title="Toggle Camera">
+      <span class="material-symbols-outlined text-[20px]">videocam</span>
+    </button>
+    <button id="screen-btn" onclick="toggleScreenShare()" class="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-white" title="Toggle Architecture Deck">
+      <span class="material-symbols-outlined text-[20px]">present_to_all</span>
+    </button>
+    <button id="transcript-btn" onclick="toggleTranscriptDrawer()" class="md:hidden w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-white" title="Open transcript" aria-controls="transcript-drawer" aria-expanded="false">
+      <span class="material-symbols-outlined text-[20px]">chat</span>
+    </button>
+    <button onclick="promptEva()" class="px-4 h-11 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-300 font-medium text-xs transition-all flex items-center gap-1.5" title="Speak to Eva AI">
+      <span class="material-symbols-outlined text-[18px]">memory</span>
+      <span>Ask Eva</span>
+    </button>
+    <button onclick="copyClientInvite()" class="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-white" title="Copy client invite link">
+      <span class="material-symbols-outlined text-[20px]">person_add</span>
+    </button>
+    <div class="w-px h-6 bg-white/15 mx-1"></div>
+    <button onclick="endCall()" class="w-11 h-11 rounded-full bg-rose-500/80 hover:bg-rose-500 text-white transition-all flex items-center justify-center shadow-[0_0_15px_rgba(244,63,94,0.4)]" title="End Call">
+      <span class="material-symbols-outlined text-[20px]">call_end</span>
+    </button>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.min.js"></script>
+  <script src="/static/meet/js/meet.js"></script>
+</body>
+</html>

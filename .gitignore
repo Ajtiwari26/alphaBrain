@@ -1,0 +1,42 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environments & Virtualenv
+.venv/
+env/
+venv/
+ENV/
+
+# Testing & Linting Caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local databases & storage
+*.db
+*.sqlite3
+*.sqlite
+alpha_brain.db
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# OS & IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Recordings, Worktrees, Artifacts & Logs
+logs/
+recordings/
+artifacts/
+temp_worktrees/

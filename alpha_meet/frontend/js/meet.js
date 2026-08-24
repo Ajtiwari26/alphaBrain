@@ -1,0 +1,481 @@
+/** Real LiveKit meeting controller: founder + client + Eva Gemini Live participant. */
+
+const EVA_IDENTITY = "eva-cto";
+const EVA_LINKED_PARTICIPANT_ATTRIBUTE = "alpha.eva.linkedParticipant";
+const { Room, RoomEvent, Track, VideoPresets } = window.LivekitClient || {};
+
+let room = null;
+let roomName = "deploymate-main";
+let currentParticipant = "Ajay (Founder)";
+let apiToken = "";
+let inviteToken = "";
+let isAudioMuted = false;
+let isVideoMuted = false;
+let isScreenSharing = false;
+const transcriptElements = new Map();
+
+function setText(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
+}
+
+function showJoinError(message) {
+  const element = document.getElementById("join-error");
+  if (!element) return;
+  element.textContent = message;
+  element.classList.toggle("hidden", !message);
+}
+
+function authHeaders() {
+  return apiToken ? { Authorization: `Bearer ${apiToken}` } : {};
+}
+
+function withTimeout(promise, timeoutMs, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(`${label} permission timed out`)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
+
+function markMediaUnavailable(controlId, icon, message) {
+  const button = document.getElementById(controlId);
+  button?.classList.add("bg-rose-500/80");
+  if (button) {
+    button.title = message;
+    button.innerHTML = `<span class="material-symbols-outlined text-[20px]">${icon}</span>`;
+  }
+}
+
+async function enableLocalMedia() {
+  if (!room) return;
+  await waitForEvaLink();
+  try {
+    await withTimeout(room.localParticipant.setMicrophoneEnabled(true), 8000, "Microphone");
+  } catch (microphoneError) {
+    console.warn("Microphone unavailable; meeting remains connected", microphoneError);
+    isAudioMuted = true;
+    markMediaUnavailable("mic-btn", "mic_off", "Microphone unavailable — click to retry");
+  }
+
+  try {
+    await withTimeout(room.localParticipant.setCameraEnabled(true), 8000, "Camera");
+    attachLocalCamera();
+  } catch (cameraError) {
+    console.warn("Camera unavailable; joining audio-only", cameraError);
+    isVideoMuted = true;
+    markMediaUnavailable("cam-btn", "videocam_off", "Camera unavailable — click to retry");
+  }
+}
+
+async function waitForEvaLink(timeoutMs = 3000) {
+  if (!room) return false;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const eva = room.remoteParticipants.get(EVA_IDENTITY);
+    if (eva?.attributes?.[EVA_LINKED_PARTICIPANT_ATTRIBUTE] === room.localParticipant.identity) {
+      return true;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+  }
+  return false;
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_) {
+    data = {};
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || `Request failed (${response.status})`);
+  }
+  return data;
+}
+
+function decodeInviteClaims(token) {
+  try {
+    const encoded = token.split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = encoded + "=".repeat((4 - (encoded.length % 4)) % 4);
+    return JSON.parse(decodeURIComponent(escape(atob(padded))));
+  } catch (_) {
+    return null;
+  }
+}
+
+function readLobbyContext() {
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  inviteToken = fragment.get("invite") || "";
+  const identityInput = document.getElementById("identity-input");
+  const roomInput = document.getElementById("room-input");
+  const tokenInput = document.getElementById("api-token-input");
+
+  if (inviteToken) {
+    const claims = decodeInviteClaims(inviteToken);
+    if (claims) {
+      identityInput.value = claims.identity || identityInput.value;
+      roomInput.value = claims.room || roomInput.value;
+      identityInput.readOnly = true;
+      roomInput.readOnly = true;
+    }
+    document.getElementById("api-token-field")?.classList.add("hidden");
+  } else {
+    tokenInput.value = sessionStorage.getItem("alpha-meet-api-token") || "";
+  }
+}
+
+function updateParticipantCount() {
+  if (!room) {
+    setText("participant-count", "Not connected");
+    return;
+  }
+  const total = room.remoteParticipants.size + 1;
+  setText("participant-count", `${total} connected`);
+}
+
+function setEvaState(state) {
+  const normalized = String(state || "connected");
+  const labels = {
+    ready: "Eva ready — say ‘Eva’",
+    listening: "Eva listening",
+    thinking: "Eva thinking",
+    speaking: "Eva speaking",
+    idle: "Eva ready — say ‘Eva’",
+    connected: "Eva connected",
+    reconnecting: "Eva reconnecting",
+    failed: "Eva unavailable",
+  };
+  const label = labels[normalized] || `Eva ${normalized}`;
+  setText("eva-status-text", label);
+  setText("voice-runtime-status", label);
+  const tile = document.getElementById("eva-tile");
+  tile?.classList.toggle("ring-2", normalized === "speaking");
+  tile?.classList.toggle("ring-cyan-400", normalized === "speaking");
+}
+
+function attachLocalCamera() {
+  if (!room) return;
+  const publication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+  const video = document.getElementById("local-video");
+  if (publication?.videoTrack && video) publication.videoTrack.attach(video);
+}
+
+function attachRemoteTrack(track, participant) {
+  const isEva = participant.identity === EVA_IDENTITY;
+  if (track.kind === Track.Kind.Audio) {
+    const audio = track.attach();
+    audio.autoplay = true;
+    audio.dataset.participantIdentity = participant.identity;
+    audio.className = "hidden";
+    (isEva ? document.getElementById("eva-tile") : document.body).appendChild(audio);
+    if (isEva) setEvaState("connected");
+    return;
+  }
+
+  if (track.kind !== Track.Kind.Video || isEva) return;
+  if (track.source === Track.Source.ScreenShare) {
+    showScreenTrack(track);
+    return;
+  }
+  const tile = document.getElementById("remote-human-tile");
+  const video = track.attach();
+  video.autoplay = true;
+  video.playsInline = true;
+  video.className = "absolute inset-0 w-full h-full object-cover";
+  video.dataset.participantIdentity = participant.identity;
+  tile?.prepend(video);
+  document.getElementById("remote-human-placeholder")?.classList.add("hidden");
+}
+
+function showScreenTrack(track) {
+  const stage = document.getElementById("screen-share-stage");
+  const blueprint = document.getElementById("main-blueprint-stage");
+  if (!stage || !blueprint) return;
+  stage.replaceChildren();
+  const video = track.attach();
+  video.autoplay = true;
+  video.playsInline = true;
+  video.className = "w-full h-full object-contain rounded-xl";
+  stage.appendChild(video);
+  stage.classList.remove("hidden");
+  blueprint.classList.add("hidden");
+}
+
+function hideScreenTrack() {
+  const stage = document.getElementById("screen-share-stage");
+  const blueprint = document.getElementById("main-blueprint-stage");
+  if (!stage || !blueprint) return;
+  stage.querySelectorAll("video").forEach((video) => video.remove());
+  stage.classList.add("hidden");
+  blueprint.classList.remove("hidden");
+}
+
+function renderRemoteHuman(participant) {
+  if (participant.identity === EVA_IDENTITY) return;
+  setText("remote-human-name", participant.name || participant.identity);
+  setText("remote-human-mic", participant.isMicrophoneEnabled ? "mic" : "mic_off");
+}
+
+function clearRemoteParticipant(participant) {
+  document
+    .querySelectorAll(`[data-participant-identity="${CSS.escape(participant.identity)}"]`)
+    .forEach((element) => element.remove());
+  if (participant.identity === EVA_IDENTITY) {
+    setEvaState("reconnecting");
+  } else {
+    setText("remote-human-name", "Waiting for client");
+    setText("remote-human-mic", "mic_off");
+    document.getElementById("remote-human-placeholder")?.classList.remove("hidden");
+  }
+}
+
+function appendTranscript(speaker, text, isEva = false, segmentId = "") {
+  const list = document.getElementById("transcript-list");
+  if (!list || !text) return;
+  let item = segmentId ? transcriptElements.get(segmentId) : null;
+  if (!item) {
+    item = document.createElement("div");
+    item.className = `flex flex-col gap-1 pl-3 border-l-2 ${isEva ? "border-cyan-400" : "border-slate-600"}`;
+    const heading = document.createElement("div");
+    heading.className = "flex items-baseline gap-2";
+    const name = document.createElement("span");
+    name.className = `font-semibold ${isEva ? "text-cyan-400" : "text-slate-300"}`;
+    name.textContent = speaker;
+    const time = document.createElement("span");
+    time.className = "text-[10px] text-slate-500";
+    time.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const content = document.createElement("p");
+    content.className = "transcript-content text-slate-200 leading-relaxed";
+    heading.append(name, time);
+    item.append(heading, content);
+    list.appendChild(item);
+    if (segmentId) transcriptElements.set(segmentId, item);
+  }
+  item.querySelector(".transcript-content").textContent = text;
+  list.scrollTop = list.scrollHeight;
+}
+
+function wireRoomEvents(activeRoom) {
+  activeRoom.registerTextStreamHandler("lk.transcription", async (reader, participantInfo) => {
+    const participant = activeRoom.getParticipantByIdentity(participantInfo.identity);
+    const speaker = participant?.name || participantInfo.identity || "Participant";
+    const isEva = participantInfo.identity === EVA_IDENTITY;
+    const segmentId = reader.info?.attributes?.["lk.segment_id"] || reader.info?.id || "";
+    let completeText = "";
+    try {
+      for await (const textChunk of reader) {
+        completeText += textChunk;
+        appendTranscript(speaker, completeText, isEva, segmentId);
+      }
+    } catch (error) {
+      console.warn("Could not read LiveKit transcription stream", error);
+    }
+  });
+
+  activeRoom
+    .on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+      attachRemoteTrack(track, participant);
+    })
+    .on(RoomEvent.TrackUnsubscribed, (track) => {
+      track.detach().forEach((element) => element.remove());
+      if (track.source === Track.Source.ScreenShare) hideScreenTrack();
+    })
+    .on(RoomEvent.ParticipantConnected, (participant) => {
+      renderRemoteHuman(participant);
+      if (participant.identity === EVA_IDENTITY) setEvaState("connected");
+      updateParticipantCount();
+    })
+    .on(RoomEvent.ParticipantDisconnected, (participant) => {
+      clearRemoteParticipant(participant);
+      updateParticipantCount();
+    })
+    .on(RoomEvent.ActiveSpeakersChanged, (participants) => {
+      const evaSpeaking = participants.some((participant) => participant.identity === EVA_IDENTITY);
+      if (evaSpeaking) setEvaState("speaking");
+      else if (activeRoom.remoteParticipants.has(EVA_IDENTITY)) setEvaState("listening");
+    })
+    .on(RoomEvent.TranscriptionReceived, (segments, participant) => {
+      const speaker = participant?.name || participant?.identity || "Participant";
+      const isEva = participant?.identity === EVA_IDENTITY;
+      segments.forEach((segment) => appendTranscript(speaker, segment.text, isEva, segment.id || ""));
+    })
+    .on(RoomEvent.Reconnecting, () => setText("participant-count", "Reconnecting…"))
+    .on(RoomEvent.Reconnected, () => updateParticipantCount())
+    .on(RoomEvent.Disconnected, () => {
+      setText("participant-count", "Call ended");
+      setEvaState("reconnecting");
+    });
+}
+
+async function joinMeetingRoom(event) {
+  event.preventDefault();
+  showJoinError("");
+  if (!Room) {
+    showJoinError("LiveKit client failed to load. Check network access and reload.");
+    return;
+  }
+
+  currentParticipant = document.getElementById("identity-input").value.trim();
+  roomName = document.getElementById("room-input").value.trim();
+  apiToken = document.getElementById("api-token-input").value.trim();
+  if (!inviteToken && !apiToken) {
+    showJoinError("Alpha Brain access token is required.");
+    return;
+  }
+
+  const button = document.getElementById("join-btn");
+  button.disabled = true;
+  button.textContent = "Starting Eva…";
+  try {
+    if (apiToken) sessionStorage.setItem("alpha-meet-api-token", apiToken);
+    const data = await fetchJson("/api/meet/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({
+        room_name: roomName,
+        identity: currentParticipant,
+        invite_token: inviteToken || undefined,
+      }),
+    });
+
+    roomName = data.room_name;
+    currentParticipant = data.identity;
+    room = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+    });
+    wireRoomEvents(room);
+    button.textContent = "Connecting room…";
+    await room.connect(data.livekit_url, data.token);
+    try {
+      await withTimeout(room.startAudio(), 3000, "Audio playback");
+    } catch (audioError) {
+      console.warn("Automatic audio playback unavailable; user interaction may be required", audioError);
+    }
+    room.remoteParticipants.forEach((participant) => {
+      renderRemoteHuman(participant);
+      if (participant.identity === EVA_IDENTITY) setEvaState(data.eva?.state || "connected");
+    });
+    setText("local-name", currentParticipant);
+    setText("room-name-label", roomName);
+    updateParticipantCount();
+    document.getElementById("meeting-lobby").classList.add("hidden");
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    void enableLocalMedia();
+  } catch (error) {
+    showJoinError(error.message || "Could not join meeting.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Join meeting";
+  }
+}
+
+async function toggleAudio() {
+  if (!room) return;
+  isAudioMuted = !isAudioMuted;
+  await room.localParticipant.setMicrophoneEnabled(!isAudioMuted);
+  const button = document.getElementById("mic-btn");
+  button?.classList.toggle("bg-rose-500/80", isAudioMuted);
+  if (button) button.innerHTML = `<span class="material-symbols-outlined text-[20px]">${isAudioMuted ? "mic_off" : "mic"}</span>`;
+}
+
+async function toggleVideo() {
+  if (!room) return;
+  isVideoMuted = !isVideoMuted;
+  await room.localParticipant.setCameraEnabled(!isVideoMuted);
+  if (!isVideoMuted) attachLocalCamera();
+  const button = document.getElementById("cam-btn");
+  button?.classList.toggle("bg-rose-500/80", isVideoMuted);
+  if (button) button.innerHTML = `<span class="material-symbols-outlined text-[20px]">${isVideoMuted ? "videocam_off" : "videocam"}</span>`;
+}
+
+async function toggleScreenShare() {
+  if (!room) return;
+  const nextState = !isScreenSharing;
+  try {
+    await room.localParticipant.setScreenShareEnabled(nextState);
+    isScreenSharing = nextState;
+    const button = document.getElementById("screen-btn");
+    button?.classList.toggle("bg-cyan-500/30", isScreenSharing);
+    if (isScreenSharing) {
+      const publication = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+      if (publication?.videoTrack) showScreenTrack(publication.videoTrack);
+    } else {
+      hideScreenTrack();
+    }
+  } catch (error) {
+    console.warn("Screen share canceled or unavailable", error);
+  }
+}
+
+async function handleSendChat(event) {
+  event.preventDefault();
+  const input = document.getElementById("chat-input");
+  const text = input?.value.trim();
+  if (!room || !text) return;
+  await waitForEvaLink();
+  input.value = "";
+  appendTranscript(currentParticipant, text, false);
+  await room.localParticipant.sendText(text, { topic: "lk.chat" });
+}
+
+function promptEva() {
+  if (window.innerWidth < 768) toggleTranscriptDrawer(true);
+  const input = document.getElementById("chat-input");
+  if (!input) return;
+  window.requestAnimationFrame(() => input.focus());
+  if (!input.value) input.value = "Eva, ";
+}
+
+function toggleTranscriptDrawer(forceOpen) {
+  const drawer = document.getElementById("transcript-drawer");
+  const button = document.getElementById("transcript-btn");
+  if (!drawer) return;
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : drawer.classList.contains("hidden");
+  drawer.classList.toggle("hidden", !shouldOpen);
+  drawer.classList.toggle("flex", shouldOpen);
+  button?.setAttribute("aria-expanded", String(shouldOpen));
+}
+
+async function copyClientInvite() {
+  if (!apiToken) {
+    window.alert("Only founder/admin can create client invite links.");
+    return;
+  }
+  const identity = window.prompt("Client name", "Client");
+  if (!identity) return;
+  try {
+    const data = await fetchJson("/api/meet/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ room_name: roomName, identity }),
+    });
+    await navigator.clipboard.writeText(data.join_url);
+    window.alert("Client link copied. It expires in one hour.");
+  } catch (error) {
+    window.alert(error.message || "Could not create invite.");
+  }
+}
+
+async function endCall() {
+  if (room) await room.disconnect();
+  window.location.reload();
+}
+
+window.toggleAudio = toggleAudio;
+window.toggleVideo = toggleVideo;
+window.toggleScreenShare = toggleScreenShare;
+window.handleSendChat = handleSendChat;
+window.promptEva = promptEva;
+window.toggleTranscriptDrawer = toggleTranscriptDrawer;
+window.copyClientInvite = copyClientInvite;
+window.endCall = endCall;
+window.appendTranscript = appendTranscript;
+
+window.addEventListener("DOMContentLoaded", () => {
+  readLobbyContext();
+  document.getElementById("join-form")?.addEventListener("submit", joinMeetingRoom);
+});
