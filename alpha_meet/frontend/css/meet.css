@@ -1,15 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap');
 
 :root {
-  --color-ink: #050505;
   --color-paper: #ffffff;
+  --color-ink: #000000;
+  --color-ink-light: #111111;
+  --color-border: #000000;
+  --color-border-subtle: #e5e5e5;
   --color-signal: #E6391E;
   --color-signal-deep: #C90C0F;
-  --color-glass: rgba(255, 255, 255, 0.05);
-  --color-glass-elevated: rgba(255, 255, 255, 0.09);
-  --border-specular: rgba(255, 255, 255, 0.12);
-  --border-specular-bright: rgba(255, 255, 255, 0.24);
-  --font-display: 'Space Grotesk', sans-serif;
+  --font-display: 'Space Grotesk', -apple-system, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'Fira Code', monospace;
   --ease-out-soft: cubic-bezier(0.215, 0.61, 0.355, 1);
@@ -23,8 +22,8 @@
 }
 
 body {
-  background-color: var(--color-ink);
-  color: var(--color-paper);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
   font-family: var(--font-body);
   height: 100vh;
   width: 100vw;
@@ -34,126 +33,135 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Engineering Fine Grid Background */
-.grid-fine-invert {
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 44px 44px;
-}
-
-/* Glassmorphism Classes */
-.glass-panel {
-  background: var(--color-glass);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-  border: 1px solid var(--border-specular);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-  transition: border-color 0.25s var(--ease-out-soft), box-shadow 0.25s var(--ease-out-soft);
-}
-
-.glass-panel-elevated {
-  background: var(--color-glass-elevated);
-  backdrop-filter: blur(48px);
-  -webkit-backdrop-filter: blur(48px);
-  border-top: 1px solid var(--border-specular-bright);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  border-left: 1px solid var(--border-specular);
-  border-right: 1px solid var(--border-specular);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
-}
-
-.glass-pill {
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-top: 1px solid var(--border-specular-bright);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  border-left: 1px solid var(--border-specular);
-  border-right: 1px solid var(--border-specular);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  transition: all 0.2s var(--ease-out-soft);
-}
-
-.glass-button {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--border-specular);
-  border-top: 1px solid var(--border-specular-bright);
-  transition: all 0.2s var(--ease-out-soft);
-  color: var(--color-paper);
-}
-
-.glass-button:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.28);
-  transform: translateY(-1px);
-}
-
-.glass-button:active {
-  transform: translateY(0px) scale(0.97);
-}
-
-/* DeployMate Signal Red Active Speaker */
-.active-speaker {
-  border: 1px solid var(--color-signal) !important;
-  box-shadow: inset 0 0 35px rgba(230, 57, 30, 0.15), 0 0 25px rgba(230, 57, 30, 0.28) !important;
-}
-
 /* Typography Helpers */
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .font-mono-tech {
   font-family: var(--font-mono);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
-/* Eva Audio Waveform Equalizer Animation */
-.audio-visualizer-bars {
+/* Video Stage Tiles */
+.video-tile-container {
+  background: #000000;
+  border: 1px solid var(--color-ink);
+  position: relative;
+  overflow: hidden;
+}
+
+.video-tile-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Speaker Badge */
+.speaker-badge {
+  background: rgba(0, 0, 0, 0.85);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+}
+
+/* Control Buttons */
+.control-btn-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: #000000;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  height: 48px;
+  transition: all 0.2s var(--ease-out-soft);
+  border: none;
+  cursor: pointer;
 }
 
-.audio-bar {
-  width: 3.5px;
-  height: 8px;
+.control-btn-circle:hover {
+  background: #262626;
+  transform: translateY(-1px);
+}
+
+.control-btn-circle:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.control-btn-circle.active-off {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.control-btn-endcall {
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 6px;
   background: var(--color-signal);
-  border-radius: 9999px;
-  box-shadow: 0 0 10px rgba(230, 57, 30, 0.5);
-  animation: audioWave 1.4s ease-in-out infinite alternate;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s var(--ease-out-soft);
+  border: none;
+  cursor: pointer;
 }
 
-.audio-bar:nth-child(1) { animation-delay: 0.05s; height: 12px; }
-.audio-bar:nth-child(2) { animation-delay: 0.25s; height: 28px; }
-.audio-bar:nth-child(3) { animation-delay: 0.15s; height: 42px; }
-.audio-bar:nth-child(4) { animation-delay: 0.35s; height: 22px; }
-.audio-bar:nth-child(5) { animation-delay: 0.10s; height: 36px; }
-.audio-bar:nth-child(6) { animation-delay: 0.30s; height: 18px; }
-.audio-bar:nth-child(7) { animation-delay: 0.20s; height: 32px; }
-.audio-bar:nth-child(8) { animation-delay: 0.40s; height: 14px; }
-
-@keyframes audioWave {
-  0% { transform: scaleY(0.25); opacity: 0.4; }
-  50% { transform: scaleY(0.9); opacity: 0.85; }
-  100% { transform: scaleY(1.3); opacity: 1; }
+.control-btn-endcall:hover {
+  background: var(--color-signal-deep);
+  transform: translateY(-1px);
 }
 
-/* Scrollbar Customization */
+/* Screen Share PIP Card */
+.pip-share-card {
+  background: #ffffff;
+  border: 1px solid #000000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Active Speaker Waveform Indicator */
+.active-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+
+.active-wave span {
+  width: 2.5px;
+  height: 100%;
+  background: var(--color-signal);
+  border-radius: 1px;
+  animation: wavePulse 1.2s infinite ease-in-out alternate;
+}
+
+.active-wave span:nth-child(1) { animation-delay: 0.1s; }
+.active-wave span:nth-child(2) { animation-delay: 0.3s; }
+.active-wave span:nth-child(3) { animation-delay: 0.2s; }
+
+@keyframes wavePulse {
+  0% { transform: scaleY(0.3); }
+  100% { transform: scaleY(1); }
+}
+
+/* Scrollbars */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: #000000;
 }

@@ -231,25 +231,49 @@ function clearRemoteParticipant(participant) {
   }
 }
 
+let meetingStartTime = null;
+
+function formatElapsed() {
+  if (!meetingStartTime) return "00:00:00";
+  const diffSec = Math.floor((Date.now() - meetingStartTime) / 1000);
+  const hrs = String(Math.floor(diffSec / 3600)).padStart(2, "0");
+  const mins = String(Math.floor((diffSec % 3600) / 60)).padStart(2, "0");
+  const secs = String(diffSec % 60).padStart(2, "0");
+  return `${hrs}:${mins}:${secs}`;
+}
+
+function startMeetingTimer() {
+  meetingStartTime = Date.now();
+  setInterval(() => {
+    setText("session-timer", formatElapsed());
+  }, 1000);
+}
+
 function appendTranscript(speaker, text, isEva = false, segmentId = "") {
   const list = document.getElementById("transcript-list");
   if (!list || !text) return;
   let item = segmentId ? transcriptElements.get(segmentId) : null;
   if (!item) {
     item = document.createElement("div");
-    item.className = `flex flex-col gap-1 pl-3 border-l-2 ${isEva ? "border-cyan-400" : "border-slate-600"}`;
-    const heading = document.createElement("div");
-    heading.className = "flex items-baseline gap-2";
-    const name = document.createElement("span");
-    name.className = `font-semibold ${isEva ? "text-cyan-400" : "text-slate-300"}`;
-    name.textContent = speaker;
-    const time = document.createElement("span");
-    time.className = "text-[10px] text-slate-500";
-    time.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const content = document.createElement("p");
-    content.className = "transcript-content text-slate-200 leading-relaxed";
-    heading.append(name, time);
-    item.append(heading, content);
+    item.className = "p-4 flex gap-3 border-b border-black/10";
+    
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "font-mono text-neutral-400 font-medium shrink-0";
+    const now = new Date();
+    timeSpan.textContent = now.toTimeString().slice(3, 8); // MM:SS
+
+    const contentDiv = document.createElement("div");
+    contentDiv.className = "space-y-1";
+
+    const nameDiv = document.createElement("div");
+    nameDiv.className = `font-mono font-bold ${isEva ? "text-[#E6391E]" : "text-black"}`;
+    nameDiv.textContent = speaker;
+
+    const textP = document.createElement("p");
+    textP.className = "transcript-content font-mono text-neutral-700 leading-relaxed text-[11px]";
+
+    contentDiv.append(nameDiv, textP);
+    item.append(timeSpan, contentDiv);
     list.appendChild(item);
     if (segmentId) transcriptElements.set(segmentId, item);
   }
@@ -362,6 +386,7 @@ async function joinMeetingRoom(event) {
     setText("local-name", currentParticipant);
     setText("room-name-label", roomName);
     updateParticipantCount();
+    startMeetingTimer();
     document.getElementById("meeting-lobby").classList.add("hidden");
     window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
     void enableLocalMedia();

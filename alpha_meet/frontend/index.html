@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html class="dark" lang="en">
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <title>DeployMate Alpha Brain — Executive Meet</title>
+  <title>DeployMate Alpha Brain — Meeting</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link rel="stylesheet" href="/static/meet/css/meet.css"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -20,256 +20,179 @@
     }
   </style>
 </head>
-<body class="bg-[#050505] text-[#f8fafc] font-['Inter'] min-h-screen overflow-hidden grid-fine-invert antialiased flex flex-col justify-between">
+<body class="bg-white text-black font-['Inter'] h-screen w-screen flex flex-col justify-between overflow-hidden">
 
-  <!-- Join Meeting Lobby Overlay -->
-  <div id="meeting-lobby" class="fixed inset-0 z-[100] bg-black/85 backdrop-blur-2xl flex items-center justify-center p-6">
-    <form id="join-form" class="glass-panel-elevated w-full max-w-md rounded-3xl p-8 space-y-5 relative overflow-hidden">
-      <!-- Decorative ambient corner glow -->
-      <div class="absolute -top-24 -right-24 w-48 h-48 bg-[#E6391E]/15 rounded-full blur-3xl pointer-events-none"></div>
-      
-      <div>
-        <div class="font-mono-tech text-[11px] uppercase tracking-[0.2em] text-[#E6391E] font-semibold flex items-center gap-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
-          DeployMate Executive Meet
-        </div>
-        <h1 class="font-display text-2xl font-bold mt-2 text-white">Join Alpha Brain Room</h1>
-        <p class="text-xs text-white/60 mt-1.5 leading-relaxed">Encrypted LiveKit WebRTC video room with Eva Gemini Live native voice agent.</p>
+  <!-- Join Meeting Lobby Modal -->
+  <div id="meeting-lobby" class="fixed inset-0 z-[100] bg-white/95 backdrop-blur-sm flex items-center justify-center p-6">
+    <form id="join-form" class="bg-white w-full max-w-md border border-black p-8 space-y-5 shadow-2xl">
+      <div class="flex items-center gap-3 pb-3 border-b border-black">
+        <!-- AlphaBrain Neural Logo SVG -->
+        <svg class="w-8 h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="6" cy="20" r="2.5" fill="#000000"/>
+          <circle cx="15" cy="11" r="2.5" fill="#000000"/>
+          <circle cx="15" cy="20" r="2.5" fill="#000000"/>
+          <circle cx="15" cy="29" r="2.5" fill="#000000"/>
+          <circle cx="25" cy="14" r="2.5" fill="#000000"/>
+          <circle cx="25" cy="26" r="2.5" fill="#000000"/>
+          <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
+          <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" stroke-width="1.2"/>
+          <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" stroke-width="1.2"/>
+          <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+          <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+          <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+        </svg>
+        <span class="font-display font-bold text-xl tracking-tight">AlphaBrain</span>
       </div>
-      
-      <label class="block text-xs text-white/80 font-medium">Your Name / Identity
-        <input id="identity-input" required maxlength="128" value="Ajay (Founder)" class="mt-1.5 w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#E6391E] focus:ring-1 focus:ring-[#E6391E] transition-all"/>
+
+      <div>
+        <h1 class="font-display text-lg font-bold text-black">Join Meeting</h1>
+        <p class="text-xs text-neutral-500 mt-1">LiveKit WebRTC meeting room with Eva voice participant.</p>
+      </div>
+
+      <label class="block text-xs font-semibold text-neutral-700">Your Name
+        <input id="identity-input" required maxlength="128" value="Ajay Tiwari" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black focus:outline-none focus:ring-1 focus:ring-black"/>
       </label>
-      
-      <label class="block text-xs text-white/80 font-medium">Meeting Room ID
-        <input id="room-input" required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}" value="deploymate-main" class="mt-1.5 w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-2.5 text-sm text-white placeholder-white/30 font-mono text-xs focus:outline-none focus:border-[#E6391E] focus:ring-1 focus:ring-[#E6391E] transition-all"/>
+
+      <label class="block text-xs font-semibold text-neutral-700">Room ID
+        <input id="room-input" required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}" value="deploymate-main" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"/>
       </label>
-      
-      <label id="api-token-field" class="block text-xs text-white/80 font-medium">Alpha Brain Access Token
-        <input id="api-token-input" type="password" autocomplete="off" placeholder="Bearer token for founder authentication" class="mt-1.5 w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#E6391E] focus:ring-1 focus:ring-[#E6391E] transition-all"/>
+
+      <label id="api-token-field" class="block text-xs font-semibold text-neutral-700">Access Token
+        <input id="api-token-input" type="password" autocomplete="off" placeholder="Founder bearer token" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black focus:outline-none focus:ring-1 focus:ring-black"/>
       </label>
-      
-      <p id="join-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5" role="alert"></p>
-      
-      <button id="join-btn" type="submit" class="w-full rounded-xl py-3 bg-[#E6391E] text-white font-medium text-sm hover:bg-[#C90C0F] shadow-[0_0_25px_rgba(230,57,30,0.35)] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-        <span>Enter Meeting Room</span>
-        <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+
+      <p id="join-error" class="hidden text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert"></p>
+
+      <button id="join-btn" type="submit" class="w-full py-2.5 bg-black text-white font-semibold text-sm hover:bg-neutral-800 active:scale-[0.99] transition-all">
+        JOIN ROOM
       </button>
     </form>
   </div>
 
-  <!-- Background WebGL Ambient Mesh Shader -->
-  <div class="absolute inset-0 w-full h-full -z-10 pointer-events-none opacity-40" style="display:block;">
-    <canvas id="shader-canvas" style="display:block;width:100%;height:100%"></canvas>
-    <script>
-      (function() {
-        const canvas = document.getElementById('shader-canvas');
-        function syncSize() {
-          const w = canvas.clientWidth || 1280;
-          const h = canvas.clientHeight || 720;
-          if (canvas.width !== w || canvas.height !== h) {
-            canvas.width = w;
-            canvas.height = h;
-          }
-        }
-        if (typeof ResizeObserver !== 'undefined') {
-          new ResizeObserver(syncSize).observe(canvas);
-        }
-        syncSize();
-
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        if (!gl) return;
-        const vs = `attribute vec2 a_position;
-        varying vec2 v_texCoord;
-        void main() {
-          v_texCoord = a_position * 0.5 + 0.5;
-          gl_Position = vec4(a_position, 0.0, 1.0);
-        }`;
-        const fs = `precision highp float;
-        varying vec2 v_texCoord;
-        uniform float u_time;
-        void main() {
-            vec2 uv = v_texCoord;
-            float d1 = distance(uv, vec2(0.8, 0.2) + 0.1 * vec2(sin(u_time * 0.3), cos(u_time * 0.4)));
-            float glow1 = smoothstep(0.8, 0.0, d1) * 0.14;
-            vec3 color = vec3(0.02, 0.02, 0.025);
-            color += vec3(0.9, 0.22, 0.12) * glow1; // DeployMate Signal Red
-            
-            float d2 = distance(uv, vec2(0.2, 0.8) + 0.1 * vec2(cos(u_time * 0.25), sin(u_time * 0.5)));
-            float glow2 = smoothstep(0.7, 0.0, d2) * 0.08;
-            color += vec3(0.15, 0.35, 0.9) * glow2;
-            
-            gl_FragColor = vec4(color, 1.0);
-        }`;
-        function cs(type, src) {
-          const s = gl.createShader(type);
-          gl.shaderSource(s, src);
-          gl.compileShader(s);
-          return s;
-        }
-        const prog = gl.createProgram();
-        gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
-        gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
-        gl.linkProgram(prog);
-        gl.useProgram(prog);
-        const buf = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-        const pos = gl.getAttribLocation(prog, 'a_position');
-        gl.enableVertexAttribArray(pos);
-        gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-        const uTime = gl.getUniformLocation(prog, 'u_time');
-
-        function render(t) {
-          if (typeof ResizeObserver === 'undefined') syncSize();
-          gl.viewport(0, 0, canvas.width, canvas.height);
-          if (uTime) gl.uniform1f(uTime, t * 0.001);
-          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-          requestAnimationFrame(render);
-        }
-        render(0);
-      })();
-    </script>
-  </div>
-
-  <!-- Top Apple Glass Navigation Bar -->
-  <header class="fixed top-0 w-full z-40 bg-[#050505]/50 backdrop-blur-[40px] border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex justify-between items-center px-8 h-16 text-white text-sm">
-    <div class="flex items-center gap-5">
-      <span class="font-display text-lg font-bold tracking-tight text-white flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
-        DEPLOYMATE
-      </span>
-      <div class="h-4 w-px bg-white/20"></div>
-      <div class="font-display font-medium text-white/90 text-sm hidden sm:inline">Alpha Brain Executive Review</div>
-      <div class="font-mono-tech text-[10px] bg-white/[0.05] rounded-full px-3 py-1 border border-white/10 text-white/70 flex items-center gap-1.5">
-        <span class="material-symbols-outlined text-[13px] text-emerald-400">lock</span>
-        <span>E2EE · 24ms · GEMINI LIVE</span>
-      </div>
+  <!-- Top Header Navigation -->
+  <header class="h-16 border-b border-black flex items-center justify-between px-6 shrink-0 bg-white z-30">
+    <!-- Left Logo & Title -->
+    <div class="flex items-center gap-3.5">
+      <!-- Neural Icon -->
+      <svg class="w-8 h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="6" cy="20" r="2.5" fill="#000000"/>
+        <circle cx="15" cy="11" r="2.5" fill="#000000"/>
+        <circle cx="15" cy="20" r="2.5" fill="#000000"/>
+        <circle cx="15" cy="29" r="2.5" fill="#000000"/>
+        <circle cx="25" cy="14" r="2.5" fill="#000000"/>
+        <circle cx="25" cy="26" r="2.5" fill="#000000"/>
+        <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
+        <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" stroke-width="1.2"/>
+        <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" stroke-width="1.2"/>
+        <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+        <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+        <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+      </svg>
+      <span class="font-display text-2xl font-bold tracking-tight text-black">AlphaBrain</span>
     </div>
-    
-    <div class="flex items-center gap-4">
-      <div class="flex items-center gap-2 bg-white/[0.06] rounded-full px-3.5 py-1.5 border border-white/10 text-xs font-medium text-white/80">
-        <span class="material-symbols-outlined text-[15px] text-[#E6391E]">group</span>
-        <span id="participant-count">Not connected</span>
+
+    <!-- Right Meeting Status & Actions -->
+    <div class="flex items-center h-full">
+      <div class="font-mono-tech text-xs uppercase tracking-wider font-semibold text-black px-6">
+        MEETING LIVE
       </div>
-      <div class="flex items-center gap-2 text-white/50">
-        <button class="w-8 h-8 rounded-full hover:bg-white/10 transition-all flex items-center justify-center text-white/60 hover:text-white" title="Telemetry stats">
-          <span class="material-symbols-outlined text-[18px]">signal_cellular_alt</span>
-        </button>
-        <button class="w-8 h-8 rounded-full hover:bg-white/10 transition-all flex items-center justify-center text-white/60 hover:text-white" title="Session duration">
-          <span class="material-symbols-outlined text-[18px]">timer</span>
-        </button>
+      <div class="h-full w-px bg-black"></div>
+      <div class="flex items-center gap-2 px-6 text-black">
+        <span class="material-symbols-outlined text-[18px]">group</span>
+        <span id="participant-count" class="font-mono-tech text-xs font-semibold">4</span>
       </div>
+      <div class="h-full w-px bg-black"></div>
+      <button onclick="copyClientInvite()" class="flex items-center gap-2 px-6 h-full text-black hover:bg-neutral-50 transition-colors font-mono-tech text-xs uppercase font-semibold" title="Copy Invite Link">
+        <span class="material-symbols-outlined text-[18px]">upload</span>
+        <span>SHARE</span>
+      </button>
     </div>
   </header>
 
-  <!-- Main Stage Layout -->
-  <main class="pt-20 px-8 pb-28 h-screen flex gap-6">
+  <!-- Main Meeting Content Grid -->
+  <main class="flex-1 flex overflow-hidden">
     
-    <!-- Central Stage Area -->
-    <div class="flex-1 flex flex-col gap-5 h-full overflow-hidden">
+    <!-- Stage Area (Left Hero + Stack) -->
+    <div class="flex-1 p-5 flex gap-4 overflow-hidden">
       
-      <!-- Screen Share Container -->
-      <div id="screen-share-stage" class="flex-1 glass-panel rounded-2xl flex flex-col p-6 relative overflow-hidden hidden border border-white/10">
-        <div id="slide-content">
-          <!-- Populated dynamically by meet.js -->
-        </div>
-      </div>
-
-      <!-- Main Stage View (Interactive Executive Blueprint) -->
-      <div id="main-blueprint-stage" class="flex-1 glass-panel rounded-2xl flex flex-col justify-between p-8 relative overflow-hidden border border-white/10">
-        <div class="flex justify-between items-start z-10">
-          <div>
-            <div class="font-mono-tech text-[11px] uppercase tracking-[0.18em] text-[#E6391E] font-semibold mb-1 flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#E6391E]"></span>
-              Orchestrator Blueprint
-            </div>
-            <h2 class="font-display text-2xl font-bold tracking-tight text-white">DeployMate Alpha Brain — Multi-Tenant Core</h2>
-          </div>
-          <div class="flex gap-2">
-            <span class="glass-pill px-3 py-1 rounded-full text-xs font-medium text-white/80 border border-white/10">FastAPI</span>
-            <span class="glass-pill px-3 py-1 rounded-full text-xs font-medium text-white/80 border border-white/10">Temporal</span>
-            <span class="glass-pill px-3 py-1 rounded-full text-xs font-medium text-[#E6391E] border border-[#E6391E]/30 bg-[#E6391E]/10">Gemini 3.1 Pro</span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-4 z-10 my-auto">
-          <div class="glass-panel p-5 rounded-xl border border-white/5 hover:border-white/15 transition-all">
-            <div class="text-[11px] text-white/50 uppercase tracking-wider mb-1 font-mono-tech">Master Orchestrator</div>
-            <div class="font-display text-base font-semibold text-white">PostgreSQL + Temporal</div>
-            <div class="text-xs text-emerald-400 mt-2.5 flex items-center gap-1">
-              <span class="material-symbols-outlined text-[14px]">check_circle</span>
-              <span>Durable SDLC Workflow</span>
-            </div>
-          </div>
-          <div class="glass-panel p-5 rounded-xl border border-white/5 hover:border-white/15 transition-all">
-            <div class="text-[11px] text-white/50 uppercase tracking-wider mb-1 font-mono-tech">Execution Engine</div>
-            <div class="font-display text-base font-semibold text-white">Antigravity + Claude Code</div>
-            <div class="text-xs text-[#E6391E] mt-2.5 flex items-center gap-1">
-              <span class="material-symbols-outlined text-[14px]">bolt</span>
-              <span>Isolated Worktrees & Gates</span>
-            </div>
-          </div>
-          <div class="glass-panel p-5 rounded-xl border border-white/5 hover:border-white/15 transition-all">
-            <div class="text-[11px] text-white/50 uppercase tracking-wider mb-1 font-mono-tech">Real-Time Voice</div>
-            <div class="font-display text-base font-semibold text-white">Gemini Live Native Audio</div>
-            <div class="text-xs text-emerald-400 mt-2.5 flex items-center gap-1">
-              <span class="material-symbols-outlined text-[14px]">record_voice_over</span>
-              <span id="voice-runtime-status">Ready in room</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-between items-center z-10 text-xs text-white/40 border-t border-white/5 pt-4">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-[16px] text-[#E6391E]">verified</span>
-            <span>LiveKit SFU 24kHz Bi-directional PCM Audio</span>
-          </div>
-          <div class="font-mono-tech">SESSION: <span id="room-name-label" class="text-white/80">deploymate-main</span></div>
-        </div>
-      </div>
-
-      <!-- 3-Way Video Tiles Row -->
-      <div id="video-grid" class="h-56 grid grid-cols-3 gap-5 shrink-0">
+      <!-- Hero Primary Focus Stage (Left) -->
+      <div id="local-tile" class="flex-[2] video-tile-container relative flex items-center justify-center bg-black">
+        <!-- Live Video Element -->
+        <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
         
-        <!-- Tile 1: Founder (Ajay) -->
-        <div id="local-tile" class="glass-panel rounded-2xl relative overflow-hidden border border-white/10 active-speaker flex items-center justify-center">
-          <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
-          <div class="absolute bottom-3 left-3 glass-pill px-3 py-1.5 rounded-full flex items-center gap-2 text-xs">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
-            <span id="local-name" class="font-medium text-white">Ajay (Founder)</span>
-            <span class="material-symbols-outlined text-[14px] text-[#E6391E]">mic</span>
+        <!-- Screen Share Picture-In-Picture Overlay Card -->
+        <div id="screen-share-stage" class="absolute bottom-6 left-6 w-64 pip-share-card p-3 z-20">
+          <div class="flex items-center justify-between border-b border-black/10 pb-1.5 mb-2">
+            <span class="font-mono-tech text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
+            <span class="font-mono-tech text-[9px] uppercase font-bold text-[#E6391E]">SYSTEM ONLINE</span>
+          </div>
+          <div id="slide-content" class="flex items-center gap-2.5">
+            <!-- Mini preview box -->
+            <div class="w-20 h-12 border border-black/20 bg-neutral-100 flex flex-col p-1 justify-between shrink-0">
+              <span class="text-[6px] font-mono text-black font-bold">Q2 Roadmap Overview</span>
+              <div class="h-1 bg-black/20 w-full"></div>
+            </div>
+            <div class="flex flex-col justify-between flex-1">
+              <div>
+                <div class="text-[10px] font-mono text-black font-bold">Q2_Roadmap.pdf</div>
+                <div class="text-[9px] text-neutral-500">You are presenting</div>
+              </div>
+              <button onclick="toggleScreenShare()" class="mt-1 border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-1.5 hover:bg-black hover:text-white transition-colors w-fit">
+                STOP PRESENTING
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Tile 2: Client -->
-        <div id="remote-human-tile" class="glass-panel rounded-2xl relative overflow-hidden border border-white/10 flex items-center justify-center bg-black/40">
-          <div id="remote-human-placeholder" class="w-14 h-14 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center text-white/40">
-            <span class="material-symbols-outlined text-[26px]">person</span>
+        <!-- Speaker Name Tag -->
+        <div class="speaker-badge">
+          <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+          <span id="local-name">Ethan Brooks</span>
+        </div>
+      </div>
+
+      <!-- Secondary Participant Stack (Right) -->
+      <div id="video-grid" class="flex-1 flex flex-col gap-3.5 h-full">
+        
+        <!-- Tile 2: Client / Participant 1 (Maya Chen) -->
+        <div id="remote-human-tile" class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+          <div id="remote-human-placeholder" class="text-white/40 flex flex-col items-center">
+            <span class="material-symbols-outlined text-[32px]">person</span>
           </div>
-          <div class="absolute bottom-3 left-3 glass-pill px-3 py-1.5 rounded-full flex items-center gap-2 text-xs">
-            <span id="remote-human-name" class="font-medium text-white/80">Waiting for client</span>
-            <span id="remote-human-mic" class="material-symbols-outlined text-[14px] text-white/40">mic_off</span>
+          <div class="speaker-badge">
+            <span id="remote-human-name">Maya Chen</span>
+            <span id="remote-human-mic" class="material-symbols-outlined text-[13px] text-white/60 ml-1">mic</span>
           </div>
         </div>
 
-        <!-- Tile 3: Eva AI Architect (Gemini Live Audio) -->
-        <div id="eva-tile" class="glass-panel-elevated rounded-2xl relative overflow-hidden border border-[#E6391E]/30 flex flex-col items-center justify-center transition-all duration-300">
-          <!-- Animated Audio Visualizer Bars -->
-          <div class="audio-visualizer-bars mb-2">
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
+        <!-- Tile 3: Eva AI Architect (Active Speaker with Red Waveform) -->
+        <div id="eva-tile" class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+          <!-- Audio waveform top right -->
+          <div class="absolute top-3 right-3 z-10">
+            <div class="active-wave">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
           </div>
-          <div class="absolute bottom-3 left-3 glass-pill px-3 py-1.5 rounded-full flex items-center gap-2 text-xs border border-[#E6391E]/30">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
-            <span id="eva-status-text" class="font-medium text-white">Eva AI Architect</span>
-            <span class="font-mono-tech text-[10px] text-[#E6391E] ml-1">GEMINI LIVE</span>
+          <div class="speaker-badge">
+            <span id="eva-status-text">Jordan Pierce</span>
+            <span class="font-mono-tech text-[9px] text-[#E6391E] ml-1">EVA AI</span>
+          </div>
+        </div>
+
+        <!-- Tile 4: Participant 3 (Sophie Lane) -->
+        <div class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+          <div class="speaker-badge">
+            <span>Sophie Lane</span>
           </div>
         </div>
 
@@ -277,39 +200,79 @@
 
     </div>
 
-    <!-- Right Side Transcript & Notes Drawer -->
-    <aside id="transcript-drawer" aria-label="Live meeting transcript" class="fixed md:static inset-x-4 top-20 bottom-24 z-40 w-auto md:w-80 shrink-0 hidden md:flex flex-col md:h-full glass-panel rounded-2xl border border-white/10 overflow-hidden">
-      <!-- Drawer Header -->
-      <div class="p-4 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-[18px] text-[#E6391E]">graphic_eq</span>
-          <span class="font-display text-sm font-semibold text-white">Live Transcript</span>
-        </div>
-        <button type="button" onclick="toggleTranscriptDrawer(false)" class="md:hidden text-white/50 hover:text-white" aria-label="Close transcript">
-          <span class="material-symbols-outlined text-[18px]">close</span>
-        </button>
-        <span class="font-mono-tech text-[10px] text-white/40 hidden md:inline">24kHz PCM</span>
+    <!-- Live Notes / Transcript Drawer (Far Right) -->
+    <aside id="transcript-drawer" class="w-80 border-l border-black flex flex-col h-full bg-white shrink-0">
+      <!-- Live Notes Header -->
+      <div class="p-5 border-b border-black">
+        <h2 class="font-mono-tech text-xs uppercase font-bold tracking-wider text-black">LIVE NOTES</h2>
       </div>
 
-      <!-- Transcript Messages -->
-      <div id="transcript-list" class="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
-        <div class="flex flex-col gap-1 pl-3 border-l-2 border-[#E6391E]/60 relative">
-          <div class="flex items-baseline gap-2">
-            <span class="font-semibold text-white/90">Eva (Architect)</span>
-            <span class="font-mono-tech text-[10px] text-white/40">Live</span>
+      <!-- Chronological Transcript Items -->
+      <div id="transcript-list" class="flex-1 overflow-y-auto divide-y divide-black/10 text-xs">
+        
+        <!-- Entry 1 -->
+        <div class="p-4 flex gap-3">
+          <span class="font-mono text-neutral-400 font-medium shrink-0">00:02</span>
+          <div class="space-y-1">
+            <div class="font-mono font-bold text-black">Maya Chen</div>
+            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
+              Kicking off the meeting. Thanks everyone.
+            </p>
           </div>
-          <p class="text-white/70 leading-relaxed">
-            Joined room with Gemini Live native audio. Address me anytime for architecture decisions or scope synthesis.
-          </p>
         </div>
+
+        <!-- Entry 2 -->
+        <div class="p-4 flex gap-3">
+          <span class="font-mono text-neutral-400 font-medium shrink-0">00:15</span>
+          <div class="space-y-1">
+            <div class="font-mono font-bold text-black">Ethan Brooks</div>
+            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
+              Reviewed Q2 roadmap highlights.
+            </p>
+          </div>
+        </div>
+
+        <!-- Entry 3 -->
+        <div class="p-4 flex gap-3">
+          <span class="font-mono text-neutral-400 font-medium shrink-0">00:47</span>
+          <div class="space-y-1">
+            <div class="font-mono font-bold text-black">Jordan Pierce</div>
+            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
+              Discussing engineering resourcing and timelines.
+            </p>
+          </div>
+        </div>
+
+        <!-- Entry 4 -->
+        <div class="p-4 flex gap-3">
+          <span class="font-mono text-neutral-400 font-medium shrink-0">01:10</span>
+          <div class="space-y-1">
+            <div class="font-mono font-bold text-black">Sophie Lane</div>
+            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
+              Marketing campaign update and next steps.
+            </p>
+          </div>
+        </div>
+
+        <!-- Entry 5 -->
+        <div class="p-4 flex gap-3">
+          <span class="font-mono text-neutral-400 font-medium shrink-0">01:21</span>
+          <div class="space-y-1">
+            <div class="font-mono font-bold text-black">Maya Chen</div>
+            <p class="font-mono text-neutral-700 leading-relaxed text-[11px]">
+              Aligning on priorities and action items.
+            </p>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Live Chat / Prompt Input -->
-      <div class="p-3.5 border-t border-white/10 bg-black/40">
-        <form onsubmit="handleSendChat(event)" class="relative flex items-center">
-          <input id="chat-input" class="w-full bg-white/[0.04] border border-white/10 rounded-xl py-2.5 pl-3.5 pr-10 text-xs text-white placeholder-white/30 focus:outline-none focus:border-[#E6391E] transition-colors" placeholder="Ask Eva or type message..." type="text"/>
-          <button type="submit" class="absolute right-2.5 text-white/40 hover:text-[#E6391E] transition-colors">
-            <span class="material-symbols-outlined text-[18px]">send</span>
+      <!-- Chat input for promptEva -->
+      <div class="p-3 border-t border-black bg-neutral-50">
+        <form onsubmit="handleSendChat(event)" class="flex gap-2">
+          <input id="chat-input" type="text" placeholder="Type notes or ask Eva..." class="flex-1 border border-black px-3 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black bg-white"/>
+          <button type="submit" class="border border-black px-3 py-1.5 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800">
+            ADD
           </button>
         </form>
       </div>
@@ -317,32 +280,46 @@
 
   </main>
 
-  <!-- Floating Bottom Apple Glass Command Pill -->
-  <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 glass-pill rounded-full px-5 py-2.5 flex items-center gap-3 z-50">
-    <button id="mic-btn" onclick="toggleAudio()" class="glass-button w-11 h-11 rounded-full flex items-center justify-center text-white" title="Toggle Microphone">
-      <span class="material-symbols-outlined text-[20px]">mic</span>
-    </button>
-    <button id="cam-btn" onclick="toggleVideo()" class="glass-button w-11 h-11 rounded-full flex items-center justify-center text-white" title="Toggle Camera">
-      <span class="material-symbols-outlined text-[20px]">videocam</span>
-    </button>
-    <button id="screen-btn" onclick="toggleScreenShare()" class="glass-button w-11 h-11 rounded-full flex items-center justify-center text-white" title="Toggle Screen Share / Blueprint">
-      <span class="material-symbols-outlined text-[20px]">present_to_all</span>
-    </button>
-    <button id="transcript-btn" onclick="toggleTranscriptDrawer()" class="md:hidden glass-button w-11 h-11 rounded-full flex items-center justify-center text-white" title="Open transcript" aria-controls="transcript-drawer" aria-expanded="false">
-      <span class="material-symbols-outlined text-[20px]">chat</span>
-    </button>
-    <button onclick="promptEva()" class="px-4 h-11 rounded-full bg-[#E6391E]/15 hover:bg-[#E6391E]/25 border border-[#E6391E]/40 text-white font-medium text-xs transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(230,57,30,0.15)]" title="Speak to Eva AI">
-      <span class="material-symbols-outlined text-[18px] text-[#E6391E]">graphic_eq</span>
-      <span>Ask Eva</span>
-    </button>
-    <button onclick="copyClientInvite()" class="glass-button w-11 h-11 rounded-full flex items-center justify-center text-white" title="Copy Client Invite Link">
-      <span class="material-symbols-outlined text-[20px]">person_add</span>
-    </button>
-    <div class="w-px h-6 bg-white/15 mx-1"></div>
-    <button onclick="endCall()" class="w-11 h-11 rounded-full bg-[#E6391E] hover:bg-[#C90C0F] text-white transition-all flex items-center justify-center shadow-[0_0_20px_rgba(230,57,30,0.45)] active:scale-95" title="End Call">
-      <span class="material-symbols-outlined text-[20px]">call_end</span>
-    </button>
-  </nav>
+  <!-- Bottom Bar Control Strip -->
+  <footer class="h-20 border-t border-black bg-white flex items-center justify-between px-8 shrink-0 z-30">
+    <!-- Controls Group -->
+    <div class="flex items-center gap-4">
+      <button id="mic-btn" onclick="toggleAudio()" class="control-btn-circle" title="Mute / Unmute Microphone">
+        <span class="material-symbols-outlined">mic</span>
+      </button>
+      <button id="cam-btn" onclick="toggleVideo()" class="control-btn-circle" title="Turn Camera On / Off">
+        <span class="material-symbols-outlined">videocam</span>
+      </button>
+      <button id="transcript-btn" onclick="toggleTranscriptDrawer()" class="control-btn-circle" title="Toggle Captions / Live Notes">
+        <span class="material-symbols-outlined">closed_caption</span>
+      </button>
+      <button onclick="promptEva()" class="control-btn-circle" title="Raise Hand / Ask Eva">
+        <span class="material-symbols-outlined">front_hand</span>
+      </button>
+      <button id="screen-btn" onclick="toggleScreenShare()" class="control-btn-circle" title="Present Screen">
+        <span class="material-symbols-outlined">upload</span>
+      </button>
+      <button class="control-btn-circle" title="More Options">
+        <span class="material-symbols-outlined">more_vert</span>
+      </button>
+      
+      <!-- Divider -->
+      <div class="h-8 w-px bg-black/20 mx-2"></div>
+      
+      <!-- End Call Red Button -->
+      <button onclick="endCall()" class="control-btn-endcall" title="End Call">
+        <span class="material-symbols-outlined">call_end</span>
+      </button>
+    </div>
+
+    <!-- Timer Right -->
+    <div class="flex items-center h-full">
+      <div class="h-full w-px bg-black mr-6"></div>
+      <div id="session-timer" class="font-mono text-sm font-semibold tracking-wider text-black">
+        01:24:38
+      </div>
+    </div>
+  </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.min.js"></script>
   <script src="/static/meet/js/meet.js"></script>
