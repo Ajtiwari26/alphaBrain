@@ -65,8 +65,8 @@ You are calling to welcome the client, capture requirements, or schedule a techn
             "media": {
                 "contentType": "audio/x-l16;rate=8000",
                 "sampleRate": 8000,
-                "payload": encoded
-            }
+                "payload": encoded,
+            },
         }
         if self.stream_id:
             payload["streamId"] = self.stream_id

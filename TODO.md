@@ -6,9 +6,10 @@ Status: foundation prototype
 Target: secure, durable, evidence-backed system connecting Unifold, Alpha Brain,
 AgentLine, Inito, and local Mac execution worker.
 
-Latest verified progress: 25 August 2026 — P0 security tranche 1 plus real P8
-LiveKit/Gemini Live meeting slice completed; 33 tests, focused Ruff, provider RTC
-smoke, and browser join/audio/transcript flow passing.
+Latest verified progress: 25 August 2026 — Gemini 2.5 native-audio provider restored;
+direct provider, real LiveKit RTC, and same-machine founder/client/Eva browser room
+audio/transcript proofs pass. 110 tests, Ruff lint/format, mypy, compile, JavaScript
+syntax, dependency, migration, and source-secret gates pass.
 
 ## How to use this file
 
@@ -37,7 +38,7 @@ smoke, and browser join/audio/transcript flow passing.
 - [x] Gemini Live setup/audio message formatter and parser.
 - [x] Plivo media message formatter and parser.
 - [x] Basic Mac battery/load health check.
-- [x] Twenty-four prototype tests pass with explicit `PYTHONPATH=.`.
+- [x] 110 deterministic tests pass without manual `PYTHONPATH` configuration.
 
 ### Not production-complete
 
@@ -66,10 +67,10 @@ Goal: prevent unauthenticated network request from executing commands on Mac.
 - [x] Add authentication dependency to every private REST endpoint.
 - [x] Add WebSocket authentication before `accept()`.
 - [x] Add founder, client, worker, service, and admin roles.
-- [x] Add organization/project authorization checks to every database query.
+- [ ] Add organization/project authorization checks to every database query.
 - [x] Remove client-controlled `is_admin` from LiveKit token request.
 - [x] Mint LiveKit permissions from authenticated server-side role.
-- [x] Add worker identity using short-lived signed token or mTLS.
+- [ ] Add worker identity using short-lived signed token or mTLS at worker API boundary.
 - [x] Add repository-root allowlist for worker tasks.
 - [x] Reject task repository paths outside allowlisted roots.
 - [x] Reject path traversal in task, project, room, and branch identifiers.
@@ -80,18 +81,18 @@ Goal: prevent unauthenticated network request from executing commands on Mac.
 - [x] Enforce `allowed_paths` and `allowed_tools` at worker boundary.
 - [x] Validate Plivo V3 webhook signatures and reject replayed nonces.
 - [x] Validate Exotel webhook signatures and replay timestamps.
-- [x] Stop swallowing WebSocket/provider exceptions; log scrubbed failure events.
+- [ ] Stop swallowing every WebSocket/provider exception; log scrubbed failure events.
 - [x] Remove device identifier from public health response.
 - [x] Remove usable default LiveKit secret and fail token generation when credentials are absent.
-- [x] Add secret-redaction filter for logs, audit events, prompts, and artifacts.
-- [x] Add global worker kill switch and per-project pause.
+- [ ] Apply secret-redaction filter to logs, audit events, prompts, and artifacts.
+- [ ] Enforce global worker kill switch and per-project pause at execution boundary.
 
 ### P0 acceptance gate
 
 - [x] Anonymous task submission returns `401`.
 - [x] Anonymous task leasing returns `401`.
 - [x] Client cannot mint room-admin token.
-- [x] Cross-project access returns `403`.
+- [ ] Cross-project access returns `403` through real API routes.
 - [x] Raw shell-command and path-traversal test cases fail closed.
 - [x] Worker cannot access file outside allowed worktree.
 - [x] Invalid or replayed Plivo signature receives rejection.
@@ -117,9 +118,9 @@ Goal: make project reproducible, versioned, and safe to test.
   - [x] JWT/cryptography packages.
 - [x] Pin compatible dependency ranges and generate lock file.
 - [x] Add explicit environment loading and validation.
-- [x] Separate development, test, staging, and production settings.
+- [ ] Separate development, test, staging, and production settings.
 - [x] Replace hard-coded machine paths/device data with configuration.
-- [x] Add structured logging configuration.
+- [ ] Add structured logging configuration.
 - [x] Add Ruff formatting/linting and static type checking.
 - [x] Make direct `.venv/bin/pytest` work without manual `PYTHONPATH`.
 - [x] Override database dependency in tests.
@@ -131,7 +132,7 @@ Goal: make project reproducible, versioned, and safe to test.
 
 ### P1 acceptance gate
 
-- [x] Fresh clone installs from documented command.
+- [ ] Fresh clone installs from documented command on clean checkout.
 - [x] `pytest testscript/` passes without environment hacks.
 - [x] Test run leaves repository and development database unchanged.
 - [x] Python lint, format, type, compile, and dependency checks pass.
@@ -169,7 +170,7 @@ Goal: freeze trustworthy contracts shared by all four systems.
 
 ### P2 acceptance gate
 
-- [x] Unifold, AgentLine, Inito, and Alpha Worker validate same protocol fixtures.
+- [ ] Unifold, AgentLine, Inito, and Alpha Worker validate same protocol fixtures.
 - [x] Invalid tenant, path, consent, gate, and artifact payloads fail validation.
 - [x] Protocol v1 fixtures remain stable across releases.
 
@@ -177,29 +178,29 @@ Goal: freeze trustworthy contracts shared by all four systems.
 
 Goal: establish one authoritative, recoverable system of record.
 
-- [x] Use PostgreSQL outside local unit tests.
-- [x] Add Alembic migrations; stop using `create_all()` as production migration system.
-- [x] Add organizations, users, memberships, clients, roles, and consent tables.
+- [ ] Use PostgreSQL outside local unit tests.
+- [ ] Stop using `create_all()` during production startup; run Alembic migrations.
+- [ ] Add memberships, clients, roles, and consent tables.
 - [x] Add meetings, participants, transcript segments, and meeting-event tables.
-- [x] Add spec versions, approvals, decisions, open questions, and change requests.
-- [x] Add workflow, task dependency, attempt, gate, artifact, and deployment tables.
+- [ ] Add decisions, open questions, and change request tables.
+- [ ] Add workflow and normalized task dependency tables.
 - [x] Add worker registration, heartbeat, capability, lease, and health history tables.
 - [x] Add notification/call status history.
-- [x] Add immutable append-only audit event model.
-- [x] Store JSON as database JSON/JSONB, not Python string representations.
-- [x] Add required uniqueness and foreign-key constraints.
+- [ ] Enforce immutable append-only audit events through application and database policy.
+- [ ] Store JSON as database JSON/JSONB, not text.
+- [ ] Add remaining required uniqueness and foreign-key constraints.
 - [ ] Add soft-delete/retention policy where appropriate.
 - [ ] Add encrypted object storage for recordings, specs, screenshots, logs, and builds.
-- [x] Add signed short-lived artifact URLs.
+- [ ] Add signed short-lived artifact URLs backed by object storage.
 - [ ] Add backup, restore, and retention jobs.
 
 ### P3 acceptance gate
 
 - [x] Migration from empty database succeeds.
-- [x] Migration rollback succeeds in staging.
-- [x] Tenant-isolation database tests pass.
-- [x] Backup restores working project, task, approval, and artifact history.
-- [x] Audit events cannot be silently overwritten through application API.
+- [ ] Migration rollback succeeds in staging.
+- [ ] Tenant-isolation database tests pass.
+- [ ] Backup restores working project, task, approval, and artifact history.
+- [ ] Audit events cannot be silently overwritten through application API.
 
 ## P4 — Task engine and policy broker
 
@@ -326,13 +327,13 @@ Goal: execute development through supported, observable agent interfaces.
   availability, and verified historical quality.
 - [ ] Do not permanently hard-code frontend/backend model ownership.
 - [ ] Select independent reviewer from different agent/model family.
-- [ ] Prevent unsupported agent enum from silently falling back to Antigravity.
+- [x] Prevent unsupported agent enum from silently falling back to Antigravity.
 
 ### P6 acceptance gate
 
 - [ ] Each adapter completes same benchmark and returns same result schema.
 - [ ] Agent failure, timeout, rate limit, and auth failure map to correct task state.
-- [ ] Unsupported agent request fails clearly.
+- [x] Unsupported agent request fails clearly.
 - [ ] Model cannot alter files outside allowed paths.
 - [ ] Reviewer detects seeded defect from another agent.
 
@@ -385,7 +386,7 @@ Goal: deliver real three-participant room: founder, client, Eva.
 ### Room and media
 
 - [ ] Add authenticated lobby and waiting room.
-- [ ] Generate short-lived role-scoped LiveKit tokens.
+- [x] Generate 30-minute server-owned founder, client, and Eva LiveKit grants.
 - [x] Connect browser using LiveKit RTC client.
 - [x] Publish microphone and camera tracks without blocking room join on device failure.
 - [x] Subscribe/render remote participant tracks.
@@ -399,12 +400,12 @@ Goal: deliver real three-participant room: founder, client, Eva.
 ### Eva Gemini Live agent
 
 - [x] Join Eva as LiveKit agent participant.
-- [x] Open real Gemini Live session through Vertex AI.
+- [x] Open real Gemini 2.5 native-audio session through configured Google provider.
 - [x] Stream browser/room audio to Gemini using LiveKit 24 kHz mono agent input.
 - [x] Stream Gemini audio back into room.
 - [x] Add input/output transcription using legacy events and `lk.transcription` streams.
 - [x] Add Gemini Live interruption and barge-in configuration.
-- [ ] Add session resumption and context compression.
+- [x] Add transparent session resumption and sliding-window context compression.
 - [x] Add speaking policy: addressed, clarification needed, or critical risk.
 - [ ] Load versioned DeployMate knowledge instead of static marketing claims.
 - [x] Prevent Eva from claiming unimplemented security, deployment, or gates.
@@ -413,7 +414,7 @@ Goal: deliver real three-participant room: founder, client, Eva.
 
 - [ ] Replace global Eva transcript with room-scoped durable sessions.
 - [x] Escape rendered participant and transcript content through DOM `textContent`.
-- [ ] Add content-security policy.
+- [x] Add content-security policy and external event-handler wiring.
 - [ ] Add participant consent, retention, export, and deletion controls.
 - [ ] Record raw transcript separately from AI interpretation.
 

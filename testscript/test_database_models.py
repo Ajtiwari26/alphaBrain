@@ -59,6 +59,7 @@ async def db_session():
 # Organization & User Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_organization_and_user_creation(db_session: AsyncSession):
     org = OrganizationRecord(
@@ -91,6 +92,7 @@ async def test_organization_and_user_creation(db_session: AsyncSession):
 # Project, Spec & Approval Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_spec_versioning_and_uniqueness(db_session: AsyncSession):
     proj = ProjectRecord(
@@ -119,7 +121,7 @@ async def test_spec_versioning_and_uniqueness(db_session: AsyncSession):
         version=1,
         title="Duplicate Version",
         summary="Should fail",
-        spec_json='{}',
+        spec_json="{}",
     )
     db_session.add(spec_v1_dup)
     with pytest.raises(IntegrityError):
@@ -143,7 +145,7 @@ async def test_approval_record_linkage(db_session: AsyncSession):
         version=1,
         title="Approval Spec",
         summary="Spec for approvals",
-        spec_json='{}',
+        spec_json="{}",
     )
     db_session.add(spec)
     await db_session.flush()
@@ -169,6 +171,7 @@ async def test_approval_record_linkage(db_session: AsyncSession):
 # ---------------------------------------------------------------------------
 # Task, Attempt & Gate Evidence Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_task_attempts_and_gate_evidence(db_session: AsyncSession):
@@ -218,7 +221,9 @@ async def test_task_attempts_and_gate_evidence(db_session: AsyncSession):
     await db_session.commit()
 
     # Query back and verify relations
-    res = await db_session.execute(select(GateEvidenceRecord).where(GateEvidenceRecord.task_id == task.id))
+    res = await db_session.execute(
+        select(GateEvidenceRecord).where(GateEvidenceRecord.task_id == task.id)
+    )
     saved_gate = res.scalar_one()
     assert saved_gate.passed is True
     assert saved_gate.gate_type == "unit_test"
@@ -227,6 +232,7 @@ async def test_task_attempts_and_gate_evidence(db_session: AsyncSession):
 # ---------------------------------------------------------------------------
 # Meeting, Participant & Transcript Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_meeting_session_and_transcripts(db_session: AsyncSession):
@@ -284,7 +290,9 @@ async def test_meeting_session_and_transcripts(db_session: AsyncSession):
     db_session.add(event)
     await db_session.commit()
 
-    res = await db_session.execute(select(TranscriptSegmentRecord).where(TranscriptSegmentRecord.meeting_id == meet.id))
+    res = await db_session.execute(
+        select(TranscriptSegmentRecord).where(TranscriptSegmentRecord.meeting_id == meet.id)
+    )
     segments = res.scalars().all()
     assert len(segments) == 1
     assert segments[0].speaker_identity == "ajay"
@@ -293,6 +301,7 @@ async def test_meeting_session_and_transcripts(db_session: AsyncSession):
 # ---------------------------------------------------------------------------
 # Worker & Lease Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_worker_registration_and_health(db_session: AsyncSession):
@@ -328,7 +337,9 @@ async def test_worker_registration_and_health(db_session: AsyncSession):
     db_session.add(lease)
     await db_session.commit()
 
-    res = await db_session.execute(select(WorkerRecord).where(WorkerRecord.id == "mac-worker-alpha"))
+    res = await db_session.execute(
+        select(WorkerRecord).where(WorkerRecord.id == "mac-worker-alpha")
+    )
     saved_worker = res.scalar_one()
     assert saved_worker.hostname == "Ajays-MacBook-Air"
 
@@ -336,6 +347,7 @@ async def test_worker_registration_and_health(db_session: AsyncSession):
 # ---------------------------------------------------------------------------
 # Artifact & Deployment Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_artifact_and_deployment_records(db_session: AsyncSession):
@@ -379,6 +391,7 @@ async def test_artifact_and_deployment_records(db_session: AsyncSession):
 # Call Status History & Audit Log Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_call_history_and_audit_indexing(db_session: AsyncSession):
     call = CallJobRecord(
@@ -412,7 +425,9 @@ async def test_call_history_and_audit_indexing(db_session: AsyncSession):
     db_session.add(audit)
     await db_session.commit()
 
-    res = await db_session.execute(select(AuditEventRecord).where(AuditEventRecord.id == "audit_evt_101"))
+    res = await db_session.execute(
+        select(AuditEventRecord).where(AuditEventRecord.id == "audit_evt_101")
+    )
     saved_audit = res.scalar_one()
     assert saved_audit.event_type == "call_placed"
     assert saved_audit.actor == "eva"

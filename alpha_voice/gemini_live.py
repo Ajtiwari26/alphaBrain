@@ -45,7 +45,7 @@ You welcome clients, capture high-level requirements, and coordinate technical r
         elif self.persona == "eva":
             self.voice_name = "Aoede"  # Confident, crisp, authoritative female voice
         else:
-            self.voice_name = "Kore"   # Warm, friendly customer intake voice
+            self.voice_name = "Kore"  # Warm, friendly customer intake voice
 
         if system_instruction:
             self.system_instruction = system_instruction
@@ -64,32 +64,19 @@ You welcome clients, capture high-level requirements, and coordinate technical r
                 "generationConfig": {
                     "responseModalities": ["AUDIO"],
                     "speechConfig": {
-                        "voiceConfig": {
-                            "prebuiltVoiceConfig": {
-                                "voiceName": self.voice_name
-                            }
-                        }
-                    }
+                        "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": self.voice_name}}
+                    },
                 },
-                "systemInstruction": {
-                    "parts": [{"text": self.system_instruction}]
-                }
+                "systemInstruction": {"parts": [{"text": self.system_instruction}]},
             }
         }
 
-    def format_realtime_audio_chunk(self, pcm_bytes: bytes, mime_type: str = "audio/pcm;rate=16000") -> dict[str, Any]:
+    def format_realtime_audio_chunk(
+        self, pcm_bytes: bytes, mime_type: str = "audio/pcm;rate=16000"
+    ) -> dict[str, Any]:
         """Encodes raw PCM audio chunk to base64 JSON payload."""
         encoded = base64.b64encode(pcm_bytes).decode("utf-8")
-        return {
-            "realtimeInput": {
-                "mediaChunks": [
-                    {
-                        "mimeType": mime_type,
-                        "data": encoded
-                    }
-                ]
-            }
-        }
+        return {"realtimeInput": {"mediaChunks": [{"mimeType": mime_type, "data": encoded}]}}
 
     def parse_server_message(self, raw_json_str: str) -> dict[str, Any]:
         """Parses server event (audio chunk, transcription, or tool call)."""

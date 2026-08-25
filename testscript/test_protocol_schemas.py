@@ -3,6 +3,9 @@ testscript/test_protocol_schemas.py
 Automated unit tests for alpha_protocol Pydantic models and serialization.
 """
 
+import pytest
+from pydantic import ValidationError
+
 from alpha_protocol import (
     AcceptancePlan,
     AgentType,
@@ -59,6 +62,19 @@ def test_task_envelope_serialization():
     reloaded = TaskEnvelope.model_validate_json(json_str)
     assert reloaded.task_id == task.task_id
     assert len(reloaded.acceptance_plan.required_gates) == 2
+
+
+@pytest.mark.parametrize("agent", [AgentType.CLAUDE_CODE, AgentType.CODEX, AgentType.GEMINI])
+def test_disabled_execution_agents_are_rejected(agent):
+    with pytest.raises(ValidationError, match="disabled"):
+        TaskEnvelope(
+            task_id="tsk_disabled_agent",
+            project_id="prj_alpha",
+            repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+            objective="Must not route to disabled agent",
+            allowed_paths=["."],
+            preferred_agent=agent,
+        )
 
 
 def test_gate_result_and_evidence():

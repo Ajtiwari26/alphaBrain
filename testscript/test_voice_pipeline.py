@@ -20,7 +20,12 @@ def test_gemini_live_session_setup_payload():
     )
     payload = session.build_initial_setup_payload()
     assert payload["setup"]["model"] == "models/gemini-2.0-flash-exp"
-    assert payload["setup"]["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"] == "Aoede"
+    assert (
+        payload["setup"]["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"][
+            "voiceName"
+        ]
+        == "Aoede"
+    )
 
 
 def test_gemini_live_audio_chunking():
@@ -46,23 +51,22 @@ def test_plivo_voice_bridge_media_parsing():
     bridge = PlivoVoiceBridge(job)
 
     # 1. Start event
-    start_msg = json.dumps({
-        "event": "start",
-        "streamId": "stream_12345",
-        "callId": "call_abc987",
-    })
+    start_msg = json.dumps(
+        {
+            "event": "start",
+            "streamId": "stream_12345",
+            "callId": "call_abc987",
+        }
+    )
     bridge.handle_plivo_media_message(start_msg)
     assert bridge.stream_id == "stream_12345"
     assert bridge.call_uuid == "call_abc987"
 
     # 2. Inbound media audio
     raw_pcm = b"\x10\x20\x30\x40"
-    media_msg = json.dumps({
-        "event": "media",
-        "media": {
-            "payload": base64.b64encode(raw_pcm).decode("utf-8")
-        }
-    })
+    media_msg = json.dumps(
+        {"event": "media", "media": {"payload": base64.b64encode(raw_pcm).decode("utf-8")}}
+    )
     extracted_pcm = bridge.handle_plivo_media_message(media_msg)
     assert extracted_pcm == raw_pcm
 

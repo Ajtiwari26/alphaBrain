@@ -58,9 +58,7 @@ class ClaudeCLIAdapter(BaseAgentAdapter):
         )
 
         requested_tools = task.allowed_tools or list(settings.ALLOWED_CLAUDE_TOOLS)
-        allowed_tools = [
-            tool for tool in requested_tools if tool in settings.ALLOWED_CLAUDE_TOOLS
-        ]
+        allowed_tools = [tool for tool in requested_tools if tool in settings.ALLOWED_CLAUDE_TOOLS]
         if not allowed_tools:
             return TaskResult(
                 attempt_id=attempt_id,
@@ -127,7 +125,7 @@ class ClaudeCLIAdapter(BaseAgentAdapter):
         if disallowed_changes:
             gate_result.evidence_items.append(
                 GateEvidence(
-                    evidence_id=f"evi_{len(gate_result.evidence_items)+1}",
+                    evidence_id=f"evi_{len(gate_result.evidence_items) + 1}",
                     gate_type=GateType.SECURITY_SCAN,
                     passed=False,
                     summary="Agent changed files outside allowed_paths",
@@ -160,6 +158,8 @@ class ClaudeCLIAdapter(BaseAgentAdapter):
             files_changed=changed_files,
             diff_summary=diff_summary,
             gate_result=gate_result,
-            blockers=[] if res.returncode == 0 else [f"Claude CLI exited with code {res.returncode}"],
+            blockers=[]
+            if res.returncode == 0
+            else [f"Claude CLI exited with code {res.returncode}"],
             provenance_notes=[f"CLI exited with code {res.returncode}"],
         )

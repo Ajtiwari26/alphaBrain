@@ -22,9 +22,11 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import DeclarativeBase, relationship
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 def utc_now() -> datetime:
@@ -34,6 +36,7 @@ def utc_now() -> datetime:
 # ---------------------------------------------------------------------------
 # Organization & User Models
 # ---------------------------------------------------------------------------
+
 
 class OrganizationRecord(Base):
     __tablename__ = "organizations"
@@ -67,6 +70,7 @@ class UserRecord(Base):
 # Project Model
 # ---------------------------------------------------------------------------
 
+
 class ProjectRecord(Base):
     __tablename__ = "projects"
 
@@ -80,11 +84,11 @@ class ProjectRecord(Base):
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     organization = relationship("OrganizationRecord", back_populates="projects")
-    specs = relationship("SpecVersionRecord", back_populates="project", cascade="all, delete-orphan")
-    tasks = relationship("TaskRecord", back_populates="project", cascade="all, delete-orphan")
-    meetings = relationship(
-        "MeetingRecord", back_populates="project", cascade="all, delete-orphan"
+    specs = relationship(
+        "SpecVersionRecord", back_populates="project", cascade="all, delete-orphan"
     )
+    tasks = relationship("TaskRecord", back_populates="project", cascade="all, delete-orphan")
+    meetings = relationship("MeetingRecord", back_populates="project", cascade="all, delete-orphan")
     deployments = relationship(
         "DeploymentRecord", back_populates="project", cascade="all, delete-orphan"
     )
@@ -93,6 +97,7 @@ class ProjectRecord(Base):
 # ---------------------------------------------------------------------------
 # Specification Models
 # ---------------------------------------------------------------------------
+
 
 class SpecVersionRecord(Base):
     __tablename__ = "spec_versions"
@@ -110,13 +115,9 @@ class SpecVersionRecord(Base):
     approved_at = Column(DateTime(timezone=True), nullable=True)
 
     project = relationship("ProjectRecord", back_populates="specs")
-    approvals = relationship(
-        "ApprovalRecord", back_populates="spec", cascade="all, delete-orphan"
-    )
+    approvals = relationship("ApprovalRecord", back_populates="spec", cascade="all, delete-orphan")
 
-    __table_args__ = (
-        UniqueConstraint("project_id", "version", name="uq_spec_project_version"),
-    )
+    __table_args__ = (UniqueConstraint("project_id", "version", name="uq_spec_project_version"),)
 
 
 class ApprovalRecord(Base):
@@ -139,6 +140,7 @@ class ApprovalRecord(Base):
 # ---------------------------------------------------------------------------
 # Task & Attempt Models
 # ---------------------------------------------------------------------------
+
 
 class TaskRecord(Base):
     __tablename__ = "tasks"
@@ -166,9 +168,7 @@ class TaskRecord(Base):
     project = relationship("ProjectRecord", back_populates="tasks")
     attempts = relationship("AttemptRecord", back_populates="task", cascade="all, delete-orphan")
     gates = relationship("GateEvidenceRecord", back_populates="task", cascade="all, delete-orphan")
-    artifacts = relationship(
-        "ArtifactRecord", back_populates="task", cascade="all, delete-orphan"
-    )
+    artifacts = relationship("ArtifactRecord", back_populates="task", cascade="all, delete-orphan")
 
 
 class AttemptRecord(Base):
@@ -213,6 +213,7 @@ class GateEvidenceRecord(Base):
 # Artifact Model
 # ---------------------------------------------------------------------------
 
+
 class ArtifactRecord(Base):
     __tablename__ = "artifacts"
 
@@ -235,6 +236,7 @@ class ArtifactRecord(Base):
 # ---------------------------------------------------------------------------
 # Deployment Model
 # ---------------------------------------------------------------------------
+
 
 class DeploymentRecord(Base):
     __tablename__ = "deployments"
@@ -261,6 +263,7 @@ class DeploymentRecord(Base):
 # ---------------------------------------------------------------------------
 # Meeting Models
 # ---------------------------------------------------------------------------
+
 
 class MeetingRecord(Base):
     __tablename__ = "meetings"
@@ -313,9 +316,7 @@ class TranscriptSegmentRecord(Base):
 
     meeting = relationship("MeetingRecord", back_populates="transcript_segments")
 
-    __table_args__ = (
-        Index("ix_transcript_meeting_ts", "meeting_id", "timestamp"),
-    )
+    __table_args__ = (Index("ix_transcript_meeting_ts", "meeting_id", "timestamp"),)
 
 
 class MeetingEventRecord(Base):
@@ -339,6 +340,7 @@ class MeetingEventRecord(Base):
 # ---------------------------------------------------------------------------
 # Worker Models
 # ---------------------------------------------------------------------------
+
 
 class WorkerRecord(Base):
     __tablename__ = "workers"
@@ -393,6 +395,7 @@ class WorkerLeaseRecord(Base):
 # Call / Notification Models
 # ---------------------------------------------------------------------------
 
+
 class CallJobRecord(Base):
     __tablename__ = "call_jobs"
 
@@ -432,6 +435,7 @@ class CallStatusRecord(Base):
 # ---------------------------------------------------------------------------
 # Audit Model (Immutable, Append-Only)
 # ---------------------------------------------------------------------------
+
 
 class AuditEventRecord(Base):
     __tablename__ = "audit_events"

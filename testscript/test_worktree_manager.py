@@ -23,7 +23,9 @@ def temp_git_repo():
     # Initialize git repo and make first commit
     subprocess.run(["git", "init"], cwd=str(repo_dir), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True)
-    subprocess.run(["git", "config", "user.email", "test@alphabrain.ai"], cwd=str(repo_dir), check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@alphabrain.ai"], cwd=str(repo_dir), check=True
+    )
 
     init_file = repo_dir / "README.md"
     init_file.write_text("# Test Repo\n")

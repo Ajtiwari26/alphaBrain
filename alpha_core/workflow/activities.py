@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 from alpha_core.db.connection import get_session_factory
 from alpha_core.state.task_engine import TaskEngine
@@ -16,7 +16,9 @@ class SDLCActivities:
     """Activities invoked by the durable Temporal SDLC workflow."""
 
     @staticmethod
-    async def extract_specification(transcript_text: str, project_id: str, title: str) -> dict[str, Any]:
+    async def extract_specification(
+        transcript_text: str, project_id: str, title: str
+    ) -> dict[str, Any]:
         """Extracts requirements and decisions from a meeting transcript."""
         # Simulated extraction for testing & fallback
         spec = SpecExtractor.parse_extraction_json(
@@ -45,7 +47,7 @@ class SDLCActivities:
             project_id=project_id,
             title=title,
         )
-        return spec.model_dump()
+        return cast(dict[str, Any], spec.model_dump())
 
     @staticmethod
     async def dispatch_task(task_envelope_data: dict[str, Any]) -> str:
@@ -55,7 +57,7 @@ class SDLCActivities:
         async with session_factory() as session:
             task = await TaskEngine.submit_task(session, envelope)
             await session.commit()
-            return task.id
+            return cast(str, task.id)
 
     @staticmethod
     async def wait_for_task_verification(task_id: str, timeout_seconds: int = 1800) -> bool:
@@ -68,6 +70,7 @@ class SDLCActivities:
                 from sqlalchemy import select
 
                 from alpha_core.db.models import TaskRecord
+
                 res = await session.execute(select(TaskRecord).where(TaskRecord.id == task_id))
                 task = res.scalar_one_or_none()
                 if task and task.status == TaskStatus.VERIFIED.value:
@@ -92,4 +95,4 @@ class SDLCActivities:
             script_facts={"project_id": project_id, "preview_url": preview_url},
             idempotency_key=f"idemp_{project_id}_preview",
         )
-        return job.model_dump()
+        return cast(dict[str, Any], job.model_dump())

@@ -20,6 +20,7 @@ def utc_now() -> datetime:
 
 class WorkerCapability(BaseModel):
     """Declares what a worker can execute."""
+
     supported_agents: list[AgentType] = Field(
         default_factory=lambda: [AgentType.ANTIGRAVITY],
     )
@@ -34,6 +35,7 @@ class WorkerCapability(BaseModel):
 
 class WorkerRegistration(BaseModel):
     """Worker announces itself to the control plane."""
+
     protocol_version: str = Field(default=PROTOCOL_VERSION)
     worker_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     hostname: str
@@ -47,6 +49,7 @@ class WorkerRegistration(BaseModel):
 
 class WorkerHealthReport(BaseModel):
     """Periodic health status from worker daemon."""
+
     worker_id: str
     status: WorkerHealth = WorkerHealth.ONLINE
     battery_percent: int | None = Field(default=None, ge=0, le=100)

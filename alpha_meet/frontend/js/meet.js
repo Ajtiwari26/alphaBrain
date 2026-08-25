@@ -2,6 +2,7 @@
 
 const EVA_IDENTITY = "eva-cto";
 const EVA_LINKED_PARTICIPANT_ATTRIBUTE = "alpha.eva.linkedParticipant";
+const EVA_TARGET_TOPIC = "alpha.eva.target";
 const { Room, RoomEvent, Track, VideoPresets } = window.LivekitClient || {};
 
 let room = null;
@@ -465,6 +466,10 @@ async function handleSendChat(event) {
   const input = document.getElementById("chat-input");
   const text = input?.value.trim();
   if (!room || !text) return;
+  await room.localParticipant.publishData(new TextEncoder().encode("link"), {
+    reliable: true,
+    topic: EVA_TARGET_TOPIC,
+  });
   await waitForEvaLink();
   input.value = "";
   appendTranscript(currentParticipant, text, false);
@@ -527,4 +532,14 @@ window.appendTranscript = appendTranscript;
 window.addEventListener("DOMContentLoaded", () => {
   readLobbyContext();
   document.getElementById("join-form")?.addEventListener("submit", joinMeetingRoom);
+  document.getElementById("chat-form")?.addEventListener("submit", handleSendChat);
+  document.getElementById("mic-btn")?.addEventListener("click", toggleAudio);
+  document.getElementById("cam-btn")?.addEventListener("click", toggleVideo);
+  document.getElementById("transcript-btn")?.addEventListener("click", () => toggleTranscriptDrawer());
+  document.getElementById("prompt-eva-btn")?.addEventListener("click", promptEva);
+  document.getElementById("screen-btn")?.addEventListener("click", toggleScreenShare);
+  document.getElementById("stage-screen-btn")?.addEventListener("click", toggleScreenShare);
+  document.getElementById("header-invite-btn")?.addEventListener("click", copyClientInvite);
+  document.getElementById("footer-invite-btn")?.addEventListener("click", copyClientInvite);
+  document.getElementById("end-call-btn")?.addEventListener("click", endCall);
 });

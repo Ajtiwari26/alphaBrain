@@ -32,12 +32,16 @@ class LiveMeetAudioBridge:
         self.is_running = True
         try:
             # Inform frontend of connected persona
-            await self.websocket.send_json({
-                "type": "session_init",
-                "persona": self.persona,
-                "voice": self.session.voice_name,
-                "role": "Lead Engineering CTO" if self.persona == "eva" else "Intake Specialist",
-            })
+            await self.websocket.send_json(
+                {
+                    "type": "session_init",
+                    "persona": self.persona,
+                    "voice": self.session.voice_name,
+                    "role": "Lead Engineering CTO"
+                    if self.persona == "eva"
+                    else "Intake Specialist",
+                }
+            )
 
             # Start message receiver loop
             while self.is_running:
@@ -65,12 +69,14 @@ class LiveMeetAudioBridge:
                         f"and Stitch MCP using Gemini 3.1 Pro for high-fidelity Apple Glass UI generation."
                     )
 
-                    await self.websocket.send_json({
-                        "type": "transcript",
-                        "speaker": "Eva (CTO)",
-                        "text": reply_text,
-                        "is_eva": True,
-                    })
+                    await self.websocket.send_json(
+                        {
+                            "type": "transcript",
+                            "speaker": "Eva (CTO)",
+                            "text": reply_text,
+                            "is_eva": True,
+                        }
+                    )
 
         except WebSocketDisconnect:
             logger.info("Browser audio WebSocket disconnected")

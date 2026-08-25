@@ -37,7 +37,13 @@ Gemini provider:
   credential path.
 - Gemini Developer API: set `GEMINI_USE_VERTEX=false` and `GOOGLE_API_KEY`.
 
+For Gemini Developer API meetings, use
+`GEMINI_LIVE_MODEL=gemini-2.5-flash-native-audio-latest`. Gemini 3.1 Live currently
+connects directly but is not compatible with Alpha Brain's LiveKit realtime-agent
+configuration, so it must not be used for Eva rooms.
+
 Never commit `.env.local` or reuse sample keys in production.
+Rotate any credential that was ever pasted into source, logs, screenshots, or chat.
 
 ```bash
 # Start local LiveKit with same key and 32+ character secret configured in .env.local.
@@ -61,6 +67,24 @@ ALPHA_API_TOKEN='YOUR_LOCAL_API_TOKEN' ./.venv/bin/python testscript/smoke_livek
 
 # Prove direct Gemini Live provider audio and transcription.
 ./.venv/bin/python testscript/smoke_gemini_live.py
+```
+
+## Antigravity worker
+
+Alpha Brain currently executes development tasks through Antigravity only. Claude Code, Codex,
+and Gemini worker envelopes are rejected rather than silently routed elsewhere.
+
+No Antigravity window needs opening. Alpha Brain attempts to create one internal, project-scoped
+conversation through local `agentapi` on first task, stores its ID in Memory Graph, then reuses
+only that ID. It never discovers or borrows arbitrary chats. Current local Antigravity build
+rejects creation because its CLI omits provider-required `project_id`; Alpha Brain fails closed
+until provider exposes that field or a project-scoped creation endpoint. Each dispatch requires
+Antigravity to build/update code-review graph before edits and review changed files before
+completion.
+
+```bash
+# Run isolated calculator task. It fails closed if provider still blocks internal chat creation.
+./.venv/bin/python testscript/run_antigravity_calculator_task.py --port 4173
 ```
 
 ## Remaining production gates

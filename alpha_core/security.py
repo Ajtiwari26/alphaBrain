@@ -30,54 +30,96 @@ logger = logging.getLogger(__name__)
 # Role definitions
 # ---------------------------------------------------------------------------
 
+
 class PrincipalRole(str, Enum):
     """All recognized roles in the Alpha Brain system."""
-    FOUNDER = "founder"    # Full access: project, task, spec, deployment, worker mgmt
-    ADMIN = "admin"        # System-level: equivalent to founder for API operations
-    CLIENT = "client"      # Scoped: view project status, review specs, attend meetings
-    WORKER = "worker"      # Task execution: lease, heartbeat, submit results
-    SERVICE = "service"    # Internal: inter-service calls (e.g. AgentLine -> Alpha Brain)
+
+    FOUNDER = "founder"  # Full access: project, task, spec, deployment, worker mgmt
+    ADMIN = "admin"  # System-level: equivalent to founder for API operations
+    CLIENT = "client"  # Scoped: view project status, review specs, attend meetings
+    WORKER = "worker"  # Task execution: lease, heartbeat, submit results
+    SERVICE = "service"  # Internal: inter-service calls (e.g. AgentLine -> Alpha Brain)
 
 
 # Legal permission matrix: what each role is authorized to do
 ROLE_PERMISSIONS: dict[PrincipalRole, frozenset[str]] = {
-    PrincipalRole.FOUNDER: frozenset({
-        "project:read", "project:write", "project:delete",
-        "task:read", "task:write", "task:cancel",
-        "spec:read", "spec:write", "spec:approve",
-        "meeting:create", "meeting:join", "meeting:invite",
-        "worker:read", "worker:manage", "worker:kill",
-        "deployment:read", "deployment:approve", "deployment:rollback",
-        "call:read", "call:initiate",
-        "audit:read",
-    }),
-    PrincipalRole.ADMIN: frozenset({
-        "project:read", "project:write", "project:delete",
-        "task:read", "task:write", "task:cancel",
-        "spec:read", "spec:write", "spec:approve",
-        "meeting:create", "meeting:join", "meeting:invite",
-        "worker:read", "worker:manage", "worker:kill",
-        "deployment:read", "deployment:approve", "deployment:rollback",
-        "call:read", "call:initiate",
-        "audit:read",
-    }),
-    PrincipalRole.CLIENT: frozenset({
-        "project:read",
-        "spec:read", "spec:approve",
-        "meeting:join",
-        "audit:read",
-    }),
-    PrincipalRole.WORKER: frozenset({
-        "task:read", "task:write",
-        "worker:read",
-    }),
-    PrincipalRole.SERVICE: frozenset({
-        "project:read",
-        "task:read", "task:write",
-        "spec:read",
-        "call:read", "call:initiate",
-        "audit:read",
-    }),
+    PrincipalRole.FOUNDER: frozenset(
+        {
+            "project:read",
+            "project:write",
+            "project:delete",
+            "task:read",
+            "task:write",
+            "task:cancel",
+            "spec:read",
+            "spec:write",
+            "spec:approve",
+            "meeting:create",
+            "meeting:join",
+            "meeting:invite",
+            "worker:read",
+            "worker:manage",
+            "worker:kill",
+            "deployment:read",
+            "deployment:approve",
+            "deployment:rollback",
+            "call:read",
+            "call:initiate",
+            "audit:read",
+        }
+    ),
+    PrincipalRole.ADMIN: frozenset(
+        {
+            "project:read",
+            "project:write",
+            "project:delete",
+            "task:read",
+            "task:write",
+            "task:cancel",
+            "spec:read",
+            "spec:write",
+            "spec:approve",
+            "meeting:create",
+            "meeting:join",
+            "meeting:invite",
+            "worker:read",
+            "worker:manage",
+            "worker:kill",
+            "deployment:read",
+            "deployment:approve",
+            "deployment:rollback",
+            "call:read",
+            "call:initiate",
+            "audit:read",
+        }
+    ),
+    PrincipalRole.CLIENT: frozenset(
+        {
+            "project:read",
+            "spec:read",
+            "spec:approve",
+            "meeting:join",
+            "audit:read",
+        }
+    ),
+    PrincipalRole.WORKER: frozenset(
+        {
+            "task:read",
+            "task:write",
+            "worker:read",
+        }
+    ),
+    PrincipalRole.SERVICE: frozenset(
+        {
+            "project:read",
+            "task:read",
+            "task:write",
+            "spec:read",
+            "call:read",
+            "call:initiate",
+            "audit:read",
+        }
+    ),
 }
 
 
@@ -85,12 +127,14 @@ ROLE_PERMISSIONS: dict[PrincipalRole, frozenset[str]] = {
 # Auth principal
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class AuthPrincipal:
     """Authenticated identity with a typed role."""
+
     subject: str
     role: PrincipalRole
-    project_ids: tuple[str, ...] = ()   # Scoped project access (empty = all)
+    project_ids: tuple[str, ...] = ()
 
     def has_permission(self, permission: str) -> bool:
         return permission in ROLE_PERMISSIONS.get(self.role, frozenset())
@@ -100,7 +144,7 @@ class AuthPrincipal:
         if self.role in (PrincipalRole.FOUNDER, PrincipalRole.ADMIN, PrincipalRole.SERVICE):
             return True  # Full access roles
         if not self.project_ids:
-            return True  # No scoping constraint = unrestricted
+            return False  # Scoped roles fail closed when no project scope was issued
         return project_id in self.project_ids
 
 
@@ -125,6 +169,7 @@ def require_project_access(principal: AuthPrincipal, project_id: str) -> None:
 # ---------------------------------------------------------------------------
 # Bearer token authentication
 # ---------------------------------------------------------------------------
+
 
 def _require_bearer_token(
     authorization: str | None,
@@ -180,15 +225,14 @@ def require_worker_principal(
 
 def verify_websocket_bearer(supplied_token: str | None, expected_token: str) -> bool:
     return bool(
-        supplied_token
-        and expected_token
-        and hmac.compare_digest(supplied_token, expected_token)
+        supplied_token and expected_token and hmac.compare_digest(supplied_token, expected_token)
     )
 
 
 # ---------------------------------------------------------------------------
 # Scoped stream tokens (short-lived HMAC)
 # ---------------------------------------------------------------------------
+
 
 def create_scoped_stream_token(scope: str, ttl_seconds: int = 300) -> str:
     if not settings.ALPHA_SIGNING_SECRET:
@@ -214,19 +258,24 @@ def verify_scoped_stream_token(token: str | None, scope: str) -> bool:
     if expires_at < int(time.time()):
         return False
     payload = f"{scope}:{expires_at}"
-    expected_signature = base64.urlsafe_b64encode(
-        hmac.new(
-            settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
-            payload.encode("utf-8"),
-            hashlib.sha256,
-        ).digest()
-    ).decode("ascii").rstrip("=")
+    expected_signature = (
+        base64.urlsafe_b64encode(
+            hmac.new(
+                settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
+                payload.encode("utf-8"),
+                hashlib.sha256,
+            ).digest()
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
     return hmac.compare_digest(supplied_signature, expected_signature)
 
 
 # ---------------------------------------------------------------------------
 # Worker identity tokens (short-lived signed worker credentials)
 # ---------------------------------------------------------------------------
+
 
 def create_worker_identity_token(
     worker_id: str,
@@ -242,9 +291,13 @@ def create_worker_identity_token(
         "role": PrincipalRole.WORKER.value,
         "cap": capabilities or [],
     }
-    encoded_claims = base64.urlsafe_b64encode(
-        json.dumps(claims, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    ).decode("ascii").rstrip("=")
+    encoded_claims = (
+        base64.urlsafe_b64encode(
+            json.dumps(claims, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
     signature = hmac.new(
         settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
         encoded_claims.encode("ascii"),
@@ -261,13 +314,17 @@ def verify_worker_identity_token(token: str | None) -> dict[str, Any] | None:
     encoded_claims, separator, supplied_signature = token.partition(".")
     if separator != "." or not encoded_claims or not supplied_signature:
         return None
-    expected_signature = base64.urlsafe_b64encode(
-        hmac.new(
-            settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
-            encoded_claims.encode("ascii"),
-            hashlib.sha256,
-        ).digest()
-    ).decode("ascii").rstrip("=")
+    expected_signature = (
+        base64.urlsafe_b64encode(
+            hmac.new(
+                settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
+                encoded_claims.encode("ascii"),
+                hashlib.sha256,
+            ).digest()
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
     if not hmac.compare_digest(supplied_signature, expected_signature):
         return None
     try:
@@ -288,6 +345,7 @@ def verify_worker_identity_token(token: str | None) -> dict[str, Any] | None:
 # Meeting invite tokens
 # ---------------------------------------------------------------------------
 
+
 def create_meeting_invite(
     room_name: str,
     identity: str,
@@ -303,9 +361,13 @@ def create_meeting_invite(
         "role": role,
         "room": room_name,
     }
-    encoded_claims = base64.urlsafe_b64encode(
-        json.dumps(claims, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    ).decode("ascii").rstrip("=")
+    encoded_claims = (
+        base64.urlsafe_b64encode(
+            json.dumps(claims, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
     signature = hmac.new(
         settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
         encoded_claims.encode("ascii"),
@@ -322,13 +384,17 @@ def verify_meeting_invite(token: str | None) -> dict[str, object] | None:
     encoded_claims, separator, supplied_signature = token.partition(".")
     if separator != "." or not encoded_claims or not supplied_signature:
         return None
-    expected_signature = base64.urlsafe_b64encode(
-        hmac.new(
-            settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
-            encoded_claims.encode("ascii"),
-            hashlib.sha256,
-        ).digest()
-    ).decode("ascii").rstrip("=")
+    expected_signature = (
+        base64.urlsafe_b64encode(
+            hmac.new(
+                settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
+                encoded_claims.encode("ascii"),
+                hashlib.sha256,
+            ).digest()
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
     if not hmac.compare_digest(supplied_signature, expected_signature):
         return None
     try:
@@ -349,6 +415,7 @@ def verify_meeting_invite(token: str | None) -> dict[str, object] | None:
 # ---------------------------------------------------------------------------
 # Plivo V3 webhook signature verification
 # ---------------------------------------------------------------------------
+
 
 def validate_plivo_v3_signature(
     method: str,
@@ -405,21 +472,34 @@ plivo_nonce_cache = NonceReplayCache()
 
 # Patterns that look like secrets: API keys, tokens, passwords, signing secrets
 _SECRET_PATTERNS = [
-    re.compile(r"(AIza[A-Za-z0-9_-]{35})", re.ASCII),                    # Google API key
-    re.compile(r"(sk-[A-Za-z0-9]{20,})", re.ASCII),                      # OpenAI/generic
-    re.compile(r"(AQ\.[A-Za-z0-9_-]{10,})", re.ASCII),                   # Stitch API key
-    re.compile(r"(ghp_[A-Za-z0-9]{36,})", re.ASCII),                     # GitHub PAT
-    re.compile(r"(Bearer\s+[A-Za-z0-9._-]{20,})", re.ASCII),             # Bearer tokens
-    re.compile(r"(-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----)", re.ASCII),# Private keys
+    re.compile(r"(AIza[A-Za-z0-9_-]{35})", re.ASCII),  # Google API key
+    re.compile(r"(sk-[A-Za-z0-9]{20,})", re.ASCII),  # OpenAI/generic
+    re.compile(r"(AQ\.[A-Za-z0-9_-]{10,})", re.ASCII),  # Stitch API key
+    re.compile(r"(ghp_[A-Za-z0-9]{36,})", re.ASCII),  # GitHub PAT
+    re.compile(r"(Bearer\s+[A-Za-z0-9._-]{20,})", re.ASCII),  # Bearer tokens
+    re.compile(r"(-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----)", re.ASCII),  # Private keys
 ]
 
 # Known setting names that should always be redacted
-_SECRET_FIELD_NAMES = frozenset({
-    "api_key", "api_secret", "auth_token", "password", "secret",
-    "signing_secret", "access_token", "bearer_token", "private_key",
-    "livekit_api_secret", "alpha_api_token", "alpha_worker_token",
-    "alpha_signing_secret", "gemini_api_key", "plivo_auth_token",
-})
+_SECRET_FIELD_NAMES = frozenset(
+    {
+        "api_key",
+        "api_secret",
+        "auth_token",
+        "password",
+        "secret",
+        "signing_secret",
+        "access_token",
+        "bearer_token",
+        "private_key",
+        "livekit_api_secret",
+        "alpha_api_token",
+        "alpha_worker_token",
+        "alpha_signing_secret",
+        "gemini_api_key",
+        "plivo_auth_token",
+    }
+)
 
 REDACTED = "[REDACTED]"
 
@@ -447,8 +527,10 @@ def redact_dict(data: dict[str, Any], depth: int = 0) -> dict[str, Any]:
             cleaned[key] = redact_secrets(value)
         elif isinstance(value, list):
             cleaned[key] = [
-                redact_dict(item, depth + 1) if isinstance(item, dict)
-                else redact_secrets(item) if isinstance(item, str)
+                redact_dict(item, depth + 1)
+                if isinstance(item, dict)
+                else redact_secrets(item)
+                if isinstance(item, str)
                 else item
                 for item in value
             ]
@@ -460,6 +542,7 @@ def redact_dict(data: dict[str, Any], depth: int = 0) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Worker kill switch
 # ---------------------------------------------------------------------------
+
 
 class WorkerKillSwitch:
     """Global and per-project worker pause/kill mechanism."""

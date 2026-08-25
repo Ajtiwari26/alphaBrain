@@ -15,7 +15,12 @@ def test_eva_cto_persona_and_voice():
     assert "Stitch MCP (Gemini 3.1 Pro)" in session.system_instruction
 
     setup_payload = session.build_initial_setup_payload()
-    assert setup_payload["setup"]["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"] == "Aoede"
+    assert (
+        setup_payload["setup"]["generationConfig"]["speechConfig"]["voiceConfig"][
+            "prebuiltVoiceConfig"
+        ]["voiceName"]
+        == "Aoede"
+    )
 
 
 def test_kavya_intake_persona_and_voice():
@@ -25,4 +30,9 @@ def test_kavya_intake_persona_and_voice():
     assert "onboarding and support specialist" in session.system_instruction
 
     setup_payload = session.build_initial_setup_payload()
-    assert setup_payload["setup"]["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"] == "Kore"
+    assert (
+        setup_payload["setup"]["generationConfig"]["speechConfig"]["voiceConfig"][
+            "prebuiltVoiceConfig"
+        ]["voiceName"]
+        == "Kore"
+    )

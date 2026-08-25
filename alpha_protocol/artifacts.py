@@ -20,6 +20,7 @@ def utc_now() -> datetime:
 
 class ArtifactMetadata(BaseModel):
     """Metadata for a stored artifact (log, screenshot, build, recording, spec doc)."""
+
     protocol_version: str = Field(default=PROTOCOL_VERSION)
     artifact_id: str = Field(
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
@@ -28,18 +29,14 @@ class ArtifactMetadata(BaseModel):
     project_id: str
     task_id: str | None = None
     attempt_id: str | None = None
-    media_type: str = Field(
-        description="MIME type, e.g. application/pdf, text/plain, image/png"
-    )
+    media_type: str = Field(description="MIME type, e.g. application/pdf, text/plain, image/png")
     filename: str = Field(max_length=255)
     size_bytes: int = Field(ge=0)
     sha256_hash: str = Field(
         pattern=r"^[a-f0-9]{64}$",
         description="SHA-256 hex digest of file contents",
     )
-    storage_path: str = Field(
-        description="Internal storage path (bucket/key or local path)"
-    )
+    storage_path: str = Field(description="Internal storage path (bucket/key or local path)")
     signed_url: str | None = Field(
         default=None,
         description="Short-lived pre-signed download URL",

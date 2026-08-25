@@ -16,6 +16,7 @@ from alpha_meet.tokens import LiveKitTokenGenerator
 logger = logging.getLogger("alpha_meet.eva_live_agent")
 EVA_IDENTITY = "eva-cto"
 EVA_LINKED_PARTICIPANT_ATTRIBUTE = "alpha.eva.linkedParticipant"
+EVA_TARGET_TOPIC = "alpha.eva.target"
 
 EVA_LIVE_INSTRUCTIONS = """
 You are Eva, DeployMate's live technical lead and CTO, in a client discovery meeting.
@@ -120,9 +121,55 @@ class EvaRoomManager:
         if not settings.LIVEKIT_URL:
             raise RuntimeError("LiveKit URL is not configured")
 
+    @staticmethod
+    def _model_options() -> dict[str, Any]:
+        options: dict[str, Any] = {
+            "model": settings.GEMINI_LIVE_MODEL,
+            "voice": settings.GEMINI_LIVE_VOICE,
+            "instructions": EVA_LIVE_INSTRUCTIONS,
+            "input_audio_transcription": types.AudioTranscriptionConfig(),
+            "output_audio_transcription": types.AudioTranscriptionConfig(),
+            "enable_affective_dialog": True,
+            "proactivity": True,
+            "temperature": 0.6,
+            "session_resumption": types.SessionResumptionConfig(transparent=True),
+            "context_window_compression": types.ContextWindowCompressionConfig(
+                trigger_tokens=24_000,
+                sliding_window=types.SlidingWindow(target_tokens=12_000),
+            ),
+        }
+        if settings.GEMINI_USE_VERTEX:
+            options.update(
+                vertexai=True,
+                project=settings.GOOGLE_CLOUD_PROJECT,
+                location=settings.GOOGLE_CLOUD_LOCATION,
+            )
+        else:
+            options["api_key"] = settings.GOOGLE_API_KEY
+        return options
+
+    @staticmethod
+    async def _wait_for_provider_connection(
+        model: google.realtime.RealtimeModel,
+        failed: asyncio.Event,
+        timeout_seconds: float = 10.0,
+    ) -> None:
+        """Wait until LiveKit's Gemini adapter owns a connected provider session."""
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                while not failed.is_set():
+                    sessions = tuple(getattr(model, "_sessions", ()))
+                    if any(getattr(item, "_active_session", None) is not None for item in sessions):
+                        return
+                    await asyncio.sleep(0.05)
+        except TimeoutError as exc:
+            raise RuntimeError("Gemini Live provider connection timed out") from exc
+        raise RuntimeError("Gemini Live provider connection failed")
+
     async def _run_room(self, runtime: EvaRoomRuntime) -> None:
         room = rtc.Room()
         session: AgentSession | None = None
+        provider_failed = asyncio.Event()
         initial_join_timeout: asyncio.Task[None] | None = None
         empty_room_timeout: asyncio.Task[None] | None = None
 
@@ -173,6 +220,15 @@ class EvaRoomManager:
                     choose_participant(participant.identity)
                     break
 
+        def on_data_received(packet: rtc.DataPacket) -> None:
+            participant = packet.participant
+            if (
+                packet.topic == EVA_TARGET_TOPIC
+                and participant is not None
+                and participant.identity in runtime.human_participants
+            ):
+                choose_participant(participant.identity)
+
         async def stop_after(delay_seconds: float) -> None:
             await asyncio.sleep(delay_seconds)
             if not runtime.human_participants:
@@ -182,36 +238,19 @@ class EvaRoomManager:
             room.on("participant_connected", on_participant_connected)
             room.on("participant_disconnected", on_participant_disconnected)
             room.on("active_speakers_changed", on_active_speakers_changed)
+            room.on("data_received", on_data_received)
             room.on("disconnected", lambda *_: runtime.stop.set())
 
             eva_token = LiveKitTokenGenerator().generate_token(
                 room_name=runtime.room_name,
                 participant_identity=EVA_IDENTITY,
                 participant_name="Eva (DeployMate CTO)",
-                is_admin=False,
+                role="eva",
                 valid_minutes=30,
             )
             await room.connect(settings.LIVEKIT_URL, eva_token)
 
-            model_options = {
-                "model": settings.GEMINI_LIVE_MODEL,
-                "voice": settings.GEMINI_LIVE_VOICE,
-                "instructions": EVA_LIVE_INSTRUCTIONS,
-                "input_audio_transcription": types.AudioTranscriptionConfig(),
-                "output_audio_transcription": types.AudioTranscriptionConfig(),
-                "enable_affective_dialog": True,
-                "proactivity": True,
-                "temperature": 0.6,
-            }
-            if settings.GEMINI_USE_VERTEX:
-                model_options.update(
-                    vertexai=True,
-                    project=settings.GOOGLE_CLOUD_PROJECT,
-                    location=settings.GOOGLE_CLOUD_LOCATION,
-                )
-            else:
-                model_options["api_key"] = settings.GOOGLE_API_KEY
-            model = google.realtime.RealtimeModel(**model_options)
+            model = google.realtime.RealtimeModel(**self._model_options())
             session = AgentSession(
                 llm=model,
                 turn_handling={"interruption": {"enabled": True}},
@@ -224,9 +263,19 @@ class EvaRoomManager:
             @session.on("error")
             def on_session_error(event: Any) -> None:
                 logger.error("Eva Gemini Live session error: %s", event.error)
+                runtime.state = "failed"
+                runtime.error = "Gemini Live session failed"
+                provider_failed.set()
+                runtime.ready.set()
+                runtime.stop.set()
 
             @session.on("close")
-            def on_session_close(_: Any) -> None:
+            def on_session_close(event: Any) -> None:
+                if getattr(event, "error", None) and runtime.error is None:
+                    runtime.state = "failed"
+                    runtime.error = "Gemini Live session closed with an error"
+                    provider_failed.set()
+                    runtime.ready.set()
                 runtime.stop.set()
 
             await session.start(
@@ -242,6 +291,7 @@ class EvaRoomManager:
                 ),
                 record=False,
             )
+            await self._wait_for_provider_connection(model, provider_failed)
             if runtime.active_speaker:
                 choose_participant(runtime.active_speaker)
             runtime.state = "ready"

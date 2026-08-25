@@ -49,7 +49,7 @@ class BaseAgentAdapter(ABC):
             if command.executable not in allowed_executables:
                 evidence_items.append(
                     GateEvidence(
-                        evidence_id=f"evi_{len(evidence_items)+1}",
+                        evidence_id=f"evi_{len(evidence_items) + 1}",
                         gate_type=command.gate_type,
                         passed=False,
                         summary=f"Executable '{command.executable}' is not allowlisted",
@@ -61,7 +61,7 @@ class BaseAgentAdapter(ABC):
             if not resolved_executable:
                 evidence_items.append(
                     GateEvidence(
-                        evidence_id=f"evi_{len(evidence_items)+1}",
+                        evidence_id=f"evi_{len(evidence_items) + 1}",
                         gate_type=command.gate_type,
                         passed=False,
                         summary=f"Executable '{command.executable}' was not found",
@@ -82,18 +82,19 @@ class BaseAgentAdapter(ABC):
 
                 evidence_items.append(
                     GateEvidence(
-                        evidence_id=f"evi_{len(evidence_items)+1}",
+                        evidence_id=f"evi_{len(evidence_items) + 1}",
                         gate_type=command.gate_type,
                         passed=passed,
                         summary=f"Command '{command_label}' exited with code {res.returncode}",
-                        output_log=res.stdout[-2000:] + ("\nSTDERR:\n" + res.stderr[-1000:] if res.stderr else ""),
+                        output_log=res.stdout[-2000:]
+                        + ("\nSTDERR:\n" + res.stderr[-1000:] if res.stderr else ""),
                         metrics={"exit_code": res.returncode},
                     )
                 )
             except Exception as e:
                 evidence_items.append(
                     GateEvidence(
-                        evidence_id=f"evi_{len(evidence_items)+1}",
+                        evidence_id=f"evi_{len(evidence_items) + 1}",
                         gate_type=command.gate_type,
                         passed=False,
                         summary=f"Command '{command_label}' failed with exception: {e!s}",
@@ -101,13 +102,11 @@ class BaseAgentAdapter(ABC):
                 )
 
         for required_gate in task.acceptance_plan.required_gates:
-            matching_evidence = [
-                item for item in evidence_items if item.gate_type == required_gate
-            ]
+            matching_evidence = [item for item in evidence_items if item.gate_type == required_gate]
             if not matching_evidence:
                 evidence_items.append(
                     GateEvidence(
-                        evidence_id=f"evi_{len(evidence_items)+1}",
+                        evidence_id=f"evi_{len(evidence_items) + 1}",
                         gate_type=required_gate,
                         passed=False,
                         summary=f"Required gate '{required_gate.value}' produced no evidence",

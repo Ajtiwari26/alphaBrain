@@ -20,17 +20,14 @@ def utc_now() -> datetime:
 
 class ProvenanceRecord(BaseModel):
     """Immutable provenance trail for any AI-generated output."""
+
     agent: str
     model: str
     prompt_hash: str | None = None
     tools_used: list[str] = Field(default_factory=list)
     session_id: str | None = None
-    input_commit: str | None = Field(
-        default=None, description="Git commit of input state"
-    )
-    output_commit: str | None = Field(
-        default=None, description="Git commit of output state"
-    )
+    input_commit: str | None = Field(default=None, description="Git commit of input state")
+    output_commit: str | None = Field(default=None, description="Git commit of output state")
     input_artifacts: list[str] = Field(
         default_factory=list, description="Input artifact references"
     )
@@ -38,6 +35,7 @@ class ProvenanceRecord(BaseModel):
 
 class AuditEvent(BaseModel):
     """Immutable, append-only audit record for every significant system action."""
+
     protocol_version: str = Field(default=PROTOCOL_VERSION)
     event_id: str
     event_type: str = Field(
@@ -48,9 +46,7 @@ class AuditEvent(BaseModel):
     project_id: str | None = None
     task_id: str | None = None
     actor: str = Field(description="system, founder, client, worker, service, or agent identity")
-    actor_role: str | None = Field(
-        default=None, description="Principal role of the actor"
-    )
+    actor_role: str | None = Field(default=None, description="Principal role of the actor")
     details: dict[str, Any] = Field(default_factory=dict)
     provenance: ProvenanceRecord | None = None
     timestamp: datetime = Field(default_factory=utc_now)

@@ -90,7 +90,7 @@ async def test_plivo_incoming_xml():
     assert response.status_code == 200
     assert "application/xml" in response.headers["content-type"]
     assert "<Stream" in response.text
-    assert "bidirectional=\"true\"" in response.text
+    assert 'bidirectional="true"' in response.text
 
 
 @pytest.mark.asyncio

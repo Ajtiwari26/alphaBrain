@@ -4,7 +4,7 @@ import re
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from alpha_core.config import settings
 from alpha_voice.gemini_live import GeminiLiveSession
@@ -44,7 +44,7 @@ Your persona:
     def generate_response(self, speaker: str, user_input: str) -> str:
         """Generates a dynamic, intelligent CTO response using Gemini API, Claude CLI, or contextual engine."""
         user_text = user_input.strip()
-        words = set(re.findall(r'\b[a-zA-Z0-9_\u0900-\u097F]+\b', user_text.lower()))
+        words = set(re.findall(r"\b[a-zA-Z0-9_\u0900-\u097F]+\b", user_text.lower()))
         lower_text = user_text.lower()
 
         # 1. Try Gemini API if key is valid
@@ -55,28 +55,44 @@ Your persona:
                     history_prompt = "Recent meeting context:\n"
                     for t in self.transcript_history[-5:]:
                         history_prompt += f"{t['speaker']}: {t['text']}\n"
-                    history_prompt += f"\n{speaker}: {user_text}\n\nRespond as Eva (CTO) in 2-3 spoken sentences:"
+                    history_prompt += (
+                        f"\n{speaker}: {user_text}\n\nRespond as Eva (CTO) in 2-3 spoken sentences:"
+                    )
 
                     payload = {
                         "contents": [{"parts": [{"text": history_prompt}]}],
                         "systemInstruction": {"parts": [{"text": self.EVA_SYSTEM_PROMPT}]},
-                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 200}
+                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 200},
                     }
                     req = urllib.request.Request(
                         url,
                         data=json.dumps(payload).encode("utf-8"),
-                        headers={"Content-Type": "application/json"}
+                        headers={"Content-Type": "application/json"},
                     )
                     with urllib.request.urlopen(req, timeout=3) as resp:
                         data = json.loads(resp.read().decode("utf-8"))
-                        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                        text = cast(
+                            str,
+                            data["candidates"][0]["content"]["parts"][0]["text"],
+                        ).strip()
                         if text:
                             return text
                 except Exception:
                     pass
 
         # 2. Multilingual & Hindi Intent Detection
-        hindi_triggers = {"hindi", "namaste", "kaise", "kya", "bolo", "batao", "shukriya", "dhanyawad", "aap", "haan"}
+        hindi_triggers = {
+            "hindi",
+            "namaste",
+            "kaise",
+            "kya",
+            "bolo",
+            "batao",
+            "shukriya",
+            "dhanyawad",
+            "aap",
+            "haan",
+        }
         if words.intersection(hindi_triggers) or "hindi" in lower_text or "बात" in user_text:
             if "hindi" in lower_text:
                 return f"हाँ {speaker}! मैं हिंदी में भी बात कर सकती हूँ। DeployMate के सिस्टम आर्किटेक्चर, बैकएंड या डेटाबेस को लेकर आपका क्या सवाल है?"
@@ -88,16 +104,32 @@ Your persona:
         if words.intersection({"stack", "architecture", "structure", "techstack"}):
             return "For DeployMate, I recommend a decoupled event-driven architecture: Next.js with Tailwind on the frontend, FastAPI microservices with PostgreSQL on the backend, and Stitch MCP powered by Gemini 3.1 Pro for generative UI."
 
-        if words.intersection({"database", "db", "postgres", "postgresql", "mongo", "mongodb", "redis", "sql"}):
+        if words.intersection(
+            {"database", "db", "postgres", "postgresql", "mongo", "mongodb", "redis", "sql"}
+        ):
             return "We should use PostgreSQL with SQLAlchemy async for relational transactional state, Redis for low-latency session caching, and MongoDB for unstructured audit logs."
 
-        if words.intersection({"deploy", "deployment", "scale", "scaling", "docker", "k8s", "kubernetes", "render", "vercel"}):
+        if words.intersection(
+            {
+                "deploy",
+                "deployment",
+                "scale",
+                "scaling",
+                "docker",
+                "k8s",
+                "kubernetes",
+                "render",
+                "vercel",
+            }
+        ):
             return "We containerize services using lightweight multi-stage Docker builds, deploy frontend apps on Vercel, and orchestrate background tasks using Temporal for strict workflow durability and state recovery."
 
         if words.intersection({"ui", "design", "stitch", "glass", "glassmorphism", "frontend"}):
             return "We're utilizing Stitch MCP with the Gemini 3.1 Pro model to generate our Apple Glassmorphism design system featuring 40px backdrop blur, specular borders, and clean vector symbols."
 
-        if words.intersection({"test", "testing", "quality", "gate", "gates", "coverage", "lint", "ci"}):
+        if words.intersection(
+            {"test", "testing", "quality", "gate", "gates", "coverage", "lint", "ci"}
+        ):
             return "Every build must pass all four automated gates: strict linting, unit test coverage, isolated git worktree builds, and browser smoke tests before preview acceptance."
 
         if words.intersection({"auth", "authentication", "security", "jwt", "oauth"}):
@@ -111,7 +143,9 @@ Your persona:
         # 5. General Context-Aware CTO Response
         return f"Understood, {speaker}. Regarding '{user_text}', I am incorporating this into our technical specifications and verifying the implementation against our quality gates."
 
-    def generate_presentation_slide(self, project_name: str, tech_stack: dict[str, str] | None = None) -> dict[str, Any]:
+    def generate_presentation_slide(
+        self, project_name: str, tech_stack: dict[str, str] | None = None
+    ) -> dict[str, Any]:
         """Generates dynamic architecture slide data for Eva's Screen Share."""
         default_stack = {
             "frontend": "Next.js / Vite (Apple Glass UI)",

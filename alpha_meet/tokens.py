@@ -1,6 +1,19 @@
 from datetime import UTC, datetime, timedelta
+from typing import Literal, cast
 
 from alpha_core.config import settings
+
+MeetingRole = Literal["founder", "client", "eva"]
+
+
+def _grants_for_role(role: MeetingRole) -> dict[str, bool]:
+    return {
+        "can_publish": True,
+        "can_subscribe": True,
+        "can_publish_data": True,
+        "can_update_own_metadata": role in {"founder", "eva"},
+        "room_admin": role == "founder",
+    }
 
 
 class LiveKitTokenGenerator:
@@ -19,10 +32,11 @@ class LiveKitTokenGenerator:
         room_name: str,
         participant_identity: str,
         participant_name: str | None = None,
-        is_admin: bool = False,
-        valid_minutes: int = 120,
+        role: MeetingRole = "client",
+        valid_minutes: int = 30,
     ) -> str:
         """Generates a signed JWT token with video grants for the specified room."""
+        grants = _grants_for_role(role)
         try:
             from livekit.api import AccessToken, VideoGrants
 
@@ -34,16 +48,12 @@ class LiveKitTokenGenerator:
                     VideoGrants(
                         room_join=True,
                         room=room_name,
-                        can_publish=True,
-                        can_subscribe=True,
-                        can_publish_data=True,
-                        can_update_own_metadata=True,
-                        room_admin=is_admin,
+                        **grants,
                     )
                 )
                 .with_ttl(timedelta(minutes=valid_minutes))
             )
-            return token.to_jwt()
+            return cast(str, token.to_jwt())
 
         except ImportError:
             # Fallback using standard PyJWT
@@ -59,11 +69,11 @@ class LiveKitTokenGenerator:
                 "video": {
                     "room": room_name,
                     "roomJoin": True,
-                    "canPublish": True,
-                    "canSubscribe": True,
-                    "canPublishData": True,
-                    "canUpdateOwnMetadata": True,
-                    "roomAdmin": is_admin,
+                    "canPublish": grants["can_publish"],
+                    "canSubscribe": grants["can_subscribe"],
+                    "canPublishData": grants["can_publish_data"],
+                    "canUpdateOwnMetadata": grants["can_update_own_metadata"],
+                    "roomAdmin": grants["room_admin"],
                 },
             }
-            return jwt.encode(payload, self.api_secret, algorithm="HS256")
+            return cast(str, jwt.encode(payload, self.api_secret, algorithm="HS256"))

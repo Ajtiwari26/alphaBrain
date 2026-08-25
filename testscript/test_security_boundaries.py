@@ -26,7 +26,7 @@ from alpha_worker.worktree import WorktreeManager
 
 class GateOnlyAdapter(BaseAgentAdapter):
     def __init__(self):
-        super().__init__(AgentType.CODEX)
+        super().__init__(AgentType.ANTIGRAVITY)
 
     def check_readiness(self):
         return True, "ready"
@@ -82,15 +82,29 @@ async def test_meeting_admin_grant_is_server_controlled(api_headers, monkeypatch
                 "is_admin": True,
             },
         )
+        invite = create_meeting_invite("security-room", "Security Client", role="client")
+        client_response = await client.post(
+            "/api/meet/token",
+            json={"invite_token": invite},
+        )
 
     assert response.status_code == 200
-    claims = jwt.decode(
+    founder_claims = jwt.decode(
         response.json()["token"],
         settings.LIVEKIT_API_SECRET,
         algorithms=["HS256"],
         options={"verify_aud": False},
     )
-    assert claims["video"]["roomAdmin"] is False
+    assert founder_claims["video"]["roomAdmin"] is True
+    assert client_response.status_code == 200
+    client_claims = jwt.decode(
+        client_response.json()["token"],
+        settings.LIVEKIT_API_SECRET,
+        algorithms=["HS256"],
+        options={"verify_aud": False},
+    )
+    assert client_claims["video"]["roomAdmin"] is False
+    assert client_claims["video"]["canUpdateOwnMetadata"] is False
 
 
 def test_meeting_invite_rejects_tampering_and_expiry(monkeypatch):

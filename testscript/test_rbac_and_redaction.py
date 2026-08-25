@@ -26,6 +26,7 @@ from alpha_core.security import (
 # RBAC Role & Permission Tests
 # ---------------------------------------------------------------------------
 
+
 class TestRBACRoles:
     def test_all_roles_defined(self):
         """Every declared role must have a permission set."""
@@ -81,6 +82,7 @@ class TestRBACRoles:
 # Project Scoped Access Tests
 # ---------------------------------------------------------------------------
 
+
 class TestProjectAccess:
     def test_founder_accesses_any_project(self):
         principal = AuthPrincipal(subject="ajay", role=PrincipalRole.FOUNDER)
@@ -96,9 +98,9 @@ class TestProjectAccess:
         assert principal.can_access_project("prj_alpha")
         assert not principal.can_access_project("prj_other")
 
-    def test_client_without_scoping_accesses_all(self):
-        principal = AuthPrincipal(subject="client-open", role=PrincipalRole.CLIENT)
-        assert principal.can_access_project("prj_any")
+    def test_client_without_scoping_fails_closed(self):
+        principal = AuthPrincipal(subject="client-unscoped", role=PrincipalRole.CLIENT)
+        assert not principal.can_access_project("prj_any")
 
     def test_require_project_access_raises_403(self):
         scoped = AuthPrincipal(
@@ -116,6 +118,7 @@ class TestProjectAccess:
 # Worker Identity Token Tests
 # ---------------------------------------------------------------------------
 
+
 class TestWorkerIdentityTokens:
     def test_create_and_verify_worker_token(self):
         token = create_worker_identity_token("mac-worker-01", capabilities=["run_tests"])
@@ -131,6 +134,7 @@ class TestWorkerIdentityTokens:
 
     def test_expired_token_fails(self, monkeypatch):
         import alpha_core.security as sec_module
+
         monkeypatch.setattr(sec_module.time, "time", lambda: 1_000)
         token = create_worker_identity_token("mac-worker-01", ttl_seconds=60)
 
@@ -145,6 +149,7 @@ class TestWorkerIdentityTokens:
 # ---------------------------------------------------------------------------
 # Secret Redaction Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSecretRedaction:
     def test_redacts_google_api_key(self):
@@ -190,6 +195,7 @@ class TestSecretRedaction:
 # Artifact Path Validation Tests
 # ---------------------------------------------------------------------------
 
+
 class TestArtifactValidation:
     def test_valid_artifact_ids(self):
         assert validate_artifact_identifier("report.pdf") is True
@@ -216,6 +222,7 @@ class TestArtifactValidation:
 # ---------------------------------------------------------------------------
 # Worker Kill Switch Tests
 # ---------------------------------------------------------------------------
+
 
 class TestWorkerKillSwitch:
     def setup_method(self):

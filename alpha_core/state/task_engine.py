@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +42,7 @@ class TaskEngine:
             )
             session.add(proj)
             await session.flush()
-        return proj
+        return cast(ProjectRecord, proj)
 
     @staticmethod
     async def submit_task(
@@ -49,7 +50,9 @@ class TaskEngine:
         envelope: TaskEnvelope,
     ) -> TaskRecord:
         # Check if project exists, or create a stub project
-        res_p = await session.execute(select(ProjectRecord).where(ProjectRecord.id == envelope.project_id))
+        res_p = await session.execute(
+            select(ProjectRecord).where(ProjectRecord.id == envelope.project_id)
+        )
         proj = res_p.scalar_one_or_none()
         if not proj:
             proj = ProjectRecord(
@@ -99,7 +102,7 @@ class TaskEngine:
         )
         session.add(audit)
         await session.flush()
-        return task
+        return cast(TaskRecord, task)
 
     @staticmethod
     async def lease_next_task(

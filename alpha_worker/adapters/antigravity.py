@@ -3,6 +3,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
+from typing import cast
 
 from alpha_core.config import settings
 from alpha_protocol import (
@@ -15,6 +16,7 @@ from alpha_protocol import (
 )
 from alpha_worker.worktree import WorktreeManager
 
+from .antigravity_live import AntigravityLiveBridge
 from .base import BaseAgentAdapter
 
 logger = logging.getLogger("alpha_worker.antigravity")
@@ -23,15 +25,14 @@ logger = logging.getLogger("alpha_worker.antigravity")
 class AntigravityAdapter(BaseAgentAdapter):
     """Antigravity IDE & Session Adapter integrating directly with Memory Graph."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(AgentType.ANTIGRAVITY)
-        self.memory_graph_path = settings.MEMORY_GRAPH_PATH
+        self.memory_graph_path: Path = Path(settings.MEMORY_GRAPH_PATH)
         self.worktree_mgr = WorktreeManager()
+        self.live_bridge = AntigravityLiveBridge()
 
     def check_readiness(self) -> tuple[bool, str]:
-        if not self.memory_graph_path.exists():
-            return False, f"Memory Graph directory not found at {self.memory_graph_path}"
-        return True, "Antigravity Memory Graph & session environment ready"
+        return cast(tuple[bool, str], self.live_bridge.check_readiness())
 
     def setup_session_in_memory_graph(
         self,
@@ -79,11 +80,44 @@ class AntigravityAdapter(BaseAgentAdapter):
     ) -> TaskResult:
         attempt_id = f"att_{task.task_id}_{uuid.uuid4().hex[:6]}"
 
-        # 1. Setup isolated session in Memory Graph
+        # 1. Record task provenance locally; this is not execution proof.
         session_dir = self.setup_session_in_memory_graph(task, worktree_path)
 
-        # 2. Run declared acceptance gates
+        # 2. Execute through the project-dedicated Antigravity chat.
+        dispatch = await self.live_bridge.dispatch(task, worktree_path)
+
+        # 3. Run declared acceptance gates after explicit agent completion.
         gate_result = self.run_acceptance_gates(task, worktree_path, attempt_id)
+        gate_result.evidence_items.append(
+            GateEvidence(
+                evidence_id=f"evi_{len(gate_result.evidence_items) + 1}",
+                gate_type=GateType.CODE_REVIEW_GRAPH,
+                passed=dispatch.completed,
+                summary=(
+                    "Antigravity completed with required code-review graph calls"
+                    if dispatch.completed
+                    else f"Antigravity execution did not complete: {dispatch.blocked_reason}"
+                ),
+                artifacts_created=[str(dispatch.transcript_path)]
+                if dispatch.transcript_path
+                else [],
+                metrics={
+                    "conversation_id": dispatch.conversation_id,
+                    "tools_used": list(dispatch.tool_names),
+                },
+            )
+        )
+        if dispatch.qa_evidence:
+            gate_result.evidence_items.append(
+                GateEvidence(
+                    evidence_id=f"evi_{len(gate_result.evidence_items) + 1}",
+                    gate_type=GateType.INDEPENDENT_REVIEW,
+                    passed=True,
+                    summary="Antigravity supplied validated multi-agent-sdlc QA evidence",
+                    metrics={"qa_evidence": dispatch.qa_evidence},
+                )
+            )
+        gate_result.all_passed = gate_result.all_passed and dispatch.completed
 
         # 3. Inspect changed files & commit
         changed_files = self.worktree_mgr.get_changed_files(worktree_path, base_commit)
@@ -95,7 +129,7 @@ class AntigravityAdapter(BaseAgentAdapter):
         if disallowed_changes:
             gate_result.evidence_items.append(
                 GateEvidence(
-                    evidence_id=f"evi_{len(gate_result.evidence_items)+1}",
+                    evidence_id=f"evi_{len(gate_result.evidence_items) + 1}",
                     gate_type=GateType.SECURITY_SCAN,
                     passed=False,
                     summary="Agent changed files outside allowed_paths",
@@ -118,12 +152,19 @@ class AntigravityAdapter(BaseAgentAdapter):
             task_id=task.task_id,
             status=status,
             agent=self.agent_type,
-            model="antigravity-ide-session",
+            model=f"antigravity-{settings.ANTIGRAVITY_MODEL}",
             base_commit=base_commit,
             result_commit=result_commit or base_commit,
             files_changed=changed_files,
             diff_summary=diff_summary,
             gate_result=gate_result,
-            artifacts=[str(session_dir / "artifacts")],
-            provenance_notes=[f"Session recorded in Memory Graph at {session_dir}"],
+            artifacts=[
+                str(session_dir / "artifacts"),
+                *([str(dispatch.transcript_path)] if dispatch.transcript_path else []),
+            ],
+            blockers=[dispatch.blocked_reason] if dispatch.blocked_reason else [],
+            provenance_notes=[
+                f"Task provenance recorded at {session_dir}",
+                f"Antigravity project conversation: {dispatch.conversation_id}",
+            ],
         )

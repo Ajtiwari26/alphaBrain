@@ -14,6 +14,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 from .enums import (
+    EXECUTION_ENABLED_AGENTS,
     PROTOCOL_VERSION,
     AgentType,
     ApprovalStatus,
@@ -31,8 +32,10 @@ def utc_now() -> datetime:
 # DAG Dependency Contract
 # ---------------------------------------------------------------------------
 
+
 class TaskDependency(BaseModel):
     """Declares that this task depends on another task reaching a required status."""
+
     task_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     required_status: TaskStatus = TaskStatus.COMPLETED
 
@@ -41,8 +44,10 @@ class TaskDependency(BaseModel):
 # Retry & Concurrency Policy
 # ---------------------------------------------------------------------------
 
+
 class RetryPolicy(BaseModel):
     """Controls how failed tasks are retried."""
+
     max_attempts: int = Field(default=3, ge=1, le=10)
     backoff_base_seconds: int = Field(default=60, ge=10, le=3600)
     backoff_multiplier: float = Field(default=2.0, ge=1.0, le=10.0)
@@ -56,6 +61,7 @@ class RetryPolicy(BaseModel):
 
 class ConcurrencyPolicy(BaseModel):
     """Per-project and per-worker concurrency limits."""
+
     max_per_project: int = Field(default=5, ge=1, le=50)
     max_per_worker: int = Field(default=2, ge=1, le=10)
 
@@ -64,12 +70,16 @@ class ConcurrencyPolicy(BaseModel):
 # Approval Request/Result
 # ---------------------------------------------------------------------------
 
+
 class ApprovalRequest(BaseModel):
     """Request for human approval before a high-risk action proceeds."""
+
     approval_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     task_id: str
     project_id: str
-    action_type: str = Field(description="e.g. production_deployment, db_migration, destructive_cmd")
+    action_type: str = Field(
+        description="e.g. production_deployment, db_migration, destructive_cmd"
+    )
     description: str
     risk_class: RiskClass
     requested_by: str = Field(description="system, agent, or worker identity")
@@ -81,6 +91,7 @@ class ApprovalRequest(BaseModel):
 
 class ApprovalResult(BaseModel):
     """Result of a human approval decision."""
+
     approval_id: str
     status: ApprovalStatus
     decided_by: str
@@ -92,8 +103,10 @@ class ApprovalResult(BaseModel):
 # Task Envelope v1
 # ---------------------------------------------------------------------------
 
+
 class TaskEnvelope(BaseModel):
     """Versioned task dispatched to worker plane."""
+
     protocol_version: str = Field(default=PROTOCOL_VERSION, description="Protocol version")
     task_id: str = Field(
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
@@ -123,9 +136,7 @@ class TaskEnvelope(BaseModel):
         min_length=1,
         description="Scoped relative paths allowed to be touched; use '.' for whole repo",
     )
-    allowed_tools: list[str] = Field(
-        default_factory=list, description="Allowed tool or MCP names"
-    )
+    allowed_tools: list[str] = Field(default_factory=list, description="Allowed tool or MCP names")
     risk_class: RiskClass = RiskClass.LOW
     acceptance_plan: AcceptancePlan = Field(default_factory=AcceptancePlan)
     preferred_agent: AgentType = AgentType.ANTIGRAVITY
@@ -134,6 +145,10 @@ class TaskEnvelope(BaseModel):
     )
     lease_timeout_seconds: int = Field(
         default=1800, description="Task lease timeout (default 30 mins)"
+    )
+    retain_worktree_for_preview: bool = Field(
+        default=False,
+        description="Keep successful isolated worktree available for a local preview server",
     )
 
     # DAG dependency and retry/concurrency controls
@@ -162,13 +177,25 @@ class TaskEnvelope(BaseModel):
                 raise ValueError("allowed_paths must contain safe relative paths")
         return paths
 
+    @field_validator("preferred_agent")
+    @classmethod
+    def validate_enabled_agent(cls, agent: AgentType) -> AgentType:
+        if agent not in EXECUTION_ENABLED_AGENTS:
+            enabled = ", ".join(sorted(item.value for item in EXECUTION_ENABLED_AGENTS))
+            raise ValueError(
+                f"Agent '{agent.value}' is disabled; enabled execution agents: {enabled}"
+            )
+        return agent
+
 
 # ---------------------------------------------------------------------------
 # Task Attempt
 # ---------------------------------------------------------------------------
 
+
 class TaskAttempt(BaseModel):
     """Represents a single execution attempt by an agent adapter."""
+
     attempt_id: str = Field(description="Unique attempt ID, e.g. att_101_1")
     task_id: str
     attempt_number: int = Field(default=1, ge=1)
@@ -184,8 +211,10 @@ class TaskAttempt(BaseModel):
 # Task Result
 # ---------------------------------------------------------------------------
 
+
 class TaskResult(BaseModel):
     """Structured result returned by an agent adapter upon completing an attempt."""
+
     attempt_id: str
     task_id: str
     status: TaskStatus
@@ -207,8 +236,10 @@ class TaskResult(BaseModel):
 # Usage / Cost / Quota
 # ---------------------------------------------------------------------------
 
+
 class UsageRecord(BaseModel):
     """Structured usage/cost tracking per task attempt."""
+
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
     duration_seconds: float = Field(default=0.0, ge=0.0)

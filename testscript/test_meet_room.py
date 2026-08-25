@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from alpha_core.api.app import app
+from alpha_core.api.app import app, eva_meet_agent
 from alpha_core.db.connection import init_db
 from alpha_meet.eva_agent import EvaMeetingAgent
 from alpha_meet.eva_live_agent import eva_room_manager
@@ -29,7 +29,7 @@ def test_livekit_token_generator():
     token = generator.generate_token(
         room_name="test-room-101",
         participant_identity="Ajay (Founder)",
-        is_admin=True,
+        role="founder",
     )
     assert token is not None
     assert isinstance(token, str)
@@ -59,11 +59,21 @@ async def test_meet_api_endpoints(api_headers, monkeypatch):
         }
 
     monkeypatch.setattr(eva_room_manager, "ensure_room", fake_ensure_room)
+    monkeypatch.setattr(
+        eva_meet_agent,
+        "generate_response",
+        lambda _speaker, _text: (
+            "For DeployMate, use Next.js, FastAPI, and PostgreSQL with verified gates."
+        ),
+    )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Test /meet page HTML
         resp_page = await ac.get("/meet")
         assert resp_page.status_code == 200
         assert "DeployMate Alpha Brain" in resp_page.text
+        assert "default-src 'self'" in resp_page.headers["content-security-policy"]
+        assert resp_page.headers["x-content-type-options"] == "nosniff"
+        assert resp_page.headers["referrer-policy"] == "no-referrer"
 
         # 2. Test /api/meet/token
         resp_tok = await ac.post(
@@ -118,6 +128,10 @@ async def test_meet_api_endpoints(api_headers, monkeypatch):
         assert resp_speak.status_code == 200
         assert "DeployMate" in resp_speak.json()["eva_reply"]
         assert "Next.js" in resp_speak.json()["eva_reply"]
+        assert any(
+            turn["speaker"] == "Ajay" and turn["text"] == "What tech stack do you recommend?"
+            for turn in resp_speak.json()["transcript"]
+        )
 
 
 def test_meeting_frontend_uses_livekit_not_browser_voice_simulation():
@@ -126,6 +140,7 @@ def test_meeting_frontend_uses_livekit_not_browser_voice_simulation():
     javascript = (root / "alpha_meet/frontend/js/meet.js").read_text()
 
     assert "livekit-client@2.22.0" in html
+    assert "/static/meet/js/meet.js?v=" in html
     assert "new Room(" in javascript
     assert "setMicrophoneEnabled(true)" in javascript
     assert "setScreenShareEnabled" in javascript
@@ -133,3 +148,8 @@ def test_meeting_frontend_uses_livekit_not_browser_voice_simulation():
     assert "RoomEvent.TranscriptionReceived" in javascript
     assert "speechSynthesis" not in javascript
     assert "SpeechRecognition" not in javascript
+    assert "onclick=" not in html
+    assert "onsubmit=" not in html
+    assert 'getElementById("chat-form")?.addEventListener' in javascript
+    assert 'EVA_TARGET_TOPIC = "alpha.eva.target"' in javascript
+    assert "localParticipant.publishData" in javascript

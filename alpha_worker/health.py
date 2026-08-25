@@ -33,6 +33,7 @@ class HardwareHealthChecker:
         """Returns 'nominal', 'moderate', or 'heavy' based on CPU load."""
         try:
             import os
+
             load_1m, _, _ = os.getloadavg()
             cpu_count = os.cpu_count() or 4
             if load_1m > cpu_count * 1.5:

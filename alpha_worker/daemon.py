@@ -13,7 +13,6 @@ from alpha_protocol import (
 )
 
 from .adapters.antigravity import AntigravityAdapter
-from .adapters.claude_cli import ClaudeCLIAdapter
 from .health import HardwareHealthChecker
 from .worktree import WorktreeManager
 
@@ -28,12 +27,11 @@ class AlphaWorkerDaemon:
         self.worktree_mgr = WorktreeManager()
         self.health_checker = HardwareHealthChecker()
         self.antigravity_adapter = AntigravityAdapter()
-        self.claude_adapter = ClaudeCLIAdapter()
         self.running = False
 
     def select_adapter(self, agent_type: AgentType):
-        if agent_type == AgentType.CLAUDE_CODE:
-            return self.claude_adapter
+        if agent_type != AgentType.ANTIGRAVITY:
+            raise ValueError(f"Unsupported execution agent: {agent_type.value}")
         return self.antigravity_adapter
 
     async def execute_task_cycle(self, session: AsyncSession) -> bool:
@@ -41,7 +39,9 @@ class AlphaWorkerDaemon:
         # 1. Health & Power Check
         health, _metrics = self.health_checker.evaluate_worker_health()
         if health == WorkerHealth.DRAINING:
-            logger.warning("Worker health is DRAINING (low battery / thermal). Pausing task intake.")
+            logger.warning(
+                "Worker health is DRAINING (low battery / thermal). Pausing task intake."
+            )
             return False
 
         # 2. Lease next task
@@ -88,7 +88,9 @@ class AlphaWorkerDaemon:
             await TaskEngine.submit_result(session, failed_result, lease_token)
         finally:
             # 6. Safely clean up worktree
-            if worktree_path:
+            if worktree_path and not (
+                envelope.retain_worktree_for_preview and result.status == TaskStatus.COMPLETED
+            ):
                 try:
                     self.worktree_mgr.remove_worktree(envelope.repo, envelope.task_id)
                 except Exception:

@@ -42,6 +42,7 @@ from alpha_protocol import (
 # Protocol Version
 # ---------------------------------------------------------------------------
 
+
 def test_protocol_version_is_1():
     assert PROTOCOL_VERSION == "1"
 
@@ -60,6 +61,7 @@ def test_task_envelope_carries_version():
 # ---------------------------------------------------------------------------
 # State Transition Table
 # ---------------------------------------------------------------------------
+
 
 class TestStateTransitions:
     def test_queued_can_become_leased(self):
@@ -88,6 +90,7 @@ class TestStateTransitions:
 # ---------------------------------------------------------------------------
 # DAG Dependencies
 # ---------------------------------------------------------------------------
+
 
 class TestDAGDependencies:
     def test_task_with_dependencies(self):
@@ -123,6 +126,7 @@ class TestDAGDependencies:
 # Retry & Concurrency Policies
 # ---------------------------------------------------------------------------
 
+
 class TestRetryPolicy:
     def test_default_policy(self):
         policy = RetryPolicy()
@@ -152,6 +156,7 @@ class TestConcurrencyPolicy:
 # Approval Contracts
 # ---------------------------------------------------------------------------
 
+
 class TestApprovalContracts:
     def test_approval_request_creation(self):
         req = ApprovalRequest(
@@ -179,6 +184,7 @@ class TestApprovalContracts:
 # ---------------------------------------------------------------------------
 # Artifact Metadata
 # ---------------------------------------------------------------------------
+
 
 class TestArtifactMetadata:
     def test_valid_artifact(self):
@@ -211,6 +217,7 @@ class TestArtifactMetadata:
 # ---------------------------------------------------------------------------
 # Deployment Contracts
 # ---------------------------------------------------------------------------
+
 
 class TestDeploymentContracts:
     def test_deployment_request(self):
@@ -249,6 +256,7 @@ class TestDeploymentContracts:
 # ---------------------------------------------------------------------------
 # Meeting Events
 # ---------------------------------------------------------------------------
+
 
 class TestMeetingEvents:
     def test_transcript_segment(self):
@@ -290,6 +298,7 @@ class TestMeetingEvents:
 # Worker Contracts
 # ---------------------------------------------------------------------------
 
+
 class TestWorkerContracts:
     def test_worker_registration(self):
         reg = WorkerRegistration(
@@ -300,11 +309,8 @@ class TestWorkerContracts:
         assert reg.capability.max_concurrent_tasks == 2
 
     def test_worker_capability(self):
-        cap = WorkerCapability(
-            supported_agents=[AgentType.ANTIGRAVITY, AgentType.CLAUDE_CODE],
-            max_concurrent_tasks=4,
-        )
-        assert len(cap.supported_agents) == 2
+        cap = WorkerCapability(supported_agents=[AgentType.ANTIGRAVITY], max_concurrent_tasks=4)
+        assert cap.supported_agents == [AgentType.ANTIGRAVITY]
 
     def test_health_report_drain_on_low_battery(self):
         report = WorkerHealthReport(
@@ -343,6 +349,7 @@ class TestWorkerContracts:
 # Usage / Cost Records
 # ---------------------------------------------------------------------------
 
+
 class TestUsageRecords:
     def test_usage_tracking(self):
         usage = UsageRecord(
@@ -360,6 +367,7 @@ class TestUsageRecords:
 # ---------------------------------------------------------------------------
 # Agent Readiness & Workflow Phases
 # ---------------------------------------------------------------------------
+
 
 def test_agent_readiness_states():
     assert AgentReadiness.READY.value == "ready"

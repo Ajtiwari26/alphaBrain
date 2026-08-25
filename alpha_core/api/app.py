@@ -3,7 +3,7 @@ import logging
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qsl, quote, urlsplit, urlunsplit
 from xml.sax.saxutils import escape as xml_escape
 
@@ -42,7 +42,7 @@ from alpha_core.state.task_engine import TaskEngine
 from alpha_meet.eva_agent import EvaMeetingAgent
 from alpha_meet.eva_live_agent import eva_room_manager
 from alpha_meet.live_audio import LiveMeetAudioBridge
-from alpha_meet.tokens import LiveKitTokenGenerator
+from alpha_meet.tokens import LiveKitTokenGenerator, MeetingRole
 from alpha_protocol import (
     CallJob,
     PersonaType,
@@ -84,6 +84,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+MEETING_CONTENT_SECURITY_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: blob:",
+        "media-src 'self' blob:",
+        "connect-src 'self' ws: wss:",
+    )
+)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = MEETING_CONTENT_SECURITY_POLICY
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = (
+        "camera=(self), microphone=(self), display-capture=(self)"
+    )
+    return response
+
+
 if MEET_FRONTEND_DIR.exists():
     app.mount("/static/meet", StaticFiles(directory=str(MEET_FRONTEND_DIR)), name="static_meet")
 
@@ -100,6 +128,7 @@ async def health_check():
 # ==========================================
 # Meeting Room (You + Client + Eva) Endpoints
 # ==========================================
+
 
 @app.get("/meet", response_class=HTMLResponse)
 async def get_meeting_room():
@@ -148,7 +177,7 @@ async def generate_meet_token(
     token = LiveKitTokenGenerator().generate_token(
         room_name=room_name,
         participant_identity=identity,
-        is_admin=False,
+        role=cast(MeetingRole, role),
     )
     return {
         "token": token,
@@ -247,6 +276,7 @@ async def meet_live_audio_websocket(websocket: WebSocket, persona: str = "eva"):
 # Task Management Endpoints
 # ==========================================
 
+
 @app.post("/api/tasks", response_model=dict[str, Any])
 async def submit_task(
     envelope: TaskEnvelope,
@@ -329,7 +359,9 @@ async def get_task_details(
         raise HTTPException(status_code=404, detail="Task not found")
 
     res_attempts = await session.execute(
-        select(AttemptRecord).where(AttemptRecord.task_id == task_id).order_by(AttemptRecord.started_at.desc())
+        select(AttemptRecord)
+        .where(AttemptRecord.task_id == task_id)
+        .order_by(AttemptRecord.started_at.desc())
     )
     attempts = res_attempts.scalars().all()
 
@@ -358,6 +390,7 @@ async def get_task_details(
 # Specification Intelligence Endpoints
 # ==========================================
 
+
 @app.post("/api/specs/extract")
 async def extract_specification(
     payload: dict[str, str],
@@ -371,27 +404,29 @@ async def extract_specification(
         raise HTTPException(status_code=400, detail="Transcript text is required")
 
     spec = SpecExtractor.parse_extraction_json(
-        json.dumps({
-            "requirements": [
-                {
-                    "req_id": "req_01",
-                    "title": "Transcript Ingestion",
-                    "raw_quote": transcript_text[:100],
-                    "description": "Ingest and process user meeting notes",
-                    "acceptance_criteria": ["Parsed accurately into spec schema"],
-                    "priority": "must_have"
-                }
-            ],
-            "decisions": [
-                {
-                    "dec_id": "dec_01",
-                    "topic": "Architecture",
-                    "decision": "Use Alpha Brain Zero-Cost Master Engine",
-                    "rationale": "High throughput and no external API bill for code"
-                }
-            ],
-            "open_questions": []
-        }),
+        json.dumps(
+            {
+                "requirements": [
+                    {
+                        "req_id": "req_01",
+                        "title": "Transcript Ingestion",
+                        "raw_quote": transcript_text[:100],
+                        "description": "Ingest and process user meeting notes",
+                        "acceptance_criteria": ["Parsed accurately into spec schema"],
+                        "priority": "must_have",
+                    }
+                ],
+                "decisions": [
+                    {
+                        "dec_id": "dec_01",
+                        "topic": "Architecture",
+                        "decision": "Use Alpha Brain Zero-Cost Master Engine",
+                        "rationale": "High throughput and no external API bill for code",
+                    }
+                ],
+                "open_questions": [],
+            }
+        ),
         project_id=project_id,
         title=title,
     )
@@ -401,6 +436,7 @@ async def extract_specification(
 # ==========================================
 # Telephony & Plivo Webhook Endpoints
 # ==========================================
+
 
 @app.post("/api/voice/plivo/incoming")
 async def plivo_incoming_call(request: Request):
@@ -430,13 +466,15 @@ async def plivo_incoming_call(request: Request):
     stream_token = create_scoped_stream_token("plivo-media", ttl_seconds=300)
     parsed_base = urlsplit(settings.PUBLIC_BASE_URL)
     ws_scheme = "wss" if parsed_base.scheme == "https" else "ws"
-    ws_url = urlunsplit((
-        ws_scheme,
-        parsed_base.netloc,
-        "/api/voice/plivo/media",
-        f"stream_token={quote(stream_token)}",
-        "",
-    ))
+    ws_url = urlunsplit(
+        (
+            ws_scheme,
+            parsed_base.netloc,
+            "/api/voice/plivo/media",
+            f"stream_token={quote(stream_token)}",
+            "",
+        )
+    )
 
     plivo_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>

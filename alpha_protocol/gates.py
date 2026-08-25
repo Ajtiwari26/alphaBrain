@@ -12,18 +12,24 @@ def utc_now() -> datetime:
 
 class GateEvidence(BaseModel):
     """Specific evidence item proving a gate passed."""
+
     evidence_id: str = Field(description="Unique ID for this evidence record")
     gate_type: GateType
     passed: bool
     summary: str
     output_log: str = Field(default="", description="Scrubbed stdout/stderr or tool output")
-    metrics: dict[str, Any] = Field(default_factory=dict, description="e.g. coverage, duration, exit_code")
-    artifacts_created: list[str] = Field(default_factory=list, description="Relative paths to produced artifacts")
+    metrics: dict[str, Any] = Field(
+        default_factory=dict, description="e.g. coverage, duration, exit_code"
+    )
+    artifacts_created: list[str] = Field(
+        default_factory=list, description="Relative paths to produced artifacts"
+    )
     timestamp: datetime = Field(default_factory=utc_now)
 
 
 class GateResult(BaseModel):
     """Aggregate result of running all declared acceptance gates on a task."""
+
     task_id: str
     attempt_id: str
     all_passed: bool
@@ -43,7 +49,10 @@ class GateCommand(BaseModel):
 
 class AcceptancePlan(BaseModel):
     """Declared acceptance criteria that must be satisfied before task completion."""
-    required_gates: list[GateType] = Field(default_factory=lambda: [GateType.LINT, GateType.UNIT_TEST])
+
+    required_gates: list[GateType] = Field(
+        default_factory=lambda: [GateType.LINT, GateType.UNIT_TEST]
+    )
     commands: list[GateCommand] = Field(default_factory=list)
     custom_commands: list[str] = Field(
         default_factory=list,

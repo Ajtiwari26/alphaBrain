@@ -28,22 +28,36 @@ class TaskStatus(str, Enum):
 # Legal state transitions: (from_status) -> {allowed target statuses}
 LEGAL_TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {
     TaskStatus.QUEUED: frozenset({TaskStatus.LEASED, TaskStatus.CANCELLED}),
-    TaskStatus.LEASED: frozenset({
-        TaskStatus.RUNNING, TaskStatus.QUEUED, TaskStatus.CANCELLED,
-    }),
-    TaskStatus.RUNNING: frozenset({
-        TaskStatus.VERIFIED, TaskStatus.RETRYABLE_FAILED, TaskStatus.BLOCKED,
-        TaskStatus.WAITING_APPROVAL, TaskStatus.CANCELLED, TaskStatus.QUEUED,
-    }),
-    TaskStatus.WAITING_APPROVAL: frozenset({
-        TaskStatus.RUNNING, TaskStatus.CANCELLED, TaskStatus.QUEUED,
-    }),
+    TaskStatus.LEASED: frozenset(
+        {
+            TaskStatus.RUNNING,
+            TaskStatus.QUEUED,
+            TaskStatus.CANCELLED,
+        }
+    ),
+    TaskStatus.RUNNING: frozenset(
+        {
+            TaskStatus.VERIFIED,
+            TaskStatus.RETRYABLE_FAILED,
+            TaskStatus.BLOCKED,
+            TaskStatus.WAITING_APPROVAL,
+            TaskStatus.CANCELLED,
+            TaskStatus.QUEUED,
+        }
+    ),
+    TaskStatus.WAITING_APPROVAL: frozenset(
+        {
+            TaskStatus.RUNNING,
+            TaskStatus.CANCELLED,
+            TaskStatus.QUEUED,
+        }
+    ),
     TaskStatus.VERIFIED: frozenset({TaskStatus.COMPLETED, TaskStatus.SUPERSEDED}),
     TaskStatus.RETRYABLE_FAILED: frozenset({TaskStatus.QUEUED, TaskStatus.CANCELLED}),
     TaskStatus.BLOCKED: frozenset({TaskStatus.QUEUED, TaskStatus.CANCELLED}),
-    TaskStatus.CANCELLED: frozenset(),       # Terminal
-    TaskStatus.SUPERSEDED: frozenset(),      # Terminal
-    TaskStatus.COMPLETED: frozenset(),       # Terminal
+    TaskStatus.CANCELLED: frozenset(),  # Terminal
+    TaskStatus.SUPERSEDED: frozenset(),  # Terminal
+    TaskStatus.COMPLETED: frozenset(),  # Terminal
 }
 
 
@@ -61,8 +75,12 @@ class AgentType(str, Enum):
     STITCH = "stitch"
 
 
+EXECUTION_ENABLED_AGENTS = frozenset({AgentType.ANTIGRAVITY})
+
+
 class AgentReadiness(str, Enum):
     """Agent availability states reported by adapters."""
+
     READY = "ready"
     BUSY = "busy"
     RATE_LIMITED = "rate_limited"
@@ -86,6 +104,7 @@ class GateType(str, Enum):
     BROWSER_SMOKE = "browser_smoke"
     SECURITY_SCAN = "security_scan"
     INDEPENDENT_REVIEW = "independent_review"
+    CODE_REVIEW_GRAPH = "code_review_graph"
 
 
 class ApprovalStatus(str, Enum):
@@ -104,12 +123,13 @@ class WorkerHealth(str, Enum):
 
 
 class PersonaType(str, Enum):
-    EVA = "eva"        # Engineering persona (Unifold meet, SDLC review, technical updates)
-    KAVYA = "kavya"    # Customer support / Intake persona (AgentLine default)
+    EVA = "eva"  # Engineering persona (Unifold meet, SDLC review, technical updates)
+    KAVYA = "kavya"  # Customer support / Intake persona (AgentLine default)
 
 
 class MeetingEventType(str, Enum):
     """Structured event types extracted from meeting conversations."""
+
     RAW_REQUEST = "raw_request"
     CLARIFIED_REQUIREMENT = "clarified_requirement"
     EVA_RECOMMENDATION = "eva_recommendation"
@@ -122,6 +142,7 @@ class MeetingEventType(str, Enum):
 
 class DeploymentStatus(str, Enum):
     """Deployment lifecycle statuses."""
+
     REQUESTED = "requested"
     BUILDING = "building"
     PREVIEW_READY = "preview_ready"
@@ -135,6 +156,7 @@ class DeploymentStatus(str, Enum):
 
 class WorkflowPhase(str, Enum):
     """SDLC workflow lifecycle phases for Temporal orchestration."""
+
     INTAKE = "intake"
     DISCOVERY = "discovery"
     SPEC_DRAFT = "spec_draft"

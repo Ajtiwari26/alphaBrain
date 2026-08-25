@@ -12,7 +12,9 @@ def utc_now() -> datetime:
 class Requirement(BaseModel):
     req_id: str
     title: str
-    raw_quote: str | None = Field(default=None, description="Direct quote from meeting transcript or client message")
+    raw_quote: str | None = Field(
+        default=None, description="Direct quote from meeting transcript or client message"
+    )
     description: str
     acceptance_criteria: list[str] = Field(default_factory=list)
     priority: str = Field(default="medium", description="must_have, should_have, nice_to_have")

@@ -21,6 +21,7 @@ def utc_now() -> datetime:
 
 class TranscriptSegment(BaseModel):
     """Raw timestamped transcript segment from a meeting."""
+
     segment_id: str
     room_name: str
     speaker_identity: str
@@ -33,6 +34,7 @@ class TranscriptSegment(BaseModel):
 
 class MeetingEvent(BaseModel):
     """Structured event extracted from meeting transcript analysis."""
+
     protocol_version: str = Field(default=PROTOCOL_VERSION)
     event_id: str
     room_name: str
@@ -54,7 +56,9 @@ class MeetingEvent(BaseModel):
         description="True if this was inferred by AI rather than directly stated",
     )
     confidence: float = Field(
-        default=1.0, ge=0.0, le=1.0,
+        default=1.0,
+        ge=0.0,
+        le=1.0,
         description="AI confidence in extraction accuracy",
     )
     tags: list[str] = Field(default_factory=list)
@@ -63,6 +67,7 @@ class MeetingEvent(BaseModel):
 
 class MeetingSession(BaseModel):
     """Aggregated meeting session metadata."""
+
     session_id: str
     room_name: str
     project_id: str

@@ -76,10 +76,12 @@ async def test_result_submission_with_gates(test_db_session):
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Implement authentication middleware",
         allowed_paths=["auth.py"],
-        preferred_agent=AgentType.CLAUDE_CODE,
+        preferred_agent=AgentType.ANTIGRAVITY,
     )
     await TaskEngine.submit_task(test_db_session, envelope)
-    leased_task, _ = await TaskEngine.lease_next_task(test_db_session, worker_id="mac_worker_1")
+    lease = await TaskEngine.lease_next_task(test_db_session, worker_id="mac_worker_1")
+    assert lease is not None
+    leased_task, _ = lease
 
     # Construct successful gate evidence
     gate_evidence = GateEvidence(
@@ -99,8 +101,8 @@ async def test_result_submission_with_gates(test_db_session):
         attempt_id="att_state_002_1",
         task_id="tsk_state_002",
         status=TaskStatus.COMPLETED,
-        agent=AgentType.CLAUDE_CODE,
-        model="claude-3.7-sonnet",
+        agent=AgentType.ANTIGRAVITY,
+        model="antigravity-flash",
         base_commit="HEAD",
         result_commit="commit_abc123",
         files_changed=["auth.py"],

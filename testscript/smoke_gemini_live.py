@@ -4,8 +4,12 @@ import asyncio
 import json
 import os
 
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+load_dotenv(".env.local")
+load_dotenv(".env")
 
 
 async def main() -> int:
@@ -20,7 +24,7 @@ async def main() -> int:
         (
             "gemini-live-2.5-flash-native-audio"
             if use_vertex
-            else "gemini-2.5-flash-native-audio-preview-12-2025"
+            else "gemini-2.5-flash-native-audio-latest"
         ),
     )
     if use_vertex:

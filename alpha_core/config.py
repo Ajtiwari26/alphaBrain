@@ -48,7 +48,7 @@ class Settings(BaseModel):
         (
             "gemini-live-2.5-flash-native-audio"
             if USE_VERTEX
-            else "gemini-2.5-flash-native-audio-preview-12-2025"
+            else "gemini-2.5-flash-native-audio-latest"
         ),
     )
     GEMINI_LIVE_VOICE: str = os.getenv("GEMINI_LIVE_VOICE", "Aoede")
@@ -73,7 +73,43 @@ class Settings(BaseModel):
 
     # Local Paths & Hardware
     WORKSPACE_ROOT: Path = PROJECT_ROOT
-    MEMORY_GRAPH_PATH: Path = Path(os.getenv("MEMORY_GRAPH_PATH", "/Users/ajaytiwari/Desktop/Projects/memory_graph"))
+    MEMORY_GRAPH_PATH: Path = Path(
+        os.getenv("MEMORY_GRAPH_PATH", "/Users/ajaytiwari/Desktop/Projects/memory_graph")
+    )
+    CLIENT_PROJECTS_ROOT: Path = Path(
+        os.getenv("CLIENT_PROJECTS_ROOT", "/Users/ajaytiwari/Desktop/Projects/clientProjects")
+    )
+    ANTIGRAVITY_EXECUTION_ENABLED: bool = (
+        os.getenv("ANTIGRAVITY_EXECUTION_ENABLED", "true").lower() == "true"
+    )
+    ANTIGRAVITY_MODEL: str = os.getenv("ANTIGRAVITY_MODEL", "flash")
+    ANTIGRAVITY_SDLC_SKILL_PATH: Path = Path(
+        os.getenv(
+            "ANTIGRAVITY_SDLC_SKILL_PATH",
+            str(
+                Path.home() / ".gemini" / "antigravity" / "skills" / "multi-agent-sdlc" / "SKILL.md"
+            ),
+        )
+    )
+    ANTIGRAVITY_TASK_TIMEOUT_SECONDS: int = int(
+        os.getenv("ANTIGRAVITY_TASK_TIMEOUT_SECONDS", "1200")
+    )
+    ANTIGRAVITY_AGENTAPI_BIN: Path = Path(
+        os.getenv(
+            "ANTIGRAVITY_AGENTAPI_BIN",
+            str(Path.home() / ".gemini" / "antigravity" / "bin" / "agentapi"),
+        )
+    )
+    ANTIGRAVITY_OAUTH_TOKEN_FILE: Path = Path(
+        os.getenv(
+            "ANTIGRAVITY_OAUTH_TOKEN_FILE",
+            str(Path.home() / ".gemini" / "jetski-standalone-oauth-token"),
+        )
+    )
+    ANTIGRAVITY_BRAIN_DIRS: tuple[Path, ...] = (
+        Path.home() / ".gemini" / "antigravity-ide" / "brain",
+        Path.home() / ".gemini" / "antigravity" / "brain",
+    )
     WORKTREE_BASE_DIR: Path = Path(
         os.getenv(
             "WORKTREE_BASE_DIR",
@@ -82,7 +118,8 @@ class Settings(BaseModel):
     )
     ATTACHED_DEVICE_ID: str = os.getenv("ATTACHED_DEVICE_ID", "local-mac-worker")
     ALLOWED_REPO_ROOTS: tuple[Path, ...] = tuple(
-        Path(item).expanduser() for item in _csv_env(
+        Path(item).expanduser()
+        for item in _csv_env(
             "ALLOWED_REPO_ROOTS",
             "/Users/ajaytiwari/Desktop/Projects",
         )
@@ -91,11 +128,6 @@ class Settings(BaseModel):
         "ALLOWED_GATE_EXECUTABLES",
         "pytest,ruff,mypy,npm,npx,pnpm,yarn,swift,xcodebuild,cargo,go",
     )
-    ALLOWED_CLAUDE_TOOLS: tuple[str, ...] = _csv_env(
-        "ALLOWED_CLAUDE_TOOLS",
-        "Read,Edit,Write",
-    )
-
     # LiveKit (Local or Cloud WebRTC)
     LIVEKIT_URL: str = os.getenv("LIVEKIT_URL", "ws://localhost:7880")
     LIVEKIT_API_KEY: str = os.getenv("LIVEKIT_API_KEY", "")

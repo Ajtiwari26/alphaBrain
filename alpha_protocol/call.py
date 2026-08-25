@@ -39,14 +39,19 @@ class CallTranscript(BaseModel):
 
 class CallJob(BaseModel):
     """Job submitted to AgentLine to initiate an autonomous voice call."""
+
     notification_id: str
     persona: PersonaType = PersonaType.KAVYA
     recipient_phone: str
     recipient_name: str | None = None
     project_id: str | None = None
     purpose: str = Field(description="e.g. founder_preview_review, client_milestone_update")
-    script_facts: dict[str, Any] = Field(default_factory=dict, description="Verified facts model is allowed to state")
-    evidence_refs: list[str] = Field(default_factory=list, description="IDs of passing gates or preview URLs")
+    script_facts: dict[str, Any] = Field(
+        default_factory=dict, description="Verified facts model is allowed to state"
+    )
+    evidence_refs: list[str] = Field(
+        default_factory=list, description="IDs of passing gates or preview URLs"
+    )
     idempotency_key: str
     status: CallStatus = CallStatus.QUEUED
     call_id: str | None = None

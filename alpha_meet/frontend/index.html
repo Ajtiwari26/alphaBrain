@@ -110,7 +110,7 @@
         <span id="participant-count" class="font-mono-tech text-xs font-semibold">1</span>
       </div>
       <div class="h-full w-px bg-black"></div>
-      <button onclick="copyClientInvite()" class="flex items-center gap-2 px-6 h-full text-black hover:bg-neutral-50 transition-colors font-mono-tech text-xs uppercase font-semibold" title="Copy Invite Link">
+      <button id="header-invite-btn" type="button" class="flex items-center gap-2 px-6 h-full text-black hover:bg-neutral-50 transition-colors font-mono-tech text-xs uppercase font-semibold" title="Copy Invite Link">
         <span class="material-symbols-outlined text-[18px]">upload</span>
         <span>SHARE</span>
       </button>
@@ -137,7 +137,7 @@
             </div>
             <div id="slide-content" class="flex items-center justify-between">
               <div class="text-[10px] font-mono text-black font-bold">Screen active</div>
-              <button onclick="toggleScreenShare()" class="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-2 hover:bg-black hover:text-white transition-colors">
+              <button id="stage-screen-btn" type="button" class="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-2 hover:bg-black hover:text-white transition-colors">
                 STOP
               </button>
             </div>
@@ -214,7 +214,7 @@
 
       <!-- Chat / Prompt Input Form -->
       <div class="p-3 border-t border-black bg-neutral-50">
-        <form onsubmit="handleSendChat(event)" class="flex gap-2">
+        <form id="chat-form" class="flex gap-2">
           <input id="chat-input" type="text" placeholder="Type message or ask Eva..." class="flex-1 border border-black px-3 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black bg-white"/>
           <button type="submit" class="border border-black px-3 py-1.5 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800 transition-colors">
             ADD
@@ -229,22 +229,22 @@
   <footer class="h-20 border-t border-black bg-white flex items-center justify-between px-8 shrink-0 z-30">
     <!-- Controls Group -->
     <div class="flex items-center gap-4">
-      <button id="mic-btn" onclick="toggleAudio()" class="control-btn-circle" title="Mute / Unmute Microphone">
+      <button id="mic-btn" type="button" class="control-btn-circle" title="Mute / Unmute Microphone">
         <span class="material-symbols-outlined">mic</span>
       </button>
-      <button id="cam-btn" onclick="toggleVideo()" class="control-btn-circle" title="Turn Camera On / Off">
+      <button id="cam-btn" type="button" class="control-btn-circle" title="Turn Camera On / Off">
         <span class="material-symbols-outlined">videocam</span>
       </button>
-      <button id="transcript-btn" onclick="toggleTranscriptDrawer()" class="control-btn-circle" title="Toggle Captions / Live Notes">
+      <button id="transcript-btn" type="button" class="control-btn-circle" title="Toggle Captions / Live Notes">
         <span class="material-symbols-outlined">closed_caption</span>
       </button>
-      <button onclick="promptEva()" class="control-btn-circle" title="Ask Eva / Prompt">
+      <button id="prompt-eva-btn" type="button" class="control-btn-circle" title="Ask Eva / Prompt">
         <span class="material-symbols-outlined">front_hand</span>
       </button>
-      <button id="screen-btn" onclick="toggleScreenShare()" class="control-btn-circle" title="Present Screen">
+      <button id="screen-btn" type="button" class="control-btn-circle" title="Present Screen">
         <span class="material-symbols-outlined">upload</span>
       </button>
-      <button onclick="copyClientInvite()" class="control-btn-circle" title="Invite Client">
+      <button id="footer-invite-btn" type="button" class="control-btn-circle" title="Invite Client">
         <span class="material-symbols-outlined">person_add</span>
       </button>
       
@@ -252,7 +252,7 @@
       <div class="h-8 w-px bg-black/20 mx-2"></div>
       
       <!-- End Call Red Button -->
-      <button onclick="endCall()" class="control-btn-endcall" title="End Call">
+      <button id="end-call-btn" type="button" class="control-btn-endcall" title="End Call">
         <span class="material-symbols-outlined">call_end</span>
       </button>
     </div>
@@ -267,6 +267,6 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.min.js"></script>
-  <script src="/static/meet/js/meet.js"></script>
+  <script src="/static/meet/js/meet.js?v=20260825-2"></script>
 </body>
 </html>
