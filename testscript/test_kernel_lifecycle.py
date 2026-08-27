@@ -68,7 +68,9 @@ async def test_happy_path_kernel_proof(memory_db, fake_daemon, tmp_path, monkeyp
         preferred_agent=AgentType.ANTIGRAVITY,
         requires_approval=True,
         retain_worktree_for_preview=True,
-        acceptance_plan=AcceptancePlan(require_independent_review=False),
+        acceptance_plan=AcceptancePlan(
+            require_independent_review=False, required_gates=[GateType.BROWSER_SMOKE]
+        ),
     )
 
     task = await TaskEngine.submit_task(session, envelope)

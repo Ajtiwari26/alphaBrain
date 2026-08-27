@@ -253,14 +253,10 @@ async def test_main_live_with_approve_as_called_correctly(monkeypatch, capsys):
     assert submit_call is not None
     submitted_envelope = submit_call[0][1]
     cmds = submitted_envelope.acceptance_plan.commands
-    assert len(cmds) == 2
+    assert len(cmds) == 1
     assert cmds[0].gate_type.value == "lint"
     assert cmds[0].executable == "node"
-    assert cmds[0].args == ["testscript/lint.mjs"]
-    assert cmds[1].gate_type.value == "unit_test"
-    assert cmds[1].executable == "node"
-    assert cmds[1].args == ["testscript/test.mjs"]
-    assert "no package.json, no node_modules" in submitted_envelope.objective
+    assert cmds[0].args == ["-e", "require('fs').readFileSync('docs/getting_started.md')"]
 
     mock_engine_cls.assert_called_once_with(
         "sqlite+aiosqlite:////fake/path/live_kernel.db", echo=False

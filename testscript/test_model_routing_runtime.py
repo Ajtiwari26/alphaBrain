@@ -47,14 +47,34 @@ def test_routing_request_invalid_stage():
 
 
 def test_routing_decision():
+    # Test internal field-name construction
     dec = RoutingDecision(
         status=RoutingDecisionStatus.SELECTED,
         model="gemini-3.1-pro-high",
         account_id="fake_account",
+        rationale_codes=["test"],
+        independence_status="isolated",
     )
     assert dec.status == RoutingDecisionStatus.SELECTED
     assert dec.model == "gemini-3.1-pro-high"
     assert dec.founder_review_required is False
+    assert dec.account_id == "fake_account"
+    assert dec.rationale_codes == ["test"]
+    assert dec.independence_status == "isolated"
+
+    # Test external alias compatibility
+    dec2 = RoutingDecision.model_validate(
+        {
+            "decision": "rate_limited",
+            "account": "alias_account",
+            "rationale": ["alias_test"],
+            "independence": "shared",
+        }
+    )
+    assert dec2.status == RoutingDecisionStatus.RATE_LIMITED
+    assert dec2.account_id == "alias_account"
+    assert dec2.rationale_codes == ["alias_test"]
+    assert dec2.independence_status == "shared"
 
 
 def test_account_model_state():

@@ -1,87 +1,53 @@
 # AlphaBrain Current Report
 
-**Audit date:** 2026-08-27  
-**Audited revision:** `ad6b01fc664abfcfc723473ed1e87e03067d80ad`  
-**Decision:** AlphaBrain has a strong local control-plane foundation and autonomous coding
-kernel, but it is not yet an operational autonomous delivery system.
+**Audit date:** 2026-08-28
+**Audited base revision:** `15b1eb8`
+**Working tree status:** Uncommitted / dirty candidate (local P6-R2 / D2 implementation pending founder review)
+**Decision:** AlphaBrain has completed local P6-R2 model routing and credential lease mechanics, with a clean root and passing test suite. D2 kernel proof is VERIFIED but NOT ACCEPTED (founder review pending, unmerged). Baseline candidate is not yet founder-approved.
 
 ## Current evidence
 
 | Area | Status | Evidence |
 |---|---|---|
-| Automated tests | Passing | 336 tests passed during the audit |
-| Ruff lint | Failing | 11 repository-wide findings |
-| Ruff formatting | Failing | 2 files require formatting |
-| mypy | Failing | 2 typed-return errors |
-| Repository state | Blocked for self-admission | 33 tracked changes and 135 untracked paths |
+| Automated tests | Passing | 375 tests passed (`pytest -q --disable-warnings`) |
+| Ruff lint | Passing | Zero findings (`ruff check .`) |
+| Ruff formatting | Passing | All active files formatted (`ruff format --check .`) |
+| Source mypy | Passing | Zero errors in `alpha_protocol`, `alpha_core`, `alpha_worker` |
+| Repository root | Clean & Organized | Historical/debug scripts archived under `testscript/dev_artifacts/` |
+| Archive isolation | Ignored | `testscript/dev_artifacts/` ignored by git, pytest, Ruff, and mypy |
+| Whitespace & diff | Passing | Clean `git diff --check` across modified working tree |
+| Implementation state | P6-R2 Complete (Local) | Model router, serialized credential leasing, isolated AGY dispatch |
+| D2 Self-Task Proof | VERIFIED (Not Accepted) | `d2_kernel_proof.json` shows task verified; `founder_reviewed=false`; no auto-merge |
 | AlphaBrain API | Not running | No active Uvicorn service |
 | Mac worker | Not running | LaunchAgent is not installed or loaded |
-| AGY bridge | Structurally ready, runtime unproven | CLI and SDLC skill exist; authenticated bounded execution still requires proof |
-| Render | Configured, not deployed | CLI authenticated; no AlphaBrain service exists |
-| Supabase | Healthy, not wired | Cloud project active; runtime still uses SQLite |
+| Render | Configured, not deployed | CLI authenticated; no AlphaBrain service deployed |
+| Supabase | Healthy, not wired | Cloud project active; runtime currently uses local SQLite |
 | Eva meeting | Historical local proof only | Not running during this audit; production network proof remains open |
 | Local preview | Stale | Port 4173 serves an old Health Status Page, not current project proof |
 
-## Roadmap snapshot
-
-Raw TODO checkbox counts at audit time:
-
-- P0: 33/33
-- P1: 17/23
-- P2: 19/19
-- P3: 17/20
-- P4: 16/34
-- P5: 24/27
-- P6: 6/34
-- P7: 0/18
-- P8: 16/33
-- P9-P12: mostly open
-- P13: 1/51
-
-These counts are not completion percentages. `TODO.md` has drift: some completed capabilities
-remain unchecked and its older test baseline does not match the current 336-test suite.
-
 ## Working foundation
 
-- Founder-only self-development admission and task queueing.
-- Task states, leases, heartbeats, audit events, retries, and evidence records.
-- Active cancellation from API through worker into AGY process-group termination.
-- AGY adapter, model configuration, SDLC skill discovery, and project conversation registry.
-- Isolated-worktree execution design and allowed-path enforcement.
-- Approval boundaries for risky or production side effects.
-- Render and Supabase CLIs authenticated.
+- Local P6-R2 routing decisions and serialized global credential lease (`fcntl.flock`).
+- AGY live bridge integration with strict allowlist and process-group lifecycle control.
+- Task states, leases, heartbeats, typed gate submissions, audit events, and review provenance.
+- Clean working tree boundaries: historical diagnostic scripts moved to `testscript/dev_artifacts/`.
+- 375 repository tests passing with zero failures.
 
 ## Blocking gaps
 
-1. Dirty source repository correctly fails self-development admission.
-2. Repository-wide lint, formatting, and type gates are not green.
-3. Persistent Mac worker is not installed or running.
+1. Working tree is dirty; baseline candidate requires founder review and explicit approval before commit.
+2. D2 self-task kernel proof is VERIFIED but remains UNACCEPTED (pending separate founder decision).
+3. Persistent Mac worker daemon LaunchAgent is not installed.
 4. Render control plane is not deployed.
-5. Supabase is not connected as AlphaBrain's durable database.
-6. Real AGY authentication, quota, execution, result, and cancellation need one bounded proof.
-7. Full requirement-to-preview-to-founder-decision loop has not passed on a clean project.
+5. Supabase Postgres is not connected as the primary system of record.
+6. Temporal SDLC workflow (P7) and future phases (P8–P13) still require packet-level implementation designs.
 
-## Approved delivery order
+## Next steps
 
-1. Establish repository truth and clean immutable baseline.
-2. Finish supervised self-development kernel and prove one low-risk self-task.
-3. Deploy staging control plane on Render.
-4. Wire Supabase Postgres and run migrations.
-5. Install persistent outbound Mac worker.
-6. Prove one external project through AGY, independent QA, preview, and founder decision.
-7. Expand into specification, portal, calls, deployment automation, and hardening.
-
-## Runtime ownership
-
-- Founder: requirements, risk approval, final acceptance, and production approval.
-- AlphaBrain: durable orchestration, policy, leases, evidence, recovery, and reporting.
-- Senior supervisor: architecture, task packets, gate definitions, independent review, and repair
-  decisions.
-- AGY: bounded implementation labor inside assigned worktree; never self-approval.
-- Mac worker: local execution and artifact collection.
-- Render: remote API/control plane.
-- Supabase: durable system of record.
-
-Redis is not required for current milestone. Add it only when distributed locks, high-volume
-queues, or rate limiting require it.
-
+1. **Founder Review & Baseline Commit:**
+   - Founder reviews verified candidate changes across `alpha_core`, `alpha_protocol`, `alpha_worker`, tests, and configuration.
+   - Founder approves creating one local immutable baseline commit.
+2. **Execute First Low-Risk AlphaBrain Self-Task:**
+   - Run task through the complete autonomous kernel lifecycle: admission -> execution approval -> isolated AGY worktree -> typed gate evidence -> independent review -> founder acceptance.
+   - Recommended task scope: TODO documentation and test suite count reconciliation.
+   - Strict constraints: maximum 2 allowed files (`TODO.md`, `docs/CURRENT_REPORT.md`), zero runtime source changes, zero network calls, zero deployment side effects.

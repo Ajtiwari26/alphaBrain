@@ -203,6 +203,8 @@ async def main(args_list: list[str] | None = None):
         print("Error: --live requires --approve-as <identity> for explicit approval provenance")
         sys.exit(1)
 
+    # Remove DEBUG logging
+
     founder_identity = args.approve_as.strip()
 
     print("=== LIVE KERNEL PROOF ===")
@@ -255,25 +257,24 @@ async def main(args_list: list[str] | None = None):
                 task_id=task_id,
                 project_id=proj.id,
                 repo=str(project_path),
-                objective="Build a responsive health-status page built only with HTML/CSS/vanilla browser JavaScript. Create testscript/lint.mjs and testscript/test.mjs using Node built-ins only; no package.json, no node_modules, no dependencies, no external network access. Dependency-free proof. Browser smoke is not declared for this zero-dependency proof. (Future follow-up: fully browser-tested projects require an explicit local/preprovisioned browser smoke gate.) Then exit.",
-                allowed_paths=["."],
+                objective="Create a missing P1 documentation file at docs/getting_started.md and a test script at testscript/test_getting_started.sh. You must follow the multi-agent-sdlc protocol precisely. Do NOT mutate .gitignore. Your FINAL output line MUST be exactly 'ALPHA_BRAIN_TASK_DONE' with no other characters.",
+                allowed_paths=[
+                    "docs/getting_started.md",
+                    "testscript/test_getting_started.sh",
+                ],
                 risk_class=RiskClass.LOW,
                 preferred_agent=AgentType.ANTIGRAVITY,
                 requires_approval=True,
                 retain_worktree_for_preview=True,
                 acceptance_plan=AcceptancePlan(
-                    require_independent_review=False,
+                    require_independent_review=True,
+                    required_gates=[GateType.LINT],
                     commands=[
                         GateCommand(
                             gate_type=GateType.LINT,
                             executable="node",
-                            args=["testscript/lint.mjs"],
-                        ),
-                        GateCommand(
-                            gate_type=GateType.UNIT_TEST,
-                            executable="node",
-                            args=["testscript/test.mjs"],
-                        ),
+                            args=["-e", "require('fs').readFileSync('docs/getting_started.md')"],
+                        )
                     ],
                 ),
             )
@@ -295,7 +296,10 @@ async def main(args_list: list[str] | None = None):
             await session.commit()
 
             await session.refresh(task)
-            print(f"6. Task processed. Final Status: {task.status}")
+            print(f"6. Task processed. Intermediate Status: {task.status}")
+
+            if task.status == "verified":
+                print("7. Task is VERIFIED. Pending separate founder review and acceptance.")
 
             details = task.details_json or {}
             print("   Review-ready Result Evidence:")

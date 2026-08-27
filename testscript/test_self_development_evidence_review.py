@@ -89,6 +89,7 @@ async def test_exact_declared_argv_passes(db_session: AsyncSession):
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
     assert leased is not None
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
@@ -105,9 +106,11 @@ async def test_wrong_argv_fails(db_session: AsyncSession):
     env = make_test_envelope()
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
+    assert res.gate_result is not None
     res.gate_result.evidence_items[0].metrics = {"command_argv": ["pytest", "-v"], "exit_code": 0}
 
     success = await TaskEngine.submit_result(db_session, res, task_rec.lease_token, "w1")
@@ -121,9 +124,11 @@ async def test_missing_required_gate_fails(db_session: AsyncSession):
     env = make_test_envelope()
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
+    assert res.gate_result is not None
     res.gate_result.evidence_items[0].gate_type = GateType.LINT
 
     assert await TaskEngine.submit_result(db_session, res, task_rec.lease_token, "w1") is False
@@ -134,13 +139,16 @@ async def test_mismatched_ids_fail(db_session: AsyncSession):
     env = make_test_envelope()
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
+    assert res.gate_result is not None
     res.gate_result.task_id = "wrong_task"
     assert await TaskEngine.submit_result(db_session, res, task_rec.lease_token, "w1") is False
 
     res = make_passing_result(env)
+    assert res.gate_result is not None
     res.gate_result.attempt_id = "wrong_att"
     assert await TaskEngine.submit_result(db_session, res, task_rec.lease_token, "w1") is False
 
@@ -150,9 +158,11 @@ async def test_duplicate_evidence_ids_fail(db_session: AsyncSession):
     env = make_test_envelope()
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
+    assert res.gate_result is not None
     ev = res.gate_result.evidence_items[0]
     res.gate_result.evidence_items.append(ev.model_copy())
 
@@ -164,6 +174,7 @@ async def test_outside_scope_paths_fail(db_session: AsyncSession):
     env = make_test_envelope()
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
@@ -179,6 +190,7 @@ async def test_valid_bound_result_creates_review(db_session: AsyncSession):
     env = make_test_envelope(require_packet_binding=True)
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
@@ -203,6 +215,7 @@ async def test_duplicate_result_is_idempotent(db_session: AsyncSession):
     env = make_test_envelope(require_packet_binding=True)
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
@@ -223,6 +236,7 @@ async def test_founder_review_completes_task(db_session: AsyncSession):
     env = make_test_envelope(require_packet_binding=True)
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)
@@ -249,6 +263,7 @@ async def test_wrong_founder_review_digest_fails(db_session: AsyncSession):
     env = make_test_envelope(require_packet_binding=True)
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
+    assert leased is not None
     task_rec, _ = leased
 
     res = make_passing_result(env)

@@ -446,11 +446,11 @@ class TestGateEvidenceAndIndependentReview:
         )
 
         res = await TaskEngine.submit_result(async_db, incomplete_result, lease_token, "worker-01")
-        assert res is True
+        assert res is False
 
-        # Task should fail verification and be in retryable_failed
+        # Task should be rejected and remain leased (or unchanged) rather than automatically failing
         res_t = await async_db.execute(select(TaskRecord).where(TaskRecord.id == "tsk_gate_01"))
-        assert res_t.scalar_one().status == TaskStatus.RETRYABLE_FAILED.value
+        assert res_t.scalar_one().status == TaskStatus.LEASED.value
 
     async def test_high_risk_task_requires_different_independent_reviewer(
         self, async_db: AsyncSession
@@ -490,12 +490,24 @@ class TestGateEvidenceAndIndependentReview:
                 all_passed=True,
                 evidence_items=[
                     GateEvidence(
+                        evidence_id="ev_lint_hr",
+                        gate_type=GateType.LINT,
+                        passed=True,
+                        summary="Lint passed",
+                    ),
+                    GateEvidence(
+                        evidence_id="ev_unit_hr",
+                        gate_type=GateType.UNIT_TEST,
+                        passed=True,
+                        summary="Unit tests passed",
+                    ),
+                    GateEvidence(
                         evidence_id="ev_rev1",
                         gate_type=GateType.INDEPENDENT_REVIEW,
                         passed=True,
                         summary="Self review",
                         metrics={"reviewer": "worker-01"},
-                    )
+                    ),
                 ],
             ),
         )
@@ -540,3 +552,52 @@ class TestReportingSnapshots:
         )
         assert client_snap is not None
         assert client_snap["project_name"] == "Report Proj"
+
+    async def test_changed_files_outside_allowed_paths_fails_verification(
+        self, async_db: AsyncSession
+    ):
+        envelope = TaskEnvelope(
+            task_id="tsk_path_01",
+            project_id="prj_path",
+            repo="/repo/path",
+            objective="Path Escape Task",
+            allowed_paths=["docs/", "src/allowed.py"],
+            acceptance_plan=AcceptancePlan(
+                required_gates=[GateType.UNIT_TEST],
+                commands=[GateCommand(gate_type=GateType.UNIT_TEST, executable="pytest")],
+            ),
+        )
+        await TaskEngine.submit_task(async_db, envelope, "prj_path")
+        lease_res = await TaskEngine.lease_next_task(async_db, "worker-01")
+        assert lease_res is not None
+        leased_task, _leased_env = lease_res
+
+        result = TaskResult(
+            task_id="tsk_path_01",
+            attempt_id="att_path_01",
+            agent=AgentType.ANTIGRAVITY,
+            model="gemini-pro",
+            base_commit="HEAD",
+            result_commit="newcommit",
+            status=TaskStatus.COMPLETED,
+            files_changed=["docs/readme.md", "src/not_allowed.py"],
+            gate_result=GateResult(
+                task_id="tsk_path_01",
+                attempt_id="att_path_01",
+                all_passed=True,
+                evidence_items=[
+                    GateEvidence(
+                        evidence_id="ev_unit",
+                        gate_type=GateType.UNIT_TEST,
+                        passed=True,
+                        summary="Pass",
+                    )
+                ],
+            ),
+        )
+
+        res = await TaskEngine.submit_result(async_db, result, leased_task.lease_token, "worker-01")
+        assert res is False
+
+        res_t = await async_db.execute(select(TaskRecord).where(TaskRecord.id == "tsk_path_01"))
+        assert res_t.scalar_one().status == TaskStatus.LEASED.value

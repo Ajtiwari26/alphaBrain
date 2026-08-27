@@ -41,3 +41,16 @@ logs/
 recordings/
 artifacts/
 temp_worktrees/
+
+# Debug artifacts
+/patch*.py
+/fix_*.py
+/fix_daemon_diff.patch
+/print_err.py
+/scratch.py
+/test_error.txt
+/test_out*.txt
+/err.log
+/d2_debug.log
+/r2_*_manifest.json
+testscript/dev_artifacts/

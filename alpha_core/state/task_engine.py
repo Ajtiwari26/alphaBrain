@@ -633,12 +633,22 @@ class TaskEngine:
                 base_commit=envelope.base_commit,
                 result_commit=attempt.result_commit,
                 packet_sha256=attempt.packet_sha256,
-                files_changed=json.loads(attempt.files_changed_json)
-                if attempt.files_changed_json
-                else [],
-                gate_result=GateResult.model_validate_json(attempt.gate_result_json)
-                if attempt.gate_result_json
-                else None,
+                files_changed=(
+                    attempt.files_changed_json
+                    if isinstance(attempt.files_changed_json, list)
+                    else (
+                        json.loads(attempt.files_changed_json) if attempt.files_changed_json else []
+                    )
+                ),
+                gate_result=(
+                    GateResult.model_validate(attempt.gate_result_json)
+                    if isinstance(attempt.gate_result_json, dict)
+                    else (
+                        GateResult.model_validate_json(attempt.gate_result_json)
+                        if attempt.gate_result_json
+                        else None
+                    )
+                ),
             )
             recomputed = compute_review_digest(tr, attempt.worker_id or "")
             if review_sha256 != recomputed:

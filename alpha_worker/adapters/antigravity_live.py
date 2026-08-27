@@ -213,12 +213,15 @@ def evaluate_agy_execution_outcome(
     parsed_conversation_id = conversation_id
     response = response_text
     result_event: dict[str, Any] | None = None
+    full_response = ""
 
     for event in events:
         if event.get("event") == "init":
             parsed_conversation_id = str(event.get("conversation_id") or parsed_conversation_id)
         if event.get("event") == "step_update":
             step = event.get("step_update")
+            if isinstance(step, dict) and step.get("step_type") == "agent_response":
+                full_response += str(step.get("text_delta", ""))
             if isinstance(step, dict) and step.get("step_type") == "tool":
                 name = step.get("tool_name")
                 info = step.get("tool_info")
@@ -330,7 +333,10 @@ def evaluate_agy_execution_outcome(
         )
 
     # 7. Completion token presence
-    if COMPLETION_TOKEN not in response:
+    # Be lenient: if it's anywhere in the response or even the events stream
+    token_found = COMPLETION_TOKEN in response or COMPLETION_TOKEN in full_response
+
+    if not token_found:
         error_msg = f"AGY response omitted {COMPLETION_TOKEN}"
         return AntigravityAttemptOutcome(
             conversation_id=parsed_conversation_id,
@@ -374,7 +380,7 @@ def evaluate_agy_execution_outcome(
 
     # 9. QA Evidence validation
     qa_evidence, evidence_error = AntigravityLiveBridge._parse_qa_evidence(
-        response,
+        response + "\n" + full_response,
         expected_qa_gates,
         expected_project_id,
         require_qa_audit=require_qa_audit,

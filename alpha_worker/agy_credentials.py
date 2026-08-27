@@ -13,7 +13,7 @@ from alpha_core.config import settings
 logger = logging.getLogger("alpha_worker.agy_credentials")
 
 # Basic validation: alphanumeric, dash, dot, underscore, max 64 chars
-ACCOUNT_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+ACCOUNT_ID_PATTERN = re.compile(r"^[A-Za-z0-9._@-]{1,128}$")
 TOKEN_PATTERN = re.compile(r"(ya29\.[A-Za-z0-9_-]+|AQ\.Ab[A-Za-z0-9_-]+|1//[A-Za-z0-9_-]+)")
 
 

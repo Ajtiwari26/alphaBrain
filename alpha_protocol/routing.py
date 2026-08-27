@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExecutionStage(str, Enum):
@@ -59,7 +59,7 @@ class RoutingRequest(BaseModel):
     risk_class: str
     complexity_class: str
     implementation_model: str | None = None
-    allowed_models: list[str] = Field(default_factory=list)
+    allowed_models: list[str] | None = None
     claude_budget_allowed: bool = False
     required_capabilities: list[str] = Field(default_factory=list)
     tool_needs: list[str] = Field(default_factory=list)
@@ -68,13 +68,15 @@ class RoutingRequest(BaseModel):
 class RoutingDecision(BaseModel):
     """Deterministic output from the model router."""
 
-    status: RoutingDecisionStatus
+    model_config = ConfigDict(populate_by_name=True)
+
+    status: RoutingDecisionStatus = Field(alias="decision")
     model: str | None = None
     effort: str | None = None
-    account_id: str | None = None
-    rationale_codes: list[str] = Field(default_factory=list)
+    account_id: str | None = Field(default=None, alias="account")
+    rationale_codes: list[str] = Field(default_factory=list, alias="rationale")
     fallback_chain: list[str] = Field(default_factory=list)
-    independence_status: str | None = None
+    independence_status: str | None = Field(default=None, alias="independence")
     founder_review_required: bool = False
     earliest_retry_at: datetime | None = None
     retry_timestamp_known: bool = False
