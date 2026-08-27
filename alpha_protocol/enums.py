@@ -27,10 +27,12 @@ class TaskStatus(str, Enum):
 
 # Legal state transitions: (from_status) -> {allowed target statuses}
 LEGAL_TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {
-    TaskStatus.QUEUED: frozenset({TaskStatus.LEASED, TaskStatus.CANCELLED}),
+    TaskStatus.QUEUED: frozenset({TaskStatus.LEASED, TaskStatus.CANCELLED, TaskStatus.BLOCKED}),
     TaskStatus.LEASED: frozenset(
         {
             TaskStatus.RUNNING,
+            TaskStatus.RETRYABLE_FAILED,
+            TaskStatus.BLOCKED,
             TaskStatus.QUEUED,
             TaskStatus.CANCELLED,
         }
@@ -52,8 +54,12 @@ LEGAL_TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {
             TaskStatus.QUEUED,
         }
     ),
-    TaskStatus.VERIFIED: frozenset({TaskStatus.COMPLETED, TaskStatus.SUPERSEDED}),
-    TaskStatus.RETRYABLE_FAILED: frozenset({TaskStatus.QUEUED, TaskStatus.CANCELLED}),
+    TaskStatus.VERIFIED: frozenset(
+        {TaskStatus.COMPLETED, TaskStatus.SUPERSEDED, TaskStatus.BLOCKED}
+    ),
+    TaskStatus.RETRYABLE_FAILED: frozenset(
+        {TaskStatus.QUEUED, TaskStatus.BLOCKED, TaskStatus.CANCELLED}
+    ),
     TaskStatus.BLOCKED: frozenset({TaskStatus.QUEUED, TaskStatus.CANCELLED}),
     TaskStatus.CANCELLED: frozenset(),  # Terminal
     TaskStatus.SUPERSEDED: frozenset(),  # Terminal

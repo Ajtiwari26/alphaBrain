@@ -9,6 +9,7 @@ Protocol version: 1
 """
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -35,7 +36,7 @@ class TranscriptSegment(BaseModel):
 class MeetingEvent(BaseModel):
     """Structured event extracted from meeting transcript analysis."""
 
-    protocol_version: str = Field(default=PROTOCOL_VERSION)
+    protocol_version: Literal["1"] = Field(default=PROTOCOL_VERSION)
     event_id: str
     room_name: str
     project_id: str

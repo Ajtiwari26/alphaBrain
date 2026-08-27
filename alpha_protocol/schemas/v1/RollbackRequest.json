@@ -1,0 +1,40 @@
+{
+  "description": "Request to rollback a deployment to a previous known-good state.",
+  "properties": {
+    "deployment_id": {
+      "title": "Deployment Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "target_commit": {
+      "description": "Commit hash to rollback to",
+      "title": "Target Commit",
+      "type": "string"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "requested_by": {
+      "title": "Requested By",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "deployment_id",
+    "project_id",
+    "target_commit",
+    "reason",
+    "requested_by"
+  ],
+  "title": "RollbackRequest",
+  "type": "object"
+}

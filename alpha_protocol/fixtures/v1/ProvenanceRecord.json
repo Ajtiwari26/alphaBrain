@@ -1,0 +1,13 @@
+{
+  "agent": "antigravity",
+  "model": "gemini-3.7-flash-high",
+  "prompt_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "tools_used": [
+    "view_file",
+    "edit_file"
+  ],
+  "session_id": null,
+  "input_commit": "a1b2c3d4e5f6",
+  "output_commit": null,
+  "input_artifacts": []
+}

@@ -1,0 +1,56 @@
+{
+  "properties": {
+    "req_id": {
+      "title": "Req Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "raw_quote": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Direct quote from meeting transcript or client message",
+      "title": "Raw Quote"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "acceptance_criteria": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Acceptance Criteria",
+      "type": "array"
+    },
+    "priority": {
+      "default": "medium",
+      "description": "must_have, should_have, nice_to_have",
+      "title": "Priority",
+      "type": "string"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    }
+  },
+  "required": [
+    "req_id",
+    "title",
+    "description"
+  ],
+  "title": "Requirement",
+  "type": "object"
+}

@@ -26,6 +26,14 @@ from .enums import (
 )
 from .gates import AcceptancePlan, GateCommand, GateEvidence, GateResult
 from .meeting import MeetingEvent, MeetingSession, TranscriptSegment
+from .routing import (
+    AccountModelState,
+    AccountState,
+    ExecutionStage,
+    RoutingDecision,
+    RoutingDecisionStatus,
+    RoutingRequest,
+)
 from .spec import Decision, OpenQuestion, Requirement, SpecDocument, SpecVersion
 from .task import (
     ApprovalRequest,
@@ -37,6 +45,8 @@ from .task import (
     TaskEnvelope,
     TaskResult,
     UsageRecord,
+    compute_packet_digest,
+    compute_review_digest,
 )
 from .worker import WorkerCapability, WorkerHealthReport, WorkerRegistration
 
@@ -44,6 +54,8 @@ __all__ = [
     "LEGAL_TRANSITIONS",
     "PROTOCOL_VERSION",
     "AcceptancePlan",
+    "AccountModelState",
+    "AccountState",
     "AgentReadiness",
     "AgentType",
     "ApprovalRequest",
@@ -59,6 +71,7 @@ __all__ = [
     "DeploymentRequest",
     "DeploymentResult",
     "DeploymentStatus",
+    "ExecutionStage",
     "GateCommand",
     "GateEvidence",
     "GateResult",
@@ -73,6 +86,9 @@ __all__ = [
     "RetryPolicy",
     "RiskClass",
     "RollbackRequest",
+    "RoutingDecision",
+    "RoutingDecisionStatus",
+    "RoutingRequest",
     "SpecDocument",
     "SpecVersion",
     "TaskAttempt",
@@ -87,5 +103,7 @@ __all__ = [
     "WorkerHealthReport",
     "WorkerRegistration",
     "WorkflowPhase",
+    "compute_packet_digest",
+    "compute_review_digest",
     "is_legal_transition",
 ]

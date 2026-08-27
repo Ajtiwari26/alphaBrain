@@ -1,0 +1,188 @@
+{
+  "$defs": {
+    "ProvenanceRecord": {
+      "description": "Immutable provenance trail for any AI-generated output.",
+      "properties": {
+        "agent": {
+          "title": "Agent",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Hash"
+        },
+        "tools_used": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tools Used",
+          "type": "array"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
+        },
+        "input_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Git commit of input state",
+          "title": "Input Commit"
+        },
+        "output_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Git commit of output state",
+          "title": "Output Commit"
+        },
+        "input_artifacts": {
+          "description": "Input artifact references",
+          "items": {
+            "type": "string"
+          },
+          "title": "Input Artifacts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "agent",
+        "model"
+      ],
+      "title": "ProvenanceRecord",
+      "type": "object"
+    }
+  },
+  "description": "Immutable, append-only audit record for every significant system action.",
+  "properties": {
+    "protocol_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Protocol Version",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_type": {
+      "description": "e.g. task_leased, gate_passed, approval_granted, call_placed, deployment_started, worker_registered, spec_approved",
+      "title": "Event Type",
+      "type": "string"
+    },
+    "org_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Org Id"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Id"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    },
+    "actor": {
+      "description": "system, founder, client, worker, service, or agent identity",
+      "title": "Actor",
+      "type": "string"
+    },
+    "actor_role": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Principal role of the actor",
+      "title": "Actor Role"
+    },
+    "details": {
+      "additionalProperties": true,
+      "title": "Details",
+      "type": "object"
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProvenanceRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "actor"
+  ],
+  "title": "AuditEvent",
+  "type": "object"
+}

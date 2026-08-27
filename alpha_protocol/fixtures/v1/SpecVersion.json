@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "project_id": "prj_alpha",
+  "title": "Alpha Protocol Data Contracts",
+  "summary": "Unified shared schemas for DeployMate ecosystem.",
+  "requirements": [
+    {
+      "req_id": "REQ-001",
+      "title": "Strict Schema Validation",
+      "raw_quote": null,
+      "description": "All external messages must validate against Alpha Protocol v1 models.",
+      "acceptance_criteria": [],
+      "priority": "medium",
+      "tags": []
+    }
+  ],
+  "decisions": [
+    {
+      "dec_id": "DEC-001",
+      "topic": "Protocol Versioning",
+      "decision": "Freeze Protocol v1",
+      "rationale": "Enables independent development across four client repositories.",
+      "alternatives_considered": [],
+      "timestamp": "2026-08-26T18:22:28.888558Z"
+    }
+  ],
+  "open_questions": [],
+  "architecture_overview": null,
+  "status": "approved",
+  "founder_approved": true,
+  "client_approved": true,
+  "created_at": "2026-08-26T18:22:28.888560Z",
+  "approved_at": null
+}

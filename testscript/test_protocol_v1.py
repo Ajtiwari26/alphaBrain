@@ -58,6 +58,45 @@ def test_task_envelope_carries_version():
     assert task.protocol_version == "1"
 
 
+class TestProtocolVersionEnforcement:
+    def test_unsupported_version_fails_task_envelope(self):
+        with pytest.raises(ValidationError):
+            TaskEnvelope(
+                protocol_version="99",  # type: ignore[arg-type]
+                task_id="tsk_v1_bad",
+                project_id="prj_alpha",
+                repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+                objective="Version check",
+                allowed_paths=["."],
+            )
+
+    def test_unsupported_version_fails_meeting_event(self):
+        with pytest.raises(ValidationError):
+            MeetingEvent(
+                protocol_version="2",  # type: ignore[arg-type]
+                event_id="evt_01",
+                room_name="room_01",
+                project_id="prj_01",
+                event_type=MeetingEventType.DECISION,
+                title="Test",
+                description="Test",
+            )
+
+    def test_unsupported_version_fails_artifact_metadata(self):
+        with pytest.raises(ValidationError):
+            ArtifactMetadata(
+                protocol_version="0",  # type: ignore[arg-type]
+                artifact_id="art_01",
+                project_id="prj_01",
+                media_type="text/plain",
+                filename="file.txt",
+                size_bytes=10,
+                sha256_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                storage_path="path/file.txt",
+                created_by="user",
+            )
+
+
 # ---------------------------------------------------------------------------
 # State Transition Table
 # ---------------------------------------------------------------------------

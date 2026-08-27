@@ -1,0 +1,302 @@
+{
+  "$defs": {
+    "AgentType": {
+      "enum": [
+        "antigravity",
+        "claude_code",
+        "codex",
+        "gemini",
+        "stitch"
+      ],
+      "title": "AgentType",
+      "type": "string"
+    },
+    "GateEvidence": {
+      "description": "Specific evidence item proving a gate passed.",
+      "properties": {
+        "evidence_id": {
+          "description": "Unique ID for this evidence record",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "gate_type": {
+          "$ref": "#/$defs/GateType"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "output_log": {
+          "default": "",
+          "description": "Scrubbed stdout/stderr or tool output",
+          "title": "Output Log",
+          "type": "string"
+        },
+        "metrics": {
+          "additionalProperties": true,
+          "description": "e.g. coverage, duration, exit_code",
+          "title": "Metrics",
+          "type": "object"
+        },
+        "artifacts_created": {
+          "description": "Relative paths to produced artifacts",
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifacts Created",
+          "type": "array"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "gate_type",
+        "passed",
+        "summary"
+      ],
+      "title": "GateEvidence",
+      "type": "object"
+    },
+    "GateResult": {
+      "description": "Aggregate result of running all declared acceptance gates on a task.",
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "all_passed": {
+          "title": "All Passed",
+          "type": "boolean"
+        },
+        "evidence_items": {
+          "items": {
+            "$ref": "#/$defs/GateEvidence"
+          },
+          "title": "Evidence Items",
+          "type": "array"
+        },
+        "defect_summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Defect Summary"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "attempt_id",
+        "all_passed"
+      ],
+      "title": "GateResult",
+      "type": "object"
+    },
+    "GateType": {
+      "enum": [
+        "lint",
+        "unit_test",
+        "integration_test",
+        "build",
+        "browser_smoke",
+        "security_scan",
+        "independent_review",
+        "code_review_graph"
+      ],
+      "title": "GateType",
+      "type": "string"
+    },
+    "TaskStatus": {
+      "enum": [
+        "queued",
+        "leased",
+        "running",
+        "waiting_approval",
+        "verified",
+        "retryable_failed",
+        "blocked",
+        "cancelled",
+        "superseded",
+        "completed"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    },
+    "UsageRecord": {
+      "description": "Structured usage/cost tracking per task attempt.",
+      "properties": {
+        "input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "duration_seconds": {
+          "default": 0.0,
+          "minimum": 0.0,
+          "title": "Duration Seconds",
+          "type": "number"
+        },
+        "estimated_cost_usd": {
+          "default": 0.0,
+          "minimum": 0.0,
+          "title": "Estimated Cost Usd",
+          "type": "number"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "default": "",
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "title": "UsageRecord",
+      "type": "object"
+    }
+  },
+  "description": "Structured result returned by an agent adapter upon completing an attempt.",
+  "properties": {
+    "attempt_id": {
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/TaskStatus"
+    },
+    "agent": {
+      "$ref": "#/$defs/AgentType"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "base_commit": {
+      "title": "Base Commit",
+      "type": "string"
+    },
+    "result_commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Result Commit"
+    },
+    "files_changed": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Files Changed",
+      "type": "array"
+    },
+    "diff_summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Diff Summary"
+    },
+    "gate_result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GateResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "artifacts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "provenance_notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Provenance Notes",
+      "type": "array"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UsageRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "completed_at": {
+      "format": "date-time",
+      "title": "Completed At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "attempt_id",
+    "task_id",
+    "status",
+    "agent",
+    "model",
+    "base_commit"
+  ],
+  "title": "TaskResult",
+  "type": "object"
+}

@@ -1,0 +1,65 @@
+{
+  "protocol_version": "1",
+  "task_id": "tsk_proto_v1_001",
+  "project_id": "prj_alpha",
+  "org_id": "org_deploymate",
+  "repo": "/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+  "base_commit": "main",
+  "objective": "Implement cross-project protocol validation",
+  "detailed_instructions": null,
+  "inputs": [],
+  "allowed_paths": [
+    "alpha_protocol",
+    "testscript"
+  ],
+  "allowed_tools": [
+    "view_file",
+    "edit_file",
+    "run_command"
+  ],
+  "risk_class": "low",
+  "acceptance_plan": {
+    "required_gates": [
+      "unit_test",
+      "lint"
+    ],
+    "commands": [
+      {
+        "gate_type": "unit_test",
+        "executable": "pytest",
+        "args": [
+          "testscript/test_protocol_v1.py"
+        ],
+        "timeout_seconds": 300
+      },
+      {
+        "gate_type": "lint",
+        "executable": "ruff",
+        "args": [
+          "check",
+          "."
+        ],
+        "timeout_seconds": 300
+      }
+    ],
+    "require_independent_review": false,
+    "browser_smoke_url": null
+  },
+  "preferred_agent": "antigravity",
+  "session_id": null,
+  "lease_timeout_seconds": 1800,
+  "retain_worktree_for_preview": false,
+  "dependencies": [],
+  "retry_policy": {
+    "max_attempts": 3,
+    "backoff_base_seconds": 60,
+    "backoff_multiplier": 2.0,
+    "deadline_seconds": 86400
+  },
+  "concurrency_policy": {
+    "max_per_project": 5,
+    "max_per_worker": 2
+  },
+  "requires_approval": false,
+  "created_at": "2026-08-26T18:22:28.888383Z"
+}

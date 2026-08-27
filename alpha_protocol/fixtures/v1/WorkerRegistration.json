@@ -1,0 +1,22 @@
+{
+  "protocol_version": "1",
+  "worker_id": "mac_worker_local_01",
+  "hostname": "ajay-macbook-pro.local",
+  "platform": "macos-arm64",
+  "capability": {
+    "supported_agents": [
+      "antigravity"
+    ],
+    "supported_languages": [
+      "python",
+      "typescript",
+      "swift"
+    ],
+    "max_concurrent_tasks": 2,
+    "has_gpu": false,
+    "has_display": true,
+    "platform": "macos-arm64"
+  },
+  "identity_token": null,
+  "registered_at": "2026-08-26T18:22:28.888538Z"
+}

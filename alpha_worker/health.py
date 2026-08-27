@@ -30,8 +30,20 @@ class HardwareHealthChecker:
 
     @staticmethod
     def check_thermal_and_load() -> str:
-        """Returns 'nominal', 'moderate', or 'heavy' based on CPU load."""
+        """Return macOS thermal pressure, falling back to bounded CPU-load signal."""
         try:
+            thermal = subprocess.run(
+                ["pmset", "-g", "therm"], capture_output=True, text=True, check=False
+            ).stdout.lower()
+            if "critical" in thermal:
+                return "critical"
+            if "heavy" in thermal:
+                return "heavy"
+            if "moderate" in thermal:
+                return "moderate"
+            if "nominal" in thermal:
+                return "nominal"
+
             import os
 
             load_1m, _, _ = os.getloadavg()
@@ -56,6 +68,9 @@ class HardwareHealthChecker:
         }
 
         # If battery is low (< 20%) and not on AC power, drain worker
+        if thermal_state in {"heavy", "critical"}:
+            return WorkerHealth.DRAINING, metrics
+
         if not is_ac and battery_pct < 20:
             return WorkerHealth.DRAINING, metrics
 

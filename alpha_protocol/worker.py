@@ -8,6 +8,7 @@ Protocol version: 1
 """
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +37,7 @@ class WorkerCapability(BaseModel):
 class WorkerRegistration(BaseModel):
     """Worker announces itself to the control plane."""
 
-    protocol_version: str = Field(default=PROTOCOL_VERSION)
+    protocol_version: Literal["1"] = Field(default=PROTOCOL_VERSION)
     worker_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     hostname: str
     platform: str = Field(default="macos-arm64")

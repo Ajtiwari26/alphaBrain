@@ -23,10 +23,20 @@ os.environ["LIVEKIT_API_SECRET"] = "test-livekit-secret-with-at-least-32-chars"
 os.environ["PUBLIC_BASE_URL"] = "http://test"
 
 
+import pytest_asyncio  # noqa: E402
+
+from alpha_core.db.connection import init_db  # noqa: E402
+
+
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_test_state():
     yield
     shutil.rmtree(TEST_STATE_DIR, ignore_errors=True)
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def setup_db():
+    await init_db()
 
 
 @pytest.fixture

@@ -1,0 +1,40 @@
+{
+  "contract_version": 1,
+  "packet_ids": ["P6-R2-C"],
+  "status": "DONE",
+  "base_revision": "ad6b01fc664abfcfc723473ed1e87e03067d80ad",
+  "changed_files": [
+    "alpha_worker/adapters/antigravity.py",
+    "alpha_worker/adapters/antigravity_live.py",
+    "alpha_worker/routing.py",
+    "testscript/test_agy_routed_execution.py"
+  ],
+  "models_used": ["gemini-3.1-pro-high"],
+  "account_ids_used": [],
+  "commands": [
+    {"argv": ["./.venv/bin/pytest", "-q", "testscript/test_antigravity_live_bridge.py", "testscript/test_agy_execution_result.py", "testscript/test_adapter_conformance.py", "testscript/test_worker_runtime.py", "testscript/test_agy_routed_execution.py", "testscript/test_state_engine.py", "testscript/test_api_and_workflow.py"], "exit_code": 0, "summary": "76 tests passed"},
+    {"argv": ["./.venv/bin/ruff", "check", "alpha_worker", "alpha_protocol", "alpha_core/config.py", "testscript/test_antigravity_live_bridge.py", "testscript/test_agy_execution_result.py", "testscript/test_adapter_conformance.py", "testscript/test_worker_runtime.py", "testscript/test_agy_routed_execution.py"], "exit_code": 0, "summary": "Ruff lint passed"},
+    {"argv": ["./.venv/bin/ruff", "format", "--check", "alpha_worker", "alpha_protocol", "alpha_core/config.py", "testscript/test_antigravity_live_bridge.py", "testscript/test_agy_execution_result.py", "testscript/test_adapter_conformance.py", "testscript/test_worker_runtime.py", "testscript/test_agy_routed_execution.py"], "exit_code": 0, "summary": "Ruff format passed"},
+    {"argv": ["./.venv/bin/mypy", "alpha_worker", "alpha_protocol", "alpha_core/config.py"], "exit_code": 0, "summary": "Mypy passed"},
+    {"argv": ["git", "diff", "--check"], "exit_code": 0, "summary": "Whitespace check passed"}
+  ],
+  "tests": {"passed": 76, "failed": 0, "scope": "focused"},
+  "ruff": "PASS",
+  "format": "PASS",
+  "mypy": "PASS",
+  "review": {
+    "model": "gemini-3.1-pro-high",
+    "independent": false,
+    "degraded_same_family": false,
+    "open_high_findings": 0
+  },
+  "routing_proof": {
+    "real_account_switch_performed": false,
+    "fake_concurrency_proof": "PASS",
+    "bounded_retry_proof": "PASS",
+    "secret_scan": "PASS"
+  },
+  "side_effects": [],
+  "blockers": [],
+  "next_packet": "P6-R2-D"
+}

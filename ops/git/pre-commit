@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ops/git/pre-commit
+# Fast pre-commit verification script for Alpha Brain
+
+echo "🔍 Running pre-commit checks..."
+
+# 1. Check for committed private keys or unredacted credentials
+echo "→ Checking for credential leaks..."
+if git diff --cached -S"AIzaSy" -- ":(exclude)testscript/*" | grep -q "+"; then
+    echo "❌ ERROR: Detected potential live Google API key in staged changes!" >&2
+    exit 1
+fi
+
+# 2. Ruff Lint & Format
+echo "→ Running Ruff linter and format check..."
+./.venv/bin/ruff check .
+./.venv/bin/ruff format --check .
+
+# 3. Mypy Type Check
+echo "→ Running Mypy static type analysis..."
+./.venv/bin/mypy alpha_core alpha_worker alpha_protocol testscript
+
+# 4. Pytest Test Suite
+echo "→ Running unit test suite..."
+./.venv/bin/pytest -q testscript/
+
+echo "✅ All pre-commit checks passed successfully."

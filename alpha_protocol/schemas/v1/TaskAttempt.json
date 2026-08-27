@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "AgentType": {
+      "enum": [
+        "antigravity",
+        "claude_code",
+        "codex",
+        "gemini",
+        "stitch"
+      ],
+      "title": "AgentType",
+      "type": "string"
+    },
+    "TaskStatus": {
+      "enum": [
+        "queued",
+        "leased",
+        "running",
+        "waiting_approval",
+        "verified",
+        "retryable_failed",
+        "blocked",
+        "cancelled",
+        "superseded",
+        "completed"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    }
+  },
+  "description": "Represents a single execution attempt by an agent adapter.",
+  "properties": {
+    "attempt_id": {
+      "description": "Unique attempt ID, e.g. att_101_1",
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "attempt_number": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Attempt Number",
+      "type": "integer"
+    },
+    "agent": {
+      "$ref": "#/$defs/AgentType"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "completed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At"
+    },
+    "status": {
+      "$ref": "#/$defs/TaskStatus",
+      "default": "running"
+    },
+    "worktree_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Worktree Path"
+    }
+  },
+  "required": [
+    "attempt_id",
+    "task_id",
+    "agent",
+    "model"
+  ],
+  "title": "TaskAttempt",
+  "type": "object"
+}

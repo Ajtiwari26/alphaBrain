@@ -1,0 +1,63 @@
+# Render Blueprint Specification for Alpha Brain
+# https://render.com/docs/blueprint-spec
+
+version: "1"
+
+services:
+  - type: web
+    name: alpha-brain
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn alpha_core.api.app:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Non-secret runtime configuration
+      - key: ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: GEMINI_USE_VERTEX
+        value: "false"
+      - key: GEMINI_LIVE_MODEL
+        value: "gemini-2.5-flash-native-audio-latest"
+      - key: GEMINI_LIVE_VOICE
+        value: "Aoede"
+      - key: ALLOWED_GATE_EXECUTABLES
+        value: "pytest,ruff,mypy,npm,npx,pnpm,yarn,swift,xcodebuild,cargo,go"
+      - key: WORKER_ALLOW_LOCAL_DB
+        value: "false"
+      - key: ANTIGRAVITY_EXECUTION_ENABLED
+        value: "false"
+
+      # Service & Origin URLs (Configure with assigned Render service domain)
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Secret configuration (Set manually in Render Dashboard)
+      - key: DATABASE_URL
+        sync: false
+      - key: ALPHA_API_TOKEN
+        sync: false
+      - key: ALPHA_WORKER_TOKEN
+        sync: false
+      - key: ALPHA_SIGNING_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: PLIVO_AUTH_ID
+        sync: false
+      - key: PLIVO_AUTH_TOKEN
+        sync: false
+      - key: PLIVO_PHONE_NUMBER
+        sync: false

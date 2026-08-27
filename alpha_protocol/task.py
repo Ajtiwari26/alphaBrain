@@ -9,7 +9,7 @@ Protocol version: 1
 
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
-from typing import Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -107,7 +107,9 @@ class ApprovalResult(BaseModel):
 class TaskEnvelope(BaseModel):
     """Versioned task dispatched to worker plane."""
 
-    protocol_version: str = Field(default=PROTOCOL_VERSION, description="Protocol version")
+    protocol_version: Literal["1"] = Field(
+        default=PROTOCOL_VERSION, description="Protocol version (must be '1')"
+    )
     task_id: str = Field(
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
         description="Unique task identifier, e.g. tsk_101",
@@ -162,6 +164,10 @@ class TaskEnvelope(BaseModel):
         default=False,
         description="If true, task enters WAITING_APPROVAL before execution",
     )
+    require_packet_binding: bool = Field(
+        default=False,
+        description="If true, enforces exact digest equality throughout the task lifecycle.",
+    )
 
     # Timestamps
     created_at: datetime = Field(default_factory=utc_now)
@@ -186,6 +192,39 @@ class TaskEnvelope(BaseModel):
                 f"Agent '{agent.value}' is disabled; enabled execution agents: {enabled}"
             )
         return agent
+
+
+def compute_packet_digest(envelope: TaskEnvelope) -> str:
+    """Produce deterministic SHA-256 hex digest from canonical task-envelope JSON."""
+    import hashlib
+    import json
+
+    data = envelope.model_dump(mode="json")
+    canonical_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
+def compute_review_digest(result: "TaskResult", worker_id: str) -> str:
+    """Produce deterministic SHA-256 digest for founder review binding."""
+    import hashlib
+    import json
+
+    # Extract only authority fields
+    data = {
+        "task_id": result.task_id,
+        "attempt_id": result.attempt_id,
+        "packet_sha256": result.packet_sha256,
+        "base_commit": result.base_commit,
+        "result_commit": result.result_commit,
+        "files_changed": sorted(result.files_changed) if result.files_changed else [],
+        "agent": result.agent.value if result.agent else None,
+        "model": result.model,
+        "worker_id": worker_id,
+        "gate_result": result.gate_result.model_dump(mode="json") if result.gate_result else None,
+    }
+
+    canonical_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -222,12 +261,18 @@ class TaskResult(BaseModel):
     model: str
     base_commit: str
     result_commit: str | None = None
+    packet_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[a-f0-9]{64}$",
+        description="Canonical task packet digest verified by worker",
+    )
     files_changed: list[str] = Field(default_factory=list)
     diff_summary: str | None = None
     gate_result: GateResult | None = None
     artifacts: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     provenance_notes: list[str] = Field(default_factory=list)
+    preview_evidence: dict[str, Any] | None = None
     usage: Optional["UsageRecord"] = None
     completed_at: datetime = Field(default_factory=utc_now)
 

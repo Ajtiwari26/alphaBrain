@@ -8,6 +8,7 @@ Protocol version: 1
 """
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,7 +22,7 @@ def utc_now() -> datetime:
 class ArtifactMetadata(BaseModel):
     """Metadata for a stored artifact (log, screenshot, build, recording, spec doc)."""
 
-    protocol_version: str = Field(default=PROTOCOL_VERSION)
+    protocol_version: Literal["1"] = Field(default=PROTOCOL_VERSION)
     artifact_id: str = Field(
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
         description="Safe artifact identifier without path traversal",

@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "AgentType": {
+      "enum": [
+        "antigravity",
+        "claude_code",
+        "codex",
+        "gemini",
+        "stitch"
+      ],
+      "title": "AgentType",
+      "type": "string"
+    },
+    "WorkerCapability": {
+      "description": "Declares what a worker can execute.",
+      "properties": {
+        "supported_agents": {
+          "items": {
+            "$ref": "#/$defs/AgentType"
+          },
+          "title": "Supported Agents",
+          "type": "array"
+        },
+        "supported_languages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supported Languages",
+          "type": "array"
+        },
+        "max_concurrent_tasks": {
+          "default": 2,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Concurrent Tasks",
+          "type": "integer"
+        },
+        "has_gpu": {
+          "default": false,
+          "title": "Has Gpu",
+          "type": "boolean"
+        },
+        "has_display": {
+          "default": true,
+          "title": "Has Display",
+          "type": "boolean"
+        },
+        "platform": {
+          "default": "macos-arm64",
+          "title": "Platform",
+          "type": "string"
+        }
+      },
+      "title": "WorkerCapability",
+      "type": "object"
+    }
+  },
+  "description": "Worker announces itself to the control plane.",
+  "properties": {
+    "protocol_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Protocol Version",
+      "type": "string"
+    },
+    "worker_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "title": "Worker Id",
+      "type": "string"
+    },
+    "hostname": {
+      "title": "Hostname",
+      "type": "string"
+    },
+    "platform": {
+      "default": "macos-arm64",
+      "title": "Platform",
+      "type": "string"
+    },
+    "capability": {
+      "$ref": "#/$defs/WorkerCapability"
+    },
+    "identity_token": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Signed short-lived worker identity token",
+      "title": "Identity Token"
+    },
+    "registered_at": {
+      "format": "date-time",
+      "title": "Registered At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "worker_id",
+    "hostname"
+  ],
+  "title": "WorkerRegistration",
+  "type": "object"
+}

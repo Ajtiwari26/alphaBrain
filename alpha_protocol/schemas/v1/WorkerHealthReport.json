@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "WorkerHealth": {
+      "enum": [
+        "online",
+        "degraded",
+        "draining",
+        "asleep",
+        "offline"
+      ],
+      "title": "WorkerHealth",
+      "type": "string"
+    }
+  },
+  "description": "Periodic health status from worker daemon.",
+  "properties": {
+    "worker_id": {
+      "title": "Worker Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/WorkerHealth",
+      "default": "online"
+    },
+    "battery_percent": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Battery Percent"
+    },
+    "ac_power": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ac Power"
+    },
+    "thermal_pressure": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "nominal, moderate, heavy, critical",
+      "title": "Thermal Pressure"
+    },
+    "cpu_load_percent": {
+      "anyOf": [
+        {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cpu Load Percent"
+    },
+    "disk_free_gb": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Disk Free Gb"
+    },
+    "active_task_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Active Task Count",
+      "type": "integer"
+    },
+    "uptime_seconds": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Uptime Seconds",
+      "type": "integer"
+    },
+    "reported_at": {
+      "format": "date-time",
+      "title": "Reported At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "worker_id"
+  ],
+  "title": "WorkerHealthReport",
+  "type": "object"
+}

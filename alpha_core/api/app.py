@@ -16,38 +16,56 @@ from fastapi import (
     Response,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alpha_core.config import settings
 from alpha_core.db.connection import get_db_session, init_db
-from alpha_core.db.models import AttemptRecord, TaskRecord
+from alpha_core.db.models import (
+    ApprovalRecord,
+    AttemptRecord,
+    TaskRecord,
+    WorkerHealthRecord,
+    WorkerRecord,
+)
 from alpha_core.security import (
     AuthPrincipal,
+    PrincipalRole,
     create_meeting_invite,
     create_scoped_stream_token,
     plivo_nonce_cache,
+    redact_secrets,
     require_api_principal,
+    require_permission,
+    require_project_access,
     require_worker_principal,
     validate_plivo_v3_signature,
     verify_meeting_invite,
     verify_scoped_stream_token,
     verify_websocket_bearer,
+    worker_kill_switch,
 )
+from alpha_core.self_development import SelfImprovementRequest, create_self_improvement_task
 from alpha_core.state.task_engine import TaskEngine
 from alpha_meet.eva_agent import EvaMeetingAgent
 from alpha_meet.eva_live_agent import eva_room_manager
 from alpha_meet.live_audio import LiveMeetAudioBridge
 from alpha_meet.tokens import LiveKitTokenGenerator, MeetingRole
 from alpha_protocol import (
+    ApprovalStatus,
     CallJob,
     PersonaType,
     TaskEnvelope,
     TaskResult,
+    TaskStatus,
+    WorkerHealthReport,
+    WorkerRegistration,
 )
 from alpha_voice.extractor import SpecExtractor
 from alpha_voice.plivo_bridge import PlivoVoiceBridge
@@ -57,6 +75,24 @@ MEET_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "alpha_meet"
 eva_meet_agent = EvaMeetingAgent()
 logger = logging.getLogger("alpha_core.api")
 SAFE_EXTERNAL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+class SelfDevelopmentTaskSubmission(BaseModel):
+    """Founder request to queue one bounded AlphaBrain self-development task."""
+
+    task_id: str = Field(min_length=1, max_length=64)
+    project_id: str = Field(default="prj_alphabrain_self", min_length=1, max_length=64)
+    source_repo: Path
+    allowed_paths: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2000)
+    detailed_instructions: str | None = Field(default=None, max_length=20000)
+    base_commit: str = Field(default="HEAD", min_length=1, max_length=128)
+
+
+class TaskCancellationRequest(BaseModel):
+    """Founder cancellation reason persisted in task audit history."""
+
+    reason: str = Field(min_length=1, max_length=2000)
 
 
 @asynccontextmanager
@@ -122,6 +158,69 @@ async def health_check():
         "status": "healthy",
         "app": settings.APP_NAME,
         "env": settings.ENV,
+    }
+
+
+@app.post("/api/workers/register")
+async def register_worker(
+    registration: WorkerRegistration,
+    principal: AuthPrincipal = Depends(require_worker_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    if registration.worker_id != principal.subject:
+        raise HTTPException(status_code=403, detail="Worker ID does not match authenticated worker")
+    worker = await TaskEngine.register_worker(session, registration)
+    return {"status": "registered", "worker_id": worker.id}
+
+
+@app.post("/api/workers/{worker_id}/health")
+async def record_worker_health(
+    worker_id: str,
+    report: WorkerHealthReport,
+    principal: AuthPrincipal = Depends(require_worker_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    if worker_id != principal.subject or report.worker_id != principal.subject:
+        raise HTTPException(status_code=403, detail="Worker ID does not match authenticated worker")
+    worker = await TaskEngine.record_worker_health(session, report)
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker must register before reporting health")
+    return {"status": "recorded", "worker_id": worker.id, "worker_status": worker.status}
+
+
+@app.get("/api/workers/{worker_id}")
+async def get_worker_status(
+    worker_id: str,
+    _principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    require_permission(_principal, "worker:read")
+    worker = await session.get(WorkerRecord, worker_id)
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    latest = await session.scalar(
+        select(WorkerHealthRecord)
+        .where(WorkerHealthRecord.worker_id == worker_id)
+        .order_by(WorkerHealthRecord.reported_at.desc())
+        .limit(1)
+    )
+    return {
+        "worker_id": worker.id,
+        "hostname": worker.hostname,
+        "platform": worker.platform,
+        "status": worker.status,
+        "last_heartbeat_at": (
+            worker.last_heartbeat_at.isoformat() if worker.last_heartbeat_at else None
+        ),
+        "latest_health": {
+            "battery_percent": latest.battery_percent,
+            "ac_power": latest.ac_power,
+            "thermal_pressure": latest.thermal_pressure,
+            "active_task_count": latest.active_task_count,
+            "reported_at": latest.reported_at.isoformat() if latest.reported_at else None,
+        }
+        if latest
+        else None,
     }
 
 
@@ -195,6 +294,7 @@ async def generate_meet_invite(
     _principal: AuthPrincipal = Depends(require_api_principal),
 ):
     """Create short-lived client link without exposing Alpha Brain API token."""
+    require_permission(_principal, "meeting:invite")
     room_name = payload.get("room_name", "deploymate-main")
     identity = payload.get("identity", "Client")
     if not isinstance(room_name, str) or not SAFE_EXTERNAL_ID.fullmatch(room_name):
@@ -233,6 +333,8 @@ async def get_meet_slide(
     _principal: AuthPrincipal = Depends(require_api_principal),
 ):
     """Returns dynamic architecture slide presentation for Eva's Screen Share."""
+    require_permission(_principal, "project:read")
+    require_project_access(_principal, project)
     slide = eva_meet_agent.generate_presentation_slide(project_name=project)
     return JSONResponse(slide)
 
@@ -243,6 +345,7 @@ async def meet_speak(
     _principal: AuthPrincipal = Depends(require_api_principal),
 ):
     """Processes spoken input and generates Eva's CTO voice reply."""
+    require_permission(_principal, "meeting:join")
     speaker = payload.get("speaker", "Participant")
     text = payload.get("text", "")
 
@@ -269,7 +372,12 @@ async def meet_live_audio_websocket(websocket: WebSocket, persona: str = "eva"):
         return
     await websocket.accept()
     bridge = LiveMeetAudioBridge(websocket=websocket, persona=persona)
-    await bridge.run()
+    try:
+        await bridge.run()
+    except WebSocketDisconnect:
+        logger.info("Live audio WebSocket disconnected")
+    except Exception as exc:
+        logger.warning("Live audio WebSocket failed: %s", redact_secrets(str(exc)))
 
 
 # ==========================================
@@ -283,12 +391,62 @@ async def submit_task(
     _principal: AuthPrincipal = Depends(require_api_principal),
     session: AsyncSession = Depends(get_db_session),
 ):
+    require_permission(_principal, "task:write")
+    require_project_access(_principal, envelope.project_id)
+    if not worker_kill_switch.can_execute(envelope.project_id):
+        raise HTTPException(status_code=403, detail="Task execution is paused for this project")
     try:
         WorktreeManager.validate_repo_path(envelope.repo)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    task = await TaskEngine.submit_task(session, envelope)
-    return {"status": "queued", "task_id": task.id, "project_id": task.project_id}
+    try:
+        task = await TaskEngine.submit_task(session, envelope)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"status": task.status, "task_id": task.id, "project_id": task.project_id}
+
+
+@app.post("/api/self-development/tasks", response_model=dict[str, Any])
+async def submit_self_development_task(
+    payload: SelfDevelopmentTaskSubmission,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Queue founder-approved self-work; execution remains separately approved."""
+
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(status_code=403, detail="Self-development requires founder access")
+    require_permission(principal, "task:write")
+    require_project_access(principal, payload.project_id)
+    if not worker_kill_switch.can_execute(payload.project_id):
+        raise HTTPException(status_code=403, detail="Task execution is paused for this project")
+
+    request = SelfImprovementRequest(
+        source_repo=payload.source_repo,
+        allowed_paths=tuple(payload.allowed_paths),
+        founder_identity=principal.subject,
+        requires_approval=True,
+        base_commit=payload.base_commit,
+    )
+    try:
+        task = await create_self_improvement_task(
+            session,
+            request,
+            project_id=payload.project_id,
+            task_id=payload.task_id,
+            objective=payload.objective,
+            detailed_instructions=payload.detailed_instructions,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "status": task.status,
+        "task_id": task.id,
+        "project_id": task.project_id,
+        "packet_sha256": task.packet_sha256,
+        "execution_started": False,
+        "next_owner_action": "founder_approval_required",
+    }
 
 
 @app.post("/api/tasks/lease")
@@ -297,12 +455,21 @@ async def lease_task(
     principal: AuthPrincipal = Depends(require_worker_principal),
     session: AsyncSession = Depends(get_db_session),
 ):
+    require_permission(principal, "task:read")
+    if not worker_kill_switch.can_execute():
+        return {"status": "no_tasks_available"}
     worker_id = payload.get("worker_id", principal.subject)
+    if worker_id != principal.subject:
+        raise HTTPException(status_code=403, detail="Worker ID does not match authenticated worker")
     if not SAFE_EXTERNAL_ID.fullmatch(worker_id):
         raise HTTPException(status_code=422, detail="Invalid worker ID")
     preferred_agent = payload.get("preferred_agent")
 
-    leased_tuple = await TaskEngine.lease_next_task(session, worker_id, preferred_agent)
+    leased_tuple = await TaskEngine.lease_next_task(
+        session,
+        worker_id,
+        preferred_agent=preferred_agent,
+    )
     if not leased_tuple:
         return {"status": "no_tasks_available"}
 
@@ -318,33 +485,112 @@ async def lease_task(
 async def task_heartbeat(
     task_id: str,
     payload: dict[str, str],
-    _principal: AuthPrincipal = Depends(require_worker_principal),
+    principal: AuthPrincipal = Depends(require_worker_principal),
     session: AsyncSession = Depends(get_db_session),
 ):
+    require_permission(principal, "task:write")
     lease_token = payload.get("lease_token", "")
-    success = await TaskEngine.record_heartbeat(session, task_id, lease_token)
+    success = await TaskEngine.record_heartbeat(session, task_id, lease_token, principal.subject)
     if not success:
+        task = await session.get(TaskRecord, task_id)
+        if (
+            task
+            and task.status == TaskStatus.CANCELLED.value
+            and task.worker_id == principal.subject
+            and task.lease_token == lease_token
+        ):
+            return {"status": "cancel_requested"}
         raise HTTPException(status_code=400, detail="Invalid lease token or task not found")
     return {"status": "heartbeat_recorded"}
+
+
+@app.post("/api/tasks/{task_id}/cancel")
+async def cancel_task_execution(
+    task_id: str,
+    payload: TaskCancellationRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Cancel queued or active task and signal its authenticated worker."""
+
+    require_permission(principal, "task:cancel")
+    task = await session.get(TaskRecord, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(principal, task.project_id)
+    try:
+        cancelled = await TaskEngine.cancel_task(
+            session,
+            task_id,
+            reason=payload.reason,
+            actor=principal.subject,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not cancelled:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {
+        "status": "cancel_requested",
+        "task_id": task_id,
+        "worker_signal_pending": task.worker_id is not None,
+    }
 
 
 @app.post("/api/tasks/{task_id}/result")
 async def submit_task_result(
     task_id: str,
     payload: dict[str, Any],
-    _principal: AuthPrincipal = Depends(require_worker_principal),
+    principal: AuthPrincipal = Depends(require_worker_principal),
     session: AsyncSession = Depends(get_db_session),
 ):
+    require_permission(principal, "task:write")
     lease_token = payload.get("lease_token", "")
     result_data = payload.get("result", {})
     result = TaskResult.model_validate(result_data)
     if result.task_id != task_id:
-        raise HTTPException(status_code=422, detail="Task ID does not match result body")
+        raise HTTPException(status_code=400, detail="Task ID mismatch between URL and payload")
 
-    success = await TaskEngine.submit_result(session, result, lease_token)
+    success = await TaskEngine.submit_result(session, result, lease_token, principal.subject)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to record task result")
-    return {"status": "result_recorded", "task_status": result.status.value}
+    task_details = await session.get(TaskRecord, task_id)
+    return {
+        "status": "result_recorded",
+        "task_status": task_details.status if task_details else result.status.value,
+    }
+
+
+@app.post("/api/tasks/{task_id}/approval")
+async def decide_task_approval(
+    task_id: str,
+    payload: dict[str, Any],
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    res = await session.execute(select(TaskRecord).where(TaskRecord.id == task_id))
+    task_rec = res.scalar_one_or_none()
+    if not task_rec:
+        raise HTTPException(status_code=404, detail="Task not found")
+    require_permission(principal, "spec:approve")
+    require_project_access(principal, task_rec.project_id)
+
+    approved = payload.get("approved")
+    if not isinstance(approved, bool):
+        raise HTTPException(status_code=422, detail="'approved' must be a boolean")
+    reason = payload.get("reason")
+    if reason is not None and not isinstance(reason, str):
+        raise HTTPException(status_code=422, detail="'reason' must be a string")
+    packet_sha256 = payload.get("packet_sha256")
+    review_sha256 = payload.get("review_sha256")
+    try:
+        task = await TaskEngine.decide_task_approval(
+            session, task_id, approved, principal.subject, reason, packet_sha256, review_sha256
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not task:
+        raise HTTPException(status_code=409, detail="Task is not awaiting a pending approval")
+    return {"status": task.status, "task_id": task.id}
 
 
 @app.get("/api/tasks/{task_id}")
@@ -357,6 +603,12 @@ async def get_task_details(
     task = res.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if not (_principal.has_permission("task:read") or _principal.has_permission("project:read")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Role '{_principal.role.value}' lacks permission 'task:read'",
+        )
+    require_project_access(_principal, task.project_id)
 
     res_attempts = await session.execute(
         select(AttemptRecord)
@@ -365,7 +617,20 @@ async def get_task_details(
     )
     attempts = res_attempts.scalars().all()
 
-    return {
+    res_appr = await session.execute(
+        select(ApprovalRecord)
+        .where(
+            and_(
+                ApprovalRecord.task_id == task_id,
+                ApprovalRecord.status == ApprovalStatus.PENDING.value,
+            )
+        )
+        .order_by(ApprovalRecord.created_at.desc())
+        .limit(1)
+    )
+    pending_appr = res_appr.scalar_one_or_none()
+
+    response = {
         "task_id": task.id,
         "project_id": task.project_id,
         "objective": task.objective,
@@ -385,6 +650,28 @@ async def get_task_details(
         ],
     }
 
+    if pending_appr:
+        response["pending_approval"] = {
+            "approval_type": pending_appr.approval_type,
+            "scope_sha256": pending_appr.scope_sha256,
+        }
+
+    return response
+
+
+@app.get("/api/projects/{project_id}/progress")
+async def get_project_progress(
+    project_id: str,
+    _principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    require_permission(_principal, "project:read")
+    require_project_access(_principal, project_id)
+    snapshot = await TaskEngine.project_progress_snapshot(session, project_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return snapshot
+
 
 # ==========================================
 # Specification Intelligence Endpoints
@@ -399,6 +686,9 @@ async def extract_specification(
     transcript_text = payload.get("transcript", "")
     project_id = payload.get("project_id", "prj_default")
     title = payload.get("title", "Generated Specification")
+
+    require_permission(_principal, "spec:write")
+    require_project_access(_principal, project_id)
 
     if not transcript_text:
         raise HTTPException(status_code=400, detail="Transcript text is required")
@@ -510,6 +800,6 @@ async def plivo_media_websocket(websocket: WebSocket):
             raw_text = await websocket.receive_text()
             bridge.handle_plivo_media_message(raw_text)
     except WebSocketDisconnect:
-        pass
+        logger.info("Plivo media WebSocket disconnected")
     except Exception as exc:
-        logger.warning("Plivo media WebSocket failed: %s", exc)
+        logger.warning("Plivo media WebSocket failed: %s", redact_secrets(str(exc)))

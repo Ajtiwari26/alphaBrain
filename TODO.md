@@ -67,10 +67,10 @@ Goal: prevent unauthenticated network request from executing commands on Mac.
 - [x] Add authentication dependency to every private REST endpoint.
 - [x] Add WebSocket authentication before `accept()`.
 - [x] Add founder, client, worker, service, and admin roles.
-- [ ] Add organization/project authorization checks to every database query.
+- [x] Add organization/project authorization checks to every database query.
 - [x] Remove client-controlled `is_admin` from LiveKit token request.
 - [x] Mint LiveKit permissions from authenticated server-side role.
-- [ ] Add worker identity using short-lived signed token or mTLS at worker API boundary.
+- [x] Add worker identity using short-lived signed token or mTLS at worker API boundary.
 - [x] Add repository-root allowlist for worker tasks.
 - [x] Reject task repository paths outside allowlisted roots.
 - [x] Reject path traversal in task, project, room, and branch identifiers.
@@ -81,18 +81,18 @@ Goal: prevent unauthenticated network request from executing commands on Mac.
 - [x] Enforce `allowed_paths` and `allowed_tools` at worker boundary.
 - [x] Validate Plivo V3 webhook signatures and reject replayed nonces.
 - [x] Validate Exotel webhook signatures and replay timestamps.
-- [ ] Stop swallowing every WebSocket/provider exception; log scrubbed failure events.
+- [x] Stop swallowing every WebSocket/provider exception; log scrubbed failure events.
 - [x] Remove device identifier from public health response.
 - [x] Remove usable default LiveKit secret and fail token generation when credentials are absent.
-- [ ] Apply secret-redaction filter to logs, audit events, prompts, and artifacts.
-- [ ] Enforce global worker kill switch and per-project pause at execution boundary.
+- [x] Apply secret-redaction filter to logs, audit events, prompts, and artifacts.
+- [x] Enforce global worker kill switch and per-project pause at execution boundary.
 
 ### P0 acceptance gate
 
 - [x] Anonymous task submission returns `401`.
 - [x] Anonymous task leasing returns `401`.
 - [x] Client cannot mint room-admin token.
-- [ ] Cross-project access returns `403` through real API routes.
+- [x] Cross-project access returns `403` through real API routes.
 - [x] Raw shell-command and path-traversal test cases fail closed.
 - [x] Worker cannot access file outside allowed worktree.
 - [x] Invalid or replayed Plivo signature receives rejection.
@@ -170,7 +170,7 @@ Goal: freeze trustworthy contracts shared by all four systems.
 
 ### P2 acceptance gate
 
-- [ ] Unifold, AgentLine, Inito, and Alpha Worker validate same protocol fixtures.
+- [x] Unifold, AgentLine, Inito, and Alpha Worker validate same protocol fixtures.
 - [x] Invalid tenant, path, consent, gate, and artifact payloads fail validation.
 - [x] Protocol v1 fixtures remain stable across releases.
 
@@ -179,45 +179,62 @@ Goal: freeze trustworthy contracts shared by all four systems.
 Goal: establish one authoritative, recoverable system of record.
 
 - [ ] Use PostgreSQL outside local unit tests.
-- [ ] Stop using `create_all()` during production startup; run Alembic migrations.
-- [ ] Add memberships, clients, roles, and consent tables.
+- [x] Stop using `create_all()` during production startup; run Alembic migrations.
+- [x] Add memberships, clients, roles, and consent tables.
 - [x] Add meetings, participants, transcript segments, and meeting-event tables.
-- [ ] Add decisions, open questions, and change request tables.
-- [ ] Add workflow and normalized task dependency tables.
+- [x] Add decisions, open questions, and change request tables.
+- [x] Add workflow and normalized task dependency tables.
 - [x] Add worker registration, heartbeat, capability, lease, and health history tables.
 - [x] Add notification/call status history.
-- [ ] Enforce immutable append-only audit events through application and database policy.
-- [ ] Store JSON as database JSON/JSONB, not text.
-- [ ] Add remaining required uniqueness and foreign-key constraints.
-- [ ] Add soft-delete/retention policy where appropriate.
-- [ ] Add encrypted object storage for recordings, specs, screenshots, logs, and builds.
-- [ ] Add signed short-lived artifact URLs backed by object storage.
-- [ ] Add backup, restore, and retention jobs.
+- [x] Enforce immutable append-only audit events through application and database policy.
+- [x] Store JSON as database JSON/JSONB, not text.
+- [x] Add remaining required uniqueness and foreign-key constraints.
+- [x] Add soft-delete/retention policy where appropriate.
+- [x] Add encrypted object storage for recordings, specs, screenshots, logs, and builds.
+- [x] Add signed short-lived artifact URLs backed by object storage.
+- [x] Add backup, restore, and retention jobs.
 
 ### P3 acceptance gate
 
 - [x] Migration from empty database succeeds.
 - [ ] Migration rollback succeeds in staging.
-- [ ] Tenant-isolation database tests pass.
+- [x] Tenant-isolation database tests pass.
 - [ ] Backup restores working project, task, approval, and artifact history.
-- [ ] Audit events cannot be silently overwritten through application API.
+- [x] Audit events cannot be silently overwritten through application API.
 
 ## P4 — Task engine and policy broker
 
 Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
 
-- [ ] Implement atomic lease using PostgreSQL row locking or atomic update/returning.
-- [ ] Validate lease token, worker identity, status, and expiry on heartbeat/result.
+- [x] Implement PostgreSQL `FOR UPDATE SKIP LOCKED` lease selection; PostgreSQL concurrency
+  integration proof still required.
+- [x] Validate lease token, worker identity, active status, and expiry on heartbeat/result.
 - [ ] Reject result whose URL task ID differs from body task ID.
-- [ ] Add idempotent result submission and duplicate-attempt handling.
-- [ ] Prevent re-submission from resetting verified task without explicit retry/version.
-- [ ] Schedule expired-lease recovery continuously.
-- [ ] Add exponential retry policy and maximum attempts.
+- [x] Add idempotent result submission and duplicate-attempt handling.
+- [x] Prevent re-submission from resetting verified task without explicit retry/version.
+- [x] Run expired-lease recovery before every local worker polling cycle.
+- [x] Enforce declared same-project task dependencies before a task can be leased.
+- [x] Enforce declared per-project and per-worker active-task limits during lease selection.
+- [x] Add bounded exponential retry delay and maximum-attempt blocking.
+- [ ] Add cloud control-plane event log for project, task, work, QA, preview, review, and
+  incident progress; retain resumable checkpoints and scrubbed failure reasons.
+- [ ] Add task-progress heartbeat watchdog: mark a task stalled when its worker or agent has
+  no bounded progress event, capture logs, safely terminate it, then retry or escalate.
+- [ ] Add idempotent wake/recovery worker that resumes only a checkpointed task with the exact
+  project, repository, worktree, conversation ID, lease token, and side-effect state.
+- [ ] Add reporting snapshots for founder/client: work completed, evidence, preview status,
+  blocked reason, elapsed time, uptime, downtime, and next owner action.
+  - [x] Founder-only project progress snapshot exposes task counts, next owner action, and safe
+    audit-event metadata. Client portal, evidence/preview links, uptime, and downtime remain open.
+- [ ] Add notification policy: routine reports remain in portal; AgentLine calls only for
+  urgent approval, repeated repair failure, deadline risk, or active-worker loss.
 - [ ] Add blocked, cancelled, waiting-approval, and superseded transitions.
-- [ ] Enforce legal state-transition table.
-- [ ] Implement dependency-aware DAG scheduling.
-- [ ] Add per-project and per-worker concurrency limits.
-- [ ] Add risk-based approval policies.
+  - [x] Tasks marked `requires_approval` create a pending task approval and cannot lease until a
+    founder approves; rejection cancels task.
+- [x] Enforce legal state-transition table in task-engine mutations.
+- [x] Implement dependency-aware DAG scheduling.
+- [x] Add per-project and per-worker concurrency limits.
+- [x] Add risk-based approval policies.
 - [ ] Build typed action broker for shell, files, browser, deployment, MCP, and calls.
 - [ ] Add deny-by-default tool policy.
 - [ ] Require human approval for:
@@ -236,46 +253,57 @@ Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
 ### P4 acceptance gate
 
 - [ ] Concurrent workers never lease same task.
-- [ ] Worker crash leads to safe requeue after lease expiry.
-- [ ] Late/stolen lease cannot submit result.
-- [ ] Duplicate result produces no duplicate side effect.
+- [x] Worker crash leads to safe requeue after lease expiry and retry backoff.
+- [x] Late/stolen lease cannot submit result.
+- [x] Duplicate result produces no duplicate side effect.
 - [ ] Missing required gate prevents verification.
 - [ ] Illegal state transitions fail.
-- [ ] High-risk action waits for correct approval.
+- [x] High-risk action waits for founder approval.
 
 ## P5 — Alpha Mac Worker and Node Keeper
 
 Goal: run approved tasks safely and recover across restarts/network loss.
 
-- [ ] Make worker poll cloud control plane outbound; remove direct production DB access.
-- [ ] Add worker registration, signed identity, heartbeat, and capability report.
+- [x] Make worker poll cloud control plane outbound; remove direct production DB access.
+- [x] Add worker registration, signed identity, heartbeat, and capability report.
+  - [x] Control-plane API persists signed worker registration, capability declaration, and health
+    samples. Local daemon outbound reporting remains open.
 - [ ] Install worker with launchd under dedicated non-admin macOS user.
-- [ ] Add graceful startup, shutdown, pause, and drain.
-- [ ] Add network, disk, AC power, battery, and real thermal-pressure monitoring.
-- [ ] Add idle-sleep assertion only while eligible work runs.
-- [ ] Add low-battery and thermal drain thresholds.
-- [ ] Add worktree disk quota and cleanup policy.
-- [ ] Validate repository cleanliness and exact base commit before worktree creation.
-- [ ] Sanitize branch and task identifiers.
-- [ ] Stop force-deleting existing branches.
-- [ ] Preserve result branch/commit until merge or explicit rejection.
-- [ ] Store worker credentials in Keychain.
-- [ ] Add FileVault/non-admin-worker setup documentation.
-- [ ] Add local kill-switch command.
-- [ ] Integrate Node Keeper status with Inito UI without weakening privacy guard.
-- [ ] Document supported operating mode:
-  - [ ] Lid open, AC power, screen locked/off.
-  - [ ] Supported clamshell hardware when required.
-  - [ ] External camera when closed-display owner detection is required.
+  - [x] Launchd plist template, preflight installation script, uninstall script, and automated plist validation pass. Physical dedicated non-admin account install plus reboot/login proof remains pending operator action.
+- [x] Make Mac worker fully background-only: outbound connection to cloud control plane,
+  headless AGY execution, no Chrome/IDE/meeting UI automation.
+- [x] Persist local encrypted handoff spool for outbound heartbeats/events during network loss;
+  replay idempotently when service returns.
+- [x] Add process supervisor for AGY turns: file-backed logs, progress timeout, process-group
+  cleanup, one bounded repair retry, and durable escalation event.
+- [x] Add remote-offline policy: cloud queues tasks and informs founder; do not claim it can
+  wake a powered-off Mac. Add documented power/lid/network eligibility checks.
+- [x] Add graceful startup, shutdown, pause, and drain.
+- [x] Add network, disk, AC power, battery, and real thermal-pressure monitoring.
+- [x] Add idle-sleep assertion only while eligible work runs.
+- [x] Add low-battery and thermal drain thresholds.
+- [x] Add worktree disk quota and cleanup policy.
+- [x] Validate repository cleanliness and exact base commit before worktree creation.
+- [x] Sanitize branch and task identifiers.
+- [x] Stop force-deleting existing branches.
+- [x] Preserve result branch/commit until merge or explicit rejection.
+- [x] Store worker credentials in Keychain.
+- [x] Add FileVault/non-admin-worker setup documentation.
+- [x] Add local kill-switch command.
+- [x] Integrate Node Keeper status with Inito UI without weakening privacy guard.
+- [x] Document supported operating mode:
+  - [x] Lid open, AC power, screen locked/off.
+  - [x] Supported clamshell hardware when required.
+  - [x] External camera when closed-display owner detection is required.
 
 ### P5 acceptance gate
 
-- [ ] Reboot/login starts worker automatically.
-- [ ] Network outage pauses and resumes without duplicate execution.
-- [ ] Low battery drains task safely.
-- [ ] Thermal pressure stops new heavy tasks.
-- [ ] Worker cannot escape worktree or use undeclared credentials.
-- [ ] Eight-hour and overnight soak tests pass.
+- [ ] Reboot/login starts worker automatically. (Launchd plist template, plutil validation, and service configuration verified; physical OS reboot verification pending operator execution on dedicated account).
+- [x] Network outage pauses and resumes without duplicate execution.
+- [x] Low battery drains task safely.
+- [x] Thermal pressure stops new heavy tasks.
+- [x] Worker cannot escape worktree or use undeclared credentials.
+- [ ] Eight-hour and overnight soak tests pass. (Durable soak harness with telemetry logging, checkpointing, and Markdown/JSON reporting verified; full 8-hour live overnight soak ready to run via `python testscript/soak_worker_harness.py --duration-hours 8`).
 
 ## P6 — Real coding-agent adapters
 
@@ -295,10 +323,12 @@ Goal: execute development through supported, observable agent interfaces.
 
 ### Antigravity
 
-- [ ] Replace Memory Graph-only adapter with supported Antigravity SDK/CLI invocation.
-- [ ] Keep Memory Graph as context/provenance, not execution proof.
-- [ ] Add structured completion result and cancellation.
-- [ ] Keep private IDE/process scraping disabled in production.
+- [x] Replace Memory Graph-only adapter with official Antigravity AGY CLI invocation.
+- [x] Keep Memory Graph as context/provenance, not execution proof.
+- [x] Add structured completion result and active founder cancellation: API cancellation is
+  delivered through authenticated worker heartbeat, cancels adapter task, and terminates AGY's
+  isolated process group.
+- [x] Keep private IDE/process scraping disabled in production.
 
 ### Codex
 

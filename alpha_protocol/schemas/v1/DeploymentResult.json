@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "DeploymentStatus": {
+      "description": "Deployment lifecycle statuses.",
+      "enum": [
+        "requested",
+        "building",
+        "preview_ready",
+        "awaiting_approval",
+        "deploying",
+        "deployed",
+        "rolling_back",
+        "rolled_back",
+        "failed"
+      ],
+      "title": "DeploymentStatus",
+      "type": "string"
+    }
+  },
+  "description": "Result of a deployment attempt.",
+  "properties": {
+    "deployment_id": {
+      "title": "Deployment Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/DeploymentStatus"
+    },
+    "deploy_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Live preview/production URL",
+      "title": "Deploy Url"
+    },
+    "deploy_log": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deploy Log"
+    },
+    "deployed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deployed At"
+    },
+    "smoke_test_passed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Smoke Test Passed"
+    },
+    "rollback_available": {
+      "default": true,
+      "title": "Rollback Available",
+      "type": "boolean"
+    },
+    "previous_commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Commit to rollback to if needed",
+      "title": "Previous Commit"
+    }
+  },
+  "required": [
+    "deployment_id",
+    "status"
+  ],
+  "title": "DeploymentResult",
+  "type": "object"
+}

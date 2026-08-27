@@ -1,0 +1,67 @@
+{
+  "description": "Aggregated meeting session metadata.",
+  "properties": {
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "room_name": {
+      "title": "Room Name",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "participants": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Participants",
+      "type": "array"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "ended_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ended At"
+    },
+    "segment_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Segment Count",
+      "type": "integer"
+    },
+    "event_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Event Count",
+      "type": "integer"
+    },
+    "consent_recorded": {
+      "default": false,
+      "description": "Whether all participants consented to recording/transcription",
+      "title": "Consent Recorded",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "session_id",
+    "room_name",
+    "project_id"
+  ],
+  "title": "MeetingSession",
+  "type": "object"
+}

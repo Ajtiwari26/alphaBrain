@@ -1,0 +1,82 @@
+"""Regression test: detached AGY descendants must not stall Alpha Brain."""
+
+import asyncio
+import json
+import os
+
+import pytest
+
+from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
+
+
+def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
+    fake_agy = tmp_path / "fake-agy"
+    conversation_id = "00000000-0000-0000-0000-000000000003"
+    fake_agy.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s\\n' '{json.dumps({'event': 'init', 'conversation_id': conversation_id})}'\n"
+        "(sleep 20) &\n"
+        f"printf '%s\\n' '{json.dumps({'event': 'result', 'result': {'conversation_id': conversation_id, 'status': 'SUCCESS', 'response': 'done'}})}'\n"
+    )
+    fake_agy.chmod(0o755)
+    bridge = AntigravityLiveBridge()
+    bridge.agy_bin = fake_agy
+
+    result = asyncio.run(
+        bridge._run_agy(
+            prompt="test",
+            worktree_path=tmp_path,
+            conversation_id=None,
+            is_new_project=True,
+            timeout_seconds=60,
+            log_path=tmp_path / "agy.json",
+        )
+    )
+
+    assert result["returncode"] == 0
+    assert result["events"][0]["conversation_id"] == conversation_id
+    assert "SUCCESS" in (tmp_path / "agy.json").read_text()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_agy_turn_kills_process_group(tmp_path):
+    fake_agy = tmp_path / "fake-agy-cancellable"
+    pid_path = tmp_path / "agy.pid"
+    fake_agy.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os\n"
+        "import time\n"
+        f"open({str(pid_path)!r}, 'w').write(str(os.getpid()))\n"
+        "time.sleep(30)\n"
+    )
+    fake_agy.chmod(0o755)
+    bridge = AntigravityLiveBridge()
+    bridge.agy_bin = fake_agy
+    turn = asyncio.create_task(
+        bridge._run_agy(
+            prompt="test cancellation",
+            worktree_path=tmp_path,
+            conversation_id=None,
+            is_new_project=True,
+            timeout_seconds=60,
+        )
+    )
+    for _ in range(100):
+        if pid_path.exists():
+            break
+        await asyncio.sleep(0.01)
+    assert pid_path.exists()
+    pid = int(pid_path.read_text())
+
+    turn.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await turn
+
+    for _ in range(100):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        await asyncio.sleep(0.01)
+    else:
+        pytest.fail("Cancelled AGY process group remained alive")

@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "MeetingEventType": {
+      "description": "Structured event types extracted from meeting conversations.",
+      "enum": [
+        "raw_request",
+        "clarified_requirement",
+        "eva_recommendation",
+        "trade_off",
+        "decision",
+        "open_question",
+        "acceptance_criterion",
+        "owner_action"
+      ],
+      "title": "MeetingEventType",
+      "type": "string"
+    }
+  },
+  "description": "Structured event extracted from meeting transcript analysis.",
+  "properties": {
+    "protocol_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Protocol Version",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "room_name": {
+      "title": "Room Name",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/MeetingEventType"
+    },
+    "title": {
+      "description": "Short summary of the event",
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "description": "Detailed description",
+      "title": "Description",
+      "type": "string"
+    },
+    "raw_quote": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Direct transcript quote that sourced this event",
+      "title": "Raw Quote"
+    },
+    "source_segment_ids": {
+      "description": "IDs of transcript segments this event was derived from",
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Segment Ids",
+      "type": "array"
+    },
+    "speaker_identity": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Speaker Identity"
+    },
+    "is_inference": {
+      "default": false,
+      "description": "True if this was inferred by AI rather than directly stated",
+      "title": "Is Inference",
+      "type": "boolean"
+    },
+    "confidence": {
+      "default": 1.0,
+      "description": "AI confidence in extraction accuracy",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "room_name",
+    "project_id",
+    "event_type",
+    "title",
+    "description"
+  ],
+  "title": "MeetingEvent",
+  "type": "object"
+}

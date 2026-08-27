@@ -1,0 +1,95 @@
+{
+  "$defs": {
+    "ApprovalStatus": {
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "expired"
+      ],
+      "title": "ApprovalStatus",
+      "type": "string"
+    },
+    "RiskClass": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    }
+  },
+  "description": "Request for human approval before a high-risk action proceeds.",
+  "properties": {
+    "approval_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "action_type": {
+      "description": "e.g. production_deployment, db_migration, destructive_cmd",
+      "title": "Action Type",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "risk_class": {
+      "$ref": "#/$defs/RiskClass"
+    },
+    "requested_by": {
+      "description": "system, agent, or worker identity",
+      "title": "Requested By",
+      "type": "string"
+    },
+    "required_approver_role": {
+      "default": "founder",
+      "title": "Required Approver Role",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/ApprovalStatus",
+      "default": "pending"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "expires_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expires At"
+    }
+  },
+  "required": [
+    "approval_id",
+    "task_id",
+    "project_id",
+    "action_type",
+    "description",
+    "risk_class",
+    "requested_by"
+  ],
+  "title": "ApprovalRequest",
+  "type": "object"
+}

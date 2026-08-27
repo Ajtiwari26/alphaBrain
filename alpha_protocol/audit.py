@@ -7,7 +7,7 @@ Protocol version: 1
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ class ProvenanceRecord(BaseModel):
 class AuditEvent(BaseModel):
     """Immutable, append-only audit record for every significant system action."""
 
-    protocol_version: str = Field(default=PROTOCOL_VERSION)
+    protocol_version: Literal["1"] = Field(default=PROTOCOL_VERSION)
     event_id: str
     event_type: str = Field(
         description="e.g. task_leased, gate_passed, approval_granted, call_placed, "

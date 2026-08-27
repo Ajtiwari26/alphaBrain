@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import cast
 
 from alpha_core.config import settings
+from alpha_core.security import redact_dict, worker_kill_switch
 from alpha_protocol import (
     AgentType,
     GateEvidence,
@@ -58,7 +59,7 @@ class AntigravityAdapter(BaseAgentAdapter):
             "allowed_paths": task.allowed_paths,
             "allowed_tools": task.allowed_tools,
         }
-        overview_path.write_text(json.dumps(overview_content, indent=2))
+        overview_path.write_text(json.dumps(redact_dict(overview_content), indent=2))
 
         # Create project symlink entry point
         project_link_dir = self.memory_graph_path / "by_project" / task.project_id
@@ -80,12 +81,54 @@ class AntigravityAdapter(BaseAgentAdapter):
     ) -> TaskResult:
         attempt_id = f"att_{task.task_id}_{uuid.uuid4().hex[:6]}"
 
+        from alpha_protocol import compute_packet_digest
+
+        packet_sha256 = (
+            compute_packet_digest(task) if getattr(task, "require_packet_binding", False) else None
+        )
+
+        if not worker_kill_switch.can_execute(task.project_id):
+            logger.warning("Execution halted by kill switch for project %s", task.project_id)
+            return TaskResult(
+                attempt_id=attempt_id,
+                task_id=task.task_id,
+                status=TaskStatus.BLOCKED,
+                agent=self.agent_type,
+                model=f"antigravity-{settings.ANTIGRAVITY_MODEL}",
+                base_commit=base_commit,
+                result_commit=base_commit,
+                packet_sha256=packet_sha256,
+                files_changed=[],
+                diff_summary="",
+                blockers=[f"Worker kill switch active for project {task.project_id}"],
+            )
+
         # 1. Record task provenance locally; this is not execution proof.
         session_dir = self.setup_session_in_memory_graph(task, worktree_path)
 
         # 2. Execute through the project-dedicated Antigravity chat.
-        dispatch = await self.live_bridge.dispatch(task, worktree_path)
-
+        try:
+            dispatch = await self.live_bridge.dispatch(task, worktree_path, attempt_id, session_dir)
+        except Exception as exc:
+            logger.error("Antigravity bridge dispatch failed: %s", exc)
+            return TaskResult(
+                attempt_id=attempt_id,
+                task_id=task.task_id,
+                status=TaskStatus.RETRYABLE_FAILED,
+                agent=self.agent_type,
+                model=f"antigravity-{settings.ANTIGRAVITY_MODEL}",
+                base_commit=base_commit,
+                result_commit=base_commit,
+                packet_sha256=packet_sha256,
+                files_changed=[],
+                diff_summary="",
+                gate_result=None,
+                blockers=[f"Dispatch failed ({type(exc).__name__}): {exc!s}"],
+                provenance_notes=[
+                    f"Task provenance recorded at {session_dir}",
+                    "Antigravity bridge dispatch failed due to exception",
+                ],
+            )
         # 3. Run declared acceptance gates after explicit agent completion.
         gate_result = self.run_acceptance_gates(task, worktree_path, attempt_id)
         gate_result.evidence_items.append(
@@ -147,6 +190,12 @@ class AntigravityAdapter(BaseAgentAdapter):
 
         status = TaskStatus.COMPLETED if gate_result.all_passed else TaskStatus.RETRYABLE_FAILED
 
+        from alpha_protocol import compute_packet_digest
+
+        packet_sha256 = (
+            compute_packet_digest(task) if getattr(task, "require_packet_binding", False) else None
+        )
+
         return TaskResult(
             attempt_id=attempt_id,
             task_id=task.task_id,
@@ -155,6 +204,7 @@ class AntigravityAdapter(BaseAgentAdapter):
             model=f"antigravity-{settings.ANTIGRAVITY_MODEL}",
             base_commit=base_commit,
             result_commit=result_commit or base_commit,
+            packet_sha256=packet_sha256,
             files_changed=changed_files,
             diff_summary=diff_summary,
             gate_result=gate_result,

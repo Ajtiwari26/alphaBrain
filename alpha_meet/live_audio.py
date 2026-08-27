@@ -9,6 +9,7 @@ import logging
 from fastapi import WebSocket, WebSocketDisconnect
 
 from alpha_core.config import settings
+from alpha_core.security import redact_secrets
 from alpha_voice.gemini_live import GeminiLiveSession
 
 logger = logging.getLogger("alpha_meet.live_audio")
@@ -81,6 +82,6 @@ class LiveMeetAudioBridge:
         except WebSocketDisconnect:
             logger.info("Browser audio WebSocket disconnected")
         except Exception as e:
-            logger.warning(f"LiveMeetAudioBridge error: {e}")
+            logger.warning("LiveMeetAudioBridge error: %s", redact_secrets(str(e)))
         finally:
             self.is_running = False

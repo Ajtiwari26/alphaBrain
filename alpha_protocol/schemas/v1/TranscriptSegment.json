@@ -1,0 +1,56 @@
+{
+  "description": "Raw timestamped transcript segment from a meeting.",
+  "properties": {
+    "segment_id": {
+      "title": "Segment Id",
+      "type": "string"
+    },
+    "room_name": {
+      "title": "Room Name",
+      "type": "string"
+    },
+    "speaker_identity": {
+      "title": "Speaker Identity",
+      "type": "string"
+    },
+    "speaker_name": {
+      "title": "Speaker Name",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "is_eva": {
+      "default": false,
+      "title": "Is Eva",
+      "type": "boolean"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "duration_seconds": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration Seconds"
+    }
+  },
+  "required": [
+    "segment_id",
+    "room_name",
+    "speaker_identity",
+    "speaker_name",
+    "text"
+  ],
+  "title": "TranscriptSegment",
+  "type": "object"
+}

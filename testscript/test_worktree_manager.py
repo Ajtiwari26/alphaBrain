@@ -3,9 +3,7 @@ testscript/test_worktree_manager.py
 Automated tests for Git worktree creation, change detection, commits, and cleanup.
 """
 
-import shutil
 import subprocess
-from pathlib import Path
 
 import pytest
 
@@ -14,10 +12,8 @@ from alpha_worker.worktree import WorktreeManager
 
 
 @pytest.fixture
-def temp_git_repo():
-    repo_dir = Path("/tmp/test_alpha_repo")
-    if repo_dir.exists():
-        shutil.rmtree(repo_dir, ignore_errors=True)
+def temp_git_repo(tmp_path):
+    repo_dir = tmp_path / "repo"
     repo_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize git repo and make first commit
@@ -34,13 +30,10 @@ def temp_git_repo():
 
     yield repo_dir
 
-    # Cleanup
-    shutil.rmtree(repo_dir, ignore_errors=True)
 
-
-def test_worktree_lifecycle(temp_git_repo, monkeypatch):
+def test_worktree_lifecycle(temp_git_repo, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (temp_git_repo.parent,))
-    mgr = WorktreeManager(base_worktree_dir=Path("/tmp/test_alpha_worktrees"))
+    mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
     task_id = "tsk_worktree_test_1"
 
     # 1. Create worktree
@@ -51,6 +44,12 @@ def test_worktree_lifecycle(temp_git_repo, monkeypatch):
     )
     assert worktree_path.exists()
     assert (worktree_path / "README.md").exists()
+    assert (
+        mgr.create_or_resume_worktree(
+            repo_path=str(temp_git_repo), task_id=task_id, base_commit="HEAD"
+        )
+        == worktree_path
+    )
 
     # 2. Modify files in worktree
     new_file = worktree_path / "new_feature.py"
@@ -66,3 +65,18 @@ def test_worktree_lifecycle(temp_git_repo, monkeypatch):
     # 4. Remove worktree safely
     mgr.remove_worktree(str(temp_git_repo), task_id)
     assert not worktree_path.exists()
+
+
+def test_worktree_refuses_dirty_source_and_dirty_cleanup(temp_git_repo, monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (temp_git_repo.parent,))
+    mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
+    (temp_git_repo / "dirty.txt").write_text("source dirty\n")
+    with pytest.raises(RuntimeError, match="uncommitted"):
+        mgr.create_worktree(str(temp_git_repo), "tsk_dirty_source")
+    (temp_git_repo / "dirty.txt").unlink()
+
+    worktree_path = mgr.create_worktree(str(temp_git_repo), "tsk_dirty_cleanup")
+    (worktree_path / "pending.txt").write_text("preserve me\n")
+    with pytest.raises(RuntimeError, match="uncommitted"):
+        mgr.remove_worktree(str(temp_git_repo), "tsk_dirty_cleanup")
+    assert worktree_path.exists()

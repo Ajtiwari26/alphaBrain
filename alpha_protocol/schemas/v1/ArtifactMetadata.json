@@ -1,0 +1,126 @@
+{
+  "description": "Metadata for a stored artifact (log, screenshot, build, recording, spec doc).",
+  "properties": {
+    "protocol_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Protocol Version",
+      "type": "string"
+    },
+    "artifact_id": {
+      "description": "Safe artifact identifier without path traversal",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    },
+    "attempt_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attempt Id"
+    },
+    "media_type": {
+      "description": "MIME type, e.g. application/pdf, text/plain, image/png",
+      "title": "Media Type",
+      "type": "string"
+    },
+    "filename": {
+      "maxLength": 255,
+      "title": "Filename",
+      "type": "string"
+    },
+    "size_bytes": {
+      "minimum": 0,
+      "title": "Size Bytes",
+      "type": "integer"
+    },
+    "sha256_hash": {
+      "description": "SHA-256 hex digest of file contents",
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Sha256 Hash",
+      "type": "string"
+    },
+    "storage_path": {
+      "description": "Internal storage path (bucket/key or local path)",
+      "title": "Storage Path",
+      "type": "string"
+    },
+    "signed_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Short-lived pre-signed download URL",
+      "title": "Signed Url"
+    },
+    "signed_url_expires_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Signed Url Expires At"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "created_by": {
+      "description": "Identity of creator (agent, worker, system)",
+      "title": "Created By",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "project_id",
+    "media_type",
+    "filename",
+    "size_bytes",
+    "sha256_hash",
+    "storage_path",
+    "created_by"
+  ],
+  "title": "ArtifactMetadata",
+  "type": "object"
+}

@@ -1,13 +1,23 @@
 import os
+from enum import Enum
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env.local")
 load_dotenv(PROJECT_ROOT / ".env")
 USE_VERTEX = os.getenv("GEMINI_USE_VERTEX", "false").lower() == "true"
+
+
+class AppEnvironment(str, Enum):
+    """Supported operating environments for Alpha Brain."""
+
+    DEVELOPMENT = "development"
+    TEST = "test"
+    STAGING = "staging"
+    PRODUCTION = "production"
 
 
 def _csv_env(name: str, default: str = "") -> tuple[str, ...]:
@@ -17,8 +27,49 @@ def _csv_env(name: str, default: str = "") -> tuple[str, ...]:
 class Settings(BaseModel):
     # App Information
     APP_NAME: str = "Alpha Brain"
-    ENV: str = os.getenv("ENV", "development")
+    ENV: str = os.getenv("ENV", AppEnvironment.DEVELOPMENT.value)
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+
+    # Environment profile helpers
+    @property
+    def is_development(self) -> bool:
+        return self.ENV.lower() == AppEnvironment.DEVELOPMENT.value
+
+    @property
+    def is_test(self) -> bool:
+        return self.ENV.lower() == AppEnvironment.TEST.value
+
+    @property
+    def is_staging(self) -> bool:
+        return self.ENV.lower() == AppEnvironment.STAGING.value
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENV.lower() == AppEnvironment.PRODUCTION.value
+
+    def validate_environment_safety(self, strict: bool = False) -> list[str]:
+        """Validate safety constraints for staging and production environments."""
+        issues: list[str] = []
+        if self.is_production or self.is_staging:
+            if self.DEBUG:
+                issues.append(f"DEBUG must be false in {self.ENV} environment")
+            if self.WORKER_ALLOW_LOCAL_DB:
+                issues.append(f"WORKER_ALLOW_LOCAL_DB must be false in {self.ENV} environment")
+            if "sqlite" in self.DATABASE_URL.lower():
+                issues.append(f"Production database URL cannot use SQLite: {self.DATABASE_URL}")
+            if not self.ALPHA_API_TOKEN or len(self.ALPHA_API_TOKEN) < 32:
+                issues.append(f"ALPHA_API_TOKEN must be at least 32 characters in {self.ENV}")
+            if not self.ALPHA_WORKER_TOKEN or len(self.ALPHA_WORKER_TOKEN) < 32:
+                issues.append(f"ALPHA_WORKER_TOKEN must be at least 32 characters in {self.ENV}")
+            if not self.ALPHA_SIGNING_SECRET or len(self.ALPHA_SIGNING_SECRET) < 32:
+                issues.append(f"ALPHA_SIGNING_SECRET must be at least 32 characters in {self.ENV}")
+            if any(origin == "*" for origin in self.CORS_ORIGINS):
+                issues.append(f"Wildcard CORS origin '*' is forbidden in {self.ENV}")
+        if strict and issues:
+            raise ValueError(
+                f"Environment validation failed for '{self.ENV}': " + "; ".join(issues)
+            )
+        return issues
 
     # Authentication and network boundaries
     ALPHA_API_TOKEN: str = os.getenv("ALPHA_API_TOKEN", "")
@@ -82,7 +133,50 @@ class Settings(BaseModel):
     ANTIGRAVITY_EXECUTION_ENABLED: bool = (
         os.getenv("ANTIGRAVITY_EXECUTION_ENABLED", "true").lower() == "true"
     )
-    ANTIGRAVITY_MODEL: str = os.getenv("ANTIGRAVITY_MODEL", "flash")
+    ANTIGRAVITY_MODEL: str = os.getenv("ANTIGRAVITY_MODEL", "gemini-3.1-pro-high")
+    ANTIGRAVITY_UNATTENDED_COMMANDS: bool = (
+        os.getenv("ANTIGRAVITY_UNATTENDED_COMMANDS", "false").lower() == "true"
+    )
+    ANTIGRAVITY_EFFORT: str = os.getenv("ANTIGRAVITY_EFFORT", "high")
+
+    # Model Routing (Packet R2-A)
+    MODEL_ROUTING_ENABLED: bool = os.getenv("MODEL_ROUTING_ENABLED", "false").lower() == "true"
+    ROUTER_STATE_PATH: Path = Path(
+        os.getenv(
+            "ROUTER_STATE_PATH",
+            str(
+                Path.home() / "Library" / "Application Support" / "AlphaBrain" / "router-state.json"
+            ),
+        )
+    )
+    ROUTER_LOCK_PATH: Path = Path(
+        os.getenv(
+            "ROUTER_LOCK_PATH",
+            str(Path.home() / "Library" / "Application Support" / "AlphaBrain" / "router-lock.lck"),
+        )
+    )
+    ROUTER_LOCK_TIMEOUT_SECONDS: int = int(os.getenv("ROUTER_LOCK_TIMEOUT_SECONDS", "300"))
+    ROUTER_INFERRED_COOLDOWN_HOURS: int = int(os.getenv("ROUTER_INFERRED_COOLDOWN_HOURS", "5"))
+    MAX_ELIGIBLE_ATTEMPTS: int = int(os.getenv("MAX_ELIGIBLE_ATTEMPTS", "5"))
+
+    @field_validator("WORKER_LEASE_DURATION_SECONDS")
+    @classmethod
+    def validate_worker_lease_duration(cls, v: int) -> int:
+        if v < 300 or v > 7200:
+            raise ValueError("WORKER_LEASE_DURATION_SECONDS must be between 300 and 7200")
+        return v
+
+    @field_validator("ANTIGRAVITY_EFFORT")
+    @classmethod
+    def validate_antigravity_effort(cls, v: str) -> str:
+        v = v.lower()
+        if v not in {"low", "medium", "high"}:
+            raise ValueError("ANTIGRAVITY_EFFORT must be 'low', 'medium', or 'high'")
+        return v
+
+    ANTIGRAVITY_CLI_BIN: Path = Path(
+        os.getenv("ANTIGRAVITY_CLI_BIN", str(Path.home() / ".local" / "bin" / "agy"))
+    )
     ANTIGRAVITY_SDLC_SKILL_PATH: Path = Path(
         os.getenv(
             "ANTIGRAVITY_SDLC_SKILL_PATH",
@@ -94,21 +188,11 @@ class Settings(BaseModel):
     ANTIGRAVITY_TASK_TIMEOUT_SECONDS: int = int(
         os.getenv("ANTIGRAVITY_TASK_TIMEOUT_SECONDS", "1200")
     )
-    ANTIGRAVITY_AGENTAPI_BIN: Path = Path(
-        os.getenv(
-            "ANTIGRAVITY_AGENTAPI_BIN",
-            str(Path.home() / ".gemini" / "antigravity" / "bin" / "agentapi"),
-        )
-    )
-    ANTIGRAVITY_OAUTH_TOKEN_FILE: Path = Path(
-        os.getenv(
-            "ANTIGRAVITY_OAUTH_TOKEN_FILE",
-            str(Path.home() / ".gemini" / "jetski-standalone-oauth-token"),
-        )
-    )
-    ANTIGRAVITY_BRAIN_DIRS: tuple[Path, ...] = (
-        Path.home() / ".gemini" / "antigravity-ide" / "brain",
-        Path.home() / ".gemini" / "antigravity" / "brain",
+    WORKER_LEASE_DURATION_SECONDS: int = int(os.getenv("WORKER_LEASE_DURATION_SECONDS", "1800"))
+    # Optional existing conversation for AlphaBrain's own repository only.
+    # Client projects always receive their own project-bound conversation record.
+    ALPHA_BRAIN_ANTIGRAVITY_CONVERSATION_ID: str = os.getenv(
+        "ALPHA_BRAIN_ANTIGRAVITY_CONVERSATION_ID", ""
     )
     WORKTREE_BASE_DIR: Path = Path(
         os.getenv(
@@ -117,6 +201,29 @@ class Settings(BaseModel):
         )
     )
     ATTACHED_DEVICE_ID: str = os.getenv("ATTACHED_DEVICE_ID", "local-mac-worker")
+    WORKER_CONTROL_PLANE_URL: str = os.getenv("WORKER_CONTROL_PLANE_URL", "")
+    WORKER_ID: str = os.getenv("WORKER_ID", "mac_worker_local")
+    WORKER_IDENTITY_TOKEN: str = os.getenv("WORKER_IDENTITY_TOKEN", "")
+    WORKER_STATE_DIR: Path = Path(
+        os.getenv(
+            "WORKER_STATE_DIR",
+            str(Path.home() / "Library" / "Application Support" / "AlphaBrain" / "worker-state"),
+        )
+    )
+    WORKER_SPOOL_FERNET_KEY: str = os.getenv("WORKER_SPOOL_FERNET_KEY", "")
+    WORKER_HTTP_TIMEOUT_SECONDS: float = float(os.getenv("WORKER_HTTP_TIMEOUT_SECONDS", "15"))
+    WORKER_HEARTBEAT_SECONDS: int = int(os.getenv("WORKER_HEARTBEAT_SECONDS", "60"))
+    WORKER_ALLOW_LOCAL_DB: bool = (
+        os.getenv(
+            "WORKER_ALLOW_LOCAL_DB",
+            "true" if os.getenv("ENV", "development") != "production" else "false",
+        ).lower()
+        == "true"
+    )
+    WORKER_KEYCHAIN_SERVICE: str = os.getenv("WORKER_KEYCHAIN_SERVICE", "com.deploymate.alphabrain")
+    WORKER_USE_KEYCHAIN: bool = os.getenv("WORKER_USE_KEYCHAIN", "false").lower() == "true"
+    WORKTREE_MAX_DISK_GB: float = float(os.getenv("WORKTREE_MAX_DISK_GB", "100"))
+    WORKTREE_MIN_FREE_GB: float = float(os.getenv("WORKTREE_MIN_FREE_GB", "20"))
     ALLOWED_REPO_ROOTS: tuple[Path, ...] = tuple(
         Path(item).expanduser()
         for item in _csv_env(
@@ -126,7 +233,7 @@ class Settings(BaseModel):
     )
     ALLOWED_GATE_EXECUTABLES: tuple[str, ...] = _csv_env(
         "ALLOWED_GATE_EXECUTABLES",
-        "pytest,ruff,mypy,npm,npx,pnpm,yarn,swift,xcodebuild,cargo,go",
+        "pytest,ruff,mypy,node,npm,npx,pnpm,yarn,swift,xcodebuild,cargo,go",
     )
     # LiveKit (Local or Cloud WebRTC)
     LIVEKIT_URL: str = os.getenv("LIVEKIT_URL", "ws://localhost:7880")

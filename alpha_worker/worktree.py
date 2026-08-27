@@ -48,6 +48,36 @@ class WorktreeManager:
         return path
 
     @staticmethod
+    def _git(repo: Path, args: list[str]) -> str:
+        result = subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or f"git {' '.join(args)} failed")
+        return result.stdout.strip()
+
+    def validate_clean_base_commit(self, repo: Path, base_commit: str) -> str:
+        """Require clean source repository and resolve exact immutable task base commit."""
+        if self._git(repo, ["status", "--porcelain"]):
+            raise RuntimeError("Repository has uncommitted changes; refusing task worktree")
+        return self._git(repo, ["rev-parse", "--verify", f"{base_commit}^{{commit}}"])
+
+    def _worktree_bytes(self) -> int:
+        total = 0
+        for path in self.base_dir.rglob("*"):
+            if path.is_file() and not path.is_symlink():
+                total += path.stat().st_size
+        return total
+
+    def enforce_disk_quota(self) -> None:
+        used_bytes = self._worktree_bytes()
+        max_bytes = int(settings.WORKTREE_MAX_DISK_GB * 1024**3)
+        free_bytes = shutil.disk_usage(self.base_dir).free
+        min_free_bytes = int(settings.WORKTREE_MIN_FREE_GB * 1024**3)
+        if used_bytes >= max_bytes:
+            raise RuntimeError("Worktree disk quota reached; explicit cleanup required")
+        if free_bytes < min_free_bytes:
+            raise RuntimeError("Insufficient free disk for task worktree")
+
+    @staticmethod
     def find_disallowed_changes(changed_files: list[str], allowed_paths: list[str]) -> list[str]:
         if "." in allowed_paths:
             return []
@@ -73,6 +103,8 @@ class WorktreeManager:
     ) -> Path:
         """Creates an isolated git worktree for a specific task."""
         validated_repo = self.validate_repo_path(repo_path)
+        resolved_base = self.validate_clean_base_commit(validated_repo, base_commit)
+        self.enforce_disk_quota()
         worktree_path = self.get_worktree_path(task_id)
         if worktree_path.exists():
             raise RuntimeError(f"Worktree already exists for task {task_id}")
@@ -93,12 +125,39 @@ class WorktreeManager:
             "-b",
             branch_name,
             str(worktree_path),
-            base_commit,
+            resolved_base,
         ]
         res = subprocess.run(cmd, cwd=str(validated_repo), capture_output=True, text=True)
         if res.returncode != 0:
             raise RuntimeError(f"Failed to create git worktree: {res.stderr}")
 
+        return worktree_path
+
+    def create_or_resume_worktree(
+        self,
+        repo_path: str,
+        task_id: str,
+        base_commit: str = "HEAD",
+    ) -> Path:
+        """Reuse only matching task worktree; otherwise create isolated worktree."""
+        worktree_path = self.get_worktree_path(task_id)
+        if not worktree_path.exists():
+            return self.create_worktree(repo_path, task_id, base_commit)
+
+        validated_repo = self.validate_repo_path(repo_path)
+        resolved_base = self._git(
+            validated_repo, ["rev-parse", "--verify", f"{base_commit}^{{commit}}"]
+        )
+        expected_branch = f"alpha/{task_id}"
+        branch = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=str(worktree_path),
+            capture_output=True,
+            text=True,
+        )
+        if branch.returncode != 0 or branch.stdout.strip() != expected_branch:
+            raise RuntimeError("Existing worktree does not match task branch; refusing resume")
+        self._git(worktree_path, ["merge-base", "--is-ancestor", resolved_base, "HEAD"])
         return worktree_path
 
     def get_changed_files(self, worktree_path: Path, base_commit: str = "HEAD") -> list[str]:
@@ -149,18 +208,20 @@ class WorktreeManager:
         return rev_res.stdout.strip()
 
     def remove_worktree(self, repo_path: str, task_id: str) -> None:
-        """Safely removes the worktree and prunes git worktree references."""
+        """Remove only clean worktree; preserve task branch and never force-delete evidence."""
         validated_repo = self.validate_repo_path(repo_path)
         worktree_path = self.get_worktree_path(task_id)
         if worktree_path.exists():
-            subprocess.run(
-                ["git", "worktree", "remove", "--force", str(worktree_path)],
+            if self._git(worktree_path, ["status", "--porcelain"]):
+                raise RuntimeError("Worktree has uncommitted changes; preserving for inspection")
+            result = subprocess.run(
+                ["git", "worktree", "remove", str(worktree_path)],
                 cwd=str(validated_repo),
                 capture_output=True,
+                text=True,
             )
-            # Extra cleanup if directory lingers
-            if worktree_path.exists():
-                shutil.rmtree(worktree_path, ignore_errors=True)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "Failed to remove clean worktree")
 
         subprocess.run(
             ["git", "worktree", "prune"],

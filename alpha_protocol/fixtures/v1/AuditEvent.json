@@ -1,0 +1,16 @@
+{
+  "protocol_version": "1",
+  "event_id": "audit_evt_001",
+  "event_type": "schema_exported",
+  "org_id": null,
+  "project_id": "prj_alpha",
+  "task_id": null,
+  "actor": "system",
+  "actor_role": null,
+  "details": {
+    "version": "1",
+    "models_count": 21
+  },
+  "provenance": null,
+  "timestamp": "2026-08-26T18:22:28.888601Z"
+}

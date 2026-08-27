@@ -1,0 +1,40 @@
+{
+  "properties": {
+    "dec_id": {
+      "title": "Dec Id",
+      "type": "string"
+    },
+    "topic": {
+      "title": "Topic",
+      "type": "string"
+    },
+    "decision": {
+      "title": "Decision",
+      "type": "string"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "alternatives_considered": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Alternatives Considered",
+      "type": "array"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "dec_id",
+    "topic",
+    "decision",
+    "rationale"
+  ],
+  "title": "Decision",
+  "type": "object"
+}

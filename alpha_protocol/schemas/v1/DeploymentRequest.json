@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "DeploymentStatus": {
+      "description": "Deployment lifecycle statuses.",
+      "enum": [
+        "requested",
+        "building",
+        "preview_ready",
+        "awaiting_approval",
+        "deploying",
+        "deployed",
+        "rolling_back",
+        "rolled_back",
+        "failed"
+      ],
+      "title": "DeploymentStatus",
+      "type": "string"
+    }
+  },
+  "description": "Request to deploy a verified build to a target environment.",
+  "properties": {
+    "protocol_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Protocol Version",
+      "type": "string"
+    },
+    "deployment_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "title": "Deployment Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "attempt_id": {
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "target_environment": {
+      "description": "e.g. preview, staging, production",
+      "title": "Target Environment",
+      "type": "string"
+    },
+    "source_commit": {
+      "title": "Source Commit",
+      "type": "string"
+    },
+    "gate_evidence_ids": {
+      "description": "IDs of passing gate evidence required before deployment",
+      "items": {
+        "type": "string"
+      },
+      "title": "Gate Evidence Ids",
+      "type": "array"
+    },
+    "requires_approval": {
+      "default": true,
+      "title": "Requires Approval",
+      "type": "boolean"
+    },
+    "requested_by": {
+      "description": "Identity of requester",
+      "title": "Requested By",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/DeploymentStatus",
+      "default": "requested"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "deployment_id",
+    "project_id",
+    "task_id",
+    "attempt_id",
+    "target_environment",
+    "source_commit",
+    "requested_by"
+  ],
+  "title": "DeploymentRequest",
+  "type": "object"
+}

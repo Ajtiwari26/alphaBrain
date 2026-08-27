@@ -1,0 +1,17 @@
+{
+  "protocol_version": "1",
+  "fixtures": {
+    "TaskEnvelope": "TaskEnvelope.json",
+    "TaskResult": "TaskResult.json",
+    "WorkerRegistration": "WorkerRegistration.json",
+    "WorkerHealthReport": "WorkerHealthReport.json",
+    "MeetingEvent": "MeetingEvent.json",
+    "CallJob": "CallJob.json",
+    "DeploymentRequest": "DeploymentRequest.json",
+    "SpecVersion": "SpecVersion.json",
+    "ArtifactMetadata": "ArtifactMetadata.json",
+    "ApprovalRequest": "ApprovalRequest.json",
+    "AuditEvent": "AuditEvent.json",
+    "ProvenanceRecord": "ProvenanceRecord.json"
+  }
+}

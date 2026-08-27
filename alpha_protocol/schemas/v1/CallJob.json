@@ -1,0 +1,137 @@
+{
+  "$defs": {
+    "CallStatus": {
+      "enum": [
+        "queued",
+        "accepted",
+        "dialing",
+        "answered",
+        "speaking",
+        "action_pending",
+        "completed",
+        "no_answer",
+        "failed",
+        "declined"
+      ],
+      "title": "CallStatus",
+      "type": "string"
+    },
+    "PersonaType": {
+      "enum": [
+        "eva",
+        "kavya"
+      ],
+      "title": "PersonaType",
+      "type": "string"
+    }
+  },
+  "description": "Job submitted to AgentLine to initiate an autonomous voice call.",
+  "properties": {
+    "notification_id": {
+      "title": "Notification Id",
+      "type": "string"
+    },
+    "persona": {
+      "$ref": "#/$defs/PersonaType",
+      "default": "kavya"
+    },
+    "recipient_phone": {
+      "title": "Recipient Phone",
+      "type": "string"
+    },
+    "recipient_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recipient Name"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Id"
+    },
+    "purpose": {
+      "description": "e.g. founder_preview_review, client_milestone_update",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "script_facts": {
+      "additionalProperties": true,
+      "description": "Verified facts model is allowed to state",
+      "title": "Script Facts",
+      "type": "object"
+    },
+    "evidence_refs": {
+      "description": "IDs of passing gates or preview URLs",
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "idempotency_key": {
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/CallStatus",
+      "default": "queued"
+    },
+    "call_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Call Id"
+    },
+    "duration_seconds": {
+      "default": 0,
+      "title": "Duration Seconds",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "completed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At"
+    }
+  },
+  "required": [
+    "notification_id",
+    "recipient_phone",
+    "purpose",
+    "idempotency_key"
+  ],
+  "title": "CallJob",
+  "type": "object"
+}

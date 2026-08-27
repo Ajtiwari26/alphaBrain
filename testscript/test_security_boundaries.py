@@ -11,7 +11,11 @@ from pydantic import ValidationError
 
 from alpha_core.api.app import app
 from alpha_core.config import settings
-from alpha_core.security import create_meeting_invite, verify_meeting_invite
+from alpha_core.security import (
+    create_meeting_invite,
+    create_worker_identity_token,
+    verify_meeting_invite,
+)
 from alpha_meet.eva_live_agent import eva_room_manager
 from alpha_protocol import (
     AcceptancePlan,
@@ -63,6 +67,26 @@ async def test_private_and_worker_routes_require_separate_tokens(api_headers):
 
     assert task_response.status_code == 401
     assert lease_with_api_token.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_worker_cannot_claim_another_worker_identity(worker_headers):
+    worker_identity = create_worker_identity_token("mac-worker-a")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        allowed = await client.post(
+            "/api/tasks/lease",
+            json={"worker_id": "mac-worker-a"},
+            headers={**worker_headers, "X-Alpha-Worker-Identity": worker_identity},
+        )
+        denied = await client.post(
+            "/api/tasks/lease",
+            json={"worker_id": "mac-worker-b"},
+            headers={**worker_headers, "X-Alpha-Worker-Identity": worker_identity},
+        )
+
+    assert allowed.status_code == 200
+    assert denied.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -212,7 +236,6 @@ def test_repository_and_changed_path_boundaries(tmp_path, monkeypatch):
     repository.mkdir()
     subprocess.run(["git", "init"], cwd=repository, check=True, capture_output=True)
     monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (allowed_root,))
-
     assert WorktreeManager.validate_repo_path(str(repository)) == repository.resolve()
     with pytest.raises(ValueError, match="outside allowed roots"):
         WorktreeManager.validate_repo_path(str(tmp_path / "outside"))
@@ -222,3 +245,35 @@ def test_repository_and_changed_path_boundaries(tmp_path, monkeypatch):
         ["src"],
     )
     assert violations == ["secrets.env"]
+
+
+@pytest.mark.asyncio
+async def test_invalid_worker_identity_token_returns_401(worker_headers):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        tampered_response = await client.post(
+            "/api/tasks/lease",
+            json={"worker_id": "mac-worker-tampered"},
+            headers={**worker_headers, "X-Alpha-Worker-Identity": "invalid.fake.token"},
+        )
+        assert tampered_response.status_code == 401
+        assert "Invalid worker identity" in tampered_response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_expired_worker_identity_token_returns_401(worker_headers, monkeypatch):
+    import alpha_core.security as sec_mod
+
+    monkeypatch.setattr(sec_mod.time, "time", lambda: 1000)
+    token = create_worker_identity_token("mac-worker-exp", ttl_seconds=10)
+
+    monkeypatch.setattr(sec_mod.time, "time", lambda: 1020)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        expired_response = await client.post(
+            "/api/tasks/lease",
+            json={"worker_id": "mac-worker-exp"},
+            headers={**worker_headers, "X-Alpha-Worker-Identity": token},
+        )
+        assert expired_response.status_code == 401
+        assert "Invalid worker identity" in expired_response.json()["detail"]

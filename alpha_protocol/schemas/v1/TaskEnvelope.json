@@ -1,0 +1,374 @@
+{
+  "$defs": {
+    "AcceptancePlan": {
+      "description": "Declared acceptance criteria that must be satisfied before task completion.",
+      "properties": {
+        "required_gates": {
+          "items": {
+            "$ref": "#/$defs/GateType"
+          },
+          "title": "Required Gates",
+          "type": "array"
+        },
+        "commands": {
+          "items": {
+            "$ref": "#/$defs/GateCommand"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "custom_commands": {
+          "description": "Removed unsafe compatibility field; non-empty values are rejected",
+          "items": {
+            "type": "string"
+          },
+          "title": "Custom Commands",
+          "type": "array"
+        },
+        "require_independent_review": {
+          "default": false,
+          "title": "Require Independent Review",
+          "type": "boolean"
+        },
+        "browser_smoke_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Browser Smoke Url"
+        }
+      },
+      "title": "AcceptancePlan",
+      "type": "object"
+    },
+    "AgentType": {
+      "enum": [
+        "antigravity",
+        "claude_code",
+        "codex",
+        "gemini",
+        "stitch"
+      ],
+      "title": "AgentType",
+      "type": "string"
+    },
+    "ConcurrencyPolicy": {
+      "description": "Per-project and per-worker concurrency limits.",
+      "properties": {
+        "max_per_project": {
+          "default": 5,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Max Per Project",
+          "type": "integer"
+        },
+        "max_per_worker": {
+          "default": 2,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Per Worker",
+          "type": "integer"
+        }
+      },
+      "title": "ConcurrencyPolicy",
+      "type": "object"
+    },
+    "GateCommand": {
+      "description": "Typed no-shell command used to produce evidence for one gate.",
+      "properties": {
+        "gate_type": {
+          "$ref": "#/$defs/GateType"
+        },
+        "executable": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+          "title": "Executable",
+          "type": "string"
+        },
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Args",
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "maximum": 900,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "gate_type",
+        "executable"
+      ],
+      "title": "GateCommand",
+      "type": "object"
+    },
+    "GateType": {
+      "enum": [
+        "lint",
+        "unit_test",
+        "integration_test",
+        "build",
+        "browser_smoke",
+        "security_scan",
+        "independent_review",
+        "code_review_graph"
+      ],
+      "title": "GateType",
+      "type": "string"
+    },
+    "RetryPolicy": {
+      "description": "Controls how failed tasks are retried.",
+      "properties": {
+        "max_attempts": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "backoff_base_seconds": {
+          "default": 60,
+          "maximum": 3600,
+          "minimum": 10,
+          "title": "Backoff Base Seconds",
+          "type": "integer"
+        },
+        "backoff_multiplier": {
+          "default": 2.0,
+          "maximum": 10.0,
+          "minimum": 1.0,
+          "title": "Backoff Multiplier",
+          "type": "number"
+        },
+        "deadline_seconds": {
+          "default": 86400,
+          "description": "Maximum total time allowed for all retries (default 24h)",
+          "maximum": 604800,
+          "minimum": 300,
+          "title": "Deadline Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "RetryPolicy",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    },
+    "TaskDependency": {
+      "description": "Declares that this task depends on another task reaching a required status.",
+      "properties": {
+        "task_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "required_status": {
+          "$ref": "#/$defs/TaskStatus",
+          "default": "completed"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "title": "TaskDependency",
+      "type": "object"
+    },
+    "TaskStatus": {
+      "enum": [
+        "queued",
+        "leased",
+        "running",
+        "waiting_approval",
+        "verified",
+        "retryable_failed",
+        "blocked",
+        "cancelled",
+        "superseded",
+        "completed"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    }
+  },
+  "description": "Versioned task dispatched to worker plane.",
+  "properties": {
+    "protocol_version": {
+      "const": "1",
+      "default": "1",
+      "description": "Protocol version (must be '1')",
+      "title": "Protocol Version",
+      "type": "string"
+    },
+    "task_id": {
+      "description": "Unique task identifier, e.g. tsk_101",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "project_id": {
+      "description": "Parent project ID, e.g. prj_alpha",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "org_id": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Organization scope",
+      "title": "Org Id"
+    },
+    "repo": {
+      "description": "Repository path or identifier",
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Repo",
+      "type": "string"
+    },
+    "base_commit": {
+      "default": "HEAD",
+      "description": "Git base commit/branch",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@{}~^+-]{0,127}$",
+      "title": "Base Commit",
+      "type": "string"
+    },
+    "objective": {
+      "description": "Clear, actionable task objective",
+      "title": "Objective",
+      "type": "string"
+    },
+    "detailed_instructions": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Detailed markdown instructions",
+      "title": "Detailed Instructions"
+    },
+    "inputs": {
+      "description": "Input artifact references",
+      "items": {
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "array"
+    },
+    "allowed_paths": {
+      "description": "Scoped relative paths allowed to be touched; use '.' for whole repo",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Paths",
+      "type": "array"
+    },
+    "allowed_tools": {
+      "description": "Allowed tool or MCP names",
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Tools",
+      "type": "array"
+    },
+    "risk_class": {
+      "$ref": "#/$defs/RiskClass",
+      "default": "low"
+    },
+    "acceptance_plan": {
+      "$ref": "#/$defs/AcceptancePlan"
+    },
+    "preferred_agent": {
+      "$ref": "#/$defs/AgentType",
+      "default": "antigravity"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Dedicated Antigravity or memory_graph session ID",
+      "title": "Session Id"
+    },
+    "lease_timeout_seconds": {
+      "default": 1800,
+      "description": "Task lease timeout (default 30 mins)",
+      "title": "Lease Timeout Seconds",
+      "type": "integer"
+    },
+    "retain_worktree_for_preview": {
+      "default": false,
+      "description": "Keep successful isolated worktree available for a local preview server",
+      "title": "Retain Worktree For Preview",
+      "type": "boolean"
+    },
+    "dependencies": {
+      "description": "Tasks that must complete before this task can be leased",
+      "items": {
+        "$ref": "#/$defs/TaskDependency"
+      },
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "retry_policy": {
+      "$ref": "#/$defs/RetryPolicy"
+    },
+    "concurrency_policy": {
+      "$ref": "#/$defs/ConcurrencyPolicy"
+    },
+    "requires_approval": {
+      "default": false,
+      "description": "If true, task enters WAITING_APPROVAL before execution",
+      "title": "Requires Approval",
+      "type": "boolean"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "project_id",
+    "repo",
+    "objective",
+    "allowed_paths"
+  ],
+  "title": "TaskEnvelope",
+  "type": "object"
+}

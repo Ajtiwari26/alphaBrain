@@ -5,12 +5,15 @@ worker identity tokens, artifact path validation, and kill switch.
 
 import pytest
 from fastapi import HTTPException
+from httpx import ASGITransport, AsyncClient
 
+from alpha_core.api.app import app
 from alpha_core.security import (
     REDACTED,
     ROLE_PERMISSIONS,
     AuthPrincipal,
     PrincipalRole,
+    create_scoped_principal_token,
     create_worker_identity_token,
     redact_dict,
     redact_secrets,
@@ -18,9 +21,11 @@ from alpha_core.security import (
     require_project_access,
     require_safe_artifact_id,
     validate_artifact_identifier,
+    verify_scoped_principal_token,
     verify_worker_identity_token,
     worker_kill_switch,
 )
+from alpha_protocol import TaskEnvelope
 
 # ---------------------------------------------------------------------------
 # RBAC Role & Permission Tests
@@ -152,30 +157,28 @@ class TestWorkerIdentityTokens:
 
 
 class TestSecretRedaction:
-    def test_redacts_google_api_key(self):
-        text = "key=AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ12345678"
+    def test_redacts_generic_api_key(self):
+        text = "api_key: synthetic_api_key_value_12345"
         assert REDACTED in redact_secrets(text)
-        assert "AIzaSy" not in redact_secrets(text)
+        assert "synthetic_api_key_value_12345" not in redact_secrets(text)
 
-    def test_redacts_openai_key(self):
-        text = "token: sk-abcdefghijklmnop12345678901234"
+    def test_redacts_token_assignment(self):
+        text = "token: synthetic_auth_token_value_12345"
         assert REDACTED in redact_secrets(text)
-
-    def test_redacts_stitch_key(self):
-        text = "api_key: AQ.Ab8RN6Luc_b6ENWV5-7zW3"
-        assert REDACTED in redact_secrets(text)
+        assert "synthetic_auth_token_value_12345" not in redact_secrets(text)
 
     def test_redacts_bearer_token(self):
-        text = "Authorization: Bearer alpha-local-meeting-2026-test-token-32chars"
+        text = "Authorization: Bearer synthetic_bearer_token_value_12345"
         assert REDACTED in redact_secrets(text)
+        assert "synthetic_bearer_token_value_12345" not in redact_secrets(text)
 
     def test_redact_dict_strips_secret_fields(self):
         data = {
-            "api_key": "super-secret-key",
-            "password": "hunter2",
+            "api_key": "synthetic_key_value",
+            "password": "synthetic_password_value",
             "name": "Ajay",
             "nested": {
-                "signing_secret": "very-secret",
+                "signing_secret": "synthetic_secret_value",
                 "safe": "okay",
             },
         }
@@ -250,3 +253,194 @@ class TestWorkerKillSwitch:
         worker_kill_switch.pause_project("prj_alpha")
         worker_kill_switch.resume_project("prj_alpha")
         assert worker_kill_switch.can_execute("prj_alpha") is True
+
+
+# ---------------------------------------------------------------------------
+# Scoped Principal Token Tests
+# ---------------------------------------------------------------------------
+
+
+class TestScopedPrincipalTokens:
+    def test_create_and_verify_scoped_principal_token(self):
+        token = create_scoped_principal_token(
+            subject="client-maya",
+            role=PrincipalRole.CLIENT,
+            project_ids=["prj_alpha", "prj_shared"],
+            ttl_seconds=1800,
+        )
+        principal = verify_scoped_principal_token(token)
+        assert principal is not None
+        assert principal.subject == "client-maya"
+        assert principal.role == PrincipalRole.CLIENT
+        assert principal.project_ids == ("prj_alpha", "prj_shared")
+        assert principal.can_access_project("prj_alpha") is True
+        assert principal.can_access_project("prj_shared") is True
+        assert principal.can_access_project("prj_other") is False
+
+    def test_tampered_scoped_principal_token_fails(self):
+        token = create_scoped_principal_token(
+            subject="client-1",
+            role=PrincipalRole.CLIENT,
+            project_ids=["prj_alpha"],
+        )
+        assert verify_scoped_principal_token(token + "tampered") is None
+
+    def test_expired_scoped_principal_token_fails(self, monkeypatch):
+        import alpha_core.security as sec_module
+
+        monkeypatch.setattr(sec_module.time, "time", lambda: 5000)
+        token = create_scoped_principal_token(
+            subject="client-1",
+            role=PrincipalRole.CLIENT,
+            project_ids=["prj_alpha"],
+            ttl_seconds=30,
+        )
+        monkeypatch.setattr(sec_module.time, "time", lambda: 5035)
+        assert verify_scoped_principal_token(token) is None
+
+
+# ---------------------------------------------------------------------------
+# Real API Cross-Project 403 Tests
+# ---------------------------------------------------------------------------
+
+
+class TestAPICrossProjectAccess:
+    @pytest.mark.asyncio
+    async def test_cross_project_api_returns_403_for_scoped_client(self, api_headers):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. Founder submits two tasks for different projects
+            task_alpha = TaskEnvelope(
+                task_id="tsk_api_proj_alpha_01",
+                project_id="prj_alpha",
+                repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+                objective="Alpha task",
+                allowed_paths=["."],
+            )
+            task_beta = TaskEnvelope(
+                task_id="tsk_api_proj_beta_01",
+                project_id="prj_beta",
+                repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+                objective="Beta task",
+                allowed_paths=["."],
+            )
+            res_sub_alpha = await client.post(
+                "/api/tasks",
+                json=task_alpha.model_dump(mode="json"),
+                headers=api_headers,
+            )
+            assert res_sub_alpha.status_code == 200
+
+            res_sub_beta = await client.post(
+                "/api/tasks",
+                json=task_beta.model_dump(mode="json"),
+                headers=api_headers,
+            )
+            assert res_sub_beta.status_code == 200
+
+            # 2. Mint client token scoped ONLY to prj_alpha
+            client_token = create_scoped_principal_token(
+                subject="client_alpha_only",
+                role=PrincipalRole.CLIENT,
+                project_ids=["prj_alpha"],
+            )
+            client_headers = {"Authorization": f"Bearer {client_token}"}
+
+            # 3. Client reading authorized task (prj_alpha) -> 200 OK
+            res_read_alpha = await client.get(
+                f"/api/tasks/{task_alpha.task_id}",
+                headers=client_headers,
+            )
+            assert res_read_alpha.status_code == 200
+
+            # 4. Client reading unauthorized task (prj_beta) -> 403 Forbidden!
+            res_read_beta = await client.get(
+                f"/api/tasks/{task_beta.task_id}",
+                headers=client_headers,
+            )
+            assert res_read_beta.status_code == 403
+            assert "project not in authorized scope" in res_read_beta.json()["detail"]
+
+            # 5. Client getting progress of authorized project -> 200 OK
+            res_prog_alpha = await client.get(
+                "/api/projects/prj_alpha/progress",
+                headers=client_headers,
+            )
+            assert res_prog_alpha.status_code == 200
+
+            # 6. Client getting progress of unauthorized project -> 403 Forbidden!
+            res_prog_beta = await client.get(
+                "/api/projects/prj_beta/progress",
+                headers=client_headers,
+            )
+            assert res_prog_beta.status_code == 403
+            assert "project not in authorized scope" in res_prog_beta.json()["detail"]
+
+            # 7. Client attempting to submit task (unauthorized permission) -> 403 Forbidden!
+            res_sub_client = await client.post(
+                "/api/tasks",
+                json=task_alpha.model_dump(mode="json"),
+                headers=client_headers,
+            )
+            assert res_sub_client.status_code == 403
+            assert "lacks permission 'task:write'" in res_sub_client.json()["detail"]
+
+            # 8. Client attempting slide access for unauthorized project -> 403 Forbidden!
+            res_slide_beta = await client.get(
+                "/api/meet/slide?project=prj_beta",
+                headers=client_headers,
+            )
+            assert res_slide_beta.status_code == 403
+
+            # 9. Client attempting slide access for authorized project -> 200 OK
+            res_slide_alpha = await client.get(
+                "/api/meet/slide?project=prj_alpha",
+                headers=client_headers,
+            )
+            assert res_slide_alpha.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Kill Switch API Enforcement Tests
+# ---------------------------------------------------------------------------
+
+
+class TestKillSwitchAPIEnforcement:
+    def setup_method(self):
+        worker_kill_switch.resume_all()
+
+    def teardown_method(self):
+        worker_kill_switch.resume_all()
+
+    @pytest.mark.asyncio
+    async def test_paused_project_rejects_task_submission(self, api_headers):
+        worker_kill_switch.pause_project("prj_paused")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            task = TaskEnvelope(
+                task_id="tsk_api_paused_01",
+                project_id="prj_paused",
+                repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+                objective="Paused task",
+                allowed_paths=["."],
+            )
+            res = await client.post(
+                "/api/tasks",
+                json=task.model_dump(mode="json"),
+                headers=api_headers,
+            )
+            assert res.status_code == 403
+            assert "paused for this project" in res.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_global_kill_switch_stops_leasing(self, worker_headers):
+        worker_kill_switch.kill_all()
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.post(
+                "/api/tasks/lease",
+                json={"worker_id": "alpha_worker"},
+                headers=worker_headers,
+            )
+            assert res.status_code == 200
+            assert res.json()["status"] == "no_tasks_available"

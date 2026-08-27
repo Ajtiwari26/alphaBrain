@@ -199,28 +199,125 @@ def _require_bearer_token(
     return AuthPrincipal(subject=subject, role=role)
 
 
+def create_scoped_principal_token(
+    subject: str,
+    role: PrincipalRole,
+    project_ids: list[str] | tuple[str, ...],
+    ttl_seconds: int = 3600,
+) -> str:
+    """Create signed HMAC token for scoped client or service principal."""
+    if not settings.ALPHA_SIGNING_SECRET:
+        raise RuntimeError("ALPHA_SIGNING_SECRET is not configured")
+    claims = {
+        "exp": int(time.time()) + ttl_seconds,
+        "sub": subject,
+        "role": role.value if isinstance(role, PrincipalRole) else str(role),
+        "projects": list(project_ids),
+    }
+    encoded_claims = (
+        base64.urlsafe_b64encode(
+            json.dumps(claims, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
+    signature = hmac.new(
+        settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
+        encoded_claims.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    encoded_signature = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{encoded_claims}.{encoded_signature}"
+
+
+def verify_scoped_principal_token(token: str | None) -> AuthPrincipal | None:
+    """Validate scoped principal token and return AuthPrincipal with project scope."""
+    if not token or not settings.ALPHA_SIGNING_SECRET:
+        return None
+    encoded_claims, separator, supplied_signature = token.partition(".")
+    if separator != "." or not encoded_claims or not supplied_signature:
+        return None
+    expected_signature = (
+        base64.urlsafe_b64encode(
+            hmac.new(
+                settings.ALPHA_SIGNING_SECRET.encode("utf-8"),
+                encoded_claims.encode("ascii"),
+                hashlib.sha256,
+            ).digest()
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
+    if not hmac.compare_digest(supplied_signature, expected_signature):
+        return None
+    try:
+        padded = encoded_claims + "=" * (-len(encoded_claims) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(claims, dict):
+        return None
+    if not isinstance(claims.get("exp"), int) or claims["exp"] < int(time.time()):
+        return None
+    role_str = claims.get("role")
+    try:
+        role = PrincipalRole(role_str)
+    except ValueError:
+        return None
+    subject = str(claims.get("sub", "anonymous"))
+    project_ids = tuple(claims.get("projects", []))
+    return AuthPrincipal(subject=subject, role=role, project_ids=project_ids)
+
+
 def require_api_principal(
     authorization: str | None = Header(default=None),
 ) -> AuthPrincipal:
-    """FastAPI dependency: authenticate founder/admin API requests."""
-    return _require_bearer_token(
-        authorization,
-        settings.ALPHA_API_TOKEN,
-        subject="alpha_api_user",
-        role=PrincipalRole.FOUNDER,
+    """FastAPI dependency: authenticate founder/admin API requests or scoped client tokens."""
+    if not settings.ALPHA_API_TOKEN and not settings.ALPHA_SIGNING_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication is not configured",
+        )
+    scheme, separator, supplied_token = (authorization or "").partition(" ")
+    if separator != " " or scheme.lower() != "bearer" or not supplied_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing bearer token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # 1. Match full founder/admin token
+    if settings.ALPHA_API_TOKEN and hmac.compare_digest(supplied_token, settings.ALPHA_API_TOKEN):
+        return AuthPrincipal(subject="alpha_api_user", role=PrincipalRole.FOUNDER)
+    # 2. Check signed scoped token (e.g. client token with project_ids)
+    scoped = verify_scoped_principal_token(supplied_token)
+    if scoped:
+        return scoped
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or missing bearer token",
+        headers={"WWW-Authenticate": "Bearer"},
     )
 
 
 def require_worker_principal(
     authorization: str | None = Header(default=None),
+    x_alpha_worker_identity: str | None = Header(default=None),
 ) -> AuthPrincipal:
     """FastAPI dependency: authenticate worker daemon requests."""
-    return _require_bearer_token(
+    shared_principal = _require_bearer_token(
         authorization,
         settings.ALPHA_WORKER_TOKEN,
         subject="alpha_worker",
         role=PrincipalRole.WORKER,
     )
+    if not x_alpha_worker_identity:
+        return shared_principal
+    claims = verify_worker_identity_token(x_alpha_worker_identity)
+    if not claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid worker identity"
+        )
+    return AuthPrincipal(subject=str(claims["sub"]), role=PrincipalRole.WORKER)
 
 
 def verify_websocket_bearer(supplied_token: str | None, expected_token: str) -> bool:
@@ -480,6 +577,11 @@ _SECRET_PATTERNS = [
     re.compile(r"(-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----)", re.ASCII),  # Private keys
 ]
 
+_KV_SECRET_PATTERN = re.compile(
+    r"(?i)\b([A-Za-z0-9_-]*(?:token|secret|api[_-]?key|password|auth|access|signing)[A-Za-z0-9_-]*)(\s*[=:]\s*)([^\s,;\"'}{]+)",
+    re.ASCII,
+)
+
 # Known setting names that should always be redacted
 _SECRET_FIELD_NAMES = frozenset(
     {
@@ -509,6 +611,7 @@ def redact_secrets(text: str) -> str:
     result = text
     for pattern in _SECRET_PATTERNS:
         result = pattern.sub(REDACTED, result)
+    result = _KV_SECRET_PATTERN.sub(r"\1\2" + REDACTED, result)
     return result
 
 

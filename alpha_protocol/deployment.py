@@ -7,6 +7,7 @@ Protocol version: 1
 """
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +21,7 @@ def utc_now() -> datetime:
 class DeploymentRequest(BaseModel):
     """Request to deploy a verified build to a target environment."""
 
-    protocol_version: str = Field(default=PROTOCOL_VERSION)
+    protocol_version: Literal["1"] = Field(default=PROTOCOL_VERSION)
     deployment_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     project_id: str
     task_id: str
