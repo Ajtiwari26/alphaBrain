@@ -360,8 +360,9 @@ class AlphaWorkerDaemon:
                 if getattr(envelope, "require_packet_binding", False)
                 else None
             )
+            import uuid
             failed_result = TaskResult(
-                attempt_id=f"att_{envelope.task_id}_err",
+                attempt_id=f"att_{envelope.task_id}_err_{uuid.uuid4().hex[:8]}",
                 task_id=envelope.task_id,
                 status=TaskStatus.RETRYABLE_FAILED,
                 agent=envelope.preferred_agent,
