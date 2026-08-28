@@ -313,8 +313,8 @@ class AlphaWorkerDaemon:
         worktree_path = None
         result: TaskResult | None = None
         try:
-            # 3. Create isolated worktree
-            worktree_path = self.worktree_mgr.create_worktree(
+            # 3. Create isolated worktree (or resume if a prior attempt left one)
+            worktree_path = self.worktree_mgr.create_or_resume_worktree(
                 repo_path=envelope.repo,
                 task_id=envelope.task_id,
                 base_commit=envelope.base_commit,
