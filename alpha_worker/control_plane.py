@@ -165,25 +165,35 @@ class ControlPlaneClient:
                     headers={"Authorization": f"Bearer {self._worker_token}"},
                 )
                 if response.status_code in (401, 403):
+                    self._identity_token = None
+                    self._identity_expires_at = 0
                     raise ControlPlaneProtocolError(
                         f"Bootstrap authentication rejected: {response.status_code}"
                     )
                 response.raise_for_status()
-                data = response.json()
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise ValueError("Invalid JSON response") from exc
+
+                if not isinstance(data, dict):
+                    raise ValueError("Response must be a JSON object")
 
                 identity_token = data.get("identity_token")
                 expires_at = data.get("expires_at")
 
                 if not isinstance(identity_token, str) or not identity_token.strip():
                     raise ValueError("identity_token must be a non-empty string")
-                if not isinstance(expires_at, (int, float)):
-                    raise ValueError("expires_at must be a number")
+                if type(expires_at) is not int:
+                    raise ValueError("expires_at must be an integer")
 
-                if expires_at <= time.time():
-                    raise ValueError("expires_at must be in the future")
+                if expires_at <= now + 60:
+                    raise ValueError("expires_at must be safely beyond immediate refresh window")
+                if expires_at > now + 3900:
+                    raise ValueError("expires_at excessively distant")
 
                 self._identity_token = identity_token
-                self._identity_expires_at = int(expires_at)
+                self._identity_expires_at = expires_at
                 return self._identity_token
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code >= 500:
@@ -194,6 +204,8 @@ class ControlPlaneClient:
                     f"Transport failure: {exc.__class__.__name__}"
                 ) from exc
             except (ValueError, KeyError, TypeError) as exc:
+                self._identity_token = None
+                self._identity_expires_at = 0
                 raise ControlPlaneProtocolError(
                     "Invalid identity response from control plane"
                 ) from exc

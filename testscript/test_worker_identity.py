@@ -9,6 +9,7 @@ from alpha_core.config import settings
 from alpha_core.security import create_worker_identity_token
 from alpha_worker.control_plane import (
     ControlPlaneClient,
+    ControlPlaneProtocolError,
     ControlPlaneUnavailable,
 )
 
@@ -99,7 +100,7 @@ async def test_refresh_and_outage():
             if len(calls) == 3:
                 raise httpx.ConnectError("Network is down")
             return httpx.Response(
-                200, json={"identity_token": "new-token", "expires_at": time.time() + 3600}
+                200, json={"identity_token": "new-token", "expires_at": int(time.time()) + 3600}
             )
         if request.url.path == "/api/workers/register":
             if request.headers.get("x-alpha-worker-identity") == "new-token":
@@ -134,7 +135,10 @@ async def test_successful_client_refresh_proof():
         if request.url.path.endswith("/identity"):
             return httpx.Response(
                 200,
-                json={"identity_token": f"token-{len(calls)}", "expires_at": time.time() + 3600},
+                json={
+                    "identity_token": f"token-{len(calls)}",
+                    "expires_at": int(time.time()) + 3600,
+                },
             )
 
         # Operational request
@@ -161,5 +165,45 @@ async def test_successful_client_refresh_proof():
         "/api/workers/worker-123/identity",  # forced identity refresh
         "/api/workers/register",  # operational retry succeeds
     ]
+
+    await cp.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response_json",
+    [
+        ["not", "an", "object"],  # list/non-object JSON
+        {"expires_at": int(time.time()) + 3600},  # missing token
+        {"identity_token": "", "expires_at": int(time.time()) + 3600},  # empty token
+        {"identity_token": "token"},  # missing expiry
+        {"identity_token": "token", "expires_at": "3600"},  # string expiry
+        {"identity_token": "token", "expires_at": float(int(time.time()) + 3600)},  # float expiry
+        {"identity_token": "token", "expires_at": True},  # boolean expiry
+        {"identity_token": "token", "expires_at": int(time.time()) - 100},  # expired expiry
+        {"identity_token": "token", "expires_at": int(time.time()) + 10},  # too-soon expiry
+        {
+            "identity_token": "token",
+            "expires_at": int(time.time()) + 5000,
+        },  # excessively distant expiry
+    ],
+)
+async def test_strict_identity_response_contract(response_json):
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=response_json)
+
+    cp = ControlPlaneClient(
+        "http://test", "worker-123", "token", transport=httpx.MockTransport(handler)
+    )
+    # Set a valid state to verify it gets unset
+    cp._identity_token = "valid-token"
+    cp._identity_expires_at = int(time.time()) + 3600
+
+    with pytest.raises(ControlPlaneProtocolError):
+        await cp._ensure_identity(force_refresh=True)
+
+    # Verify cache is cleared
+    assert cp._identity_token is None
+    assert cp._identity_expires_at == 0
 
     await cp.aclose()
