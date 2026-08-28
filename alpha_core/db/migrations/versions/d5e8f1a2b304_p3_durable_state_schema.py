@@ -146,16 +146,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("task_dependencies")
-    op.drop_table("workflows")
-    op.drop_table("change_requests")
-    op.drop_table("open_questions")
-    op.drop_table("decisions")
-    op.drop_index("ix_consent_project_user", "consents")
-    op.drop_table("consents")
-    op.drop_table("memberships")
-    op.drop_table("clients")
-
     with op.batch_alter_table("tasks") as batch_op:
         batch_op.drop_column("deleted_at")
 
@@ -169,6 +159,16 @@ def downgrade() -> None:
 
     with op.batch_alter_table("users") as batch_op:
         batch_op.drop_column("deleted_at")
+
+    op.drop_table("task_dependencies")
+    op.drop_table("workflows")
+    op.drop_table("change_requests")
+    op.drop_table("open_questions")
+    op.drop_table("decisions")
+    op.drop_index("ix_consent_project_user", "consents")
+    op.drop_table("consents")
+    op.drop_table("memberships")
+    op.drop_table("clients")
 
     with op.batch_alter_table("organizations") as batch_op:
         batch_op.drop_column("deleted_at")
