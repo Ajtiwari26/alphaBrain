@@ -391,3 +391,66 @@ async def test_sdlc_workflow_runner():
     assert result["final_state"] == "DEPLOYED"
     assert "spec" in result
     assert "call_job" in result
+
+
+@pytest.mark.asyncio
+async def test_result_submission_rejects_task_id_mismatch(
+    tmp_path, monkeypatch, api_headers, worker_headers
+):
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (tmp_path,))
+    worker_id = "mac-worker-e2e"
+    worker_auth = {
+        **worker_headers,
+        "X-Alpha-Worker-Identity": create_worker_identity_token(worker_id),
+    }
+    envelope = TaskEnvelope(
+        task_id="tsk-match-test",
+        project_id="prj-worker-e2e",
+        repo=str(repo_path),
+        objective="Test mismatch",
+        allowed_paths=["."],
+        preferred_agent=AgentType.ANTIGRAVITY,
+    )
+    result = TaskResult(
+        attempt_id="att-match-test",
+        task_id="tsk-DIFFERENT",
+        status=TaskStatus.COMPLETED,
+        agent=AgentType.ANTIGRAVITY,
+        model="test",
+        base_commit="HEAD",
+        result_commit="HEAD",
+        gate_result=GateResult(
+            task_id="tsk-DIFFERENT",
+            attempt_id="att-match-test",
+            all_passed=True,
+            evidence_items=[],
+        ),
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await ac.post(
+            "/api/workers/register",
+            json=WorkerRegistration(worker_id=worker_id, hostname="test").model_dump(mode="json"),
+            headers=worker_auth,
+        )
+        await ac.post(
+            "/api/tasks", json=envelope.model_dump(mode="json"), headers=api_headers
+        )
+        leased = await ac.post(
+            "/api/tasks/lease",
+            json={"worker_id": worker_id, "preferred_agent": AgentType.ANTIGRAVITY.value},
+            headers=worker_auth,
+        )
+        token = leased.json()["lease_token"]
+
+        response = await ac.post(
+            f"/api/tasks/{envelope.task_id}/result",
+            json={"lease_token": token, "result": result.model_dump(mode="json")},
+            headers=worker_auth,
+        )
+
+    assert response.status_code == 400
+    assert "mismatch" in response.json()["detail"].lower()
