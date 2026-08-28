@@ -19,20 +19,6 @@ def upgrade() -> None:
     with op.batch_alter_table("organizations") as batch_op:
         batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
 
-    with op.batch_alter_table("users") as batch_op:
-        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
-
-    with op.batch_alter_table("projects") as batch_op:
-        batch_op.add_column(sa.Column("client_id", sa.String(64), nullable=True))
-        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
-        batch_op.create_foreign_key("fk_projects_client_id", "clients", ["client_id"], ["id"])
-
-    with op.batch_alter_table("spec_versions") as batch_op:
-        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
-
-    with op.batch_alter_table("tasks") as batch_op:
-        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
-
     # 2. Clients table
     op.create_table(
         "clients",
@@ -46,6 +32,20 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
+
+    with op.batch_alter_table("users") as batch_op:
+        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
+
+    with op.batch_alter_table("projects") as batch_op:
+        batch_op.add_column(sa.Column("client_id", sa.String(64), nullable=True))
+        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
+        batch_op.create_foreign_key("fk_projects_client_id", "clients", ["client_id"], ["id"])
+
+    with op.batch_alter_table("spec_versions") as batch_op:
+        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
+
+    with op.batch_alter_table("tasks") as batch_op:
+        batch_op.add_column(sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
 
     # 3. Memberships table
     op.create_table(
