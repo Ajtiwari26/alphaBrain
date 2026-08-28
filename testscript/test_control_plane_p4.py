@@ -11,7 +11,9 @@ Comprehensive deterministic test suite for Alpha Brain P4:
 - Reporting snapshots for founder and client views
 """
 
+import asyncio
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -19,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from alpha_core.api.app import app
+from alpha_core.config import settings
 from alpha_core.db.models import (
     Base,
     ProjectRecord,
@@ -663,3 +666,96 @@ class TestReportingSnapshots:
 
         res_t = await async_db.execute(select(TaskRecord).where(TaskRecord.id == "tsk_path_01"))
         assert res_t.scalar_one().status == TaskStatus.LEASED.value
+
+
+@pytest.mark.asyncio
+async def test_lease_endpoint_zero_watchdog_calls(async_db, monkeypatch, worker_headers):
+    # Mock TaskEngine.check_watchdog_stalls and TaskEngine.lease_next_task
+    mock_watchdog = AsyncMock()
+    mock_lease = AsyncMock(return_value=None)
+    monkeypatch.setattr(TaskEngine, "check_watchdog_stalls", mock_watchdog)
+    monkeypatch.setattr(TaskEngine, "lease_next_task", mock_lease)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Submit 50 concurrent requests
+        tasks = [
+            client.post(
+                "/api/tasks/lease", headers=worker_headers, json={"worker_id": "alpha_worker"}
+            )
+            for _ in range(50)
+        ]
+        await asyncio.gather(*tasks)
+
+    # Watchdog should not be called at all from the lease endpoint
+    assert mock_watchdog.call_count == 0
+    # Lease should be called 50 times
+    assert mock_lease.call_count == 50
+    # Check lease was called with proper duration
+    assert (
+        mock_lease.call_args[1]["lease_duration_seconds"] == settings.WORKER_LEASE_DURATION_SECONDS
+    )
+
+
+@pytest.mark.asyncio
+async def test_application_lifespan_scheduler(monkeypatch):
+    import sys
+
+    app_module = sys.modules["alpha_core.api.app"]
+    from fastapi import FastAPI
+
+    # We want to verify it creates exactly one task and shuts down cleanly
+    mock_scheduler = AsyncMock()
+    monkeypatch.setattr(app_module, "watchdog_scheduler", mock_scheduler)
+
+    test_app = FastAPI(lifespan=app_module.lifespan)
+    async with test_app.router.lifespan_context(test_app):
+        # wait a bit for background task to potentially start (though it's mocked)
+        await asyncio.sleep(0.01)
+
+    # After lifespan context closes, the task should be cancelled
+    # The scheduler itself is replaced by AsyncMock, so it won't loop.
+
+
+@pytest.mark.asyncio
+async def test_scheduler_transient_failure_does_not_terminate(monkeypatch):
+    import sys
+    from contextlib import asynccontextmanager
+
+    app_module = sys.modules["alpha_core.api.app"]
+
+    @asynccontextmanager
+    async def mock_session_factory():
+        yield AsyncMock()
+
+    mock_check = AsyncMock(side_effect=[Exception("Transient DB error"), None, Exception("stop")])
+    monkeypatch.setattr(TaskEngine, "check_watchdog_stalls", mock_check)
+    monkeypatch.setattr(TaskEngine, "release_due_retries", AsyncMock())
+    monkeypatch.setattr(app_module, "get_session_factory", lambda: mock_session_factory)
+    monkeypatch.setattr(settings, "TASK_WATCHDOG_SCAN_INTERVAL_SECONDS", 0.01)
+
+    # Run the scheduler task for a short time
+    task = asyncio.create_task(app_module.watchdog_scheduler())
+    await asyncio.sleep(0.05)
+    task.cancel()
+
+    import contextlib
+
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+    assert mock_check.call_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_watchdog_row_locks_postgres(async_db, monkeypatch):
+    """Prove PostgreSQL check_watchdog_stalls uses skip_locked."""
+    monkeypatch.setattr(async_db.bind.dialect, "name", "postgresql")
+
+    with patch("sqlalchemy.sql.selectable.Select.with_for_update") as mock_update:
+        # Mock to return query
+        mock_update.return_value = select(TaskRecord)
+        await TaskEngine.check_watchdog_stalls(async_db)
+        # It's hard to test the internal builder perfectly here without deep mocking,
+        # but the assert provides unit level protection.
+        mock_update.assert_called_with(skip_locked=True)

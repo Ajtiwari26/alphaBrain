@@ -19,17 +19,12 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
 import uvicorn
 from fastapi import FastAPI, Request, Response
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-from alpha_core.db.models import TaskRecord
-from alpha_core.state.task_engine import TaskEngine
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EVIDENCE_DIR = PROJECT_ROOT / "testscript" / "evidence"
@@ -244,39 +239,16 @@ async def _task_details(client: httpx.AsyncClient, api_token: str, task_id: str)
     return payload
 
 
-async def _expire_then_recover_lease(database_url: str, task_id: str) -> dict[str, Any]:
-    """Inject elapsed time, then use production recovery methods unchanged."""
-    engine = create_async_engine(database_url)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with session_factory() as session:
-            task = await session.get(TaskRecord, task_id)
-            if task is None or task.status != "leased":
-                raise RuntimeError("Crash task was not leased before process death")
-            task.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
-            await session.commit()
-        async with session_factory() as session:
-            recovered = await TaskEngine.timeout_expired_leases(session)
-            await session.commit()
-            task = await session.get(TaskRecord, task_id)
-            if recovered != 1 or task is None or task.status != "retryable_failed":
-                raise RuntimeError("Lease watchdog did not schedule retry")
-            retry_at = task.next_eligible_at
-        await asyncio.sleep(10.25)
-        async with session_factory() as session:
-            released = await TaskEngine.release_due_retries(session)
-            await session.commit()
-            task = await session.get(TaskRecord, task_id)
-            if released != 1 or task is None or task.status != "queued":
-                raise RuntimeError("Retry scheduler did not return task to queue")
-            return {
-                "expired_leases_recovered": recovered,
-                "due_retries_released": released,
-                "retry_scheduled_at": retry_at.isoformat() if retry_at else None,
-                "final_recovery_state": task.status,
-            }
-    finally:
-        await engine.dispose()
+async def _project_progress(client: httpx.AsyncClient, api_token: str) -> dict[str, Any]:
+    response = await client.get(
+        f"/api/projects/{PROJECT_ID}/progress",
+        headers={"Authorization": f"Bearer {api_token}"},
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise RuntimeError("Progress response is not an object")
+    return payload
 
 
 def _worker_environment(proxy_url: str, temp_dir: Path) -> dict[str, str]:
@@ -343,6 +315,9 @@ async def run_proof() -> None:
                 "ALLOWED_REPO_ROOTS": str(FIXTURE_REPO.parent),
                 "WORKER_ALLOW_LOCAL_DB": "true",
                 "ANTIGRAVITY_EXECUTION_ENABLED": "false",
+                "WORKER_LEASE_DURATION_SECONDS": "2",
+                "TASK_PROGRESS_STALL_TIMEOUT_SECONDS": "2",
+                "TASK_WATCHDOG_SCAN_INTERVAL_SECONDS": "1",
             }
         )
         try:
@@ -409,8 +384,27 @@ async def run_proof() -> None:
                 if not captured:
                     raise TimeoutError("Worker did not lease crash-proof task")
                 _stop_process(worker_process)
-                worker_process = None
-                recovery = await _expire_then_recover_lease(database_url, crash_task_id)
+
+                async def watchdog_recovered() -> dict[str, Any]:
+                    progress = await _project_progress(client, api_token)
+                    events = progress.get("recent_events", [])
+                    for event in events:
+                        if event["task_id"] == crash_task_id and event["event_type"] in {
+                            "task_stalled_retrying",
+                            "lease_expired_requeued",
+                            "task_requeued_from_retry",
+                        }:
+                            task = await _task_details(client, api_token, crash_task_id)
+                            if task["status"] in {"queued", "retryable_failed"}:
+                                return {
+                                    "proof_scope": "hermetic_local_application_watchdog",
+                                    "watchdog_invocation": "fastapi_lifespan_background_scheduler",
+                                    "direct_database_mutation": False,
+                                    "watchdog_event": event["event_type"],
+                                }
+                    return {}
+
+                recovery = await _wait_until(watchdog_recovered, 30, "watchdog recovery")
                 state.hold_lease = False
                 worker_process = _start_process(
                     [str(PROJECT_ROOT / ".venv/bin/python"), "-m", "alpha_worker", "run"],
@@ -427,14 +421,13 @@ async def run_proof() -> None:
                 _write_evidence(
                     "crash_proof.json",
                     {
-                        "proof_scope": "hermetic_local_control_plane",
-                        "database": "isolated_sqlite",
-                        "fault": "worker_terminated_after_control_plane_lease",
+                        "proof_scope": "hermetic_local_application_watchdog",
+                        "watchdog_invocation": "fastapi_lifespan_background_scheduler",
+                        "direct_database_mutation": False,
                         "task_id": crash_task_id,
-                        **recovery,
+                        "watchdog_event": recovery["watchdog_event"],
                         "persisted_attempt_count": len(crash_details["attempts"]),
                         "duplicate_results": len(crash_details["attempts"]) - 1,
-                        "final_status": crash_details["status"],
                     },
                 )
         finally:

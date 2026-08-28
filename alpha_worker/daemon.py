@@ -661,6 +661,9 @@ class AlphaWorkerDaemon:
                 cancel_requested.set()
                 execution_task.cancel()
                 return
+            except ControlPlaneUnavailable:
+                logger.warning("Heartbeat transport unavailable for task %s; will retry", task_id)
+                continue
             if heartbeat_status == "cancel_requested":
                 cancel_requested.set()
                 execution_task.cancel()

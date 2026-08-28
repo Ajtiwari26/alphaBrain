@@ -1,8 +1,9 @@
+import asyncio
 import json
 import logging
 import re
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 from urllib.parse import parse_qsl, quote, urlsplit, urlunsplit
@@ -27,7 +28,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alpha_core.config import settings
-from alpha_core.db.connection import get_db_session, init_db
+from alpha_core.db.connection import get_db_session, get_session_factory, init_db
 from alpha_core.db.models import (
     ApprovalRecord,
     AttemptRecord,
@@ -127,13 +128,37 @@ def _validate_repo_reference(repo_path: str) -> str:
     return repo_path
 
 
+async def watchdog_scheduler():
+    session_factory = get_session_factory()
+    while True:
+        try:
+            async with session_factory() as session:
+                await TaskEngine.check_watchdog_stalls(
+                    session, stall_timeout_seconds=settings.TASK_PROGRESS_STALL_TIMEOUT_SECONDS
+                )
+                await TaskEngine.release_due_retries(session)
+                await session.commit()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Watchdog scheduler failed: {e.__class__.__name__} - {e}")
+        try:
+            await asyncio.sleep(settings.TASK_WATCHDOG_SCAN_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            break
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database on startup
     await init_db()
+    watchdog_task = asyncio.create_task(watchdog_scheduler())
     try:
         yield
     finally:
+        watchdog_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await watchdog_task
         await eva_room_manager.stop_all()
 
 
@@ -593,14 +618,11 @@ async def lease_task(
         raise HTTPException(status_code=422, detail="Invalid worker ID")
     preferred_agent = payload.get("preferred_agent")
 
-    await TaskEngine.check_watchdog_stalls(
-        session,
-        stall_timeout_seconds=settings.TASK_PROGRESS_STALL_TIMEOUT_SECONDS,
-    )
     leased_tuple = await TaskEngine.lease_next_task(
         session,
         worker_id,
         preferred_agent=preferred_agent,
+        lease_duration_seconds=settings.WORKER_LEASE_DURATION_SECONDS,
     )
     if not leased_tuple:
         return {"status": "no_tasks_available"}

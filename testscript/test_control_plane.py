@@ -13,6 +13,7 @@ from alpha_protocol import AgentType, TaskEnvelope, TaskResult, TaskStatus
 from alpha_worker.control_plane import (
     ControlPlaneClient,
     ControlPlaneProtocolError,
+    ControlPlaneUnavailable,
     DurableEventSpool,
 )
 from alpha_worker.daemon import AlphaWorkerDaemon
@@ -176,6 +177,32 @@ async def test_remote_heartbeat_cancels_execution_when_lease_is_revoked(monkeypa
         cancel_requested,
     )
 
+    assert cancel_requested.is_set()
+    with pytest.raises(asyncio.CancelledError):
+        await execution_task
+
+
+@pytest.mark.asyncio
+async def test_remote_heartbeat_survives_transport_outage_then_cancels(monkeypatch):
+    daemon = AlphaWorkerDaemon.__new__(AlphaWorkerDaemon)
+    daemon.control_plane = AsyncMock()
+    # First fails with transport error, second returns cancel_requested
+    daemon.control_plane.heartbeat.side_effect = [
+        ControlPlaneUnavailable("Network down"),
+        "cancel_requested",
+    ]
+    monkeypatch.setattr("alpha_worker.daemon.settings.WORKER_HEARTBEAT_SECONDS", 0)
+    execution_task = asyncio.create_task(asyncio.sleep(30))
+    cancel_requested = asyncio.Event()
+
+    await daemon._remote_heartbeat_loop(
+        "tsk_outage",
+        "lease_outage",
+        execution_task,  # type: ignore[arg-type]
+        cancel_requested,
+    )
+
+    assert daemon.control_plane.heartbeat.call_count == 2
     assert cancel_requested.is_set()
     with pytest.raises(asyncio.CancelledError):
         await execution_task

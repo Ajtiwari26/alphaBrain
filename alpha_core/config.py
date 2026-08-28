@@ -3,7 +3,7 @@ from enum import Enum
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env.local")
@@ -176,19 +176,38 @@ class Settings(BaseModel):
     ROUTER_INFERRED_COOLDOWN_HOURS: int = int(os.getenv("ROUTER_INFERRED_COOLDOWN_HOURS", "5"))
     MAX_ELIGIBLE_ATTEMPTS: int = int(os.getenv("MAX_ELIGIBLE_ATTEMPTS", "5"))
 
-    @field_validator("WORKER_LEASE_DURATION_SECONDS")
-    @classmethod
-    def validate_worker_lease_duration(cls, v: int) -> int:
-        if v < 300 or v > 7200:
-            raise ValueError("WORKER_LEASE_DURATION_SECONDS must be between 300 and 7200")
-        return v
+    @model_validator(mode="after")
+    def validate_timing_boundaries(self) -> "Settings":
+        # Validate maximums
+        if self.WORKER_LEASE_DURATION_SECONDS > 7200:
+            raise ValueError("WORKER_LEASE_DURATION_SECONDS must be <= 7200")
+        if self.TASK_PROGRESS_STALL_TIMEOUT_SECONDS > 7200:
+            raise ValueError("TASK_PROGRESS_STALL_TIMEOUT_SECONDS must be <= 7200")
+        if self.TASK_WATCHDOG_SCAN_INTERVAL_SECONDS > 3600:
+            raise ValueError("TASK_WATCHDOG_SCAN_INTERVAL_SECONDS must be <= 3600")
 
-    @field_validator("TASK_PROGRESS_STALL_TIMEOUT_SECONDS")
-    @classmethod
-    def validate_task_progress_stall_timeout(cls, value: int) -> int:
-        if value < 60 or value > 7200:
-            raise ValueError("TASK_PROGRESS_STALL_TIMEOUT_SECONDS must be between 60 and 7200")
-        return value
+        # Validate minimums
+        if self.is_production or self.is_staging:
+            if self.WORKER_LEASE_DURATION_SECONDS < 300:
+                raise ValueError(
+                    "WORKER_LEASE_DURATION_SECONDS must be >= 300 in production/staging"
+                )
+            if self.TASK_PROGRESS_STALL_TIMEOUT_SECONDS < 60:
+                raise ValueError(
+                    "TASK_PROGRESS_STALL_TIMEOUT_SECONDS must be >= 60 in production/staging"
+                )
+            if self.TASK_WATCHDOG_SCAN_INTERVAL_SECONDS < 5:
+                raise ValueError(
+                    "TASK_WATCHDOG_SCAN_INTERVAL_SECONDS must be >= 5 in production/staging"
+                )
+        elif self.is_test:
+            if self.WORKER_LEASE_DURATION_SECONDS < 1:
+                raise ValueError("WORKER_LEASE_DURATION_SECONDS must be >= 1 in test")
+            if self.TASK_PROGRESS_STALL_TIMEOUT_SECONDS < 1:
+                raise ValueError("TASK_PROGRESS_STALL_TIMEOUT_SECONDS must be >= 1 in test")
+            if self.TASK_WATCHDOG_SCAN_INTERVAL_SECONDS < 1:
+                raise ValueError("TASK_WATCHDOG_SCAN_INTERVAL_SECONDS must be >= 1 in test")
+        return self
 
     @field_validator("ANTIGRAVITY_EFFORT")
     @classmethod
@@ -238,6 +257,9 @@ class Settings(BaseModel):
     WORKER_HEARTBEAT_SECONDS: int = int(os.getenv("WORKER_HEARTBEAT_SECONDS", "60"))
     TASK_PROGRESS_STALL_TIMEOUT_SECONDS: int = int(
         os.getenv("TASK_PROGRESS_STALL_TIMEOUT_SECONDS", "300")
+    )
+    TASK_WATCHDOG_SCAN_INTERVAL_SECONDS: int = int(
+        os.getenv("TASK_WATCHDOG_SCAN_INTERVAL_SECONDS", "60")
     )
     WORKER_ALLOW_LOCAL_DB: bool = (
         os.getenv(
