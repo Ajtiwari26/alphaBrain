@@ -142,26 +142,32 @@ class WorktreeManager:
         """Reuse only matching task worktree; otherwise create isolated worktree."""
         worktree_path = self.get_worktree_path(task_id)
         if not worktree_path.exists():
-            # Clean up orphaned branch from a prior failed attempt (directory gone but branch survives)
             branch_name = f"alpha/{task_id}"
             validated_repo = self.validate_repo_path(repo_path)
-            orphan_check = subprocess.run(
-                ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"],
-                cwd=str(validated_repo),
-            )
-            if orphan_check.returncode == 0:
-                subprocess.run(
-                    ["git", "branch", "-D", branch_name],
-                    cwd=str(validated_repo),
-                    capture_output=True,
-                )
-            # Also prune stale worktree references
+
+            # Always prune stale worktree references
             subprocess.run(
                 ["git", "worktree", "prune"],
                 cwd=str(validated_repo),
                 capture_output=True,
             )
-            return self.create_worktree(repo_path, task_id, base_commit)
+
+            branch_check = subprocess.run(
+                ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"],
+                cwd=str(validated_repo),
+            )
+
+            if branch_check.returncode == 0:
+                # Branch exists but worktree directory is missing; reattach
+                cmd = ["git", "worktree", "add", str(worktree_path), branch_name]
+                res = subprocess.run(cmd, cwd=str(validated_repo), capture_output=True, text=True)
+                if res.returncode != 0:
+                    raise RuntimeError(
+                        f"Failed to reattach worktree to existing branch: {res.stderr}"
+                    )
+                return worktree_path
+            else:
+                return self.create_worktree(repo_path, task_id, base_commit)
 
         validated_repo = self.validate_repo_path(repo_path)
         resolved_base = self._git(
