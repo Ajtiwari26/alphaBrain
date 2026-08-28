@@ -1,12 +1,12 @@
 # AlphaBrain Post-D3-4 AGY Execution Pack
 
-**Authority:** senior-engineer frozen design  
-**Executor:** AGY CLI through Antigravity 2.0  
-**Primary coding model:** `gemini-3.1-pro`, effort `high`  
-**Fast QA model:** `gemini-3.7-flash-high`  
-**Independent review:** `claude-sonnet-4-6` only when quota is available  
-**Opus use:** one read-only architecture dispute turn only; never implementation  
-**Repository:** `/Users/ajaytiwari/Desktop/Projects/alphaBrain`  
+**Authority:** senior-engineer frozen design
+**Executor:** AGY CLI through Antigravity 2.0
+**Primary coding model:** `gemini-3.1-pro`, effort `high`
+**Fast QA model:** `gemini-3.7-flash-high`
+**Independent review:** `claude-sonnet-4-6` only when quota is available
+**Opus use:** one read-only architecture dispute turn only; never implementation
+**Repository:** `/Users/ajaytiwari/Desktop/Projects/alphaBrain`
 **No automatic push, deploy, migration, or production mutation.**
 
 ## 1. Mission
@@ -222,7 +222,7 @@ Run code-review-graph read-only before action. Then run exact gates:
 # Verify source typing.
 .venv/bin/mypy alpha_core alpha_protocol alpha_worker
 # Verify whitespace and patch integrity.
-git diff --check
+git diff --check 7c1a463..HEAD
 # Run disposable real-process resilience proof.
 .venv/bin/python testscript/resilience_harness.py --run
 # Prove no leaked harness processes and inspect launchd worker without changing it.
