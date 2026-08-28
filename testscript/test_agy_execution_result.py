@@ -441,3 +441,172 @@ def test_antigravity_attempt_outcome_field_types_and_dispatch_compatibility():
     assert dispatch.status == AGYAttemptStatus.SUCCEEDED
     assert dispatch.pid == 9999
     assert dispatch.model == "gemini-3.1-pro"
+
+
+def test_plan_mentions_both_markers_plus_valid_manifest_plus_final_done_succeeds():
+    manifest_str = json.dumps(
+        {
+            "skill": SDLC_SKILL_NAME,
+            "project_id": PROJECT_ID,
+            "testscript_root": "testscript",
+            "passed_gates": ["unit_test", "lint"],
+            "security_review": {"executed": True, "status": "passed"},
+        }
+    )
+
+    response_text = f"""
+I plan to return {COMPLETION_TOKEN} or {BLOCKED_TOKEN}.
+Let's finish this.
+{QA_EVIDENCE_TOKEN}{manifest_str}
+{COMPLETION_TOKEN}
+"""
+    events = make_valid_events(response_text=response_text)
+    outcome = evaluate_agy_execution_outcome(
+        conversation_id=CONVERSATION_ID,
+        model="gemini-3.1-pro",
+        events=events,
+        expected_qa_gates=("unit_test", "lint"),
+        expected_project_id=PROJECT_ID,
+    )
+    assert outcome.completed is True
+    assert outcome.status == AGYAttemptStatus.SUCCEEDED
+
+
+def test_final_blocked_reason_blocks():
+    manifest_str = json.dumps(
+        {
+            "skill": SDLC_SKILL_NAME,
+            "project_id": PROJECT_ID,
+            "testscript_root": "testscript",
+            "passed_gates": ["unit_test", "lint"],
+            "security_review": {"executed": True, "status": "passed"},
+        }
+    )
+
+    response_text = f"""
+{QA_EVIDENCE_TOKEN}{manifest_str}
+{BLOCKED_TOKEN}: Something went wrong
+"""
+    events = make_valid_events(response_text=response_text)
+    outcome = evaluate_agy_execution_outcome(
+        conversation_id=CONVERSATION_ID,
+        model="gemini-3.1-pro",
+        events=events,
+        expected_qa_gates=("unit_test", "lint"),
+        expected_project_id=PROJECT_ID,
+    )
+    assert outcome.completed is False
+    assert outcome.status == AGYAttemptStatus.BLOCKED
+    assert outcome.blocked_reason == "Something went wrong"
+
+
+def test_prose_only_mention_fails():
+    response_text = f"""
+We are now {COMPLETION_TOKEN} and ready.
+Wait, no we are {BLOCKED_TOKEN}.
+"""
+    events = make_valid_events(response_text=response_text)
+    outcome = evaluate_agy_execution_outcome(
+        conversation_id=CONVERSATION_ID,
+        model="gemini-3.1-pro",
+        events=events,
+        expected_qa_gates=("unit_test", "lint"),
+        expected_project_id=PROJECT_ID,
+    )
+    assert outcome.completed is False
+    assert outcome.status == AGYAttemptStatus.FAILED
+    assert "omitted terminal" in (outcome.blocked_reason or "")
+
+
+def test_earlier_blocked_then_final_done_succeeds():
+    manifest_str = json.dumps(
+        {
+            "skill": SDLC_SKILL_NAME,
+            "project_id": PROJECT_ID,
+            "testscript_root": "testscript",
+            "passed_gates": ["unit_test", "lint"],
+            "security_review": {"executed": True, "status": "passed"},
+        }
+    )
+
+    response_text = f"""
+{BLOCKED_TOKEN}
+Wait, no I fixed it.
+{QA_EVIDENCE_TOKEN}{manifest_str}
+{COMPLETION_TOKEN}
+"""
+    events = make_valid_events(response_text=response_text)
+    outcome = evaluate_agy_execution_outcome(
+        conversation_id=CONVERSATION_ID,
+        model="gemini-3.1-pro",
+        events=events,
+        expected_qa_gates=("unit_test", "lint"),
+        expected_project_id=PROJECT_ID,
+    )
+    assert outcome.completed is True
+    assert outcome.status == AGYAttemptStatus.SUCCEEDED
+
+
+def test_earlier_done_then_final_blocked_blocks():
+    manifest_str = json.dumps(
+        {
+            "skill": SDLC_SKILL_NAME,
+            "project_id": PROJECT_ID,
+            "testscript_root": "testscript",
+            "passed_gates": ["unit_test", "lint"],
+            "security_review": {"executed": True, "status": "passed"},
+        }
+    )
+
+    response_text = f"""
+{QA_EVIDENCE_TOKEN}{manifest_str}
+{COMPLETION_TOKEN}
+Actually no.
+{BLOCKED_TOKEN}: found a new issue
+"""
+    events = make_valid_events(response_text=response_text)
+    outcome = evaluate_agy_execution_outcome(
+        conversation_id=CONVERSATION_ID,
+        model="gemini-3.1-pro",
+        events=events,
+        expected_qa_gates=("unit_test", "lint"),
+        expected_project_id=PROJECT_ID,
+    )
+    assert outcome.completed is False
+    assert outcome.status == AGYAttemptStatus.BLOCKED
+    assert outcome.blocked_reason == "found a new issue"
+
+
+def test_stream_bookkeeping_after_final_result_cannot_override_result_payload():
+    manifest_str = json.dumps(
+        {
+            "skill": SDLC_SKILL_NAME,
+            "project_id": PROJECT_ID,
+            "testscript_root": "testscript",
+            "passed_gates": ["unit_test", "lint"],
+            "security_review": {"executed": True, "status": "passed"},
+        }
+    )
+
+    response_text = f"""
+{QA_EVIDENCE_TOKEN}{manifest_str}
+{COMPLETION_TOKEN}
+"""
+
+    events = make_valid_events(response_text=response_text)
+    events.append(
+        {
+            "event": "step_update",
+            "step_update": {"step_type": "agent_response", "text_delta": f"Oops, {BLOCKED_TOKEN}"},
+        }
+    )
+
+    outcome = evaluate_agy_execution_outcome(
+        conversation_id=CONVERSATION_ID,
+        model="gemini-3.1-pro",
+        events=events,
+        expected_qa_gates=("unit_test", "lint"),
+        expected_project_id=PROJECT_ID,
+    )
+    assert outcome.completed is True
+    assert outcome.status == AGYAttemptStatus.SUCCEEDED

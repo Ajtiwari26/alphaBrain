@@ -313,9 +313,27 @@ def evaluate_agy_execution_outcome(
             blocked_reason=error_msg,
         )
 
-    # 6. Blocked token check
-    if BLOCKED_TOKEN in response:
-        blocked_msg = response.partition(BLOCKED_TOKEN)[2].lstrip(": ")
+    # 6 & 7. Terminal protocol token check
+    # Parse final result assistant response by lines.
+    final_marker = None
+    blocked_msg = ""
+
+    for line in response.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        if line == COMPLETION_TOKEN:
+            final_marker = COMPLETION_TOKEN
+            blocked_msg = ""
+        elif line.startswith(BLOCKED_TOKEN):
+            remainder = line[len(BLOCKED_TOKEN) :].strip()
+            if not remainder or remainder.startswith(":"):
+                final_marker = BLOCKED_TOKEN
+                blocked_msg = remainder.lstrip(": ")
+
+    if final_marker == BLOCKED_TOKEN:
+        blocked_msg = blocked_msg or "Blocked without reason"
         return AntigravityAttemptOutcome(
             conversation_id=parsed_conversation_id,
             model=model,
@@ -332,12 +350,8 @@ def evaluate_agy_execution_outcome(
             blocked_reason=blocked_msg,
         )
 
-    # 7. Completion token presence
-    # Be lenient: if it's anywhere in the response or even the events stream
-    token_found = COMPLETION_TOKEN in response or COMPLETION_TOKEN in full_response
-
-    if not token_found:
-        error_msg = f"AGY response omitted {COMPLETION_TOKEN}"
+    if final_marker != COMPLETION_TOKEN:
+        error_msg = f"AGY response omitted terminal {COMPLETION_TOKEN} or {BLOCKED_TOKEN}"
         return AntigravityAttemptOutcome(
             conversation_id=parsed_conversation_id,
             model=model,
