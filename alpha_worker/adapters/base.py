@@ -41,6 +41,7 @@ class BaseAgentAdapter(ABC):
         task: TaskEnvelope,
         worktree_path: Path,
         attempt_id: str,
+        additional_evidence: list[GateEvidence] | None = None,
     ) -> GateResult:
         """Runs typed allowlisted commands and proves every required gate."""
         evidence_items: list[GateEvidence] = []
@@ -68,7 +69,7 @@ class BaseAgentAdapter(ABC):
                         evidence_id=f"evi_{len(evidence_items) + 1}",
                         gate_type=command.gate_type,
                         passed=False,
-                        summary=f"Executable '{command.executable}' was not found",
+                        summary=f"Executable '{command.executable}' not found in PATH",
                         metrics={"command_argv": command_argv},
                     )
                 )
@@ -106,6 +107,11 @@ class BaseAgentAdapter(ABC):
                         metrics={"command_argv": command_argv},
                     )
                 )
+
+        if additional_evidence:
+            for item in additional_evidence:
+                item.evidence_id = f"evi_{len(evidence_items) + 1}"
+                evidence_items.append(item)
 
         for required_gate in task.acceptance_plan.required_gates:
             matching_evidence = [item for item in evidence_items if item.gate_type == required_gate]

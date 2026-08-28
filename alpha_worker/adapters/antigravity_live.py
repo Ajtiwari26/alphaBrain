@@ -1063,9 +1063,9 @@ current implementation. {browser_rule}
 Run relevant unit, build, security, accessibility, and regression checks.
 
 If any defect, missing test, weak evidence, malformed error state, or QA failure exists: diagnose
-root cause, repair it yourself in this same conversation, add regression coverage under testscript/,
-then rerun all affected checks. Repeat until passing or genuine external blocker. Never stop merely
-to report a fix for another agent.
+root cause. If the defect requires editing files outside allowed paths, report it as a genuine external blocker.
+Otherwise, repair it yourself in this same conversation, then rerun all affected checks. Repeat until
+passing or genuine external blocker. Never stop merely to report a fix for another agent.
 
 Inspect source-control hygiene: generated dependencies, browser binaries, reports, caches, and
 local artifacts must not be committed. Add or repair .gitignore and remove generated files from

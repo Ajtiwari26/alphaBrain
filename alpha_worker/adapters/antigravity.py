@@ -129,11 +129,11 @@ class AntigravityAdapter(BaseAgentAdapter):
                     "Antigravity bridge dispatch failed due to exception",
                 ],
             )
-        # 3. Run declared acceptance gates after explicit agent completion.
-        gate_result = self.run_acceptance_gates(task, worktree_path, attempt_id)
-        gate_result.evidence_items.append(
+        # 3. Assemble agent-generated evidence
+        additional_evidence: list[GateEvidence] = []
+        additional_evidence.append(
             GateEvidence(
-                evidence_id=f"evi_{len(gate_result.evidence_items) + 1}",
+                evidence_id="evi_placeholder_crg",  # ID will be rewritten by base class
                 gate_type=GateType.CODE_REVIEW_GRAPH,
                 passed=dispatch.completed,
                 summary=(
@@ -151,15 +151,20 @@ class AntigravityAdapter(BaseAgentAdapter):
             )
         )
         if dispatch.qa_evidence:
-            gate_result.evidence_items.append(
+            additional_evidence.append(
                 GateEvidence(
-                    evidence_id=f"evi_{len(gate_result.evidence_items) + 1}",
+                    evidence_id="evi_placeholder_qa",
                     gate_type=GateType.INDEPENDENT_REVIEW,
                     passed=True,
                     summary="Antigravity supplied validated multi-agent-sdlc QA evidence",
                     metrics={"qa_evidence": dispatch.qa_evidence},
                 )
             )
+
+        # 4. Run declared acceptance gates after explicit agent completion, merging additional evidence
+        gate_result = self.run_acceptance_gates(
+            task, worktree_path, attempt_id, additional_evidence
+        )
         gate_result.all_passed = gate_result.all_passed and dispatch.completed
 
         # 3. Inspect changed files & commit
