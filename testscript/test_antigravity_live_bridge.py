@@ -595,3 +595,26 @@ def test_agy_result_fails_closed_on_browser_tool_when_dependency_free():
         forbid_external_dependencies=False,
     )
     assert result_normal.completed is True
+
+
+def test_qa_audit_prompt_allowed_paths_and_hygiene(tmp_path):
+    from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
+
+    # 1. Docs-only task
+    task_docs = make_task()
+    task_docs.allowed_paths = ["TODO.md", "docs/CURRENT_REPORT.md"]
+    prompt_docs = AntigravityLiveBridge()._build_qa_audit_prompt(task_docs, tmp_path)
+
+    assert "TODO.md, docs/CURRENT_REPORT.md" in prompt_docs
+    assert "do NOT modify it" in prompt_docs
+    assert "add or repair .gitignore" not in prompt_docs
+    assert "edit ONLY the paths listed in 'Allowed paths'" in prompt_docs
+    assert "outside allowed paths, do NOT modify it" in prompt_docs
+
+    # 2 & 3. .gitignore explicitly allowed
+    task_git = make_task()
+    task_git.allowed_paths = [".gitignore", "alpha_core/api/app.py"]
+    prompt_git = AntigravityLiveBridge()._build_qa_audit_prompt(task_git, tmp_path)
+
+    assert "add or repair .gitignore" in prompt_git
+    assert "edit ONLY the paths listed in 'Allowed paths'" in prompt_git

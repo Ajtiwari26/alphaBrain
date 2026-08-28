@@ -1076,12 +1076,19 @@ The supervisor controls retries. The junior never reruns uncontrolled loops inte
             )
             or "- No executable gates declared"
         )
+
+        allowed_paths_str = ", ".join(task.allowed_paths)
+        if ".gitignore" in task.allowed_paths:
+            hygiene_rule = "Since .gitignore is explicitly in allowed paths, you may add or repair .gitignore and remove generated files from Git tracking."
+        else:
+            hygiene_rule = "Inspect source-control hygiene. If generated artifacts, dependencies, or caches require an undeclared path (e.g. .gitignore), do NOT modify it. Report it as an external blocker instead."
+
         return f"""You are now Alpha Brain's mandatory QA auditor and repair owner.
 
 Project: {task.project_id}
 Workspace: {worktree_path}
 Original objective: {task.objective}
-Allowed paths: {", ".join(task.allowed_paths)}
+Allowed paths: {allowed_paths_str}
 Required gates: {required_gates}
 Declared commands (must run exactly):
 {declared_commands}
@@ -1090,15 +1097,15 @@ Do not trust prior completion claims. Read the multi-agent-sdlc skill and indepe
 current implementation. {browser_rule}
 Run relevant unit, build, security, accessibility, and regression checks.
 
+You may edit ONLY the paths listed in 'Allowed paths'.
+Do not add, remove, rename, stage, or modify any file outside allowed paths.
+
 If any defect, missing test, weak evidence, malformed error state, or QA failure exists: diagnose
-root cause. If the defect requires editing files outside allowed paths, report it as a genuine external blocker.
-Otherwise, repair it yourself in this same conversation, then rerun all affected checks. Repeat until
+root cause. If the defect requires editing ANY file outside allowed paths, do NOT modify it. Report it as a genuine external blocker and emit {BLOCKED_TOKEN} with the reason.
+Otherwise, repair it yourself in this same conversation, strictly within allowed paths, then rerun all affected checks. Repeat until
 passing or genuine external blocker. Never stop merely to report a fix for another agent.
 
-Inspect source-control hygiene: generated dependencies, browser binaries, reports, caches, and
-local artifacts must not be committed. Add or repair .gitignore and remove generated files from
-Git tracking while preserving package manifests, lockfiles, source, testscript/, docs, and evidence.
-
+{hygiene_rule} Preserve package manifests, lockfiles, source, testscript/, docs, and evidence.
 Call code-review-graph build_or_update_graph_tool and get_review_context_tool for changed flows.
 Do not deploy, push, access unrelated projects, or use dangerous permission bypasses.
 
