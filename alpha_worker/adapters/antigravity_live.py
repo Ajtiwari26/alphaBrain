@@ -759,8 +759,9 @@ class AntigravityLiveBridge:
             if not CONVERSATION_ID_PATTERN.fullmatch(configured_conversation):
                 raise RuntimeError("Configured AlphaBrain Antigravity conversation ID is invalid")
             self._write_record(
+                self._project_store_path(task.task_id),
                 {
-                    "project_id": task.project_id,
+                    "project_id": task.task_id,
                     "repo_path": repo_path,
                     "conversation_id": configured_conversation,
                     "created_at": datetime.now(UTC).isoformat(),
