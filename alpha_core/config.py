@@ -220,7 +220,6 @@ class Settings(BaseModel):
     ATTACHED_DEVICE_ID: str = os.getenv("ATTACHED_DEVICE_ID", "local-mac-worker")
     WORKER_CONTROL_PLANE_URL: str = os.getenv("WORKER_CONTROL_PLANE_URL", "")
     WORKER_ID: str = os.getenv("WORKER_ID", "mac_worker_local")
-    WORKER_IDENTITY_TOKEN: str = os.getenv("WORKER_IDENTITY_TOKEN", "")
     WORKER_STATE_DIR: Path = Path(
         os.getenv(
             "WORKER_STATE_DIR",

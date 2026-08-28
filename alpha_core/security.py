@@ -300,24 +300,31 @@ def require_api_principal(
 
 
 def require_worker_principal(
-    authorization: str | None = Header(default=None),
     x_alpha_worker_identity: str | None = Header(default=None),
 ) -> AuthPrincipal:
-    """FastAPI dependency: authenticate worker daemon requests."""
-    shared_principal = _require_bearer_token(
-        authorization,
-        settings.ALPHA_WORKER_TOKEN,
-        subject="alpha_worker",
-        role=PrincipalRole.WORKER,
-    )
+    """FastAPI dependency: authenticate worker daemon requests via signed identity token."""
     if not x_alpha_worker_identity:
-        return shared_principal
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing worker identity token"
+        )
     claims = verify_worker_identity_token(x_alpha_worker_identity)
     if not claims:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid worker identity"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid worker identity token"
         )
     return AuthPrincipal(subject=str(claims["sub"]), role=PrincipalRole.WORKER)
+
+
+def require_worker_bootstrap_principal(
+    authorization: str | None = Header(default=None),
+) -> AuthPrincipal:
+    """FastAPI dependency: authenticate worker bootstrap for identity issuance."""
+    return _require_bearer_token(
+        authorization,
+        settings.ALPHA_WORKER_TOKEN,
+        subject="alpha_worker_bootstrap",
+        role=PrincipalRole.WORKER,
+    )
 
 
 def verify_websocket_bearer(supplied_token: str | None, expected_token: str) -> bool:

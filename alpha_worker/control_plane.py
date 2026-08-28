@@ -1,5 +1,6 @@
 """Outbound-only control-plane client and encrypted crash-safe event spool."""
 
+import asyncio
 import json
 import os
 import time
@@ -123,29 +124,59 @@ class ControlPlaneClient:
     def __init__(
         self,
         base_url: str,
+        worker_id: str,
         worker_token: str,
-        identity_token: str,
         timeout_seconds: float = 15,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         if not base_url.startswith(("http://", "https://")):
             raise ValueError("Worker control-plane URL must be HTTP(S)")
-        if not worker_token or not identity_token:
+        if not worker_token or not worker_id:
             raise ValueError("Worker control-plane credentials are required")
         self.base_url = base_url.rstrip("/")
-        self._headers = {
-            "Authorization": f"Bearer {worker_token}",
-            "X-Alpha-Worker-Identity": identity_token,
-        }
+        self._worker_id = worker_id
+        self._worker_token = worker_token
+        self._identity_token: str | None = None
+        self._identity_expires_at: int = 0
+        self._refresh_lock = asyncio.Lock()
+
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
-            headers=self._headers,
             timeout=timeout_seconds,
             transport=transport,
         )
 
     async def aclose(self) -> None:
         await self._client.aclose()
+
+    async def _ensure_identity(self, force_refresh: bool = False) -> str:
+        async with self._refresh_lock:
+            now = time.time()
+            if (
+                not force_refresh
+                and self._identity_token
+                and now < (self._identity_expires_at - 60)
+            ):
+                return self._identity_token
+
+            try:
+                response = await self._client.post(
+                    f"/api/workers/{self._worker_id}/identity",
+                    headers={"Authorization": f"Bearer {self._worker_token}"},
+                )
+                response.raise_for_status()
+                data = response.json()
+                self._identity_token = data["identity_token"]
+                self._identity_expires_at = data["expires_at"]
+                return self._identity_token
+            except httpx.HTTPError as exc:
+                raise ControlPlaneUnavailable(
+                    f"Failed to refresh worker identity: {exc!s}"
+                ) from exc
+            except (ValueError, KeyError) as exc:
+                raise ControlPlaneProtocolError(
+                    "Invalid identity response from control plane"
+                ) from exc
 
     async def register(self, registration: WorkerRegistration) -> None:
         await self._request("POST", "/api/workers/register", registration.model_dump(mode="json"))
@@ -192,13 +223,24 @@ class ControlPlaneClient:
             {"lease_token": lease_token, "result": result.model_dump(mode="json")},
         )
 
-    async def _request(self, method: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _request(
+        self, method: str, path: str, payload: dict[str, Any], is_retry: bool = False
+    ) -> dict[str, Any]:
+        identity = await self._ensure_identity()
+        headers = {"X-Alpha-Worker-Identity": identity}
+
         try:
-            response = await self._client.request(method, path, json=payload)
+            response = await self._client.request(method, path, json=payload, headers=headers)
         except httpx.HTTPError as exc:
             raise ControlPlaneUnavailable(
                 f"Control plane unavailable: {exc.__class__.__name__}"
             ) from exc
+
+        if response.status_code == 401 and not is_retry:
+            # Token might be expired or invalidated, force refresh and retry once
+            await self._ensure_identity(force_refresh=True)
+            return await self._request(method, path, payload, is_retry=True)
+
         if response.status_code >= 500:
             raise ControlPlaneUnavailable(f"Control plane server error: {response.status_code}")
         if response.status_code >= 400:

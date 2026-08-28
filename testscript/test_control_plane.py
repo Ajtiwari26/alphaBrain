@@ -29,8 +29,12 @@ async def test_control_plane_leases_heartbeats_and_submits_with_identity_header(
     task = make_task()
 
     async def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
+        body = json.loads(request.content) if request.content else {}
         calls.append((request.method, request.url.path, dict(request.headers), body))
+        if request.url.path.endswith("/identity"):
+            return httpx.Response(
+                200, json={"identity_token": "signed-identity", "expires_at": 9999999999}
+            )
         if request.url.path == "/api/tasks/lease":
             return httpx.Response(
                 200,
@@ -44,8 +48,8 @@ async def test_control_plane_leases_heartbeats_and_submits_with_identity_header(
 
     client = ControlPlaneClient(
         "https://control.example",
+        "worker-one",
         "worker-token",
-        "signed-identity",
         transport=httpx.MockTransport(handler),
     )
     try:
@@ -67,12 +71,13 @@ async def test_control_plane_leases_heartbeats_and_submits_with_identity_header(
         await client.aclose()
 
     assert [call[1] for call in calls] == [
+        "/api/workers/worker-one/identity",
         "/api/tasks/lease",
         f"/api/tasks/{task.task_id}/heartbeat",
         f"/api/tasks/{task.task_id}/result",
     ]
-    assert calls[0][2]["x-alpha-worker-identity"] == "signed-identity"
-    assert calls[0][3]["worker_id"] == "worker-one"
+    assert calls[1][2]["x-alpha-worker-identity"] == "signed-identity"
+    assert calls[1][3]["worker_id"] == "worker-one"
 
 
 @pytest.mark.asyncio
