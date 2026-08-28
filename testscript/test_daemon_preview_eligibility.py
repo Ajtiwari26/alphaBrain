@@ -72,7 +72,9 @@ def mock_daemon() -> AlphaWorkerDaemon:
 
     # Mock WorktreeManager
     daemon.worktree_mgr = MagicMock()
-    daemon.worktree_mgr.create_or_resume_worktree = MagicMock(return_value=Path("/tmp/fake_worktree"))
+    daemon.worktree_mgr.create_or_resume_worktree = MagicMock(
+        return_value=Path("/tmp/fake_worktree")
+    )
 
     return daemon
 

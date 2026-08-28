@@ -14,7 +14,7 @@ async def test_daemon_failed_submit_returns_false_and_does_not_log_completed(mon
     daemon.health_checker = MagicMock()
     daemon.health_checker.evaluate_worker_health.return_value = ("ok", {})
     daemon.worktree_mgr = MagicMock()
-    daemon.worktree_mgr.create_worktree.return_value = "/tmp/worktree"
+    daemon.worktree_mgr.create_or_resume_worktree.return_value = "/tmp/worktree"
 
     task_record = TaskRecord(
         id="tsk_123",

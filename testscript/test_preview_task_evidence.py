@@ -14,7 +14,7 @@ def make_daemon(tmp_path, monkeypatch):
     d.preview_supervisor._state_dir = tmp_path / "previews"
     d.preview_supervisor._state_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(
-        d.worktree_mgr, "create_worktree", MagicMock(return_value=tmp_path / "worktree")
+        d.worktree_mgr, "create_or_resume_worktree", MagicMock(return_value=tmp_path / "worktree")
     )
     monkeypatch.setattr(
         d.health_checker, "evaluate_worker_health", MagicMock(return_value=("online", {}))
