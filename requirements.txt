@@ -12,3 +12,4 @@ httpx>=0.27.0,<1.0
 python-dotenv>=1.0.0,<2.0
 livekit-api>=1.2.0,<2.0
 livekit-agents[google,images]>=1.5.0,<1.6.0
+alembic>=1.13.0
