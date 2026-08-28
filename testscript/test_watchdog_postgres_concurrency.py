@@ -7,9 +7,9 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from alpha_core.db.models import AuditEventRecord, Base, TaskRecord
+from alpha_core.db.models import ApprovalRecord, AuditEventRecord, Base, TaskRecord
 from alpha_core.state.task_engine import TaskEngine
-from alpha_protocol import TaskStatus
+from alpha_protocol import TaskEnvelope, TaskStatus
 
 # Check for Docker before running
 try:
@@ -110,6 +110,34 @@ async def postgres_db(postgres_url):
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+@pytest.mark.asyncio
+async def test_approval_task_submission_preserves_postgres_fk_order(postgres_db):
+    task_id = f"tsk_{uuid.uuid4().hex[:8]}"
+    envelope = TaskEnvelope(
+        task_id=task_id,
+        project_id="test_proj",
+        repo="/test",
+        objective="Prove task row exists before pending approval insert",
+        allowed_paths=["proof.txt"],
+        requires_approval=True,
+    )
+
+    async with postgres_db() as session:
+        task = await TaskEngine.submit_task(session, envelope)
+        await session.commit()
+
+    async with postgres_db() as session:
+        persisted_task = await session.get(TaskRecord, task_id)
+        approval = await session.scalar(
+            sa.select(ApprovalRecord).where(ApprovalRecord.task_id == task_id)
+        )
+
+    assert task.status == TaskStatus.WAITING_APPROVAL.value
+    assert persisted_task is not None
+    assert approval is not None
+    assert approval.status == "pending"
 
 
 @pytest.mark.asyncio

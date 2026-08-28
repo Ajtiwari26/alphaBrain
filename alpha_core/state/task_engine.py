@@ -453,6 +453,10 @@ class TaskEngine:
             session.add(task)
 
         if requires_approval:
+            # PostgreSQL enforces the approvals.task_id foreign key during
+            # INSERT. Flush the parent task first while keeping both writes in
+            # the same transaction; SQLite did not expose this ordering bug.
+            await session.flush()
             appr = ApprovalRecord(
                 id=f"appr_{uuid.uuid4().hex[:12]}",
                 task_id=envelope.task_id,
