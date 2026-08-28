@@ -23,6 +23,14 @@ async def db_session():
 def test_envelope() -> TaskEnvelope:
     import uuid
 
+    from alpha_protocol import AcceptancePlan, GateCommand, GateType
+
+    plan = AcceptancePlan(
+        require_independent_review=True,
+        required_gates=[GateType.INDEPENDENT_REVIEW, GateType.CODE_REVIEW_GRAPH, GateType.LINT],
+        commands=[GateCommand(gate_type=GateType.LINT, executable="ruff", args=["check", "."])],
+    )
+
     return TaskEnvelope(
         task_id=f"task_{uuid.uuid4().hex[:8]}",
         project_id="prj_test",
@@ -32,6 +40,7 @@ def test_envelope() -> TaskEnvelope:
         allowed_paths=["."],
         require_packet_binding=True,
         requires_approval=True,
+        acceptance_plan=plan,
     )
 
 
@@ -71,9 +80,22 @@ async def test_self_task_stores_digest(
 
     import uuid
 
+    from alpha_protocol import AcceptancePlan, GateCommand, GateType
+
+    plan = AcceptancePlan(
+        require_independent_review=True,
+        required_gates=[GateType.INDEPENDENT_REVIEW, GateType.CODE_REVIEW_GRAPH, GateType.LINT],
+        commands=[GateCommand(gate_type=GateType.LINT, executable="ruff", args=["check", "."])],
+    )
+
     t_id = f"t_{uuid.uuid4().hex[:8]}"
     task = await create_self_improvement_task(
-        db_session, req, project_id=f"prj_{uuid.uuid4().hex[:8]}", task_id=t_id, objective="Test"
+        db_session,
+        req,
+        project_id=f"prj_{uuid.uuid4().hex[:8]}",
+        task_id=t_id,
+        objective="Test",
+        acceptance_plan=plan,
     )
     assert task.packet_sha256 is not None
 
@@ -299,3 +321,33 @@ def test_legal_transition_queued_to_blocked():
     from alpha_protocol.enums import TaskStatus, is_legal_transition
 
     assert is_legal_transition(TaskStatus.QUEUED, TaskStatus.BLOCKED) is True
+
+
+@pytest.mark.asyncio
+async def test_acceptance_plan_mutation_changes_digest(
+    db_session: AsyncSession, test_envelope: TaskEnvelope
+):
+    """Extra: Proof that command args mutation changes digest and blocks execution."""
+    task = await TaskEngine.submit_task(db_session, test_envelope)
+    digest = task.packet_sha256
+
+    await TaskEngine.decide_task_approval(
+        db_session, task.id, approved=True, decided_by="founder", packet_sha256=digest
+    )
+
+    # Mutate the argument deep inside the acceptance plan json
+    new_details = dict(task.details_json)
+    plan = new_details.get("acceptance_plan", {})
+    plan["commands"][0]["args"] = ["check", "alpha_core", "alpha_protocol"]
+    task.details_json = new_details
+    await db_session.flush()
+
+    leased = await TaskEngine.lease_next_task(db_session, "worker1")
+    # Because digest doesn't match mutated json, it should block and return None
+    assert leased is None
+
+    from sqlalchemy import select
+
+    task_after = await db_session.scalar(select(TaskRecord).where(TaskRecord.id == task.id))
+    assert task_after is not None
+    assert task_after.status == TaskStatus.BLOCKED.value

@@ -167,6 +167,18 @@ async def test_founder_can_queue_clean_self_development_task_without_starting_ex
         "source_repo": str(repo_path),
         "allowed_paths": ["alpha_core", "testscript"],
         "objective": "Add one bounded self-development proof",
+        "acceptance_plan": {
+            "required_gates": ["independent_review", "code_review_graph", "lint", "unit_test"],
+            "commands": [
+                {"gate_type": "lint", "executable": "ruff", "args": ["check", "alpha_core"]},
+                {
+                    "gate_type": "unit_test",
+                    "executable": "pytest",
+                    "args": ["testscript/test_self_development_admission.py"],
+                },
+            ],
+            "require_independent_review": True,
+        },
     }
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:

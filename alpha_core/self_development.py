@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alpha_core.config import settings
 from alpha_core.db.models import TaskRecord
 from alpha_core.state.task_engine import TaskEngine
-from alpha_protocol import AgentType, RiskClass, TaskEnvelope
+from alpha_protocol import AcceptancePlan, AgentType, GateType, RiskClass, TaskEnvelope
 
 
 @dataclass(frozen=True)
@@ -116,6 +116,7 @@ async def create_self_improvement_task(
     project_id: str,
     task_id: str,
     objective: str,
+    acceptance_plan: AcceptancePlan,
     detailed_instructions: str | None = None,
 ) -> TaskRecord:
     """Create, but never execute, one founder-approved self-development task.
@@ -128,6 +129,36 @@ async def create_self_improvement_task(
     admission = admit_self_improvement(request)
     if not admission.admitted or not admission.source_repo or not admission.base_commit:
         raise ValueError(f"Self-improvement admission rejected: {admission.reason}")
+
+    if not acceptance_plan.required_gates:
+        raise ValueError("Self-development task requires nonempty required_gates")
+    if not acceptance_plan.require_independent_review:
+        raise ValueError("Self-development task must have require_independent_review=True")
+
+    req_gates = set(acceptance_plan.required_gates)
+    if GateType.INDEPENDENT_REVIEW not in req_gates or GateType.CODE_REVIEW_GRAPH not in req_gates:
+        raise ValueError("required_gates must include INDEPENDENT_REVIEW and CODE_REVIEW_GRAPH")
+
+    cmd_gates = {cmd.gate_type for cmd in acceptance_plan.commands}
+    for gate in req_gates:
+        if gate not in {
+            GateType.INDEPENDENT_REVIEW,
+            GateType.CODE_REVIEW_GRAPH,
+        }:
+            if gate not in cmd_gates:
+                raise ValueError(f"Required gate {gate.value} has no matching GateCommand")
+
+    for cmd in acceptance_plan.commands:
+        if cmd.gate_type not in req_gates:
+            raise ValueError(
+                f"Command gate_type {cmd.gate_type.value} must be declared in required_gates"
+            )
+        if cmd.gate_type in {GateType.INDEPENDENT_REVIEW, GateType.CODE_REVIEW_GRAPH}:
+            raise ValueError(f"Gate type {cmd.gate_type.value} cannot be a shell command gate")
+        if cmd.executable not in settings.ALLOWED_GATE_EXECUTABLES:
+            raise ValueError(
+                f"Command executable '{cmd.executable}' is not in ALLOWED_GATE_EXECUTABLES"
+            )
 
     await TaskEngine.create_project(
         session,
@@ -154,5 +185,6 @@ async def create_self_improvement_task(
         risk_class=RiskClass.LOW,
         requires_approval=True,
         require_packet_binding=True,
+        acceptance_plan=acceptance_plan,
     )
     return await TaskEngine.submit_task(session, envelope, project_id=project_id)

@@ -58,6 +58,7 @@ from alpha_meet.eva_live_agent import eva_room_manager
 from alpha_meet.live_audio import LiveMeetAudioBridge
 from alpha_meet.tokens import LiveKitTokenGenerator, MeetingRole
 from alpha_protocol import (
+    AcceptancePlan,
     ApprovalStatus,
     CallJob,
     PersonaType,
@@ -87,6 +88,7 @@ class SelfDevelopmentTaskSubmission(BaseModel):
     objective: str = Field(min_length=1, max_length=2000)
     detailed_instructions: str | None = Field(default=None, max_length=20000)
     base_commit: str = Field(default="HEAD", min_length=1, max_length=128)
+    acceptance_plan: AcceptancePlan
 
 
 class TaskCancellationRequest(BaseModel):
@@ -436,6 +438,7 @@ async def submit_self_development_task(
             task_id=payload.task_id,
             objective=payload.objective,
             detailed_instructions=payload.detailed_instructions,
+            acceptance_plan=payload.acceptance_plan,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
