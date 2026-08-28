@@ -16,19 +16,19 @@ def test_render_manifest_structure_and_constraints():
     assert 'version: "1"' in content
     assert "services:" in content
     assert "type: web" in content
-    assert "name: alpha-brain" in content
+    assert "name: alpha-brain-staging" in content
     assert "runtime: python" in content
     assert "plan: free" in content
     assert "region: singapore" in content
     assert 'buildCommand: "pip install -r requirements.txt"' in content
     assert 'startCommand: "uvicorn alpha_core.api.app:app --host 0.0.0.0 --port $PORT"' in content
-    assert "healthCheckPath: /health" in content
+    assert "healthCheckPath: /health/ready" in content
 
     # Ensure zero Redis dependencies
     assert "redis" not in content.lower(), "render.yaml must not contain Redis service"
 
     # Ensure required non-secret env vars exist
-    assert "key: ENV\n        value: production" in content
+    assert "key: ENV\n        value: staging" in content
     assert 'key: DEBUG\n        value: "false"' in content
     assert "key: GEMINI_USE_VERTEX" in content
     assert "key: GEMINI_LIVE_MODEL" in content

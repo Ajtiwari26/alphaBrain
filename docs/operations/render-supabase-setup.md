@@ -1,12 +1,16 @@
-# Alpha Brain Production Deployment: Render & Supabase
+# Alpha Brain Staging Preflight Deployment: Render & Supabase
 
 This document details the manual setup, configuration, verification, and rollback procedures for deploying the Alpha Brain control plane on a **Render Web Service** connected to a **Supabase PostgreSQL** database.
+
+> [!WARNING]
+> **Production Remains Prohibited**: This configuration is explicitly for staging/preview environments. Production deployment is not authorized.
+> **Required Approval**: A separate explicit founder approval is required for GitHub push, Render service creation, and the first deployment.
 
 ---
 
 ## Architecture Overview
 
-1. **Render Web Service (`alpha-brain`)**: Runs the FastAPI application ([`alpha_core.api.app:app`](file:///Users/ajaytiwari/Desktop/Projects/alphaBrain/alpha_core/api/app.py)), exposing health endpoints, LiveKit token generation, task ingestion, and worker coordination endpoints.
+1. **Render Web Service (`alpha-brain-staging`)**: Runs the FastAPI application ([`alpha_core.api.app:app`](file:///Users/ajaytiwari/Desktop/projects/alphaBrain/alpha_core/api/app.py)), exposing health endpoints, LiveKit token generation, task ingestion, and worker coordination endpoints.
 2. **Supabase PostgreSQL**: Acts as the durable system of record for tasks, worker registrations, health history, meeting state, and audit records.
 3. **Local Mac Execution Worker (P5)**: Connects outbound to the Render control plane via HTTPS; no direct database connection or inbound open ports are needed on the worker machine.
 4. **No-Redis-Required Architecture**: Alpha Brain uses PostgreSQL transaction-safe leasing with `FOR UPDATE SKIP LOCKED` and lightweight in-memory caching. A Redis/Upstash instance is **not required** for core operations.
@@ -25,19 +29,19 @@ This document details the manual setup, configuration, verification, and rollbac
    ```text
    postgresql://postgres.[YOUR-PROJECT-REF]:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
    ```
-3. *Note*: Alpha Brain automatically translates standard `postgresql://` connection strings to SQLAlchemy async `postgresql+psycopg://` drivers at startup in [`alpha_core/db/connection.py`](file:///Users/ajaytiwari/Desktop/Projects/alphaBrain/alpha_core/db/connection.py).
+3. *Note*: Alpha Brain automatically translates standard `postgresql://` connection strings to SQLAlchemy async `postgresql+psycopg://` drivers at startup in [`alpha_core/db/connection.py`](file:///Users/ajaytiwari/Desktop/projects/alphaBrain/alpha_core/db/connection.py).
 
 ---
 
 ## 2. Render Web Service Deployment
 
 > [!WARNING]
-> **Render Free Plan Operational Boundary**: Render Free web services spin down after periods of inactivity (cold starts). As a result, the Free plan is suitable for preview, development, and control-plane smoke testing only. It cannot meet Alpha Brain P5 24x7 worker-orchestration leasing loops or immediate voice/telephony call reliability requirements. Upgrading to a paid, always-on instance remains a mandatory production gate.
+> **Render Free Plan Operational Boundary**: Render Free web services spin down after periods of inactivity (cold starts). As a result, the Free plan is suitable for preview, staging, and control-plane smoke testing only. It cannot meet Alpha Brain P5 24x7 worker-orchestration leasing loops or immediate voice/telephony call reliability requirements. Upgrading to a paid, always-on instance remains a mandatory production gate.
 
 ### 2.1 Deploying via Blueprint (`render.yaml`)
 1. In the [Render Dashboard](https://dashboard.render.com), click **New** > **Blueprint**.
 2. Connect the `alphaBrain` repository.
-3. Render will detect [`render.yaml`](file:///Users/ajaytiwari/Desktop/Projects/alphaBrain/render.yaml) and configure the `alpha-brain` Python Web Service on the `free` plan in region `singapore`.
+3. Render will detect [`render.yaml`](file:///Users/ajaytiwari/Desktop/projects/alphaBrain/render.yaml) and configure the `alpha-brain-staging` Python Web Service on the `free` plan in region `singapore`.
 
 ### 2.2 Manual Configuration (Alternative)
 If creating the service manually without Blueprint:
@@ -47,15 +51,15 @@ If creating the service manually without Blueprint:
 - **Region**: Singapore (`singapore`)
 - **Build Command**: `pip install -r requirements.txt`
 - **Start Command**: `uvicorn alpha_core.api.app:app --host 0.0.0.0 --port $PORT`
-- **Health Check Path**: `/health`
-- **Auto-Deploy**: Yes (on push to `main`)
+- **Health Check Path**: `/health/ready`
+- **Auto-Deploy**: False
 
 ### 2.3 Required Environment Variables
 
 #### Non-Secret Variables (Preconfigured in `render.yaml`)
 | Variable | Value | Purpose |
 |---|---|---|
-| `ENV` | `production` | Production environment flag |
+| `ENV` | `staging` | Staging environment flag |
 | `DEBUG` | `false` | Disables verbose debug and auto-reload |
 | `GEMINI_USE_VERTEX` | `false` | Use Developer API or Vertex AI |
 | `GEMINI_LIVE_MODEL` | `gemini-2.5-flash-native-audio-latest` | Model for Eva meeting audio |
@@ -85,16 +89,14 @@ If creating the service manually without Blueprint:
 
 ## 3. Database Schema Initialization & Migrations
 
-### 3.1 Initial Table Creation
-Alpha Brain's FastAPI lifespan automatically invokes `init_db()` upon boot in [`alpha_core/api/app.py`](file:///Users/ajaytiwari/Desktop/Projects/alphaBrain/alpha_core/api/app.py), creating all required SQLAlchemy models:
-- `tasks`, `attempts`, `task_dependencies`, `task_approvals`
-- `workers`, `worker_health`
-- `meetings`, `meeting_participants`, `meeting_events`, `meeting_transcripts`
-- `specifications`
-- `call_jobs`, `audit_events`
+### 3.1 Operator-Only Migration Rule
+> [!IMPORTANT]
+> **No Automatic Migrations**: Alpha Brain's startup **must never** run Alembic migrations or mutate the schema in staging or production.
+> Alembic remains an explicit operator/CI-only operation.
+> Application startup may initialize engine/session state but must not mutate schema.
 
 ### 3.2 Manual Migration Check (Alembic)
-If schema migrations are tracked via Alembic:
+Schema migrations are applied manually by the operator:
 ```bash
 # Apply all pending Alembic schema migrations to target Supabase database
 DATABASE_URL="postgresql://..." alembic upgrade head
@@ -106,18 +108,13 @@ DATABASE_URL="postgresql://..." alembic upgrade head
 
 Once the Render service status turns **Live**:
 
-### 4.1 Public Health Endpoint
+### 4.1 Public Health Endpoints
 ```bash
-# Query public health endpoint to verify control-plane boot status
-curl -f https://<your-service-name>.onrender.com/health
-```
-**Expected Response (HTTP 200)**:
-```json
-{
-  "status": "healthy",
-  "app": "Alpha Brain",
-  "env": "production"
-}
+# Query liveness endpoint to verify process is running
+curl -f https://<your-service-name>.onrender.com/health/live
+
+# Query readiness endpoint to verify control-plane boot status and dependencies
+curl -f https://<your-service-name>.onrender.com/health/ready
 ```
 
 ### 4.2 Authenticated Worker Health Reporting
@@ -138,7 +135,7 @@ Verify authenticated LiveKit token minting:
 curl -X POST https://<your-service-name>.onrender.com/api/meet/token \
   -H "Authorization: Bearer <ALPHA_API_TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"room_name": "prod-smoke-test", "identity": "Ajay (Founder)"}'
+  -d '{"room_name": "staging-smoke-test", "identity": "Ajay (Founder)"}'
 ```
 **Expected Response (HTTP 200)** with signed `token` and `livekit_url`.
 
@@ -166,3 +163,4 @@ curl -X POST https://<your-service-name>.onrender.com/api/meet/token \
      # Roll back the most recent database migration
      alembic downgrade -1
      ```
+

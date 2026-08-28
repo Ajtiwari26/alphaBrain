@@ -5,7 +5,7 @@ version: "1"
 
 services:
   - type: web
-    name: alpha-brain
+    name: alpha-brain-staging
     runtime: python
     plan: free
     region: singapore
@@ -16,7 +16,7 @@ services:
     envVars:
       # Non-secret runtime configuration
       - key: ENV
-        value: production
+        value: staging
       - key: DEBUG
         value: "false"
       - key: GEMINI_USE_VERTEX

@@ -79,11 +79,11 @@ async def run_alembic_migrations(database_url: str | None = None) -> None:
 async def init_db() -> None:
     """
     Initialize database schema.
-    In production and staging, runs Alembic migrations.
-    In development and test environments, uses Alembic migrations or schema creation.
+    In production and staging, must never run Alembic migrations.
+    In development and test environments, uses schema creation.
     """
     if settings.is_production or settings.is_staging:
-        await run_alembic_migrations()
+        pass
     elif settings.DATABASE_URL.startswith("sqlite+aiosqlite:///:memory:"):
         engine = get_engine()
         async with engine.begin() as conn:
