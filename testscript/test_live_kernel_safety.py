@@ -214,6 +214,8 @@ async def test_main_live_with_approve_as_called_correctly(monkeypatch, capsys):
     mock_session = MagicMock()
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.rollback = AsyncMock()
     mock_session_factory = MagicMock(return_value=mock_session)
     monkeypatch.setattr(run_live_kernel_proof, "async_sessionmaker", mock_session_factory)
     from testscript import run_live_kernel_proof

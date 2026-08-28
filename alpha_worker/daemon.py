@@ -306,12 +306,20 @@ class AlphaWorkerDaemon:
         if not leased_tuple:
             return False
 
+        try:
+            await session.commit()
+        except Exception as e:
+            logger.error(f"Failed to commit lease: {e}")
+            await session.rollback()
+            return False
+
         task_record, envelope = leased_tuple
         lease_token = task_record.lease_token
         logger.info(f"Leased task {envelope.task_id}: '{envelope.objective}'")
 
         worktree_path = None
         result: TaskResult | None = None
+        result_committed = False
         try:
             # 3. Create isolated worktree (or resume if a prior attempt left one)
             worktree_path = self.worktree_mgr.create_or_resume_worktree(
@@ -348,7 +356,17 @@ class AlphaWorkerDaemon:
                 logger.error(
                     f"Failed to persistently submit result for task {envelope.task_id} (lease expired or rejected)"
                 )
+                await session.rollback()
                 return False
+
+            try:
+                await session.commit()
+                result_committed = True
+            except Exception as e:
+                logger.error(f"Commit failed for task result: {e}")
+                await session.rollback()
+                return False
+
             logger.info(f"Completed task {envelope.task_id} with status {result.status.value}")
 
         except Exception as e:
@@ -379,11 +397,20 @@ class AlphaWorkerDaemon:
                 logger.error(
                     f"Failed to persistently submit error result for task {envelope.task_id} (lease expired or rejected)"
                 )
+                await session.rollback()
+                return False
+
+            try:
+                await session.commit()
+                result_committed = True
+            except Exception as e:
+                logger.error(f"Commit failed for error result: {e}")
+                await session.rollback()
                 return False
         finally:
             # 6. Safely clean up worktree
             retain_preview = bool(result and self._is_eligible_for_preview(envelope, result))
-            if worktree_path and not retain_preview:
+            if worktree_path and not retain_preview and result_committed:
                 try:
                     self.worktree_mgr.remove_worktree(envelope.repo, envelope.task_id)
                 except Exception:

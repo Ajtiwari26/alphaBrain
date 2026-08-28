@@ -67,7 +67,7 @@ async def test_daemon_failed_submit_returns_false_and_does_not_log_completed(mon
     logger.addHandler(handler)
 
     # We need a dummy session
-    session = MagicMock()
+    session = AsyncMock()
 
     res = await daemon.execute_task_cycle(session)
 

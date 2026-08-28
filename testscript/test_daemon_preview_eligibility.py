@@ -108,7 +108,7 @@ async def test_completed_passed_gates_starts_preview_local(
         m.setattr(TaskEngine, "submit_result", submit_mock)
 
         # Test execute_task_cycle
-        session_mock = MagicMock()
+        session_mock = AsyncMock()
 
         # We need to simulate leasing a task first?
         # Actually execute_task_cycle fetches a task. It's easier to patch the fetch.
@@ -161,7 +161,7 @@ async def test_completed_failed_gates_no_preview(
         fetch_mock = AsyncMock(return_value=(FakeTaskRecord(), base_task))
         m.setattr(TaskEngine, "lease_next_task", fetch_mock)
 
-        await mock_daemon.execute_task_cycle(MagicMock())
+        await mock_daemon.execute_task_cycle(AsyncMock())
 
         mock_daemon.preview_supervisor.start_preview.assert_not_called()
         submitted_result = submit_mock.call_args[0][1]
@@ -196,7 +196,7 @@ async def test_retryable_failed_no_preview(
         fetch_mock = AsyncMock(return_value=(FakeTaskRecord(), base_task))
         m.setattr(TaskEngine, "lease_next_task", fetch_mock)
 
-        await mock_daemon.execute_task_cycle(MagicMock())
+        await mock_daemon.execute_task_cycle(AsyncMock())
 
         mock_daemon.preview_supervisor.start_preview.assert_not_called()
         mock_daemon.worktree_mgr.remove_worktree.assert_called_once()
