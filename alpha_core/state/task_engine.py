@@ -604,7 +604,11 @@ class TaskEngine:
         if not task:
             return None
 
-        envelope = TaskEnvelope.model_validate(task.details_json)
+        envelope = (
+            TaskEnvelope.model_validate_json(task.details_json)
+            if isinstance(task.details_json, str)
+            else TaskEnvelope.model_validate(task.details_json)
+        )
 
         if approval.approval_type == "task_review":
             if not review_sha256 or review_sha256 != approval.scope_sha256:
@@ -754,15 +758,13 @@ class TaskEngine:
             and_(
                 TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
                 TaskRecord.lease_expires_at.is_not(None),
+                TaskRecord.lease_expires_at < now,
             )
         )
         if session.bind and session.bind.dialect.name == "postgresql":
             query = query.with_for_update(skip_locked=True)
         res = await session.execute(query)
-        tasks = res.scalars().all()
-        expired = [
-            t for t in tasks if t.lease_expires_at and normalize_utc(t.lease_expires_at) < now
-        ]
+        expired = res.scalars().all()
         for task in expired:
             task.lease_token = None
             task.worker_id = None
@@ -786,13 +788,13 @@ class TaskEngine:
             and_(
                 TaskRecord.status == TaskStatus.RETRYABLE_FAILED.value,
                 TaskRecord.next_eligible_at.is_not(None),
+                TaskRecord.next_eligible_at <= now,
             )
         )
         if session.bind and session.bind.dialect.name == "postgresql":
             query = query.with_for_update(skip_locked=True)
         res = await session.execute(query)
-        tasks = res.scalars().all()
-        due = [t for t in tasks if t.next_eligible_at and normalize_utc(t.next_eligible_at) <= now]
+        due = res.scalars().all()
         for task in due:
             TaskEngine._transition(task, TaskStatus.QUEUED)
             task.next_eligible_at = None
@@ -976,17 +978,19 @@ class TaskEngine:
             and_(
                 TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
                 TaskRecord.leased_at.is_not(None),
+                or_(
+                    TaskRecord.updated_at < threshold,
+                    and_(
+                        TaskRecord.updated_at.is_(None),
+                        TaskRecord.leased_at < threshold,
+                    ),
+                ),
             )
         )
         if session.bind and session.bind.dialect.name == "postgresql":
             query = query.with_for_update(skip_locked=True)
         res = await session.execute(query)
-        all_active = res.scalars().all()
-        stalled_tasks = [
-            task
-            for task in all_active
-            if normalize_utc(task.updated_at or task.leased_at) < threshold
-        ]
+        stalled_tasks = res.scalars().all()
         stalled_ids: list[str] = []
 
         for task in stalled_tasks:
@@ -1095,7 +1099,11 @@ class TaskEngine:
         if not TaskEngine._has_active_lease(task, lease_token, worker_id, now):
             return False
 
-        envelope = TaskEnvelope.model_validate(task.details_json)
+        envelope = (
+            TaskEnvelope.model_validate_json(task.details_json)
+            if isinstance(task.details_json, str)
+            else TaskEnvelope.model_validate(task.details_json)
+        )
 
         if envelope.require_packet_binding:
             fresh_digest = compute_packet_digest(envelope)
@@ -1358,7 +1366,11 @@ class TaskEngine:
         actor: str,
     ) -> None:
         """Schedule bounded exponential retry without immediate retry loops."""
-        envelope = TaskEnvelope.model_validate(task.details_json)
+        envelope = (
+            TaskEnvelope.model_validate_json(task.details_json)
+            if isinstance(task.details_json, str)
+            else TaskEnvelope.model_validate(task.details_json)
+        )
         if task.attempt_count >= task.max_attempts:
             TaskEngine._transition(task, TaskStatus.BLOCKED)
             task.next_eligible_at = None
@@ -1388,36 +1400,3 @@ class TaskEngine:
                 details_json=details,
             )
         )
-
-    @staticmethod
-    async def _recover_expired_leases(session: AsyncSession, now: datetime) -> None:
-        """Requeue expired leases with retry backoff."""
-        query = select(TaskRecord).where(
-            and_(
-                TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
-                TaskRecord.lease_expires_at.is_not(None),
-                TaskRecord.lease_expires_at < now,
-            )
-        )
-        if session.bind and session.bind.dialect.name == "postgresql":
-            query = query.with_for_update(skip_locked=True)
-        res = await session.execute(query)
-        expired_tasks = res.scalars().all()
-        for task in expired_tasks:
-            prev_worker = task.worker_id or "unknown"
-            task.lease_token = None
-            task.lease_expires_at = None
-            task.worker_id = None
-            TaskEngine._transition(task, TaskStatus.RETRYABLE_FAILED)
-            await TaskEngine._schedule_retry(session, task, now, actor="system_recovery")
-
-            session.add(
-                AuditEventRecord(
-                    id=f"evt_{uuid.uuid4().hex[:12]}",
-                    event_type="lease_expired_requeued",
-                    project_id=task.project_id,
-                    task_id=task.id,
-                    actor="system",
-                    details_json={"expired_worker_id": prev_worker},
-                )
-            )

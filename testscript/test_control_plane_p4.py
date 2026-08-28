@@ -698,36 +698,69 @@ async def test_lease_endpoint_zero_watchdog_calls(async_db, monkeypatch, worker_
 
 
 @pytest.mark.asyncio
+async def test_lease_endpoint_zero_recovery_calls(async_db, monkeypatch, worker_headers):
+    # Monkeypatch to ensure they are never called
+    mock_stalls = AsyncMock(side_effect=Exception("check_watchdog_stalls called!"))
+    mock_retries = AsyncMock(side_effect=Exception("release_due_retries called!"))
+    mock_expired = AsyncMock(side_effect=Exception("timeout_expired_leases called!"))
+
+    monkeypatch.setattr(TaskEngine, "check_watchdog_stalls", mock_stalls)
+    monkeypatch.setattr(TaskEngine, "release_due_retries", mock_retries)
+    monkeypatch.setattr(TaskEngine, "timeout_expired_leases", mock_expired)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Submit 50 concurrent requests
+        tasks = [
+            client.post(
+                "/api/tasks/lease", headers=worker_headers, json={"worker_id": "alpha_worker"}
+            )
+            for _ in range(50)
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception):
+                raise r
+
+
+@pytest.mark.asyncio
 async def test_application_lifespan_scheduler(monkeypatch):
     import sys
 
     app_module = sys.modules["alpha_core.api.app"]
     from fastapi import FastAPI
 
-    scheduler_called = asyncio.Event()
+    scheduler_started = asyncio.Event()
+    scheduler_cancelled = asyncio.Event()
+    scheduler_finalized = asyncio.Event()
     original_call_count = 0
 
     async def tracking_scheduler():
         nonlocal original_call_count
         original_call_count += 1
-        scheduler_called.set()
-        # Block until cancelled to simulate real scheduler
+        scheduler_started.set()
         try:
             await asyncio.sleep(3600)
         except asyncio.CancelledError:
+            scheduler_cancelled.set()
             raise
+        finally:
+            scheduler_finalized.set()
 
     monkeypatch.setattr(app_module, "watchdog_scheduler", tracking_scheduler)
 
     test_app = FastAPI(lifespan=app_module.lifespan)
     async with test_app.router.lifespan_context(test_app):
         # Wait for scheduler to actually start
-        await asyncio.wait_for(scheduler_called.wait(), timeout=1.0)
+        await asyncio.wait_for(scheduler_started.wait(), timeout=1.0)
+        assert not scheduler_cancelled.is_set()
+        assert not scheduler_finalized.is_set()
 
     # Scheduler was called exactly once
     assert original_call_count == 1
     # After lifespan exits, the task should have been cancelled and awaited
-    # (if it leaked, tracking_scheduler would still be sleeping)
+    assert scheduler_cancelled.is_set()
+    assert scheduler_finalized.is_set()
 
 
 @pytest.mark.asyncio
