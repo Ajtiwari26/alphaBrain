@@ -566,9 +566,9 @@ class AntigravityLiveBridge:
                     )
                     if is_new_project:
                         self._write_record(
-                            self._project_store_path(task.project_id),
+                            self._project_store_path(task.task_id),
                             {
-                                "project_id": task.project_id,
+                                "project_id": task.task_id,
                                 "repo_path": str(Path(task.repo).expanduser().resolve()),
                                 "conversation_id": dispatch_res.conversation_id,
                                 "created_at": datetime.now(UTC).isoformat(),
@@ -726,10 +726,13 @@ class AntigravityLiveBridge:
             ],
         }
 
+    def _project_store_path(self, task_id: str) -> Path:
+        return cast(Path, self.session_store_dir / f"{task_id}.json")
+
     def _get_project_conversation(self, task: TaskEnvelope) -> tuple[str | None, bool]:
-        """Return only stored conversation bound to exact project and repository."""
+        """Return only stored conversation bound to exact task and repository."""
         repo_path = str(Path(task.repo).expanduser().resolve())
-        record = self._load_record(self._project_store_path(task.project_id))
+        record = self._load_record(self._project_store_path(task.task_id))
         if record and record.get("repo_path") == repo_path:
             conversation_id = record.get("conversation_id")
             if isinstance(conversation_id, str) and CONVERSATION_ID_PATTERN.fullmatch(
@@ -740,9 +743,9 @@ class AntigravityLiveBridge:
             if not CONVERSATION_ID_PATTERN.fullmatch(task.session_id):
                 raise RuntimeError("Configured Antigravity project conversation ID is invalid")
             self._write_record(
-                self._project_store_path(task.project_id),
+                self._project_store_path(task.task_id),
                 {
-                    "project_id": task.project_id,
+                    "project_id": task.task_id,
                     "repo_path": repo_path,
                     "conversation_id": task.session_id,
                     "created_at": datetime.now(UTC).isoformat(),
@@ -756,7 +759,6 @@ class AntigravityLiveBridge:
             if not CONVERSATION_ID_PATTERN.fullmatch(configured_conversation):
                 raise RuntimeError("Configured AlphaBrain Antigravity conversation ID is invalid")
             self._write_record(
-                self._project_store_path(task.project_id),
                 {
                     "project_id": task.project_id,
                     "repo_path": repo_path,
@@ -1106,7 +1108,7 @@ Otherwise, repair it yourself in this same conversation, strictly within allowed
 passing or genuine external blocker. Never stop merely to report a fix for another agent.
 
 {hygiene_rule} Preserve package manifests, lockfiles, source, testscript/, docs, and evidence.
-Call code-review-graph build_or_update_graph_tool and get_review_context_tool for changed flows.
+You MUST unconditionally call code-review-graph build_or_update_graph_tool and get_review_context_tool in this turn before finishing, even if you made no changes.
 Do not deploy, push, access unrelated projects, or use dangerous permission bypasses.
 
 Before success emit one {QA_EVIDENCE_TOKEN} JSON line matching SDLC schema plus:
@@ -1131,8 +1133,8 @@ requires a change. Rerun every declared gate, then emit updated {QA_EVIDENCE_TOK
 {COMPLETION_TOKEN}. Do not report completion without executing missing tool.
 """
 
-    def _project_store_path(self, project_id: str) -> Path:
-        return cast(Path, self.session_store_dir / f"{project_id}.json")
+    def _project_store_path(self, task_id: str) -> Path:
+        return cast(Path, self.session_store_dir / f"{task_id}.json")
 
     @staticmethod
     def _load_record(path: Path) -> dict[str, Any] | None:
