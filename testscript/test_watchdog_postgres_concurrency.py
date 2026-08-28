@@ -13,7 +13,7 @@ from alpha_protocol import TaskStatus
 
 # Check for Docker before running
 try:
-    subprocess.check_output(["docker", "info"], stderr=subprocess.STDOUT)
+    subprocess.check_output(["docker", "info"], stderr=subprocess.STDOUT, timeout=5.0)
     DOCKER_AVAILABLE = True
 except Exception:
     DOCKER_AVAILABLE = False
@@ -38,20 +38,23 @@ def postgres_url():
             "-e",
             "POSTGRES_DB=test_db",
             "-p",
-            "5432",
+            "127.0.0.1::5432",
             "-d",
             "postgres:17",
-        ]
+        ],
+        timeout=15.0,
     )
 
     try:
         import time
 
         port_out = (
-            subprocess.check_output(["docker", "port", container_name, "5432/tcp"]).decode().strip()
+            subprocess.check_output(["docker", "port", container_name, "5432/tcp"], timeout=5.0)
+            .decode()
+            .strip()
         )
         first_line = port_out.split("\n")[0]
-        host_port = first_line.split(":")[1]
+        host_port = first_line.rsplit(":", 1)[1]
 
         sync_url = f"postgresql+psycopg://test_user:test_pass@localhost:{host_port}/test_db"
         async_url = f"postgresql+psycopg://test_user:test_pass@localhost:{host_port}/test_db"
@@ -80,7 +83,7 @@ def postgres_url():
         yield async_url
 
     finally:
-        subprocess.check_call(["docker", "rm", "-f", container_name])
+        subprocess.check_call(["docker", "rm", "-f", container_name], timeout=10.0)
 
 
 @pytest.fixture
@@ -233,7 +236,6 @@ async def test_due_retry_exactly_once(postgres_db):
         )
         events = events_res.scalars().all()
         assert len(events) == 1
-        assert events[0].event_type == "task_requeued_from_retry"
         assert events[0].event_type == "task_requeued_from_retry"
 
 
@@ -447,15 +449,31 @@ async def test_future_retry_not_locked(postgres_db):
     async def update_future():
         await asyncio.wait_for(lock_held.wait(), timeout=5.0)
         try:
-            async with postgres_db() as session:
-                async with session.begin():
-                    task = await asyncio.wait_for(session.get(TaskRecord, future_id), timeout=0.5)
-                    task.next_eligible_at = utc_now() + timedelta(minutes=120)
-                    await session.flush()
+
+            async def competing_tx():
+                async with postgres_db() as session:
+                    async with session.begin():
+                        task = await session.get(TaskRecord, future_id)
+                        task.next_eligible_at = utc_now() + timedelta(minutes=120)
+                        await session.flush()
+                        await session.commit()
+
+            await asyncio.wait_for(competing_tx(), timeout=0.5)
         finally:
             release_lock.set()
 
     await asyncio.wait_for(asyncio.gather(hold_recovery_lock(), update_future()), timeout=5.0)
+
+    async with postgres_db() as check_session:
+        task = await check_session.get(TaskRecord, future_id)
+        assert task.status == TaskStatus.RETRYABLE_FAILED.value
+        assert task.next_eligible_at > utc_now() + timedelta(minutes=110)
+
+        events_res = await check_session.execute(
+            sa.select(AuditEventRecord).where(AuditEventRecord.task_id == future_id)
+        )
+        events = events_res.scalars().all()
+        assert len(events) == 0
 
 
 @pytest.mark.asyncio

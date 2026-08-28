@@ -1333,10 +1333,9 @@ class TaskEngine:
 
     @staticmethod
     def _parse_task_envelope(value: object) -> TaskEnvelope:
-        import typing
         if isinstance(value, str):
-            return typing.cast(TaskEnvelope, TaskEnvelope.model_validate_json(value))
-        return typing.cast(TaskEnvelope, TaskEnvelope.model_validate(value))
+            return TaskEnvelope.model_validate_json(value)  # type: ignore[no-any-return]
+        return TaskEnvelope.model_validate(value)  # type: ignore[no-any-return]
 
     @staticmethod
     def _has_active_lease(
