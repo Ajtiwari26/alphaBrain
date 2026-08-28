@@ -604,11 +604,7 @@ class TaskEngine:
         if not task:
             return None
 
-        envelope = (
-            TaskEnvelope.model_validate_json(task.details_json)
-            if isinstance(task.details_json, str)
-            else TaskEnvelope.model_validate(task.details_json)
-        )
+        envelope = TaskEngine._parse_task_envelope(task.details_json)
 
         if approval.approval_type == "task_review":
             if not review_sha256 or review_sha256 != approval.scope_sha256:
@@ -871,7 +867,7 @@ class TaskEngine:
             if not worker_kill_switch.can_execute(candidate.project_id):
                 continue
 
-            envelope = TaskEnvelope.model_validate(candidate.details_json)
+            envelope = TaskEngine._parse_task_envelope(candidate.details_json)
             if envelope.risk_class in {RiskClass.HIGH, RiskClass.CRITICAL}:
                 appr_res = await session.execute(
                     select(ApprovalRecord).where(
@@ -1099,11 +1095,7 @@ class TaskEngine:
         if not TaskEngine._has_active_lease(task, lease_token, worker_id, now):
             return False
 
-        envelope = (
-            TaskEnvelope.model_validate_json(task.details_json)
-            if isinstance(task.details_json, str)
-            else TaskEnvelope.model_validate(task.details_json)
-        )
+        envelope = TaskEngine._parse_task_envelope(task.details_json)
 
         if envelope.require_packet_binding:
             fresh_digest = compute_packet_digest(envelope)
@@ -1340,6 +1332,13 @@ class TaskEngine:
         return True
 
     @staticmethod
+    def _parse_task_envelope(value: object) -> TaskEnvelope:
+        import typing
+        if isinstance(value, str):
+            return typing.cast(TaskEnvelope, TaskEnvelope.model_validate_json(value))
+        return typing.cast(TaskEnvelope, TaskEnvelope.model_validate(value))
+
+    @staticmethod
     def _has_active_lease(
         task: TaskRecord | None,
         lease_token: str,
@@ -1366,11 +1365,7 @@ class TaskEngine:
         actor: str,
     ) -> None:
         """Schedule bounded exponential retry without immediate retry loops."""
-        envelope = (
-            TaskEnvelope.model_validate_json(task.details_json)
-            if isinstance(task.details_json, str)
-            else TaskEnvelope.model_validate(task.details_json)
-        )
+        envelope = TaskEngine._parse_task_envelope(task.details_json)
         if task.attempt_count >= task.max_attempts:
             TaskEngine._transition(task, TaskStatus.BLOCKED)
             task.next_eligible_at = None

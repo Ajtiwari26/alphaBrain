@@ -135,16 +135,31 @@ async def test_expired_lease_exactly_once(postgres_db):
         setup_session.add(task)
         await setup_session.commit()
 
-    async def run_recovery():
+    lock_held = asyncio.Event()
+    release_lock = asyncio.Event()
+
+    async def session_a():
         async with postgres_db() as session:
             async with session.begin():
                 count = await TaskEngine.timeout_expired_leases(session)
+                lock_held.set()
+                await asyncio.wait_for(release_lock.wait(), timeout=5.0)
                 return count
 
-    # Run concurrently
-    results = await asyncio.gather(run_recovery(), run_recovery())
+    async def session_b():
+        await asyncio.wait_for(lock_held.wait(), timeout=5.0)
+        async with postgres_db() as session:
+            async with session.begin():
+                count = await asyncio.wait_for(
+                    TaskEngine.timeout_expired_leases(session), timeout=5.0
+                )
+                assert count == 0
+                release_lock.set()
+                return count
 
-    assert sorted(results) == [0, 1]
+    res_a, res_b = await asyncio.wait_for(asyncio.gather(session_a(), session_b()), timeout=5.0)
+    assert res_a == 1
+    assert res_b == 0
 
     async with postgres_db() as check_session:
         task = await check_session.get(TaskRecord, task_id)
@@ -156,8 +171,8 @@ async def test_expired_lease_exactly_once(postgres_db):
             sa.select(AuditEventRecord).where(AuditEventRecord.task_id == task_id)
         )
         events = events_res.scalars().all()
-        # Should have lease_expired_requeued and task_retry_scheduled
         assert len(events) == 1
+        assert events[0].event_type == "task_retry_scheduled"
 
 
 @pytest.mark.asyncio
@@ -184,16 +199,29 @@ async def test_due_retry_exactly_once(postgres_db):
         setup_session.add(task)
         await setup_session.commit()
 
-    async def run_recovery():
+    lock_held = asyncio.Event()
+    release_lock = asyncio.Event()
+
+    async def session_a():
         async with postgres_db() as session:
             async with session.begin():
                 count = await TaskEngine.release_due_retries(session)
+                lock_held.set()
+                await asyncio.wait_for(release_lock.wait(), timeout=5.0)
                 return count
 
-    # Run concurrently
-    results = await asyncio.gather(run_recovery(), run_recovery())
+    async def session_b():
+        await asyncio.wait_for(lock_held.wait(), timeout=5.0)
+        async with postgres_db() as session:
+            async with session.begin():
+                count = await asyncio.wait_for(TaskEngine.release_due_retries(session), timeout=5.0)
+                assert count == 0
+                release_lock.set()
+                return count
 
-    assert sorted(results) == [0, 1]
+    res_a, res_b = await asyncio.wait_for(asyncio.gather(session_a(), session_b()), timeout=5.0)
+    assert res_a == 1
+    assert res_b == 0
 
     async with postgres_db() as check_session:
         task = await check_session.get(TaskRecord, task_id)
@@ -204,8 +232,8 @@ async def test_due_retry_exactly_once(postgres_db):
             sa.select(AuditEventRecord).where(AuditEventRecord.task_id == task_id)
         )
         events = events_res.scalars().all()
-        # Should have one task_requeued_from_retry
         assert len(events) == 1
+        assert events[0].event_type == "task_requeued_from_retry"
         assert events[0].event_type == "task_requeued_from_retry"
 
 
@@ -237,18 +265,34 @@ async def test_stalled_task_exactly_once(postgres_db):
         setup_session.add(task)
         await setup_session.commit()
 
-    async def run_recovery():
+    lock_held = asyncio.Event()
+    release_lock = asyncio.Event()
+
+    async def session_a():
         async with postgres_db() as session:
             async with session.begin():
                 processed_ids = await TaskEngine.check_watchdog_stalls(
                     session, stall_timeout_seconds=300
                 )
+                lock_held.set()
+                await asyncio.wait_for(release_lock.wait(), timeout=5.0)
                 return len(processed_ids)
 
-    # Run concurrently
-    results = await asyncio.gather(run_recovery(), run_recovery())
+    async def session_b():
+        await asyncio.wait_for(lock_held.wait(), timeout=5.0)
+        async with postgres_db() as session:
+            async with session.begin():
+                processed_ids = await asyncio.wait_for(
+                    TaskEngine.check_watchdog_stalls(session, stall_timeout_seconds=300),
+                    timeout=5.0,
+                )
+                assert len(processed_ids) == 0
+                release_lock.set()
+                return len(processed_ids)
 
-    assert sorted(results) == [0, 1]
+    res_a, res_b = await asyncio.wait_for(asyncio.gather(session_a(), session_b()), timeout=5.0)
+    assert res_a == 1
+    assert res_b == 0
 
     async with postgres_db() as check_session:
         task = await check_session.get(TaskRecord, task_id)
@@ -258,8 +302,9 @@ async def test_stalled_task_exactly_once(postgres_db):
             sa.select(AuditEventRecord).where(AuditEventRecord.task_id == task_id)
         )
         events = events_res.scalars().all()
-        # Should have task_stalled_retrying and task_retry_scheduled
         assert len(events) == 2
+        event_types = {e.event_type for e in events}
+        assert event_types == {"task_stalled_retrying", "task_retry_scheduled"}
 
 
 @pytest.mark.asyncio
@@ -313,25 +358,34 @@ async def test_healthy_active_row_not_locked(postgres_db):
         setup_session.add_all([stalled_task, healthy_task])
         await setup_session.commit()
 
-    event = asyncio.Event()
+    lock_held = asyncio.Event()
+    release_lock = asyncio.Event()
 
     async def hold_recovery_lock():
         async with postgres_db() as session:
             async with session.begin():
                 await TaskEngine.check_watchdog_stalls(session, stall_timeout_seconds=300)
-                event.set()
-                await asyncio.sleep(0.5)  # Hold the lock
+                lock_held.set()
+                try:
+                    await asyncio.wait_for(release_lock.wait(), timeout=5.0)
+                finally:
+                    pass
 
     async def update_healthy():
-        await event.wait()  # Wait until recovery holds its lock
-        async with postgres_db() as session:
-            # Attempt to record heartbeat, this must not block
-            success = await TaskEngine.record_heartbeat(
-                session, healthy_id, lease_token="lease_healthy", worker_id="worker_1"
-            )
-            assert success
+        await asyncio.wait_for(lock_held.wait(), timeout=5.0)
+        try:
+            async with postgres_db() as session:
+                success = await asyncio.wait_for(
+                    TaskEngine.record_heartbeat(
+                        session, healthy_id, lease_token="lease_healthy", worker_id="worker_1"
+                    ),
+                    timeout=0.5,
+                )
+                assert success
+        finally:
+            release_lock.set()
 
-    await asyncio.gather(hold_recovery_lock(), update_healthy())
+    await asyncio.wait_for(asyncio.gather(hold_recovery_lock(), update_healthy()), timeout=5.0)
 
 
 @pytest.mark.asyncio
@@ -377,24 +431,31 @@ async def test_future_retry_not_locked(postgres_db):
         setup_session.add_all([due_task, future_task])
         await setup_session.commit()
 
-    event = asyncio.Event()
+    lock_held = asyncio.Event()
+    release_lock = asyncio.Event()
 
     async def hold_recovery_lock():
         async with postgres_db() as session:
             async with session.begin():
                 await TaskEngine.release_due_retries(session)
-                event.set()
-                await asyncio.sleep(0.5)  # Hold the lock
+                lock_held.set()
+                try:
+                    await asyncio.wait_for(release_lock.wait(), timeout=5.0)
+                finally:
+                    pass
 
     async def update_future():
-        await event.wait()  # Wait until recovery holds its lock
-        async with postgres_db() as session:
-            async with session.begin():
-                task = await session.get(TaskRecord, future_id)
-                task.next_eligible_at = utc_now() + timedelta(minutes=120)
-                await session.flush()
+        await asyncio.wait_for(lock_held.wait(), timeout=5.0)
+        try:
+            async with postgres_db() as session:
+                async with session.begin():
+                    task = await asyncio.wait_for(session.get(TaskRecord, future_id), timeout=0.5)
+                    task.next_eligible_at = utc_now() + timedelta(minutes=120)
+                    await session.flush()
+        finally:
+            release_lock.set()
 
-    await asyncio.gather(hold_recovery_lock(), update_future())
+    await asyncio.wait_for(asyncio.gather(hold_recovery_lock(), update_future()), timeout=5.0)
 
 
 @pytest.mark.asyncio
@@ -422,26 +483,33 @@ async def test_skip_locked_behavior(postgres_db):
         await setup_session.commit()
 
     lock_acquired = asyncio.Event()
+    release_lock = asyncio.Event()
 
     async def session_a():
         async with postgres_db() as session:
             async with session.begin():
-                # Explicitly lock the row
                 await session.execute(
                     sa.select(TaskRecord).where(TaskRecord.id == task_id).with_for_update()
                 )
                 lock_acquired.set()
-                await asyncio.sleep(1.0)  # Hold lock long enough for B to attempt
+                try:
+                    await asyncio.wait_for(release_lock.wait(), timeout=5.0)
+                finally:
+                    pass
 
     async def session_b():
-        await lock_acquired.wait()
-        async with postgres_db() as session:
-            async with session.begin():
-                # Must not block, must skip locked row
-                count = await TaskEngine.release_due_retries(session)
-                assert count == 0
+        await asyncio.wait_for(lock_acquired.wait(), timeout=5.0)
+        try:
+            async with postgres_db() as session:
+                async with session.begin():
+                    count = await asyncio.wait_for(
+                        TaskEngine.release_due_retries(session), timeout=5.0
+                    )
+                    assert count == 0
+        finally:
+            release_lock.set()
 
-    await asyncio.gather(session_a(), session_b())
+    await asyncio.wait_for(asyncio.gather(session_a(), session_b()), timeout=5.0)
 
     # After A releases the lock, B (or anyone) should be able to process it
     async with postgres_db() as check_session:

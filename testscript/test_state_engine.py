@@ -492,3 +492,73 @@ async def test_task_engine_rejects_illegal_status_transition(test_db_session):
     with pytest.raises(ValueError, match="Illegal task transition: queued -> verified"):
         TaskEngine._transition(task, TaskStatus.VERIFIED)
     assert task.status == TaskStatus.QUEUED.value
+
+
+@pytest.mark.asyncio
+async def test_task_envelope_decoding_variants(test_db_session):
+    envelope = TaskEnvelope(
+        task_id="tsk_state_decoding_1",
+        project_id="prj_state_decoding",
+        repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+        objective="Decode dictionary",
+        allowed_paths=["."],
+    )
+
+    # 1. Dictionary value parses
+    assert TaskEngine._parse_task_envelope(envelope.model_dump())
+
+    # 2. Valid JSON string parses
+    assert TaskEngine._parse_task_envelope(envelope.model_dump_json())
+
+    # 3. Malformed JSON string fails
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        TaskEngine._parse_task_envelope("not a json string")
+
+    # 4. Valid JSON containing invalid envelope fails
+    with pytest.raises(ValidationError):
+        TaskEngine._parse_task_envelope('{"task_id": "missing_required_fields"}')
+
+
+@pytest.mark.asyncio
+async def test_task_engine_string_backed_details_json(test_db_session):
+    envelope = TaskEnvelope(
+        task_id="tsk_state_decoding_lease",
+        project_id="prj_state_decoding",
+        repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+        objective="Lease with string json",
+        allowed_paths=["."],
+    )
+    task = await TaskEngine.submit_task(test_db_session, envelope)
+
+    # Force string-backed details_json in DB (simulating bad dialect / parsing config)
+    task.details_json = envelope.model_dump_json()
+    await test_db_session.flush()
+
+    # 5. lease_next_task works with string-backed details_json
+    leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
+    assert leased is not None
+    leased_task, _ = leased
+    assert leased_task.id == "tsk_state_decoding_lease"
+
+    # 6. retry scheduling works with string-backed details_json
+    task.details_json = envelope.model_dump_json()  # ensure it's still string
+    await test_db_session.flush()
+
+    from alpha_protocol import AgentType, TaskResult
+
+    # Fail it to trigger retry scheduling
+    result = TaskResult(
+        attempt_id="att_state_decoding_1",
+        task_id=task.id,
+        status=TaskStatus.RETRYABLE_FAILED,
+        agent=AgentType.ANTIGRAVITY,
+        model="antigravity-flash",
+        base_commit="HEAD",
+        result_commit="HEAD",
+    )
+    await TaskEngine.submit_result(test_db_session, result, leased_task.lease_token, "worker_one")
+
+    assert task.status == TaskStatus.RETRYABLE_FAILED.value
+    assert task.next_eligible_at is not None
