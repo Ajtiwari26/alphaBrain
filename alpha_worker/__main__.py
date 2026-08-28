@@ -37,9 +37,7 @@ def main() -> None:
     credentials = subcommands.add_parser(
         "credentials", help="store worker secrets in macOS Keychain"
     )
-    credentials.add_argument(
-        "account", choices=("worker-token", "worker-identity", "worker-spool-fernet-key")
-    )
+    credentials.add_argument("account", choices=("worker-token", "worker-spool-fernet-key"))
     args = parser.parse_args()
     store = _control_store()
     if args.command == "run":

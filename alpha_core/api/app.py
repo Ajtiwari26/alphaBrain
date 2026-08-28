@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, cast
@@ -39,11 +40,13 @@ from alpha_core.security import (
     PrincipalRole,
     create_meeting_invite,
     create_scoped_stream_token,
+    create_worker_identity_token,
     plivo_nonce_cache,
     redact_secrets,
     require_api_principal,
     require_permission,
     require_project_access,
+    require_worker_bootstrap_principal,
     require_worker_principal,
     validate_plivo_v3_signature,
     verify_meeting_invite,
@@ -197,6 +200,25 @@ async def readiness_check():
     except Exception:
         logger.error("Readiness check failed")
         raise HTTPException(status_code=503, detail="Service Unavailable") from None
+
+
+@app.post("/api/workers/{worker_id}/identity")
+async def issue_worker_identity(
+    worker_id: str,
+    principal: AuthPrincipal = Depends(require_worker_bootstrap_principal),
+):
+    if not SAFE_EXTERNAL_ID.fullmatch(worker_id):
+        raise HTTPException(status_code=422, detail="Invalid worker ID")
+
+    # Issue identity token valid for 1 hour (3600 seconds)
+    ttl_seconds = 3600
+    token = create_worker_identity_token(worker_id, ttl_seconds=ttl_seconds)
+    expires_at = int(time.time()) + ttl_seconds
+
+    return {
+        "identity_token": token,
+        "expires_at": expires_at,
+    }
 
 
 @app.post("/api/workers/register")

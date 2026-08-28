@@ -252,17 +252,15 @@ class AlphaWorkerDaemon:
             if settings.ENV == "production" and not settings.WORKER_USE_KEYCHAIN:
                 raise RuntimeError("Production worker requires WORKER_USE_KEYCHAIN=true")
             worker_token = settings.ALPHA_WORKER_TOKEN
-            identity_token = settings.WORKER_IDENTITY_TOKEN
             spool_key = settings.WORKER_SPOOL_FERNET_KEY
             if settings.WORKER_USE_KEYCHAIN:
                 keychain = MacOSKeychain(settings.WORKER_KEYCHAIN_SERVICE)
                 worker_token = keychain.get("worker-token")
-                identity_token = keychain.get("worker-identity")
                 spool_key = keychain.get("worker-spool-fernet-key")
             self.control_plane = ControlPlaneClient(
                 settings.WORKER_CONTROL_PLANE_URL,
+                self.worker_id,
                 worker_token,
-                identity_token,
                 settings.WORKER_HTTP_TIMEOUT_SECONDS,
             )
             if self.spool is None:

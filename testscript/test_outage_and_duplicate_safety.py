@@ -3,6 +3,7 @@ testscript/test_outage_and_duplicate_safety.py
 Proves network outage buffering via encrypted spool, replay without duplicate execution, and idempotent task completion.
 """
 
+import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -49,6 +50,10 @@ async def test_outage_buffers_result_then_replays_cleanly(tmp_path, mock_spool, 
         nonlocal is_online
         if not is_online:
             raise httpx.ConnectError("Network is down")
+        if request.url.path.endswith("/identity"):
+            return httpx.Response(
+                200, json={"identity_token": "test-identity", "expires_at": int(time.time()) + 3600}
+            )
         if request.url.path.endswith("/result"):
             import json
 
@@ -63,8 +68,8 @@ async def test_outage_buffers_result_then_replays_cleanly(tmp_path, mock_spool, 
     transport = httpx.MockTransport(mock_handler)
     cp_client = ControlPlaneClient(
         base_url="https://control.example",
+        worker_id="mac-worker-test",
         worker_token="test-token",
-        identity_token="test-identity",
         transport=transport,
     )
 

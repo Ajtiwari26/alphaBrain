@@ -19,7 +19,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from alpha_core.api.app import app
-from alpha_core.config import settings
 from alpha_core.db.models import (
     Base,
     ProjectRecord,
@@ -71,10 +70,9 @@ async def async_db():
 
 
 class TestTaskIDMismatch:
-    async def test_rejects_url_body_task_id_mismatch(self):
+    async def test_rejects_url_body_task_id_mismatch(self, worker_headers):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            headers = {"Authorization": f"Bearer {settings.ALPHA_WORKER_TOKEN}"}
             payload = {
                 "lease_token": "lease_123",
                 "result": {
@@ -90,7 +88,7 @@ class TestTaskIDMismatch:
             response = await client.post(
                 "/api/tasks/tsk_original_id/result",
                 json=payload,
-                headers=headers,
+                headers=worker_headers,
             )
             assert response.status_code == 400
             assert "Task ID mismatch" in response.json()["detail"]
