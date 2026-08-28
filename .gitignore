@@ -57,3 +57,4 @@ testscript/dev_artifacts/
 *.db-journal
 *.db-wal
 *.db-shm
+testscript/evidence/

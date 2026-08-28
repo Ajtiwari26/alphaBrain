@@ -1134,9 +1134,6 @@ requires a change. Rerun every declared gate, then emit updated {QA_EVIDENCE_TOK
 {COMPLETION_TOKEN}. Do not report completion without executing missing tool.
 """
 
-    def _project_store_path(self, task_id: str) -> Path:
-        return cast(Path, self.session_store_dir / f"{task_id}.json")
-
     @staticmethod
     def _load_record(path: Path) -> dict[str, Any] | None:
         try:

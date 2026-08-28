@@ -436,9 +436,7 @@ async def test_result_submission_rejects_task_id_mismatch(
             json=WorkerRegistration(worker_id=worker_id, hostname="test").model_dump(mode="json"),
             headers=worker_auth,
         )
-        await ac.post(
-            "/api/tasks", json=envelope.model_dump(mode="json"), headers=api_headers
-        )
+        await ac.post("/api/tasks", json=envelope.model_dump(mode="json"), headers=api_headers)
         leased = await ac.post(
             "/api/tasks/lease",
             json={"worker_id": worker_id, "preferred_agent": AgentType.ANTIGRAVITY.value},

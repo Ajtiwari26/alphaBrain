@@ -101,7 +101,9 @@ def test_project_chat_is_registered_once_and_never_reused_cross_project(tmp_path
     first_id, first_new = bridge._get_project_conversation(make_task(session_id=CONVERSATION_ID))
     second_id, second_new = bridge._get_project_conversation(make_task())
     other_id, other_new = bridge._get_project_conversation(
-        make_task("prj_other", session_id="00000000-0000-0000-0000-000000000002", task_id="tsk_other_01")
+        make_task(
+            "prj_other", session_id="00000000-0000-0000-0000-000000000002", task_id="tsk_other_01"
+        )
     )
 
     assert first_new is False
