@@ -105,7 +105,7 @@ def test_readiness_succeeds_with_valid_db_stub():
 
         async def execute(self, statement):
             mock_res = MagicMock()
-            mock_res.scalar.return_value = True
+            mock_res.scalars.return_value.all.return_value = ["58b5b056d9e3"]
             return mock_res
 
     with patch("alpha_core.db.connection.get_session_factory") as mock_factory:

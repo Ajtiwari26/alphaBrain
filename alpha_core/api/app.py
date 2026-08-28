@@ -179,12 +179,20 @@ async def readiness_check():
 
         session_factory = get_session_factory()
         async with session_factory() as session:
+            # 1. Check database connection
             await session.execute(text("SELECT 1"))
-            # Note: If Alembic is not used in memory DB, the table might not exist, but for staging/prod it should.
-            if settings.is_production or settings.is_staging:
-                res = await session.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
-                if not res.scalar():
-                    raise Exception("No migration history found")
+
+            # 2. Check exact schema compatibility
+            res = await session.execute(text("SELECT version_num FROM alembic_version"))
+            rows = res.scalars().all()
+
+            if not rows:
+                raise ValueError("Empty migration history")
+            if len(rows) > 1:
+                raise ValueError("Multiple migration heads found")
+            if rows[0] != settings.EXPECTED_ALEMBIC_REVISION:
+                raise ValueError("Migration revision mismatch")
+
         return {"status": "ready"}
     except Exception:
         logger.error("Readiness check failed")
