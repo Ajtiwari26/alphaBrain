@@ -704,17 +704,30 @@ async def test_application_lifespan_scheduler(monkeypatch):
     app_module = sys.modules["alpha_core.api.app"]
     from fastapi import FastAPI
 
-    # We want to verify it creates exactly one task and shuts down cleanly
-    mock_scheduler = AsyncMock()
-    monkeypatch.setattr(app_module, "watchdog_scheduler", mock_scheduler)
+    scheduler_called = asyncio.Event()
+    original_call_count = 0
+
+    async def tracking_scheduler():
+        nonlocal original_call_count
+        original_call_count += 1
+        scheduler_called.set()
+        # Block until cancelled to simulate real scheduler
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            raise
+
+    monkeypatch.setattr(app_module, "watchdog_scheduler", tracking_scheduler)
 
     test_app = FastAPI(lifespan=app_module.lifespan)
     async with test_app.router.lifespan_context(test_app):
-        # wait a bit for background task to potentially start (though it's mocked)
-        await asyncio.sleep(0.01)
+        # Wait for scheduler to actually start
+        await asyncio.wait_for(scheduler_called.wait(), timeout=1.0)
 
-    # After lifespan context closes, the task should be cancelled
-    # The scheduler itself is replaced by AsyncMock, so it won't loop.
+    # Scheduler was called exactly once
+    assert original_call_count == 1
+    # After lifespan exits, the task should have been cancelled and awaited
+    # (if it leaked, tracking_scheduler would still be sleeping)
 
 
 @pytest.mark.asyncio
@@ -731,6 +744,7 @@ async def test_scheduler_transient_failure_does_not_terminate(monkeypatch):
     mock_check = AsyncMock(side_effect=[Exception("Transient DB error"), None, Exception("stop")])
     monkeypatch.setattr(TaskEngine, "check_watchdog_stalls", mock_check)
     monkeypatch.setattr(TaskEngine, "release_due_retries", AsyncMock())
+    monkeypatch.setattr(TaskEngine, "timeout_expired_leases", AsyncMock())
     monkeypatch.setattr(app_module, "get_session_factory", lambda: mock_session_factory)
     monkeypatch.setattr(settings, "TASK_WATCHDOG_SCAN_INTERVAL_SECONDS", 0.01)
 
@@ -758,4 +772,26 @@ async def test_watchdog_row_locks_postgres(async_db, monkeypatch):
         await TaskEngine.check_watchdog_stalls(async_db)
         # It's hard to test the internal builder perfectly here without deep mocking,
         # but the assert provides unit level protection.
+        mock_update.assert_called_with(skip_locked=True)
+
+
+@pytest.mark.asyncio
+async def test_timeout_expired_leases_row_locks_postgres(async_db, monkeypatch):
+    """Prove PostgreSQL timeout_expired_leases uses skip_locked."""
+    monkeypatch.setattr(async_db.bind.dialect, "name", "postgresql")
+
+    with patch("sqlalchemy.sql.selectable.Select.with_for_update") as mock_update:
+        mock_update.return_value = select(TaskRecord)
+        await TaskEngine.timeout_expired_leases(async_db)
+        mock_update.assert_called_with(skip_locked=True)
+
+
+@pytest.mark.asyncio
+async def test_release_due_retries_row_locks_postgres(async_db, monkeypatch):
+    """Prove PostgreSQL release_due_retries uses skip_locked."""
+    monkeypatch.setattr(async_db.bind.dialect, "name", "postgresql")
+
+    with patch("sqlalchemy.sql.selectable.Select.with_for_update") as mock_update:
+        mock_update.return_value = select(TaskRecord)
+        await TaskEngine.release_due_retries(async_db)
         mock_update.assert_called_with(skip_locked=True)

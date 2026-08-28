@@ -133,6 +133,7 @@ async def watchdog_scheduler():
     while True:
         try:
             async with session_factory() as session:
+                await TaskEngine.timeout_expired_leases(session)
                 await TaskEngine.check_watchdog_stalls(
                     session, stall_timeout_seconds=settings.TASK_PROGRESS_STALL_TIMEOUT_SECONDS
                 )

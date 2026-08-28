@@ -750,14 +750,15 @@ class TaskEngine:
     async def timeout_expired_leases(session: AsyncSession) -> int:
         """Finds abandoned leased/running tasks whose lease has expired and triggers backoff or escalation."""
         now = utc_now()
-        res = await session.execute(
-            select(TaskRecord).where(
-                and_(
-                    TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
-                    TaskRecord.lease_expires_at.is_not(None),
-                )
+        query = select(TaskRecord).where(
+            and_(
+                TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
+                TaskRecord.lease_expires_at.is_not(None),
             )
         )
+        if session.bind and session.bind.dialect.name == "postgresql":
+            query = query.with_for_update(skip_locked=True)
+        res = await session.execute(query)
         tasks = res.scalars().all()
         expired = [
             t for t in tasks if t.lease_expires_at and normalize_utc(t.lease_expires_at) < now
@@ -781,14 +782,15 @@ class TaskEngine:
     async def release_due_retries(session: AsyncSession) -> int:
         """Releases retryable tasks whose backoff window has elapsed back into the queued pool."""
         now = utc_now()
-        res = await session.execute(
-            select(TaskRecord).where(
-                and_(
-                    TaskRecord.status == TaskStatus.RETRYABLE_FAILED.value,
-                    TaskRecord.next_eligible_at.is_not(None),
-                )
+        query = select(TaskRecord).where(
+            and_(
+                TaskRecord.status == TaskStatus.RETRYABLE_FAILED.value,
+                TaskRecord.next_eligible_at.is_not(None),
             )
         )
+        if session.bind and session.bind.dialect.name == "postgresql":
+            query = query.with_for_update(skip_locked=True)
+        res = await session.execute(query)
         tasks = res.scalars().all()
         due = [t for t in tasks if t.next_eligible_at and normalize_utc(t.next_eligible_at) <= now]
         for task in due:
@@ -822,7 +824,6 @@ class TaskEngine:
             return None
 
         now = utc_now()
-        await TaskEngine._recover_expired_leases(session, now)
 
         # Worker concurrency check
         worker_record = await session.get(WorkerRecord, worker_id)
@@ -1391,15 +1392,16 @@ class TaskEngine:
     @staticmethod
     async def _recover_expired_leases(session: AsyncSession, now: datetime) -> None:
         """Requeue expired leases with retry backoff."""
-        res = await session.execute(
-            select(TaskRecord).where(
-                and_(
-                    TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
-                    TaskRecord.lease_expires_at.is_not(None),
-                    TaskRecord.lease_expires_at < now,
-                )
+        query = select(TaskRecord).where(
+            and_(
+                TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
+                TaskRecord.lease_expires_at.is_not(None),
+                TaskRecord.lease_expires_at < now,
             )
         )
+        if session.bind and session.bind.dialect.name == "postgresql":
+            query = query.with_for_update(skip_locked=True)
+        res = await session.execute(query)
         expired_tasks = res.scalars().all()
         for task in expired_tasks:
             prev_worker = task.worker_id or "unknown"
