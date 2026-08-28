@@ -9,14 +9,15 @@
 
 | Area | Status | Evidence |
 |---|---|---|
-| Automated tests | Passing | 375 tests passed (`pytest -q --disable-warnings`) |
+| Automated tests | Passing | 426 tests passed (`pytest -q --disable-warnings`) |
 | Ruff lint | Passing | Zero findings (`ruff check .`) |
 | Ruff formatting | Passing | All active files formatted (`ruff format --check .`) |
 | Source mypy | Passing | Zero errors in `alpha_protocol`, `alpha_core`, `alpha_worker` |
 | Repository root | Clean & Organized | Historical/debug scripts archived under `testscript/dev_artifacts/` |
 | Archive isolation | Ignored | `testscript/dev_artifacts/` ignored by git, pytest, Ruff, and mypy |
 | Whitespace & diff | Passing | Clean `git diff --check` across modified working tree |
-| Implementation state | P6-R2 Complete (Local) | Model router, serialized credential leasing, isolated AGY dispatch |
+| Implementation state | P6-R2 Complete (Local) | Model router, serialized credential leasing, durable lease transaction evidence, parser repair, isolated AGY dispatch |
+| Self-Task (`tsk_self_truth_005`) | GATES PASSED | TODO and CURRENT_REPORT documentation reconciled with exact 426 tests baseline, durable lease and parser repair confirmed |
 | D2 Self-Task Proof | VERIFIED (Not Accepted) | `d2_kernel_proof.json` shows task verified; `founder_reviewed=false`; no auto-merge |
 | AlphaBrain API | Not running | No active Uvicorn service |
 | Mac worker | Not running | LaunchAgent is not installed or loaded |
@@ -31,7 +32,7 @@
 - AGY live bridge integration with strict allowlist and process-group lifecycle control.
 - Task states, leases, heartbeats, typed gate submissions, audit events, and review provenance.
 - Clean working tree boundaries: historical diagnostic scripts moved to `testscript/dev_artifacts/`.
-- 375 repository tests passing with zero failures.
+- 426 repository tests passing with zero failures.
 
 ## Blocking gaps
 
@@ -44,10 +45,7 @@
 
 ## Next steps
 
-1. **Founder Review & Baseline Commit:**
-   - Founder reviews verified candidate changes across `alpha_core`, `alpha_protocol`, `alpha_worker`, tests, and configuration.
-   - Founder approves creating one local immutable baseline commit.
-2. **Execute First Low-Risk AlphaBrain Self-Task:**
+1. **Execute First Low-Risk AlphaBrain Self-Task (VERIFIED, PENDING REVIEW):**
    - Run task through the complete autonomous kernel lifecycle: admission -> execution approval -> isolated AGY worktree -> typed gate evidence -> independent review -> founder acceptance.
    - Recommended task scope: TODO documentation and test suite count reconciliation.
    - Strict constraints: maximum 2 allowed files (`TODO.md`, `docs/CURRENT_REPORT.md`), zero runtime source changes, zero network calls, zero deployment side effects.
