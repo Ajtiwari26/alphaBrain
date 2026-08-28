@@ -1,5 +1,3 @@
-from alpha_core.security import create_worker_identity_token
-
 import os
 import shutil
 import sys
@@ -29,6 +27,7 @@ import pytest_asyncio  # noqa: E402
 
 from alpha_core.db.connection import get_engine  # noqa: E402
 from alpha_core.db.models import Base  # noqa: E402
+from alpha_core.security import create_worker_identity_token  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -54,6 +53,5 @@ def api_headers():
 @pytest.fixture
 def worker_headers():
     return {
-        "Authorization": f"Bearer {os.environ['ALPHA_WORKER_TOKEN']}",
         "X-Alpha-Worker-Identity": create_worker_identity_token("alpha_worker"),
     }

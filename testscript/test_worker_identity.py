@@ -25,6 +25,41 @@ def test_issuance():
     assert "identity_token" in data
     assert "expires_at" in data
 
+    # Expiration is bounded to approximately 3600 seconds
+    now = time.time()
+    assert 3500 < data["expires_at"] - now <= 3600
+
+    # Decode token to check subject matches exactly
+    import base64
+    import json
+
+    parts = data["identity_token"].split(".")
+    assert len(parts) == 2
+    padded = parts[0] + "=" * (4 - len(parts[0]) % 4)
+    decoded = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+    assert decoded["sub"] == "worker-123"
+
+
+def test_issuance_missing_token():
+    response = client.post("/api/workers/worker-123/identity")
+    assert response.status_code == 401
+
+
+def test_issuance_wrong_token():
+    response = client.post(
+        "/api/workers/worker-123/identity",
+        headers={"Authorization": "Bearer wrong-token"},
+    )
+    assert response.status_code == 401
+
+
+def test_issuance_unsafe_worker_id():
+    response = client.post(
+        "/api/workers/worker-123!/identity",
+        headers={"Authorization": f"Bearer {settings.ALPHA_WORKER_TOKEN}"},
+    )
+    assert response.status_code == 422, response.text
+
 
 def test_expiry_and_tampering():
     expired_token = create_worker_identity_token("worker-123", ttl_seconds=-3600)
@@ -86,5 +121,45 @@ async def test_refresh_and_outage():
     # Second call triggers refresh, which raises outage error
     with pytest.raises(ControlPlaneUnavailable):
         await cp._request("POST", "/api/workers/register", {})
+
+    await cp.aclose()
+
+
+@pytest.mark.asyncio
+async def test_successful_client_refresh_proof():
+    calls = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path.endswith("/identity"):
+            return httpx.Response(
+                200,
+                json={"identity_token": f"token-{len(calls)}", "expires_at": time.time() + 3600},
+            )
+
+        # Operational request
+        if request.headers.get("x-alpha-worker-identity") == "token-1":
+            # Simulate 401 on first use
+            return httpx.Response(401, json={"detail": "Invalid token"})
+        if request.headers.get("x-alpha-worker-identity") == "token-3":
+            # Succeed on retry
+            return httpx.Response(200, json={"status": "ok"})
+
+        return httpx.Response(500, json={"detail": "Unexpected state"})
+
+    cp = ControlPlaneClient(
+        "http://test", "worker-123", "token", transport=httpx.MockTransport(handler)
+    )
+
+    response = await cp._request("POST", "/api/workers/register", {})
+    assert response == {"status": "ok"}
+
+    # Assert exact sequence
+    assert calls == [
+        "/api/workers/worker-123/identity",  # identity issuance
+        "/api/workers/register",  # operational request returns 401
+        "/api/workers/worker-123/identity",  # forced identity refresh
+        "/api/workers/register",  # operational retry succeeds
+    ]
 
     await cp.aclose()

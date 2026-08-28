@@ -164,16 +164,36 @@ class ControlPlaneClient:
                     f"/api/workers/{self._worker_id}/identity",
                     headers={"Authorization": f"Bearer {self._worker_token}"},
                 )
+                if response.status_code in (401, 403):
+                    raise ControlPlaneProtocolError(
+                        f"Bootstrap authentication rejected: {response.status_code}"
+                    )
                 response.raise_for_status()
                 data = response.json()
-                self._identity_token = data["identity_token"]
-                self._identity_expires_at = data["expires_at"]
+
+                identity_token = data.get("identity_token")
+                expires_at = data.get("expires_at")
+
+                if not isinstance(identity_token, str) or not identity_token.strip():
+                    raise ValueError("identity_token must be a non-empty string")
+                if not isinstance(expires_at, (int, float)):
+                    raise ValueError("expires_at must be a number")
+
+                if expires_at <= time.time():
+                    raise ValueError("expires_at must be in the future")
+
+                self._identity_token = identity_token
+                self._identity_expires_at = int(expires_at)
                 return self._identity_token
-            except httpx.HTTPError as exc:
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code >= 500:
+                    raise ControlPlaneUnavailable("Control plane server error") from exc
+                raise ControlPlaneProtocolError("Control plane protocol error") from exc
+            except httpx.RequestError as exc:
                 raise ControlPlaneUnavailable(
-                    f"Failed to refresh worker identity: {exc!s}"
+                    f"Transport failure: {exc.__class__.__name__}"
                 ) from exc
-            except (ValueError, KeyError) as exc:
+            except (ValueError, KeyError, TypeError) as exc:
                 raise ControlPlaneProtocolError(
                     "Invalid identity response from control plane"
                 ) from exc
