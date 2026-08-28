@@ -55,8 +55,15 @@ class Settings(BaseModel):
                 issues.append(f"DEBUG must be false in {self.ENV} environment")
             if self.WORKER_ALLOW_LOCAL_DB:
                 issues.append(f"WORKER_ALLOW_LOCAL_DB must be false in {self.ENV} environment")
-            if "sqlite" in self.DATABASE_URL.lower():
-                issues.append(f"Production database URL cannot use SQLite: {self.DATABASE_URL}")
+
+            db_url_lower = self.DATABASE_URL.lower()
+            if "sqlite" in db_url_lower or not (
+                db_url_lower.startswith("postgres://")
+                or db_url_lower.startswith("postgresql://")
+                or db_url_lower.startswith("postgresql+")
+            ):
+                issues.append("Production database URL cannot use SQLite and must use PostgreSQL")
+
             if not self.ALPHA_API_TOKEN or len(self.ALPHA_API_TOKEN) < 32:
                 issues.append(f"ALPHA_API_TOKEN must be at least 32 characters in {self.ENV}")
             if not self.ALPHA_WORKER_TOKEN or len(self.ALPHA_WORKER_TOKEN) < 32:
@@ -65,6 +72,15 @@ class Settings(BaseModel):
                 issues.append(f"ALPHA_SIGNING_SECRET must be at least 32 characters in {self.ENV}")
             if any(origin == "*" for origin in self.CORS_ORIGINS):
                 issues.append(f"Wildcard CORS origin '*' is forbidden in {self.ENV}")
+            if os.getenv("RENDER") == "true" and self.ANTIGRAVITY_EXECUTION_ENABLED:
+                issues.append(
+                    f"ANTIGRAVITY_EXECUTION_ENABLED must be false on Render in {self.ENV}"
+                )
+            if self.WORKER_CONTROL_PLANE_URL and (
+                "localhost" in self.WORKER_CONTROL_PLANE_URL
+                or "127.0.0.1" in self.WORKER_CONTROL_PLANE_URL
+            ):
+                issues.append(f"WORKER_CONTROL_PLANE_URL cannot point to localhost in {self.ENV}")
         if strict and issues:
             raise ValueError(
                 f"Environment validation failed for '{self.ENV}': " + "; ".join(issues)

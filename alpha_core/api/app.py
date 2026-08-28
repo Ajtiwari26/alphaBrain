@@ -163,6 +163,34 @@ async def health_check():
     }
 
 
+@app.get("/health/live")
+async def liveness_check():
+    """Liveness proves process event loop responds."""
+    return {"status": "alive"}
+
+
+@app.get("/health/ready")
+async def readiness_check():
+    """Readiness proves database connection and migration compatibility."""
+    try:
+        from sqlalchemy import text
+
+        from alpha_core.db.connection import get_session_factory
+
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            await session.execute(text("SELECT 1"))
+            # Note: If Alembic is not used in memory DB, the table might not exist, but for staging/prod it should.
+            if settings.is_production or settings.is_staging:
+                res = await session.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+                if not res.scalar():
+                    raise Exception("No migration history found")
+        return {"status": "ready"}
+    except Exception:
+        logger.error("Readiness check failed")
+        raise HTTPException(status_code=503, detail="Service Unavailable") from None
+
+
 @app.post("/api/workers/register")
 async def register_worker(
     registration: WorkerRegistration,
