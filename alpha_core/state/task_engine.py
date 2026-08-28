@@ -88,6 +88,8 @@ class TaskEngine:
             )
             session.add(proj)
             await session.flush()
+        elif proj.repo_path != repo_path:
+            raise ValueError(f"Project '{project_id}' is already bound to a different repository")
 
         return cast(ProjectRecord, proj)
 
@@ -939,6 +941,7 @@ class TaskEngine:
             candidate.next_eligible_at = None
             candidate.worker_id = worker_id
             candidate.attempt_count += 1
+            candidate.updated_at = now
 
             session.add(
                 AuditEventRecord(
@@ -968,19 +971,20 @@ class TaskEngine:
         now = utc_now()
         threshold = now - timedelta(seconds=stall_timeout_seconds)
 
-        res = await session.execute(
-            select(TaskRecord).where(
-                and_(
-                    TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
-                    TaskRecord.leased_at.is_not(None),
-                )
+        query = select(TaskRecord).where(
+            and_(
+                TaskRecord.status.in_([TaskStatus.LEASED.value, TaskStatus.RUNNING.value]),
+                TaskRecord.leased_at.is_not(None),
             )
         )
+        if session.bind and session.bind.dialect.name == "postgresql":
+            query = query.with_for_update(skip_locked=True)
+        res = await session.execute(query)
         all_active = res.scalars().all()
         stalled_tasks = [
             task
             for task in all_active
-            if task.leased_at and normalize_utc(task.leased_at) < threshold
+            if normalize_utc(task.updated_at or task.leased_at) < threshold
         ]
         stalled_ids: list[str] = []
 

@@ -183,6 +183,13 @@ class Settings(BaseModel):
             raise ValueError("WORKER_LEASE_DURATION_SECONDS must be between 300 and 7200")
         return v
 
+    @field_validator("TASK_PROGRESS_STALL_TIMEOUT_SECONDS")
+    @classmethod
+    def validate_task_progress_stall_timeout(cls, value: int) -> int:
+        if value < 60 or value > 7200:
+            raise ValueError("TASK_PROGRESS_STALL_TIMEOUT_SECONDS must be between 60 and 7200")
+        return value
+
     @field_validator("ANTIGRAVITY_EFFORT")
     @classmethod
     def validate_antigravity_effort(cls, v: str) -> str:
@@ -229,6 +236,9 @@ class Settings(BaseModel):
     WORKER_SPOOL_FERNET_KEY: str = os.getenv("WORKER_SPOOL_FERNET_KEY", "")
     WORKER_HTTP_TIMEOUT_SECONDS: float = float(os.getenv("WORKER_HTTP_TIMEOUT_SECONDS", "15"))
     WORKER_HEARTBEAT_SECONDS: int = int(os.getenv("WORKER_HEARTBEAT_SECONDS", "60"))
+    TASK_PROGRESS_STALL_TIMEOUT_SECONDS: int = int(
+        os.getenv("TASK_PROGRESS_STALL_TIMEOUT_SECONDS", "300")
+    )
     WORKER_ALLOW_LOCAL_DB: bool = (
         os.getenv(
             "WORKER_ALLOW_LOCAL_DB",

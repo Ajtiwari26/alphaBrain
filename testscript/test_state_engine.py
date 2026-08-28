@@ -237,6 +237,57 @@ async def test_expired_lease_waits_for_backoff_then_blocks_at_retry_limit(test_d
 
 
 @pytest.mark.asyncio
+async def test_watchdog_uses_latest_progress_heartbeat_not_original_lease_time(
+    test_db_session,
+):
+    envelope = TaskEnvelope(
+        task_id="tsk_state_watchdog_progress",
+        project_id="prj_state",
+        repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+        objective="Keep healthy heartbeat from false stall recovery",
+        allowed_paths=["."],
+    )
+    await TaskEngine.submit_task(test_db_session, envelope)
+    leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
+    assert leased is not None
+    task, _ = leased
+    task.leased_at = utc_now() - timedelta(minutes=10)
+    assert await TaskEngine.record_heartbeat(
+        test_db_session,
+        task.id,
+        task.lease_token,
+        "worker_one",
+    )
+
+    assert await TaskEngine.check_watchdog_stalls(test_db_session, 300) == []
+    assert task.status == TaskStatus.RUNNING.value
+    assert task.worker_id == "worker_one"
+
+
+@pytest.mark.asyncio
+async def test_watchdog_retries_task_with_stale_progress_heartbeat(test_db_session):
+    envelope = TaskEnvelope(
+        task_id="tsk_state_watchdog_stale",
+        project_id="prj_state",
+        repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
+        objective="Recover task whose progress stopped",
+        allowed_paths=["."],
+    )
+    await TaskEngine.submit_task(test_db_session, envelope)
+    leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
+    assert leased is not None
+    task, _ = leased
+    task.leased_at = utc_now() - timedelta(minutes=10)
+    task.updated_at = utc_now() - timedelta(minutes=10)
+
+    assert await TaskEngine.check_watchdog_stalls(test_db_session, 300) == [task.id]
+    assert task.status == TaskStatus.RETRYABLE_FAILED.value
+    assert task.lease_token is None
+    assert task.worker_id is None
+    assert task.next_eligible_at is not None
+
+
+@pytest.mark.asyncio
 async def test_resubmission_cannot_replace_verified_task(test_db_session):
     envelope = TaskEnvelope(
         task_id="tsk_state_immutable",

@@ -209,7 +209,7 @@ Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
 - [x] Implement PostgreSQL `FOR UPDATE SKIP LOCKED` lease selection; PostgreSQL concurrency
   integration proof still required.
 - [x] Validate lease token, worker identity, active status, and expiry on heartbeat/result.
-- [ ] Reject result whose URL task ID differs from body task ID.
+- [x] Reject result whose URL task ID differs from body task ID.
 - [x] Add idempotent result submission and duplicate-attempt handling.
 - [x] Prevent re-submission from resetting verified task without explicit retry/version.
 - [x] Run expired-lease recovery before every local worker polling cycle.
@@ -218,8 +218,9 @@ Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
 - [x] Add bounded exponential retry delay and maximum-attempt blocking.
 - [ ] Add cloud control-plane event log for project, task, work, QA, preview, review, and
   incident progress; retain resumable checkpoints and scrubbed failure reasons.
-- [ ] Add task-progress heartbeat watchdog: mark a task stalled when its worker or agent has
-  no bounded progress event, capture logs, safely terminate it, then retry or escalate.
+- [x] Add task-progress heartbeat watchdog: use latest authenticated heartbeat, reclaim stale
+  leases under PostgreSQL row lock, cancel local execution after lease revocation, then retry or
+  escalate. Adapter transcripts and sanitized escalation records preserve failure evidence.
 - [ ] Add idempotent wake/recovery worker that resumes only a checkpointed task with the exact
   project, repository, worktree, conversation ID, lease token, and side-effect state.
 - [ ] Add reporting snapshots for founder/client: work completed, evidence, preview status,

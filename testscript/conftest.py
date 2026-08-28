@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 TEST_STATE_DIR = Path(tempfile.mkdtemp(prefix="alphabrain-tests-"))
+os.environ["ENV"] = "test"
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_STATE_DIR / 'test.db'}"
 os.environ["WORKTREE_BASE_DIR"] = str(TEST_STATE_DIR / "worktrees")
 os.environ["MEMORY_GRAPH_PATH"] = str(TEST_STATE_DIR / "memory_graph")

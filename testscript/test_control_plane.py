@@ -10,7 +10,11 @@ import pytest
 from cryptography.fernet import Fernet
 
 from alpha_protocol import AgentType, TaskEnvelope, TaskResult, TaskStatus
-from alpha_worker.control_plane import ControlPlaneClient, DurableEventSpool
+from alpha_worker.control_plane import (
+    ControlPlaneClient,
+    ControlPlaneProtocolError,
+    DurableEventSpool,
+)
 from alpha_worker.daemon import AlphaWorkerDaemon
 
 
@@ -147,6 +151,27 @@ async def test_remote_heartbeat_cancels_active_execution(monkeypatch):
     await daemon._remote_heartbeat_loop(
         "tsk_cancel",
         "lease_cancel",
+        execution_task,  # type: ignore[arg-type]
+        cancel_requested,
+    )
+
+    assert cancel_requested.is_set()
+    with pytest.raises(asyncio.CancelledError):
+        await execution_task
+
+
+@pytest.mark.asyncio
+async def test_remote_heartbeat_cancels_execution_when_lease_is_revoked(monkeypatch):
+    daemon = AlphaWorkerDaemon.__new__(AlphaWorkerDaemon)
+    daemon.control_plane = AsyncMock()
+    daemon.control_plane.heartbeat.side_effect = ControlPlaneProtocolError("revoked")
+    monkeypatch.setattr("alpha_worker.daemon.settings.WORKER_HEARTBEAT_SECONDS", 0)
+    execution_task = asyncio.create_task(asyncio.sleep(30))
+    cancel_requested = asyncio.Event()
+
+    await daemon._remote_heartbeat_loop(
+        "tsk_revoked",
+        "lease_revoked",
         execution_task,  # type: ignore[arg-type]
         cancel_requested,
     )

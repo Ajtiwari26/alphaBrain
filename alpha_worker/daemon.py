@@ -42,6 +42,7 @@ from .adapters.antigravity_live import (
 )
 from .control_plane import (
     ControlPlaneClient,
+    ControlPlaneProtocolError,
     ControlPlaneUnavailable,
     DurableEventSpool,
     LeasedTask,
@@ -653,7 +654,13 @@ class AlphaWorkerDaemon:
         assert self.control_plane
         while True:
             await asyncio.sleep(settings.WORKER_HEARTBEAT_SECONDS)
-            heartbeat_status = await self.control_plane.heartbeat(task_id, lease_token)
+            try:
+                heartbeat_status = await self.control_plane.heartbeat(task_id, lease_token)
+            except ControlPlaneProtocolError:
+                logger.warning("Lease revoked for task %s; cancelling local execution", task_id)
+                cancel_requested.set()
+                execution_task.cancel()
+                return
             if heartbeat_status == "cancel_requested":
                 cancel_requested.set()
                 execution_task.cancel()

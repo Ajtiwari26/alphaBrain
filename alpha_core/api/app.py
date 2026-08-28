@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, cast
 from urllib.parse import parse_qsl, quote, urlsplit, urlunsplit
 from xml.sax.saxutils import escape as xml_escape
@@ -31,6 +31,7 @@ from alpha_core.db.connection import get_db_session, init_db
 from alpha_core.db.models import (
     ApprovalRecord,
     AttemptRecord,
+    ProjectRecord,
     TaskRecord,
     WorkerHealthRecord,
     WorkerRecord,
@@ -73,7 +74,6 @@ from alpha_protocol import (
 )
 from alpha_voice.extractor import SpecExtractor
 from alpha_voice.plivo_bridge import PlivoVoiceBridge
-from alpha_worker.worktree import WorktreeManager
 
 MEET_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "alpha_meet" / "frontend"
 eva_meet_agent = EvaMeetingAgent()
@@ -98,6 +98,33 @@ class TaskCancellationRequest(BaseModel):
     """Founder cancellation reason persisted in task audit history."""
 
     reason: str = Field(min_length=1, max_length=2000)
+
+
+class ProjectRegistrationRequest(BaseModel):
+    """Founder-owned binding between control-plane project and Mac repository."""
+
+    project_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+    name: str = Field(min_length=1, max_length=255)
+    repo_path: str = Field(min_length=1, max_length=512)
+
+
+def _validate_repo_reference(repo_path: str) -> str:
+    """Validate repo syntax and configured-root binding without touching Render disk."""
+    if any(ord(character) < 32 for character in repo_path):
+        raise ValueError("Repository reference contains control characters")
+    path = PurePosixPath(repo_path)
+    if not path.is_absolute() or ".." in path.parts:
+        raise ValueError("Repository reference must be an absolute path without traversal")
+    if str(path) != repo_path:
+        raise ValueError("Repository reference must use canonical POSIX path syntax")
+    allowed_roots = tuple(
+        PurePosixPath(str(root.expanduser())) for root in settings.ALLOWED_REPO_ROOTS
+    )
+    if not allowed_roots:
+        raise ValueError("No repository roots are configured")
+    if not any(path == root or path.is_relative_to(root) for root in allowed_roots):
+        raise ValueError("Repository reference is outside allowed roots")
+    return repo_path
 
 
 @asynccontextmanager
@@ -445,6 +472,35 @@ async def meet_live_audio_websocket(websocket: WebSocket, persona: str = "eva"):
 # ==========================================
 
 
+@app.post("/api/projects", response_model=dict[str, Any])
+async def register_project(
+    payload: ProjectRegistrationRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Register immutable project-to-repository binding for outbound Mac workers."""
+    require_permission(principal, "project:write")
+    require_project_access(principal, payload.project_id)
+    existing: ProjectRecord | None = None
+    try:
+        repo_path = _validate_repo_reference(payload.repo_path)
+        existing = await session.get(ProjectRecord, payload.project_id)
+        project = await TaskEngine.create_project(
+            session,
+            project_id=payload.project_id,
+            name=payload.name,
+            repo_path=repo_path,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if existing else 422, detail=str(exc)) from exc
+    return {
+        "status": "existing" if existing else "registered",
+        "project_id": project.id,
+        "name": project.name,
+        "repo_path": project.repo_path,
+    }
+
+
 @app.post("/api/tasks", response_model=dict[str, Any])
 async def submit_task(
     envelope: TaskEnvelope,
@@ -456,9 +512,20 @@ async def submit_task(
     if not worker_kill_switch.can_execute(envelope.project_id):
         raise HTTPException(status_code=403, detail="Task execution is paused for this project")
     try:
-        WorktreeManager.validate_repo_path(envelope.repo)
+        _validate_repo_reference(envelope.repo)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    project = await session.get(ProjectRecord, envelope.project_id)
+    if project is None and (settings.is_staging or settings.is_production):
+        raise HTTPException(
+            status_code=404,
+            detail="Project must be registered before submitting remote tasks",
+        )
+    if project is not None and project.repo_path != envelope.repo:
+        raise HTTPException(
+            status_code=409,
+            detail="Task repository does not match registered project binding",
+        )
     try:
         task = await TaskEngine.submit_task(session, envelope)
     except ValueError as exc:
@@ -526,6 +593,10 @@ async def lease_task(
         raise HTTPException(status_code=422, detail="Invalid worker ID")
     preferred_agent = payload.get("preferred_agent")
 
+    await TaskEngine.check_watchdog_stalls(
+        session,
+        stall_timeout_seconds=settings.TASK_PROGRESS_STALL_TIMEOUT_SECONDS,
+    )
     leased_tuple = await TaskEngine.lease_next_task(
         session,
         worker_id,

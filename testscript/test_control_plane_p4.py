@@ -227,6 +227,7 @@ class TestProgressHeartbeatWatchdog:
             lease_token="lease_old",
             worker_id="worker-01",
             leased_at=stalled_time,
+            updated_at=stalled_time,
             attempt_count=1,
             max_attempts=3,
         )
@@ -264,6 +265,7 @@ class TestProgressHeartbeatWatchdog:
             lease_token="lease_old2",
             worker_id="worker-01",
             leased_at=stalled_time,
+            updated_at=stalled_time,
             attempt_count=3,
             max_attempts=3,
         )

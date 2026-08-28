@@ -73,6 +73,152 @@ async def test_task_submission_and_details_api(tmp_path, monkeypatch, api_header
 
 
 @pytest.mark.asyncio
+async def test_project_registration_is_remote_safe_and_repo_binding_is_immutable(
+    tmp_path, monkeypatch, api_headers
+):
+    """Control plane checks path policy, while Mac worker owns filesystem checks."""
+    allowed_root = tmp_path / "clientProjects"
+    allowed_root.mkdir()
+    repo_reference = allowed_root / "not-mounted-on-control-plane"
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (allowed_root,))
+
+    project = {
+        "project_id": "prj_remote_binding",
+        "name": "Remote-safe project",
+        "repo_path": str(repo_reference),
+    }
+    envelope = TaskEnvelope(
+        task_id="tsk_remote_binding_01",
+        project_id=project["project_id"],
+        repo=project["repo_path"],
+        objective="Execute only on outbound Mac worker",
+        allowed_paths=["."],
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        registered = await ac.post("/api/projects", json=project, headers=api_headers)
+        repeated = await ac.post("/api/projects", json=project, headers=api_headers)
+        submitted = await ac.post(
+            "/api/tasks",
+            json=envelope.model_dump(mode="json"),
+            headers=api_headers,
+        )
+        rebound = await ac.post(
+            "/api/projects",
+            json={**project, "repo_path": str(allowed_root / "different")},
+            headers=api_headers,
+        )
+
+    assert not repo_reference.exists()
+    assert registered.status_code == 200
+    assert registered.json()["status"] == "registered"
+    assert repeated.status_code == 200
+    assert repeated.json()["status"] == "existing"
+    assert submitted.status_code == 200
+    assert rebound.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_project_registration_rejects_repo_reference_outside_allowed_roots(
+    tmp_path, monkeypatch, api_headers
+):
+    allowed_root = tmp_path / "clientProjects"
+    allowed_root.mkdir()
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (allowed_root,))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post(
+            "/api/projects",
+            json={
+                "project_id": "prj_outside_root",
+                "name": "Rejected project",
+                "repo_path": str(tmp_path / "outside"),
+            },
+            headers=api_headers,
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Repository reference is outside allowed roots"
+
+
+@pytest.mark.asyncio
+async def test_staging_rejects_task_until_project_is_registered(tmp_path, monkeypatch, api_headers):
+    allowed_root = tmp_path / "clientProjects"
+    allowed_root.mkdir()
+    repo_reference = allowed_root / "mac-only-repo"
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (allowed_root,))
+    monkeypatch.setattr(settings, "ENV", "staging")
+    envelope = TaskEnvelope(
+        task_id="tsk_staging_requires_project",
+        project_id="prj_staging_requires_project",
+        repo=str(repo_reference),
+        objective="Reject implicit remote project creation",
+        allowed_paths=["."],
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        rejected = await ac.post(
+            "/api/tasks",
+            json=envelope.model_dump(mode="json"),
+            headers=api_headers,
+        )
+        registered = await ac.post(
+            "/api/projects",
+            json={
+                "project_id": envelope.project_id,
+                "name": "Registered staging project",
+                "repo_path": envelope.repo,
+            },
+            headers=api_headers,
+        )
+        accepted = await ac.post(
+            "/api/tasks",
+            json=envelope.model_dump(mode="json"),
+            headers=api_headers,
+        )
+
+    assert rejected.status_code == 404
+    assert rejected.json()["detail"] == (
+        "Project must be registered before submitting remote tasks"
+    )
+    assert registered.status_code == 200
+    assert accepted.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_task_repo_must_match_registered_project_binding(tmp_path, monkeypatch, api_headers):
+    allowed_root = tmp_path / "clientProjects"
+    allowed_root.mkdir()
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", (allowed_root,))
+    project = {
+        "project_id": "prj_task_repo_binding",
+        "name": "Bound project",
+        "repo_path": str(allowed_root / "expected"),
+    }
+    envelope = TaskEnvelope(
+        task_id="tsk_wrong_repo_binding",
+        project_id=project["project_id"],
+        repo=str(allowed_root / "wrong"),
+        objective="Never execute against mismatched repository",
+        allowed_paths=["."],
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        registered = await ac.post("/api/projects", json=project, headers=api_headers)
+        rejected = await ac.post(
+            "/api/tasks",
+            json=envelope.model_dump(mode="json"),
+            headers=api_headers,
+        )
+
+    assert registered.status_code == 200
+    assert rejected.status_code == 409
+    assert rejected.json()["detail"] == (
+        "Task repository does not match registered project binding"
+    )
+
+
+@pytest.mark.asyncio
 async def test_approval_required_task_needs_founder_decision(tmp_path, monkeypatch, api_headers):
     repo_path = tmp_path / "repo"
     repo_path.mkdir()

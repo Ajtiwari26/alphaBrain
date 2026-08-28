@@ -184,3 +184,23 @@ def test_worker_lease_duration_bounds():
         match="WORKER_LEASE_DURATION_SECONDS must be between 300 and 7200",
     ):
         Settings(WORKER_LEASE_DURATION_SECONDS=7201)
+
+
+def test_task_progress_stall_timeout_bounds():
+    from pydantic import ValidationError
+
+    from alpha_core.config import Settings
+
+    assert (
+        Settings(TASK_PROGRESS_STALL_TIMEOUT_SECONDS=300).TASK_PROGRESS_STALL_TIMEOUT_SECONDS == 300
+    )
+    with pytest.raises(
+        ValidationError,
+        match="TASK_PROGRESS_STALL_TIMEOUT_SECONDS must be between 60 and 7200",
+    ):
+        Settings(TASK_PROGRESS_STALL_TIMEOUT_SECONDS=59)
+    with pytest.raises(
+        ValidationError,
+        match="TASK_PROGRESS_STALL_TIMEOUT_SECONDS must be between 60 and 7200",
+    ):
+        Settings(TASK_PROGRESS_STALL_TIMEOUT_SECONDS=7201)
