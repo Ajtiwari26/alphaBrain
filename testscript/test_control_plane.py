@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from unittest.mock import AsyncMock
 
 import httpx
@@ -33,7 +34,8 @@ async def test_control_plane_leases_heartbeats_and_submits_with_identity_header(
         calls.append((request.method, request.url.path, dict(request.headers), body))
         if request.url.path.endswith("/identity"):
             return httpx.Response(
-                200, json={"identity_token": "signed-identity", "expires_at": 9999999999}
+                200,
+                json={"identity_token": "signed-identity", "expires_at": int(time.time()) + 3600},
             )
         if request.url.path == "/api/tasks/lease":
             return httpx.Response(
