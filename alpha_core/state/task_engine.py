@@ -611,15 +611,20 @@ class TaskEngine:
             # Recompute digest from persisted task + attempt data
             from alpha_protocol import AgentType, compute_review_digest
 
+            if not approval.attempt_id:
+                raise ValueError("Null legacy binding is unsupported. Attempt must be bound.")
+
             att_res = await session.execute(
-                select(AttemptRecord)
-                .where(AttemptRecord.task_id == task_id)
-                .order_by(AttemptRecord.completed_at.desc())
-                .limit(1)
+                select(AttemptRecord).where(
+                    and_(
+                        AttemptRecord.id == approval.attempt_id,
+                        AttemptRecord.task_id == task_id,
+                    )
+                )
             )
             attempt = att_res.scalar_one_or_none()
             if not attempt:
-                raise ValueError("No attempt found for review")
+                raise ValueError("Bound attempt not found or belongs to a different task")
 
             from alpha_protocol.gates import GateResult
 
@@ -1093,24 +1098,35 @@ class TaskEngine:
                 not result.packet_sha256
                 or result.packet_sha256 != task.packet_sha256
                 or result.packet_sha256 != fresh_digest
-                or result.base_commit != envelope.base_commit
             ):
+                return False
+
+        if result.base_commit != envelope.base_commit:
+            return False
+
+        is_success = result.status in {TaskStatus.COMPLETED, TaskStatus.VERIFIED}
+        has_files_changed = bool(result.files_changed)
+
+        if is_success and not result.result_commit:
+            return False
+
+        if has_files_changed:
+            if not result.result_commit or result.result_commit == result.base_commit:
+                return False
+        else:
+            if result.result_commit and result.result_commit != result.base_commit:
                 return False
 
         if result.status in {TaskStatus.COMPLETED, TaskStatus.VERIFIED}:
             if not result.gate_result or not result.gate_result.evidence_items:
-                print("DEBUG: missing evidence")
                 return False
             if result.gate_result.task_id != result.task_id:
-                print("DEBUG: task_id mismatch")
                 return False
             if result.gate_result.attempt_id != result.attempt_id:
-                print("DEBUG: attempt_id mismatch")
                 return False
 
             ev_ids = [ev.evidence_id for ev in result.gate_result.evidence_items]
             if len(ev_ids) != len(set(ev_ids)):
-                print("DEBUG: duplicate ev_ids")
                 return False
 
             evidence_by_gate: dict[GateType, list[GateEvidence]] = {}
@@ -1118,12 +1134,12 @@ class TaskEngine:
                 evidence_by_gate.setdefault(ev.gate_type, []).append(ev)
 
             for req_gate in envelope.acceptance_plan.required_gates:
+                if req_gate == GateType.INDEPENDENT_REVIEW:
+                    continue
                 gate_evs = evidence_by_gate.get(req_gate, [])
                 if not gate_evs:
-                    print(f"DEBUG: missing required gate {req_gate}")
                     return False
                 if any(not ev.passed for ev in gate_evs):
-                    print("DEBUG: failed required gate")
                     return False
 
             if envelope.acceptance_plan.commands:
@@ -1142,14 +1158,10 @@ class TaskEngine:
                             found_match = True
                             break
                     if not found_match:
-                        print(
-                            f"DEBUG: expected_argv not matched. expected={expected_argv} found_metrics={[ev.metrics for ev in gate_evs]}"
-                        )
                         return False
 
             if result.files_changed:
                 if not result.result_commit:
-                    print("DEBUG: files changed but no result commit")
                     return False
                 from pathlib import PurePosixPath
 
@@ -1157,7 +1169,6 @@ class TaskEngine:
                 for raw_path in result.files_changed:
                     path = PurePosixPath(raw_path)
                     if path.is_absolute() or ".." in path.parts:
-                        print("DEBUG: absolute or .. in path")
                         return False
 
                     if "." not in allowed_paths:
@@ -1173,7 +1184,6 @@ class TaskEngine:
                                 matched = True
                                 break
                         if not matched:
-                            print(f"DEBUG: not in allowed path {raw_path}")
                             return False
 
         if task.status == TaskStatus.LEASED.value:
@@ -1197,23 +1207,17 @@ class TaskEngine:
                             gates_passed = False
                             break
 
-            # 2. Enforce independent review for high/critical risks
+            # 2. Enforce independent review for high/critical risks or require_independent_review
             if envelope.acceptance_plan.require_independent_review or envelope.risk_class in {
                 RiskClass.HIGH,
                 RiskClass.CRITICAL,
             }:
-                has_independent_review = False
-                if result.gate_result:
-                    for ev in result.gate_result.evidence_items:
-                        if ev.gate_type == GateType.INDEPENDENT_REVIEW and ev.passed:
-                            reviewer = ev.metrics.get("reviewer") or ev.summary
-                            if reviewer and reviewer != (worker_id or task.worker_id):
-                                has_independent_review = True
-                                break
-                if not has_independent_review:
-                    # Require founder review approval before completion
-                    target_status = TaskStatus.WAITING_APPROVAL
-                    gates_passed = False
+                # Truth boundary: no separately persisted reviewer workflow exists yet.
+                # Executor TaskResult GateEvidence, AGY QA manifest, same conversation QA audit,
+                # reviewer string, or self-attested metrics can NEVER satisfy independent_review.
+                # Always route to founder fallback WAITING_APPROVAL.
+                target_status = TaskStatus.WAITING_APPROVAL
+                gates_passed = False
 
             if not gates_passed and target_status != TaskStatus.WAITING_APPROVAL:
                 target_status = TaskStatus.RETRYABLE_FAILED
@@ -1280,30 +1284,44 @@ class TaskEngine:
         )
         session.add(audit)
 
-        if target_status == TaskStatus.VERIFIED and envelope.require_packet_binding:
+        if target_status == TaskStatus.WAITING_APPROVAL or (
+            target_status == TaskStatus.VERIFIED and envelope.require_packet_binding
+        ):
             from alpha_protocol import compute_review_digest
 
             review_digest = compute_review_digest(result, worker_id or "")
-            appr = ApprovalRecord(
-                id=f"appr_{uuid.uuid4().hex[:12]}",
-                task_id=result.task_id,
-                approval_type="task_review",
-                scope_sha256=review_digest,
-                status=ApprovalStatus.PENDING.value,
-                created_at=now,
+            existing_appr = await session.scalar(
+                select(ApprovalRecord).where(
+                    and_(
+                        ApprovalRecord.task_id == result.task_id,
+                        ApprovalRecord.attempt_id == result.attempt_id,
+                        ApprovalRecord.approval_type == "task_review",
+                        ApprovalRecord.status == ApprovalStatus.PENDING.value,
+                    )
+                )
             )
-            session.add(appr)
+            if not existing_appr:
+                appr = ApprovalRecord(
+                    id=f"appr_{uuid.uuid4().hex[:12]}",
+                    task_id=result.task_id,
+                    attempt_id=result.attempt_id,
+                    approval_type="task_review",
+                    scope_sha256=review_digest,
+                    status=ApprovalStatus.PENDING.value,
+                    created_at=now,
+                )
+                session.add(appr)
 
-            review_audit = AuditEventRecord(
-                id=f"evt_{uuid.uuid4().hex[:12]}",
-                event_type="task_review_pending",
-                project_id=task.project_id,
-                task_id=task.id,
-                actor="system",
-                details_json={"attempt_id": result.attempt_id, "review_sha256": review_digest},
-                timestamp=now,
-            )
-            session.add(review_audit)
+                review_audit = AuditEventRecord(
+                    id=f"evt_{uuid.uuid4().hex[:12]}",
+                    event_type="task_review_pending",
+                    project_id=task.project_id,
+                    task_id=task.id,
+                    actor="system",
+                    details_json={"attempt_id": result.attempt_id, "review_sha256": review_digest},
+                    timestamp=now,
+                )
+                session.add(review_audit)
 
         await session.flush()
         return True

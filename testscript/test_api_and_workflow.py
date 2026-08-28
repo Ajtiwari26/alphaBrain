@@ -10,14 +10,10 @@ import subprocess
 import uuid
 
 import pytest
-import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
 
 from alpha_core.api.app import app
 from alpha_core.config import settings
-from alpha_core.db.connection import get_session_factory, init_db
-from alpha_core.db.models import TaskRecord
 from alpha_core.security import create_worker_identity_token
 from alpha_core.workflow.sdlc_workflow import SDLCWorkflowRunner
 from alpha_protocol import (
@@ -31,11 +27,6 @@ from alpha_protocol import (
     WorkerHealthReport,
     WorkerRegistration,
 )
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def setup_test_db():
-    await init_db()
 
 
 @pytest.mark.asyncio
@@ -250,6 +241,7 @@ async def test_worker_control_plane_lease_heartbeat_result_vertical_slice(
         agent=AgentType.ANTIGRAVITY,
         model="test",
         base_commit="HEAD",
+        result_commit="HEAD",
         gate_result=GateResult(
             task_id="tsk-worker-e2e",
             attempt_id="att-worker-e2e",
@@ -270,16 +262,6 @@ async def test_worker_control_plane_lease_heartbeat_result_vertical_slice(
             ],
         ),
     )
-    # Remove stale queue rows left by earlier tests; production never performs this cleanup.
-    async with get_session_factory()() as cleanup_session:
-        stale = (
-            await cleanup_session.execute(
-                select(TaskRecord).where(TaskRecord.status == TaskStatus.QUEUED.value)
-            )
-        ).scalars()
-        for task in stale:
-            task.status = TaskStatus.CANCELLED.value
-        await cleanup_session.commit()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await ac.post(
             "/api/workers/register",
@@ -331,16 +313,6 @@ async def test_founder_cancellation_reaches_authenticated_active_worker(
         objective="Prove active cancellation delivery",
         allowed_paths=["."],
     )
-    async with get_session_factory()() as cleanup_session:
-        stale = (
-            await cleanup_session.execute(
-                select(TaskRecord).where(TaskRecord.status == TaskStatus.QUEUED.value)
-            )
-        ).scalars()
-        for task in stale:
-            task.status = TaskStatus.CANCELLED.value
-        await cleanup_session.commit()
-
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await ac.post(
             "/api/workers/register",

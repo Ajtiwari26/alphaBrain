@@ -55,12 +55,16 @@ def test_worktree_lifecycle(temp_git_repo, monkeypatch, tmp_path):
     new_file = worktree_path / "new_feature.py"
     new_file.write_text("def hello(): return 'world'\n")
 
-    changed = mgr.get_changed_files(worktree_path)
-    assert "new_feature.py" in changed
+    uncommitted = mgr.get_uncommitted_files(worktree_path)
+    assert "new_feature.py" in uncommitted
 
     # 3. Commit changes in worktree
+    base_commit = mgr.get_head_commit(worktree_path)
     commit_hash = mgr.commit_changes(worktree_path, "Add new_feature.py")
     assert commit_hash is not None
+
+    changed = mgr.get_changed_files(worktree_path, base_commit)
+    assert "new_feature.py" in changed
 
     # 4. Remove worktree safely
     mgr.remove_worktree(str(temp_git_repo), task_id)

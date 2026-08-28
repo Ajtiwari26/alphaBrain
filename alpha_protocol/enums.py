@@ -52,6 +52,8 @@ LEGAL_TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {
             TaskStatus.RUNNING,
             TaskStatus.CANCELLED,
             TaskStatus.QUEUED,
+            TaskStatus.COMPLETED,
+            TaskStatus.BLOCKED,
         }
     ),
     TaskStatus.VERIFIED: frozenset(

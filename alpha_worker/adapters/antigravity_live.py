@@ -537,7 +537,9 @@ class AntigravityLiveBridge:
                     dispatch_res = self._parse_agy_result(
                         raw,
                         expected_qa_gates=tuple(
-                            gate.value for gate in task.acceptance_plan.required_gates
+                            gate.value
+                            for gate in task.acceptance_plan.required_gates
+                            if gate.value not in {"independent_review", "code_review_graph"}
                         ),
                         expected_project_id=task.project_id,
                         forbid_external_dependencies=forbid_deps,
@@ -592,7 +594,9 @@ class AntigravityLiveBridge:
                         dispatch_res = self._parse_agy_result(
                             self._combine_turn_evidence(raw, repair_raw),
                             expected_qa_gates=tuple(
-                                gate.value for gate in task.acceptance_plan.required_gates
+                                gate.value
+                                for gate in task.acceptance_plan.required_gates
+                                if gate.value not in {"independent_review", "code_review_graph"}
                             ),
                             expected_project_id=task.project_id,
                             forbid_external_dependencies=forbid_deps,
@@ -631,7 +635,9 @@ class AntigravityLiveBridge:
                         dispatch_res = self._parse_agy_result(
                             audit_raw,
                             expected_qa_gates=tuple(
-                                gate.value for gate in task.acceptance_plan.required_gates
+                                gate.value
+                                for gate in task.acceptance_plan.required_gates
+                                if gate.value not in {"independent_review", "code_review_graph"}
                             ),
                             expected_project_id=task.project_id,
                             require_qa_audit=True,
@@ -970,7 +976,11 @@ class AntigravityLiveBridge:
             else "Existing dedicated project conversation."
         )
         required_gates_json = json.dumps(
-            [gate.value for gate in task.acceptance_plan.required_gates]
+            [
+                gate.value
+                for gate in task.acceptance_plan.required_gates
+                if gate.value not in {"independent_review", "code_review_graph"}
+            ]
         )
         declared_commands = (
             "\n".join(
@@ -1040,7 +1050,11 @@ The supervisor controls retries. The junior never reruns uncontrolled loops inte
         else:
             browser_rule = "Browser smoke is NOT independently declared. Do NOT attempt browser server, browser tool, driver/install/download, curl/wget, or network acquisition. Audit only allowed local source/tests and exact declared gates."
 
-        required_gates = ", ".join(gate.value for gate in task.acceptance_plan.required_gates)
+        required_gates = ", ".join(
+            gate.value
+            for gate in task.acceptance_plan.required_gates
+            if gate.value not in {"independent_review", "code_review_graph"}
+        )
         declared_commands = (
             "\n".join(
                 f"- {command.gate_type.value}: {' '.join([command.executable, *command.args])}"
@@ -1148,7 +1162,9 @@ requires a change. Rerun every declared gate, then emit updated {QA_EVIDENCE_TOK
             isinstance(gate, str) for gate in passed_gates
         ):
             return None, "QA evidence passed_gates must be a list of gate names"
-        missing_gates = sorted(set(expected_qa_gates) - set(passed_gates))
+        missing_gates = sorted(
+            set(expected_qa_gates) - set(passed_gates) - {"independent_review", "code_review_graph"}
+        )
         if missing_gates:
             return None, "QA evidence missing required gates: " + ", ".join(missing_gates)
         security_review = evidence.get("security_review")

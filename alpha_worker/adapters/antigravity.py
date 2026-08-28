@@ -150,16 +150,6 @@ class AntigravityAdapter(BaseAgentAdapter):
                 },
             )
         )
-        if dispatch.qa_evidence:
-            additional_evidence.append(
-                GateEvidence(
-                    evidence_id="evi_placeholder_qa",
-                    gate_type=GateType.INDEPENDENT_REVIEW,
-                    passed=True,
-                    summary="Antigravity supplied validated multi-agent-sdlc QA evidence",
-                    metrics={"qa_evidence": dispatch.qa_evidence},
-                )
-            )
 
         # 4. Run declared acceptance gates after explicit agent completion, merging additional evidence
         gate_result = self.run_acceptance_gates(
@@ -167,31 +157,51 @@ class AntigravityAdapter(BaseAgentAdapter):
         )
         gate_result.all_passed = gate_result.all_passed and dispatch.completed
 
-        # 3. Inspect changed files & commit
+        # 5. Inspect uncommitted files & commit adapter-owned changes
+        uncommitted_files = self.worktree_mgr.get_uncommitted_files(worktree_path)
+        disallowed_uncommitted = (
+            self.worktree_mgr.find_disallowed_changes(
+                uncommitted_files,
+                task.allowed_paths,
+            )
+            if uncommitted_files
+            else []
+        )
+        if uncommitted_files and not disallowed_uncommitted:
+            self.worktree_mgr.commit_changes(
+                worktree_path,
+                f"alpha(task): {task.objective} [{task.task_id}]",
+            )
+
+        # 6. Derive final lineage and strictly validate all base..HEAD changes
+        result_commit = self.worktree_mgr.get_head_commit(worktree_path)
         changed_files = self.worktree_mgr.get_changed_files(worktree_path, base_commit)
-        diff_summary = self.worktree_mgr.get_diff_summary(worktree_path)
-        disallowed_changes = self.worktree_mgr.find_disallowed_changes(
+        diff_summary = self.worktree_mgr.get_diff_summary(worktree_path, base_commit)
+
+        disallowed_committed = self.worktree_mgr.find_disallowed_changes(
             changed_files,
             task.allowed_paths,
         )
-        if disallowed_changes:
+
+        all_disallowed = sorted(set(disallowed_uncommitted) | set(disallowed_committed))
+        if all_disallowed:
+            if disallowed_uncommitted and disallowed_committed:
+                summary = "Agent modified uncommitted worktree files and committed lineage files outside allowed_paths"
+            elif disallowed_uncommitted:
+                summary = "Agent changed uncommitted files outside allowed_paths"
+            else:
+                summary = "Agent committed files outside allowed_paths"
+
             gate_result.evidence_items.append(
                 GateEvidence(
                     evidence_id=f"evi_{len(gate_result.evidence_items) + 1}",
                     gate_type=GateType.SECURITY_SCAN,
                     passed=False,
-                    summary="Agent changed files outside allowed_paths",
-                    artifacts_created=disallowed_changes,
+                    summary=summary,
+                    artifacts_created=all_disallowed,
                 )
             )
             gate_result.all_passed = False
-
-        result_commit = None
-        if changed_files and not disallowed_changes:
-            result_commit = self.worktree_mgr.commit_changes(
-                worktree_path,
-                f"alpha(task): {task.objective} [{task.task_id}]",
-            )
 
         status = TaskStatus.COMPLETED if gate_result.all_passed else TaskStatus.RETRYABLE_FAILED
 
@@ -208,7 +218,7 @@ class AntigravityAdapter(BaseAgentAdapter):
             agent=self.agent_type,
             model=f"antigravity-{settings.ANTIGRAVITY_MODEL}",
             base_commit=base_commit,
-            result_commit=result_commit or base_commit,
+            result_commit=result_commit,
             packet_sha256=packet_sha256,
             files_changed=changed_files,
             diff_summary=diff_summary,

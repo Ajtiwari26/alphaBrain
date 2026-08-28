@@ -100,6 +100,7 @@ async def test_happy_path_kernel_proof(memory_db, fake_daemon, tmp_path, monkeyp
         agent=AgentType.ANTIGRAVITY,
         model="test",
         base_commit="HEAD",
+        result_commit="HEAD",
         gate_result=gate_res,
     )
     monkeypatch.setattr(

@@ -185,16 +185,15 @@ class WorktreeManager:
         self._git(worktree_path, ["merge-base", "--is-ancestor", resolved_base, "HEAD"])
         return worktree_path
 
-    def get_changed_files(self, worktree_path: Path, base_commit: str = "HEAD") -> list[str]:
-        """Returns list of modified or untracked files in the worktree."""
-        res = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=str(worktree_path),
-            capture_output=True,
-            text=True,
-        )
+    def assert_base_commit_ancestor(self, worktree_path: Path, base_commit: str) -> None:
+        """Assert that base_commit is an ancestor of HEAD in worktree."""
+        self._git(worktree_path, ["merge-base", "--is-ancestor", base_commit, "HEAD"])
+
+    def get_uncommitted_files(self, worktree_path: Path) -> list[str]:
+        """Returns list of modified or untracked files currently uncommitted in the worktree."""
+        output = self._git(worktree_path, ["status", "--porcelain"])
         files = []
-        for line in res.stdout.splitlines():
+        for line in output.splitlines():
             line = line.strip()
             if line:
                 parts = line.split(maxsplit=1)
@@ -202,35 +201,26 @@ class WorktreeManager:
                     files.append(parts[1])
         return files
 
-    def get_diff_summary(self, worktree_path: Path) -> str:
-        """Returns git diff summary."""
-        res = subprocess.run(
-            ["git", "diff", "--stat"],
-            cwd=str(worktree_path),
-            capture_output=True,
-            text=True,
-        )
-        return res.stdout.strip()
+    def get_changed_files(self, worktree_path: Path, base_commit: str = "HEAD") -> list[str]:
+        """Returns list of files changed between base_commit and worktree HEAD."""
+        self.assert_base_commit_ancestor(worktree_path, base_commit)
+        output = self._git(worktree_path, ["diff", "--name-only", f"{base_commit}..HEAD"])
+        return [f.strip() for f in output.splitlines() if f.strip()]
 
-    def commit_changes(self, worktree_path: Path, message: str) -> str | None:
+    def get_diff_summary(self, worktree_path: Path, base_commit: str = "HEAD") -> str:
+        """Returns git diff summary against base_commit."""
+        self.assert_base_commit_ancestor(worktree_path, base_commit)
+        return self._git(worktree_path, ["diff", "--stat", f"{base_commit}..HEAD"])
+
+    def get_head_commit(self, worktree_path: Path) -> str:
+        """Returns the full commit hash of HEAD in the worktree."""
+        return self._git(worktree_path, ["rev-parse", "HEAD"])
+
+    def commit_changes(self, worktree_path: Path, message: str) -> str:
         """Stages all changes and commits them, returning the new commit hash."""
-        subprocess.run(["git", "add", "-A"], cwd=str(worktree_path), check=True)
-        res = subprocess.run(
-            ["git", "commit", "-m", message],
-            cwd=str(worktree_path),
-            capture_output=True,
-            text=True,
-        )
-        if res.returncode != 0:
-            return None
-
-        rev_res = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=str(worktree_path),
-            capture_output=True,
-            text=True,
-        )
-        return rev_res.stdout.strip()
+        self._git(worktree_path, ["add", "-A"])
+        self._git(worktree_path, ["commit", "-m", message])
+        return self.get_head_commit(worktree_path)
 
     def remove_worktree(self, repo_path: str, task_id: str) -> None:
         """Remove only clean worktree; preserve task branch and never force-delete evidence."""

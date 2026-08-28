@@ -68,6 +68,7 @@ async def test_submit_gate_evidence_verified_and_failed(test_db_session):
             agent="codex",
             model="gemini",
             base_commit="abcd",
+            result_commit="abcd",
             gate_result=GateResult(
                 task_id="tsk_123",
                 attempt_id="att_1",
@@ -238,6 +239,7 @@ async def test_duplicate_evidence_id_across_attempts(test_db_session):
             agent="codex",
             model="gemini",
             base_commit="abcd",
+            result_commit="abcd",
             gate_result=GateResult(
                 task_id="tsk_1",
                 attempt_id="att_1",
@@ -263,6 +265,7 @@ async def test_duplicate_evidence_id_across_attempts(test_db_session):
             agent="codex",
             model="gemini",
             base_commit="abcd",
+            result_commit="abcd",
             gate_result=GateResult(
                 task_id="tsk_2",
                 attempt_id="att_2",
@@ -369,6 +372,7 @@ async def test_duplicate_evidence_id_long_attempt_ids(test_db_session):
             agent="codex",
             model="gemini",
             base_commit="abcd",
+            result_commit="abcd",
             gate_result=GateResult(
                 task_id="tsk_3",
                 attempt_id=att_long_1,
@@ -394,6 +398,7 @@ async def test_duplicate_evidence_id_long_attempt_ids(test_db_session):
             agent="codex",
             model="gemini",
             base_commit="abcd",
+            result_commit="abcd",
             gate_result=GateResult(
                 task_id="tsk_4",
                 attempt_id=att_long_2,

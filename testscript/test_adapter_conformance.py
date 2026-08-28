@@ -64,10 +64,12 @@ async def test_antigravity_normalized_success(fake_task: TaskEnvelope, fake_work
     )
     adapter.run_acceptance_gates = MagicMock(return_value=mock_gate_result)
 
+    adapter.worktree_mgr.get_uncommitted_files = MagicMock(return_value=["file1.py"])
     adapter.worktree_mgr.get_changed_files = MagicMock(return_value=["file1.py"])
     adapter.worktree_mgr.get_diff_summary = MagicMock(return_value="Diff summary")
     adapter.worktree_mgr.find_disallowed_changes = MagicMock(return_value=[])
     adapter.worktree_mgr.commit_changes = MagicMock(return_value="commit456")
+    adapter.worktree_mgr.get_head_commit = MagicMock(return_value="commit456")
 
     result = await adapter.execute(fake_task, fake_worktree, fake_task.base_commit)
 
@@ -109,10 +111,12 @@ async def test_antigravity_missing_qa_manifest(fake_task: TaskEnvelope, fake_wor
     )
     adapter.run_acceptance_gates = MagicMock(return_value=mock_gate_result)
 
+    adapter.worktree_mgr.get_uncommitted_files = MagicMock(return_value=["file1.py"])
     adapter.worktree_mgr.get_changed_files = MagicMock(return_value=["file1.py"])
     adapter.worktree_mgr.get_diff_summary = MagicMock(return_value="Diff")
     adapter.worktree_mgr.find_disallowed_changes = MagicMock(return_value=[])
     adapter.worktree_mgr.commit_changes = MagicMock(return_value="commit456")
+    adapter.worktree_mgr.get_head_commit = MagicMock(return_value="commit456")
 
     result = await adapter.execute(fake_task, fake_worktree, fake_task.base_commit)
 
@@ -146,9 +150,11 @@ async def test_antigravity_disallowed_changes(fake_task: TaskEnvelope, fake_work
     )
     adapter.run_acceptance_gates = MagicMock(return_value=mock_gate_result)
 
+    adapter.worktree_mgr.get_uncommitted_files = MagicMock(return_value=["secret.txt"])
     adapter.worktree_mgr.get_changed_files = MagicMock(return_value=["secret.txt"])
     adapter.worktree_mgr.get_diff_summary = MagicMock(return_value="Diff")
     adapter.worktree_mgr.find_disallowed_changes = MagicMock(return_value=["secret.txt"])
+    adapter.worktree_mgr.get_head_commit = MagicMock(return_value="commit123")
 
     result = await adapter.execute(fake_task, fake_worktree, fake_task.base_commit)
 
@@ -182,9 +188,11 @@ async def test_antigravity_nonzero_exit(fake_task: TaskEnvelope, fake_worktree: 
     )
     adapter.run_acceptance_gates = MagicMock(return_value=mock_gate_result)
 
+    adapter.worktree_mgr.get_uncommitted_files = MagicMock(return_value=[])
     adapter.worktree_mgr.get_changed_files = MagicMock(return_value=[])
     adapter.worktree_mgr.get_diff_summary = MagicMock(return_value="")
     adapter.worktree_mgr.find_disallowed_changes = MagicMock(return_value=[])
+    adapter.worktree_mgr.get_head_commit = MagicMock(return_value="commit123")
 
     result = await adapter.execute(fake_task, fake_worktree, fake_task.base_commit)
     assert result.status == TaskStatus.RETRYABLE_FAILED

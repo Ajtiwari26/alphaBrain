@@ -179,6 +179,7 @@ async def test_duplicate_result_is_idempotent_and_stale_result_is_rejected(test_
         agent=AgentType.ANTIGRAVITY,
         model="antigravity-flash",
         base_commit="HEAD",
+        result_commit="HEAD",
         gate_result=make_default_gate_result(leased_task.id, "att_state_idempotent_1"),
     )
 
@@ -255,6 +256,7 @@ async def test_resubmission_cannot_replace_verified_task(test_db_session):
         agent=AgentType.ANTIGRAVITY,
         model="antigravity-flash",
         base_commit="HEAD",
+        result_commit="HEAD",
         gate_result=make_default_gate_result(leased_task.id, "att_state_immutable_1"),
     )
     assert await TaskEngine.submit_result(
@@ -305,6 +307,7 @@ async def test_dependency_blocks_downstream_then_verified_upstream_unblocks_it(t
         agent=AgentType.ANTIGRAVITY,
         model="antigravity-flash",
         base_commit="HEAD",
+        result_commit="HEAD",
         gate_result=make_default_gate_result(upstream.task_id, "att_state_upstream_1"),
     )
     assert await TaskEngine.submit_result(

@@ -483,6 +483,7 @@ class TestGateEvidenceAndIndependentReview:
             agent=AgentType.ANTIGRAVITY,
             model="gemini-pro",
             base_commit="HEAD",
+            result_commit="HEAD",
             status=TaskStatus.COMPLETED,
             gate_result=GateResult(
                 task_id="tsk_hr_01",
@@ -517,6 +518,67 @@ class TestGateEvidenceAndIndependentReview:
         assert res1 is True
         res_t1 = await async_db.execute(select(TaskRecord).where(TaskRecord.id == "tsk_hr_01"))
         assert res_t1.scalar_one().status == TaskStatus.WAITING_APPROVAL.value
+
+        # 2. Result with claimed different reviewer (reviewer == worker-02) -> also moves to WAITING_APPROVAL
+        envelope2 = TaskEnvelope(
+            task_id="tsk_hr_02",
+            project_id="prj_hr",
+            repo="/repo/hr",
+            objective="High Risk Task 2",
+            allowed_paths=["."],
+            risk_class=RiskClass.HIGH,
+            requires_approval=True,
+        )
+        await TaskEngine.submit_task(async_db, envelope2, "prj_hr")
+        await TaskEngine.decide_approval(
+            async_db, "tsk_hr_02", approved=True, decided_by="founder-01"
+        )
+        lease_res2 = await TaskEngine.lease_next_task(async_db, "worker-02")
+        assert lease_res2 is not None
+        leased_task2, _ = lease_res2
+        assert leased_task2.lease_token is not None
+
+        diff_reviewed_result = TaskResult(
+            task_id="tsk_hr_02",
+            attempt_id="att_hr_02",
+            agent=AgentType.ANTIGRAVITY,
+            model="gemini-pro",
+            base_commit="HEAD",
+            result_commit="HEAD",
+            status=TaskStatus.COMPLETED,
+            gate_result=GateResult(
+                task_id="tsk_hr_02",
+                attempt_id="att_hr_02",
+                all_passed=True,
+                evidence_items=[
+                    GateEvidence(
+                        evidence_id="ev_lint_hr2",
+                        gate_type=GateType.LINT,
+                        passed=True,
+                        summary="Lint passed",
+                    ),
+                    GateEvidence(
+                        evidence_id="ev_unit_hr2",
+                        gate_type=GateType.UNIT_TEST,
+                        passed=True,
+                        summary="Unit tests passed",
+                    ),
+                    GateEvidence(
+                        evidence_id="ev_rev2",
+                        gate_type=GateType.INDEPENDENT_REVIEW,
+                        passed=True,
+                        summary="Claimed independent review",
+                        metrics={"reviewer": "external-auditor-99"},
+                    ),
+                ],
+            ),
+        )
+        res2 = await TaskEngine.submit_result(
+            async_db, diff_reviewed_result, leased_task2.lease_token, "worker-02"
+        )
+        assert res2 is True
+        res_t2 = await async_db.execute(select(TaskRecord).where(TaskRecord.id == "tsk_hr_02"))
+        assert res_t2.scalar_one().status == TaskStatus.WAITING_APPROVAL.value
 
 
 # ===========================================================================

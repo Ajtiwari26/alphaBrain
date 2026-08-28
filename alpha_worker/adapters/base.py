@@ -9,6 +9,7 @@ from alpha_protocol import (
     AgentType,
     GateEvidence,
     GateResult,
+    GateType,
     TaskEnvelope,
     TaskResult,
     TaskStatus,
@@ -114,6 +115,8 @@ class BaseAgentAdapter(ABC):
                 evidence_items.append(item)
 
         for required_gate in task.acceptance_plan.required_gates:
+            if required_gate == GateType.INDEPENDENT_REVIEW:
+                continue
             matching_evidence = [item for item in evidence_items if item.gate_type == required_gate]
             if not matching_evidence:
                 evidence_items.append(

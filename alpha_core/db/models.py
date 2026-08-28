@@ -305,6 +305,7 @@ class ApprovalRecord(Base):
     id = Column(String(64), primary_key=True)
     spec_id = Column(String(64), ForeignKey("spec_versions.id"), nullable=True)
     task_id = Column(String(64), ForeignKey("tasks.id"), nullable=True)
+    attempt_id = Column(String(64), ForeignKey("task_attempts.id"), nullable=True)
     deployment_id = Column(String(64), ForeignKey("deployments.id"), nullable=True)
     approval_type = Column(String(32), nullable=False)  # spec, task, deployment
     scope_sha256 = Column(String(64), nullable=True)

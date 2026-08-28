@@ -25,7 +25,8 @@ os.environ["PUBLIC_BASE_URL"] = "http://test"
 
 import pytest_asyncio  # noqa: E402
 
-from alpha_core.db.connection import init_db  # noqa: E402
+from alpha_core.db.connection import get_engine  # noqa: E402
+from alpha_core.db.models import Base  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -36,7 +37,11 @@ def cleanup_test_state():
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
-    await init_db()
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    yield
 
 
 @pytest.fixture
