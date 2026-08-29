@@ -1,0 +1,21 @@
+{
+  "name": "alpha-meet",
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/meet",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ]
+}

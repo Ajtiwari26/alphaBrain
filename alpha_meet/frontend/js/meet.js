@@ -82,19 +82,6 @@ async function waitForEvaLink(timeoutMs = 3000) {
   return false;
 }
 
-async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  let data = {};
-  try {
-    data = await response.json();
-  } catch (_) {
-    data = {};
-  }
-  if (!response.ok) {
-    throw new Error(data.detail || `Request failed (${response.status})`);
-  }
-  return data;
-}
 
 function decodeInviteClaims(token) {
   try {
@@ -324,7 +311,35 @@ function wireRoomEvents(activeRoom) {
   });
 
   activeRoom
+    .on(RoomEvent.TrackPublished, (publication, participant) => {
+      // Subscribe to my translated track
+      if (participant.identity.startsWith("translate-")) {
+        const langCode = participant.identity.replace("translate-", "");
+        if (langCode === myLanguage) {
+          publication.setSubscribed(true);
+        }
+      }
+    })
     .on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+      // Mute raw audio if we are translating their language
+      if (track.kind === Track.Kind.Audio && translateEnabled && participant.identity !== EVA_IDENTITY && !participant.identity.startsWith("translate-")) {
+          // If the backend had sent participantLanguages mapping, we'd check their language.
+          // For now, if translation is enabled, we mute ALL other human audio tracks.
+          // They will come through the translate track!
+          const audioElement = track.attach();
+          audioElement.muted = true;
+          document.body.appendChild(audioElement); // Keep attached for LiveKit but muted
+          return;
+      }
+      if (participant.identity === EVA_IDENTITY && translateEnabled) {
+          // If translation is enabled, we ALSO mute Eva's raw English audio track, 
+          // because it will come through our language's translate track!
+          const audioElement = track.attach();
+          audioElement.muted = true;
+          document.body.appendChild(audioElement);
+          return;
+      }
+      
       attachRemoteTrack(track, participant);
     })
     .on(RoomEvent.TrackUnsubscribed, (track) => {
@@ -360,15 +375,12 @@ function wireRoomEvents(activeRoom) {
 
 async function joinMeetingRoom(event) {
   event.preventDefault();
-  showJoinError("");
-  if (!Room) {
-    showJoinError("LiveKit client failed to load. Check network access and reload.");
-    return;
-  }
-
   currentParticipant = document.getElementById("identity-input").value.trim();
   roomName = document.getElementById("room-input").value.trim();
   apiToken = document.getElementById("api-token-input").value.trim();
+  myLanguage = document.getElementById("language-select").value;
+  translateEnabled = document.getElementById("translate-toggle").checked;
+  
   if (!inviteToken && !apiToken) {
     showJoinError("Alpha Brain access token is required.");
     return;
@@ -386,6 +398,7 @@ async function joinMeetingRoom(event) {
         room_name: roomName,
         identity: currentParticipant,
         invite_token: inviteToken || undefined,
+        language: myLanguage,
       }),
     });
 
@@ -542,4 +555,35 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("header-invite-btn")?.addEventListener("click", copyClientInvite);
   document.getElementById("footer-invite-btn")?.addEventListener("click", copyClientInvite);
   document.getElementById("end-call-btn")?.addEventListener("click", endCall);
+  document.getElementById("dark-mode-btn")?.addEventListener("click", () => {
+    document.body.classList.toggle("dark");
+  });
+});
+
+// ---- Language Switch ----
+document.addEventListener("DOMContentLoaded", () => {
+  const langBtn = document.getElementById("language-btn");
+  if (langBtn) {
+    langBtn.addEventListener("click", async () => {
+      const newLang = prompt("Enter new language code (hi, en, zh, ja, ko, ar, es, fr, de, pt):", myLanguage);
+      if (newLang && newLang !== myLanguage) {
+        myLanguage = newLang;
+        // Tell the server to update our language and reconcile agents
+        try {
+          await fetchJson("/api/meet/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({
+              room_name: roomName,
+              identity: currentParticipant,
+              language: myLanguage,
+            }),
+          });
+          alert(`Language updated to ${myLanguage}. The translation stream will switch momentarily.`);
+        } catch (e) {
+          alert("Failed to update language.");
+        }
+      }
+    });
+  }
 });
