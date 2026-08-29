@@ -1,3 +1,4 @@
+import enum
 """
 Alpha Brain Database Models
 ============================
@@ -385,18 +386,43 @@ class AttemptRecord(Base):
     task = relationship("TaskRecord", back_populates="attempts")
 
 
+class SideEffectState(str, enum.Enum):
+    NONE = "none"
+    PREPARED = "prepared"
+    STARTED = "started"
+    COMMITTED = "committed"
+    COMPENSATED = "compensated"
+    UNKNOWN = "unknown"
+
 class TaskCheckpointRecord(Base):
     __tablename__ = "task_checkpoints"
 
     id = Column(String(64), primary_key=True)
     task_id = Column(String(64), ForeignKey("tasks.id"), nullable=False)
     attempt_id = Column(String(64), ForeignKey("task_attempts.id"), nullable=False)
+    worker_id = Column(String(64), nullable=False)
+    attempt_number = Column(Integer, nullable=False)
+    sequence = Column(Integer, nullable=False)
+    project_id = Column(String(64), nullable=False)
+    repo_reference = Column(String(512), nullable=False)
+    base_commit = Column(String(128), nullable=False)
+    worktree_path = Column(String(512), nullable=False)
+    worktree_head = Column(String(128), nullable=False)
+    conversation_id = Column(String(64), nullable=False)
+    execution_stage = Column(String(64), nullable=False)
     lease_token_hash = Column(String(64), nullable=False)
+    side_effect_state = Column(String(32), nullable=False)
     scrubbed_payload = Column(JSON, nullable=False)
+    payload_digest = Column(String(64), nullable=False)
+    idempotency_key = Column(String(128), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), default=utc_now)
 
     task = relationship("TaskRecord")
     attempt = relationship("AttemptRecord")
+
+    __table_args__ = (
+        UniqueConstraint("task_id", "attempt_number", "sequence", name="uq_task_attempt_seq"),
+    )
 
 
 class GateEvidenceRecord(Base):

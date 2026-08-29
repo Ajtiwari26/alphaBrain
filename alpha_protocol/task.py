@@ -251,6 +251,14 @@ class TaskAttempt(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class SideEffectState(str, Enum):
+    NONE = "none"
+    PREPARED = "prepared"
+    STARTED = "started"
+    COMMITTED = "committed"
+    COMPENSATED = "compensated"
+    UNKNOWN = "unknown"
+
 class TaskCheckpoint(BaseModel):
     """Durable checkpoint of agent progress for crash recovery."""
 
@@ -259,8 +267,21 @@ class TaskCheckpoint(BaseModel):
     )
     task_id: str
     attempt_id: str
+    worker_id: str
+    attempt_number: int
+    sequence: int
+    project_id: str
+    repo_reference: str
+    base_commit: str
+    worktree_path: str
+    worktree_head: str
+    conversation_id: str
+    execution_stage: str
     lease_token_hash: str = Field(description="SHA-256 hash of the worker lease token")
+    side_effect_state: SideEffectState
     scrubbed_payload: dict[str, Any] = Field(description="Agent state (no secrets/prompts)")
+    payload_digest: str
+    idempotency_key: str
     created_at: datetime = Field(default_factory=utc_now)
 
 
