@@ -1,0 +1,10 @@
+8cce5b187610a54b2ba6e6f3ae8fb5db1b81eac3679f329c6b0286782f49365f
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a39338425c61, initial_schema_v1
+INFO  [alembic.runtime.migration] Running upgrade a39338425c61 -> b4c7d2e8f901, Persist worker identity on each task attempt.
+INFO  [alembic.runtime.migration] Running upgrade b4c7d2e8f901 -> c8f9a1d2e603, Add next eligible timestamp for task retry backoff.
+INFO  [alembic.runtime.migration] Running upgrade c8f9a1d2e603 -> d5e8f1a2b304, P3 durable state schema: memberships, clients, consents, decisions, open questions, change requests, workflows, task dependencies.
+INFO  [alembic.runtime.migration] Running upgrade d5e8f1a2b304 -> e7a9c2f4d601, self_task_packet_binding
+INFO  [alembic.runtime.migration] Running upgrade e7a9c2f4d601 -> 58b5b056d9e3, approval_attempt_binding
+INFO  [alembic.runtime.migration] Running upgrade 58b5b056d9e3 -> ea716532600e, add task_checkpoints schema

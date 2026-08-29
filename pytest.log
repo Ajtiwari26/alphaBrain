@@ -1,0 +1,1740 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ajaytiwari/Desktop/Projects/alphaBrain
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 1 item
+
+testscript/test_checkpoints_api.py F                                     [100%]
+
+=================================== FAILURES ===================================
+_________________________ test_checkpoint_adversarial __________________________
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/default.py:952: in do_execute
+    cursor.execute(statement, parameters)
+.venv/lib/python3.14/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:213: in execute
+    self._adapt_connection._handle_exception(error)
+.venv/lib/python3.14/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:373: in _handle_exception
+    raise error
+.venv/lib/python3.14/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:195: in execute
+    self.await_(_cursor.execute(operation, parameters))
+.venv/lib/python3.14/site-packages/sqlalchemy/util/_concurrency_py3k.py:132: in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/sqlalchemy/util/_concurrency_py3k.py:196: in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/aiosqlite/cursor.py:40: in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+.venv/lib/python3.14/site-packages/aiosqlite/cursor.py:32: in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/aiosqlite/core.py:160: in _execute
+    return await future
+           ^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/aiosqlite/core.py:63: in _connection_worker_thread
+    result = function()
+             ^^^^^^^^^^
+E   sqlite3.IntegrityError: NOT NULL constraint failed: projects.repo_path
+
+The above exception was the direct cause of the following exception:
+testscript/test_checkpoints_api.py:51: in test_checkpoint_adversarial
+    await session.commit()
+.venv/lib/python3.14/site-packages/sqlalchemy/ext/asyncio/session.py:999: in commit
+    await greenlet_spawn(self.sync_session.commit)
+.venv/lib/python3.14/site-packages/sqlalchemy/util/_concurrency_py3k.py:203: in greenlet_spawn
+    result = context.switch(value)
+             ^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/session.py:2035: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/session.py:1316: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/session.py:1290: in _prepare_impl
+    self.session.flush()
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/session.py:4353: in flush
+    self._flush(objects)
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/session.py:4488: in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/sqlalchemy/util/langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/session.py:4449: in _flush
+    flush_context.execute()
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/unitofwork.py:465: in execute
+    rec.execute(self)
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/unitofwork.py:641: in execute
+    util.preloaded.orm_persistence.save_obj(
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/persistence.py:94: in save_obj
+    _emit_insert_statements(
+.venv/lib/python3.14/site-packages/sqlalchemy/orm/persistence.py:1049: in _emit_insert_statements
+    result = connection.execute(
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/base.py:1421: in execute
+    return meth(
+.venv/lib/python3.14/site-packages/sqlalchemy/sql/elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/base.py:1643: in _execute_clauseelement
+    ret = self._execute_context(
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/base.py:2365: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+.venv/lib/python3.14/site-packages/sqlalchemy/engine/default.py:952: in do_execute
+    cursor.execute(statement, parameters)
+.venv/lib/python3.14/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:213: in execute
+    self._adapt_connection._handle_exception(error)
+.venv/lib/python3.14/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:373: in _handle_exception
+    raise error
+.venv/lib/python3.14/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:195: in execute
+    self.await_(_cursor.execute(operation, parameters))
+.venv/lib/python3.14/site-packages/sqlalchemy/util/_concurrency_py3k.py:132: in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/sqlalchemy/util/_concurrency_py3k.py:196: in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/aiosqlite/cursor.py:40: in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+.venv/lib/python3.14/site-packages/aiosqlite/cursor.py:32: in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/aiosqlite/core.py:160: in _execute
+    return await future
+           ^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/aiosqlite/core.py:63: in _connection_worker_thread
+    result = function()
+             ^^^^^^^^^^
+E   sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: projects.repo_path
+E   [SQL: INSERT INTO projects (id, org_id, client_id, name, repo_path, active_spec_version, status, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+E   [parameters: ('prj_test_123', None, None, 'Default Project', None, 1, 'active', None, '2026-08-29 06:57:30.153119', '2026-08-29 06:57:30.153120')]
+E   (Background on this error at: https://sqlalche.me/e/20/gkpj)
+---------------------------- Captured stdout setup -----------------------------
+2026-08-29 12:27:30,096 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-08-29 12:27:30,096 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("organizations")
+2026-08-29 12:27:30,096 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,096 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("organizations")
+2026-08-29 12:27:30,096 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("users")
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("users")
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("clients")
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("clients")
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("memberships")
+2026-08-29 12:27:30,097 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("memberships")
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("consents")
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("consents")
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("projects")
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("projects")
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("spec_versions")
+2026-08-29 12:27:30,098 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("spec_versions")
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("decisions")
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("decisions")
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("open_questions")
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("open_questions")
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("change_requests")
+2026-08-29 12:27:30,099 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("change_requests")
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("workflows")
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("workflows")
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("task_dependencies")
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("task_dependencies")
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("approvals")
+2026-08-29 12:27:30,100 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("approvals")
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("tasks")
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("tasks")
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("task_attempts")
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("task_attempts")
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("task_checkpoints")
+2026-08-29 12:27:30,101 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("task_checkpoints")
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("gate_evidence")
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("gate_evidence")
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("artifacts")
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("artifacts")
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("deployments")
+2026-08-29 12:27:30,102 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("deployments")
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("meetings")
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("meetings")
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("meeting_participants")
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("meeting_participants")
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("transcript_segments")
+2026-08-29 12:27:30,103 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("transcript_segments")
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("meeting_events")
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("meeting_events")
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("workers")
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("workers")
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("worker_health_history")
+2026-08-29 12:27:30,104 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("worker_health_history")
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("worker_leases")
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("worker_leases")
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("call_jobs")
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("call_jobs")
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("call_status_history")
+2026-08-29 12:27:30,105 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("call_status_history")
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("audit_events")
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("audit_events")
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("organizations")
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("organizations")
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("users")
+2026-08-29 12:27:30,106 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("users")
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("clients")
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("clients")
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("memberships")
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("memberships")
+2026-08-29 12:27:30,107 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("consents")
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("consents")
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("projects")
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("projects")
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("spec_versions")
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("spec_versions")
+2026-08-29 12:27:30,108 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("decisions")
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("decisions")
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("open_questions")
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("open_questions")
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("change_requests")
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("change_requests")
+2026-08-29 12:27:30,109 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("workflows")
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("workflows")
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("task_dependencies")
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("task_dependencies")
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("approvals")
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("approvals")
+2026-08-29 12:27:30,110 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("tasks")
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("tasks")
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("task_attempts")
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("task_attempts")
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("task_checkpoints")
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("task_checkpoints")
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("gate_evidence")
+2026-08-29 12:27:30,111 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("gate_evidence")
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("artifacts")
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("artifacts")
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("deployments")
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("deployments")
+2026-08-29 12:27:30,112 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("meetings")
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("meetings")
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("meeting_participants")
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("meeting_participants")
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("transcript_segments")
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("transcript_segments")
+2026-08-29 12:27:30,113 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("meeting_events")
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("meeting_events")
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("workers")
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("workers")
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("worker_health_history")
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("worker_health_history")
+2026-08-29 12:27:30,114 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("worker_leases")
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("worker_leases")
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("call_jobs")
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("call_jobs")
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("call_status_history")
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("call_status_history")
+2026-08-29 12:27:30,115 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,116 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("audit_events")
+2026-08-29 12:27:30,116 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,116 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("audit_events")
+2026-08-29 12:27:30,116 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-08-29 12:27:30,116 INFO sqlalchemy.engine.Engine 
+CREATE TABLE organizations (
+	id VARCHAR(64) NOT NULL, 
+	name VARCHAR(255) NOT NULL, 
+	slug VARCHAR(64) NOT NULL, 
+	status VARCHAR(32), 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	UNIQUE (slug)
+)
+
+
+2026-08-29 12:27:30,116 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,117 INFO sqlalchemy.engine.Engine 
+CREATE TABLE workers (
+	id VARCHAR(64) NOT NULL, 
+	hostname VARCHAR(255) NOT NULL, 
+	platform VARCHAR(64), 
+	capability_json JSON, 
+	status VARCHAR(32), 
+	last_heartbeat_at DATETIME, 
+	registered_at DATETIME, 
+	PRIMARY KEY (id)
+)
+
+
+2026-08-29 12:27:30,117 INFO sqlalchemy.engine.Engine [no key 0.00004s] ()
+2026-08-29 12:27:30,117 INFO sqlalchemy.engine.Engine 
+CREATE TABLE call_jobs (
+	id VARCHAR(64) NOT NULL, 
+	notification_id VARCHAR(64) NOT NULL, 
+	persona VARCHAR(32), 
+	recipient_phone VARCHAR(32) NOT NULL, 
+	recipient_name VARCHAR(255), 
+	project_id VARCHAR(64), 
+	purpose VARCHAR(128) NOT NULL, 
+	script_facts_json JSON, 
+	status VARCHAR(32), 
+	idempotency_key VARCHAR(128) NOT NULL, 
+	call_id VARCHAR(128), 
+	duration_seconds INTEGER, 
+	created_at DATETIME, 
+	completed_at DATETIME, 
+	PRIMARY KEY (id), 
+	UNIQUE (idempotency_key)
+)
+
+
+2026-08-29 12:27:30,117 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,118 INFO sqlalchemy.engine.Engine 
+CREATE TABLE audit_events (
+	id VARCHAR(64) NOT NULL, 
+	event_type VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	project_id VARCHAR(64), 
+	task_id VARCHAR(64), 
+	actor VARCHAR(64) NOT NULL, 
+	actor_role VARCHAR(32), 
+	details_json JSON, 
+	timestamp DATETIME, 
+	PRIMARY KEY (id)
+)
+
+
+2026-08-29 12:27:30,118 INFO sqlalchemy.engine.Engine [no key 0.00004s] ()
+2026-08-29 12:27:30,118 INFO sqlalchemy.engine.Engine CREATE INDEX ix_audit_type_ts ON audit_events (event_type, timestamp)
+2026-08-29 12:27:30,118 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,119 INFO sqlalchemy.engine.Engine CREATE INDEX ix_audit_project_ts ON audit_events (project_id, timestamp)
+2026-08-29 12:27:30,119 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,119 INFO sqlalchemy.engine.Engine 
+CREATE TABLE users (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	name VARCHAR(255) NOT NULL, 
+	email VARCHAR(255) NOT NULL, 
+	role VARCHAR(32) NOT NULL, 
+	is_active BOOLEAN, 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id), 
+	UNIQUE (email)
+)
+
+
+2026-08-29 12:27:30,119 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,120 INFO sqlalchemy.engine.Engine 
+CREATE TABLE clients (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64) NOT NULL, 
+	name VARCHAR(255) NOT NULL, 
+	email VARCHAR(255) NOT NULL, 
+	company VARCHAR(255), 
+	status VARCHAR(32), 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id)
+)
+
+
+2026-08-29 12:27:30,120 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,120 INFO sqlalchemy.engine.Engine 
+CREATE TABLE worker_health_history (
+	id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(64) NOT NULL, 
+	battery_percent INTEGER, 
+	ac_power BOOLEAN, 
+	thermal_pressure VARCHAR(32), 
+	cpu_load_percent FLOAT, 
+	disk_free_gb FLOAT, 
+	active_task_count INTEGER, 
+	reported_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(worker_id) REFERENCES workers (id)
+)
+
+
+2026-08-29 12:27:30,120 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,121 INFO sqlalchemy.engine.Engine 
+CREATE TABLE worker_leases (
+	id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	lease_token VARCHAR(128) NOT NULL, 
+	leased_at DATETIME, 
+	expires_at DATETIME NOT NULL, 
+	released_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(worker_id) REFERENCES workers (id)
+)
+
+
+2026-08-29 12:27:30,121 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,121 INFO sqlalchemy.engine.Engine 
+CREATE TABLE call_status_history (
+	id VARCHAR(64) NOT NULL, 
+	call_job_id VARCHAR(64) NOT NULL, 
+	status VARCHAR(32) NOT NULL, 
+	provider_call_id VARCHAR(128), 
+	details_json JSON, 
+	recorded_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(call_job_id) REFERENCES call_jobs (id)
+)
+
+
+2026-08-29 12:27:30,121 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,122 INFO sqlalchemy.engine.Engine 
+CREATE TABLE memberships (
+	id VARCHAR(64) NOT NULL, 
+	user_id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64) NOT NULL, 
+	role VARCHAR(32) NOT NULL, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_membership_user_org UNIQUE (user_id, org_id), 
+	FOREIGN KEY(user_id) REFERENCES users (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id)
+)
+
+
+2026-08-29 12:27:30,122 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,122 INFO sqlalchemy.engine.Engine 
+CREATE TABLE projects (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	client_id VARCHAR(64), 
+	name VARCHAR(255) NOT NULL, 
+	repo_path VARCHAR(512) NOT NULL, 
+	active_spec_version INTEGER, 
+	status VARCHAR(32), 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id), 
+	FOREIGN KEY(client_id) REFERENCES clients (id)
+)
+
+
+2026-08-29 12:27:30,122 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,123 INFO sqlalchemy.engine.Engine 
+CREATE TABLE consents (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	project_id VARCHAR(64), 
+	user_id VARCHAR(64), 
+	consent_type VARCHAR(64) NOT NULL, 
+	granted BOOLEAN NOT NULL, 
+	ip_address VARCHAR(64), 
+	user_agent VARCHAR(255), 
+	recorded_at DATETIME, 
+	revoked_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(user_id) REFERENCES users (id)
+)
+
+
+2026-08-29 12:27:30,123 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,123 INFO sqlalchemy.engine.Engine CREATE INDEX ix_consent_project_user ON consents (project_id, user_id)
+2026-08-29 12:27:30,123 INFO sqlalchemy.engine.Engine [no key 0.00002s] ()
+2026-08-29 12:27:30,124 INFO sqlalchemy.engine.Engine 
+CREATE TABLE spec_versions (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	version INTEGER NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	summary TEXT NOT NULL, 
+	spec_json JSON NOT NULL, 
+	status VARCHAR(32), 
+	founder_approved BOOLEAN, 
+	client_approved BOOLEAN, 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	approved_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_spec_project_version UNIQUE (project_id, version), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+2026-08-29 12:27:30,124 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,124 INFO sqlalchemy.engine.Engine 
+CREATE TABLE change_requests (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	description TEXT NOT NULL, 
+	requested_by VARCHAR(64) NOT NULL, 
+	impact_summary TEXT, 
+	status VARCHAR(32), 
+	created_at DATETIME, 
+	decided_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+2026-08-29 12:27:30,124 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,125 INFO sqlalchemy.engine.Engine 
+CREATE TABLE workflows (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	phase VARCHAR(32) NOT NULL, 
+	status VARCHAR(32), 
+	details_json JSON, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+2026-08-29 12:27:30,125 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,125 INFO sqlalchemy.engine.Engine 
+CREATE TABLE tasks (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	repo VARCHAR(512) NOT NULL, 
+	base_commit VARCHAR(128), 
+	objective TEXT NOT NULL, 
+	details_json JSON NOT NULL, 
+	packet_sha256 VARCHAR(64), 
+	risk_class VARCHAR(32), 
+	preferred_agent VARCHAR(32), 
+	status VARCHAR(32), 
+	attempt_count INTEGER, 
+	max_attempts INTEGER, 
+	lease_token VARCHAR(128), 
+	leased_at DATETIME, 
+	lease_expires_at DATETIME, 
+	next_eligible_at DATETIME, 
+	worker_id VARCHAR(128), 
+	depends_on_json JSON, 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+2026-08-29 12:27:30,125 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,125 INFO sqlalchemy.engine.Engine 
+CREATE TABLE deployments (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	attempt_id VARCHAR(64), 
+	target_environment VARCHAR(32) NOT NULL, 
+	source_commit VARCHAR(128) NOT NULL, 
+	previous_commit VARCHAR(128), 
+	status VARCHAR(32), 
+	deploy_url VARCHAR(512), 
+	smoke_test_passed BOOLEAN, 
+	requires_approval BOOLEAN, 
+	requested_by VARCHAR(64) NOT NULL, 
+	approved_by VARCHAR(64), 
+	created_at DATETIME, 
+	deployed_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+2026-08-29 12:27:30,126 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,126 INFO sqlalchemy.engine.Engine 
+CREATE TABLE meetings (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	room_name VARCHAR(128) NOT NULL, 
+	status VARCHAR(32), 
+	consent_recorded BOOLEAN, 
+	started_at DATETIME, 
+	ended_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+2026-08-29 12:27:30,126 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,126 INFO sqlalchemy.engine.Engine 
+CREATE TABLE decisions (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	spec_id VARCHAR(64), 
+	meeting_id VARCHAR(64), 
+	topic VARCHAR(255) NOT NULL, 
+	decision TEXT NOT NULL, 
+	rationale TEXT NOT NULL, 
+	alternatives_json JSON, 
+	created_by VARCHAR(64) NOT NULL, 
+	status VARCHAR(32), 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(spec_id) REFERENCES spec_versions (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+2026-08-29 12:27:30,126 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,127 INFO sqlalchemy.engine.Engine 
+CREATE TABLE open_questions (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	spec_id VARCHAR(64), 
+	meeting_id VARCHAR(64), 
+	question TEXT NOT NULL, 
+	context TEXT NOT NULL, 
+	owner VARCHAR(32), 
+	resolved BOOLEAN, 
+	answer TEXT, 
+	resolved_at DATETIME, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(spec_id) REFERENCES spec_versions (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+2026-08-29 12:27:30,127 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,127 INFO sqlalchemy.engine.Engine 
+CREATE TABLE task_dependencies (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	depends_on_task_id VARCHAR(64) NOT NULL, 
+	required_status VARCHAR(32), 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_task_dependency UNIQUE (task_id, depends_on_task_id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id), 
+	FOREIGN KEY(depends_on_task_id) REFERENCES tasks (id)
+)
+
+
+2026-08-29 12:27:30,127 INFO sqlalchemy.engine.Engine [no key 0.00002s] ()
+2026-08-29 12:27:30,128 INFO sqlalchemy.engine.Engine 
+CREATE TABLE task_attempts (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(128), 
+	attempt_number INTEGER, 
+	agent VARCHAR(32) NOT NULL, 
+	model VARCHAR(64) NOT NULL, 
+	status VARCHAR(32), 
+	result_commit VARCHAR(128), 
+	packet_sha256 VARCHAR(64), 
+	files_changed_json JSON, 
+	gate_result_json JSON, 
+	input_tokens INTEGER, 
+	output_tokens INTEGER, 
+	duration_seconds FLOAT, 
+	estimated_cost_usd FLOAT, 
+	started_at DATETIME, 
+	completed_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id)
+)
+
+
+2026-08-29 12:27:30,128 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,128 INFO sqlalchemy.engine.Engine 
+CREATE TABLE gate_evidence (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	attempt_id VARCHAR(64) NOT NULL, 
+	gate_type VARCHAR(32) NOT NULL, 
+	passed BOOLEAN NOT NULL, 
+	summary TEXT NOT NULL, 
+	output_log TEXT, 
+	metrics_json JSON, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id)
+)
+
+
+2026-08-29 12:27:30,128 INFO sqlalchemy.engine.Engine [no key 0.00002s] ()
+2026-08-29 12:27:30,129 INFO sqlalchemy.engine.Engine 
+CREATE TABLE artifacts (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64), 
+	attempt_id VARCHAR(64), 
+	media_type VARCHAR(128) NOT NULL, 
+	filename VARCHAR(255) NOT NULL, 
+	size_bytes INTEGER, 
+	sha256_hash VARCHAR(64) NOT NULL, 
+	storage_path VARCHAR(512) NOT NULL, 
+	tags_json JSON, 
+	created_at DATETIME, 
+	created_by VARCHAR(64) NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id)
+)
+
+
+2026-08-29 12:27:30,129 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,129 INFO sqlalchemy.engine.Engine 
+CREATE TABLE meeting_participants (
+	id VARCHAR(64) NOT NULL, 
+	meeting_id VARCHAR(64) NOT NULL, 
+	identity VARCHAR(128) NOT NULL, 
+	name VARCHAR(255) NOT NULL, 
+	role VARCHAR(32), 
+	is_eva BOOLEAN, 
+	joined_at DATETIME, 
+	left_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+2026-08-29 12:27:30,129 INFO sqlalchemy.engine.Engine [no key 0.00002s] ()
+2026-08-29 12:27:30,129 INFO sqlalchemy.engine.Engine 
+CREATE TABLE transcript_segments (
+	id VARCHAR(64) NOT NULL, 
+	meeting_id VARCHAR(64) NOT NULL, 
+	speaker_identity VARCHAR(128) NOT NULL, 
+	speaker_name VARCHAR(255) NOT NULL, 
+	text TEXT NOT NULL, 
+	is_eva BOOLEAN, 
+	timestamp DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+2026-08-29 12:27:30,129 INFO sqlalchemy.engine.Engine [no key 0.00002s] ()
+2026-08-29 12:27:30,130 INFO sqlalchemy.engine.Engine CREATE INDEX ix_transcript_meeting_ts ON transcript_segments (meeting_id, timestamp)
+2026-08-29 12:27:30,130 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,130 INFO sqlalchemy.engine.Engine 
+CREATE TABLE meeting_events (
+	id VARCHAR(64) NOT NULL, 
+	meeting_id VARCHAR(64) NOT NULL, 
+	event_type VARCHAR(32) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	description TEXT NOT NULL, 
+	raw_quote TEXT, 
+	speaker_identity VARCHAR(128), 
+	is_inference BOOLEAN, 
+	confidence FLOAT, 
+	tags_json JSON, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+2026-08-29 12:27:30,130 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,131 INFO sqlalchemy.engine.Engine 
+CREATE TABLE approvals (
+	id VARCHAR(64) NOT NULL, 
+	spec_id VARCHAR(64), 
+	task_id VARCHAR(64), 
+	attempt_id VARCHAR(64), 
+	deployment_id VARCHAR(64), 
+	approval_type VARCHAR(32) NOT NULL, 
+	scope_sha256 VARCHAR(64), 
+	status VARCHAR(32), 
+	decided_by VARCHAR(64), 
+	reason TEXT, 
+	created_at DATETIME, 
+	decided_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(spec_id) REFERENCES spec_versions (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id), 
+	FOREIGN KEY(attempt_id) REFERENCES task_attempts (id), 
+	FOREIGN KEY(deployment_id) REFERENCES deployments (id)
+)
+
+
+2026-08-29 12:27:30,131 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,131 INFO sqlalchemy.engine.Engine 
+CREATE TABLE task_checkpoints (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	attempt_id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(64) NOT NULL, 
+	attempt_number INTEGER NOT NULL, 
+	sequence INTEGER NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	repo_reference VARCHAR(512) NOT NULL, 
+	base_commit VARCHAR(128) NOT NULL, 
+	worktree_path VARCHAR(512) NOT NULL, 
+	worktree_head VARCHAR(128) NOT NULL, 
+	conversation_id VARCHAR(64) NOT NULL, 
+	execution_stage VARCHAR(64) NOT NULL, 
+	lease_token_hash VARCHAR(64) NOT NULL, 
+	side_effect_state VARCHAR(32) NOT NULL, 
+	scrubbed_payload JSON NOT NULL, 
+	payload_digest VARCHAR(64) NOT NULL, 
+	idempotency_key VARCHAR(128) NOT NULL, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_task_attempt_seq UNIQUE (task_id, attempt_number, sequence), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id), 
+	FOREIGN KEY(attempt_id) REFERENCES task_attempts (id), 
+	UNIQUE (idempotency_key)
+)
+
+
+2026-08-29 12:27:30,131 INFO sqlalchemy.engine.Engine [no key 0.00003s] ()
+2026-08-29 12:27:30,132 INFO sqlalchemy.engine.Engine COMMIT
+------------------------------ Captured log setup ------------------------------
+INFO     sqlalchemy.engine.Engine:base.py:2712 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("organizations")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("organizations")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("users")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("users")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("clients")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("clients")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("memberships")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("memberships")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("consents")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("consents")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("projects")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("projects")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("spec_versions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("spec_versions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("decisions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("decisions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("open_questions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("open_questions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("change_requests")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("change_requests")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("workflows")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("workflows")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("task_dependencies")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("task_dependencies")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("approvals")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("approvals")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("tasks")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("tasks")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("task_attempts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("task_attempts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("task_checkpoints")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("task_checkpoints")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("gate_evidence")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("gate_evidence")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("artifacts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("artifacts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("deployments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("deployments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("meetings")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("meetings")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("meeting_participants")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("meeting_participants")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("transcript_segments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("transcript_segments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("meeting_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("meeting_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("workers")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("workers")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("worker_health_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("worker_health_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("worker_leases")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("worker_leases")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("call_jobs")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("call_jobs")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("call_status_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("call_status_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("audit_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("audit_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("organizations")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("organizations")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("users")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("users")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("clients")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("clients")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("memberships")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("memberships")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("consents")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("consents")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("projects")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("projects")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("spec_versions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("spec_versions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("decisions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("decisions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("open_questions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("open_questions")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("change_requests")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("change_requests")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("workflows")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("workflows")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("task_dependencies")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("task_dependencies")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("approvals")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("approvals")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("tasks")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("tasks")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("task_attempts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("task_attempts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("task_checkpoints")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("task_checkpoints")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("gate_evidence")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("gate_evidence")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("artifacts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("artifacts")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("deployments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("deployments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("meetings")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("meetings")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("meeting_participants")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("meeting_participants")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("transcript_segments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("transcript_segments")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("meeting_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("meeting_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("workers")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("workers")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("worker_health_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("worker_health_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("worker_leases")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("worker_leases")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("call_jobs")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("call_jobs")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("call_status_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("call_status_history")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA main.table_info("audit_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 PRAGMA temp.table_info("audit_events")
+INFO     sqlalchemy.engine.Engine:base.py:1848 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE organizations (
+	id VARCHAR(64) NOT NULL, 
+	name VARCHAR(255) NOT NULL, 
+	slug VARCHAR(64) NOT NULL, 
+	status VARCHAR(32), 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	UNIQUE (slug)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE workers (
+	id VARCHAR(64) NOT NULL, 
+	hostname VARCHAR(255) NOT NULL, 
+	platform VARCHAR(64), 
+	capability_json JSON, 
+	status VARCHAR(32), 
+	last_heartbeat_at DATETIME, 
+	registered_at DATETIME, 
+	PRIMARY KEY (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00004s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE call_jobs (
+	id VARCHAR(64) NOT NULL, 
+	notification_id VARCHAR(64) NOT NULL, 
+	persona VARCHAR(32), 
+	recipient_phone VARCHAR(32) NOT NULL, 
+	recipient_name VARCHAR(255), 
+	project_id VARCHAR(64), 
+	purpose VARCHAR(128) NOT NULL, 
+	script_facts_json JSON, 
+	status VARCHAR(32), 
+	idempotency_key VARCHAR(128) NOT NULL, 
+	call_id VARCHAR(128), 
+	duration_seconds INTEGER, 
+	created_at DATETIME, 
+	completed_at DATETIME, 
+	PRIMARY KEY (id), 
+	UNIQUE (idempotency_key)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE audit_events (
+	id VARCHAR(64) NOT NULL, 
+	event_type VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	project_id VARCHAR(64), 
+	task_id VARCHAR(64), 
+	actor VARCHAR(64) NOT NULL, 
+	actor_role VARCHAR(32), 
+	details_json JSON, 
+	timestamp DATETIME, 
+	PRIMARY KEY (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00004s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 CREATE INDEX ix_audit_type_ts ON audit_events (event_type, timestamp)
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 CREATE INDEX ix_audit_project_ts ON audit_events (project_id, timestamp)
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE users (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	name VARCHAR(255) NOT NULL, 
+	email VARCHAR(255) NOT NULL, 
+	role VARCHAR(32) NOT NULL, 
+	is_active BOOLEAN, 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id), 
+	UNIQUE (email)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE clients (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64) NOT NULL, 
+	name VARCHAR(255) NOT NULL, 
+	email VARCHAR(255) NOT NULL, 
+	company VARCHAR(255), 
+	status VARCHAR(32), 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE worker_health_history (
+	id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(64) NOT NULL, 
+	battery_percent INTEGER, 
+	ac_power BOOLEAN, 
+	thermal_pressure VARCHAR(32), 
+	cpu_load_percent FLOAT, 
+	disk_free_gb FLOAT, 
+	active_task_count INTEGER, 
+	reported_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(worker_id) REFERENCES workers (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE worker_leases (
+	id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	lease_token VARCHAR(128) NOT NULL, 
+	leased_at DATETIME, 
+	expires_at DATETIME NOT NULL, 
+	released_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(worker_id) REFERENCES workers (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE call_status_history (
+	id VARCHAR(64) NOT NULL, 
+	call_job_id VARCHAR(64) NOT NULL, 
+	status VARCHAR(32) NOT NULL, 
+	provider_call_id VARCHAR(128), 
+	details_json JSON, 
+	recorded_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(call_job_id) REFERENCES call_jobs (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE memberships (
+	id VARCHAR(64) NOT NULL, 
+	user_id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64) NOT NULL, 
+	role VARCHAR(32) NOT NULL, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_membership_user_org UNIQUE (user_id, org_id), 
+	FOREIGN KEY(user_id) REFERENCES users (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE projects (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	client_id VARCHAR(64), 
+	name VARCHAR(255) NOT NULL, 
+	repo_path VARCHAR(512) NOT NULL, 
+	active_spec_version INTEGER, 
+	status VARCHAR(32), 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id), 
+	FOREIGN KEY(client_id) REFERENCES clients (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE consents (
+	id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	project_id VARCHAR(64), 
+	user_id VARCHAR(64), 
+	consent_type VARCHAR(64) NOT NULL, 
+	granted BOOLEAN NOT NULL, 
+	ip_address VARCHAR(64), 
+	user_agent VARCHAR(255), 
+	recorded_at DATETIME, 
+	revoked_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(org_id) REFERENCES organizations (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(user_id) REFERENCES users (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 CREATE INDEX ix_consent_project_user ON consents (project_id, user_id)
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00002s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE spec_versions (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	version INTEGER NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	summary TEXT NOT NULL, 
+	spec_json JSON NOT NULL, 
+	status VARCHAR(32), 
+	founder_approved BOOLEAN, 
+	client_approved BOOLEAN, 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	approved_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_spec_project_version UNIQUE (project_id, version), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE change_requests (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	description TEXT NOT NULL, 
+	requested_by VARCHAR(64) NOT NULL, 
+	impact_summary TEXT, 
+	status VARCHAR(32), 
+	created_at DATETIME, 
+	decided_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE workflows (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	phase VARCHAR(32) NOT NULL, 
+	status VARCHAR(32), 
+	details_json JSON, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE tasks (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	org_id VARCHAR(64), 
+	repo VARCHAR(512) NOT NULL, 
+	base_commit VARCHAR(128), 
+	objective TEXT NOT NULL, 
+	details_json JSON NOT NULL, 
+	packet_sha256 VARCHAR(64), 
+	risk_class VARCHAR(32), 
+	preferred_agent VARCHAR(32), 
+	status VARCHAR(32), 
+	attempt_count INTEGER, 
+	max_attempts INTEGER, 
+	lease_token VARCHAR(128), 
+	leased_at DATETIME, 
+	lease_expires_at DATETIME, 
+	next_eligible_at DATETIME, 
+	worker_id VARCHAR(128), 
+	depends_on_json JSON, 
+	deleted_at DATETIME, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE deployments (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	attempt_id VARCHAR(64), 
+	target_environment VARCHAR(32) NOT NULL, 
+	source_commit VARCHAR(128) NOT NULL, 
+	previous_commit VARCHAR(128), 
+	status VARCHAR(32), 
+	deploy_url VARCHAR(512), 
+	smoke_test_passed BOOLEAN, 
+	requires_approval BOOLEAN, 
+	requested_by VARCHAR(64) NOT NULL, 
+	approved_by VARCHAR(64), 
+	created_at DATETIME, 
+	deployed_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE meetings (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	room_name VARCHAR(128) NOT NULL, 
+	status VARCHAR(32), 
+	consent_recorded BOOLEAN, 
+	started_at DATETIME, 
+	ended_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE decisions (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	spec_id VARCHAR(64), 
+	meeting_id VARCHAR(64), 
+	topic VARCHAR(255) NOT NULL, 
+	decision TEXT NOT NULL, 
+	rationale TEXT NOT NULL, 
+	alternatives_json JSON, 
+	created_by VARCHAR(64) NOT NULL, 
+	status VARCHAR(32), 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(spec_id) REFERENCES spec_versions (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE open_questions (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	spec_id VARCHAR(64), 
+	meeting_id VARCHAR(64), 
+	question TEXT NOT NULL, 
+	context TEXT NOT NULL, 
+	owner VARCHAR(32), 
+	resolved BOOLEAN, 
+	answer TEXT, 
+	resolved_at DATETIME, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(spec_id) REFERENCES spec_versions (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE task_dependencies (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	depends_on_task_id VARCHAR(64) NOT NULL, 
+	required_status VARCHAR(32), 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_task_dependency UNIQUE (task_id, depends_on_task_id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id), 
+	FOREIGN KEY(depends_on_task_id) REFERENCES tasks (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00002s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE task_attempts (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(128), 
+	attempt_number INTEGER, 
+	agent VARCHAR(32) NOT NULL, 
+	model VARCHAR(64) NOT NULL, 
+	status VARCHAR(32), 
+	result_commit VARCHAR(128), 
+	packet_sha256 VARCHAR(64), 
+	files_changed_json JSON, 
+	gate_result_json JSON, 
+	input_tokens INTEGER, 
+	output_tokens INTEGER, 
+	duration_seconds FLOAT, 
+	estimated_cost_usd FLOAT, 
+	started_at DATETIME, 
+	completed_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE gate_evidence (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	attempt_id VARCHAR(64) NOT NULL, 
+	gate_type VARCHAR(32) NOT NULL, 
+	passed BOOLEAN NOT NULL, 
+	summary TEXT NOT NULL, 
+	output_log TEXT, 
+	metrics_json JSON, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00002s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE artifacts (
+	id VARCHAR(64) NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64), 
+	attempt_id VARCHAR(64), 
+	media_type VARCHAR(128) NOT NULL, 
+	filename VARCHAR(255) NOT NULL, 
+	size_bytes INTEGER, 
+	sha256_hash VARCHAR(64) NOT NULL, 
+	storage_path VARCHAR(512) NOT NULL, 
+	tags_json JSON, 
+	created_at DATETIME, 
+	created_by VARCHAR(64) NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE meeting_participants (
+	id VARCHAR(64) NOT NULL, 
+	meeting_id VARCHAR(64) NOT NULL, 
+	identity VARCHAR(128) NOT NULL, 
+	name VARCHAR(255) NOT NULL, 
+	role VARCHAR(32), 
+	is_eva BOOLEAN, 
+	joined_at DATETIME, 
+	left_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00002s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE transcript_segments (
+	id VARCHAR(64) NOT NULL, 
+	meeting_id VARCHAR(64) NOT NULL, 
+	speaker_identity VARCHAR(128) NOT NULL, 
+	speaker_name VARCHAR(255) NOT NULL, 
+	text TEXT NOT NULL, 
+	is_eva BOOLEAN, 
+	timestamp DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00002s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 CREATE INDEX ix_transcript_meeting_ts ON transcript_segments (meeting_id, timestamp)
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE meeting_events (
+	id VARCHAR(64) NOT NULL, 
+	meeting_id VARCHAR(64) NOT NULL, 
+	event_type VARCHAR(32) NOT NULL, 
+	title VARCHAR(255) NOT NULL, 
+	description TEXT NOT NULL, 
+	raw_quote TEXT, 
+	speaker_identity VARCHAR(128), 
+	is_inference BOOLEAN, 
+	confidence FLOAT, 
+	tags_json JSON, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(meeting_id) REFERENCES meetings (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE approvals (
+	id VARCHAR(64) NOT NULL, 
+	spec_id VARCHAR(64), 
+	task_id VARCHAR(64), 
+	attempt_id VARCHAR(64), 
+	deployment_id VARCHAR(64), 
+	approval_type VARCHAR(32) NOT NULL, 
+	scope_sha256 VARCHAR(64), 
+	status VARCHAR(32), 
+	decided_by VARCHAR(64), 
+	reason TEXT, 
+	created_at DATETIME, 
+	decided_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(spec_id) REFERENCES spec_versions (id), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id), 
+	FOREIGN KEY(attempt_id) REFERENCES task_attempts (id), 
+	FOREIGN KEY(deployment_id) REFERENCES deployments (id)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1848 
+CREATE TABLE task_checkpoints (
+	id VARCHAR(64) NOT NULL, 
+	task_id VARCHAR(64) NOT NULL, 
+	attempt_id VARCHAR(64) NOT NULL, 
+	worker_id VARCHAR(64) NOT NULL, 
+	attempt_number INTEGER NOT NULL, 
+	sequence INTEGER NOT NULL, 
+	project_id VARCHAR(64) NOT NULL, 
+	repo_reference VARCHAR(512) NOT NULL, 
+	base_commit VARCHAR(128) NOT NULL, 
+	worktree_path VARCHAR(512) NOT NULL, 
+	worktree_head VARCHAR(128) NOT NULL, 
+	conversation_id VARCHAR(64) NOT NULL, 
+	execution_stage VARCHAR(64) NOT NULL, 
+	lease_token_hash VARCHAR(64) NOT NULL, 
+	side_effect_state VARCHAR(32) NOT NULL, 
+	scrubbed_payload JSON NOT NULL, 
+	payload_digest VARCHAR(64) NOT NULL, 
+	idempotency_key VARCHAR(128) NOT NULL, 
+	created_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_task_attempt_seq UNIQUE (task_id, attempt_number, sequence), 
+	FOREIGN KEY(task_id) REFERENCES tasks (id), 
+	FOREIGN KEY(attempt_id) REFERENCES task_attempts (id), 
+	UNIQUE (idempotency_key)
+)
+
+
+INFO     sqlalchemy.engine.Engine:base.py:1848 [no key 0.00003s] ()
+INFO     sqlalchemy.engine.Engine:base.py:2718 COMMIT
+----------------------------- Captured stdout call -----------------------------
+2026-08-29 12:27:30,132 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-08-29 12:27:30,149 INFO sqlalchemy.engine.Engine SELECT projects.id, projects.org_id, projects.client_id, projects.name, projects.repo_path, projects.active_spec_version, projects.status, projects.deleted_at, projects.created_at, projects.updated_at 
+FROM projects 
+WHERE projects.id = ?
+2026-08-29 12:27:30,149 INFO sqlalchemy.engine.Engine [generated in 0.00007s] ('prj_test_123',)
+2026-08-29 12:27:30,150 INFO sqlalchemy.engine.Engine SELECT workers.id, workers.hostname, workers.platform, workers.capability_json, workers.status, workers.last_heartbeat_at, workers.registered_at 
+FROM workers 
+WHERE workers.id = ?
+2026-08-29 12:27:30,150 INFO sqlalchemy.engine.Engine [generated in 0.00005s] ('wrk_test1',)
+2026-08-29 12:27:30,152 INFO sqlalchemy.engine.Engine SELECT tasks.id, tasks.project_id, tasks.org_id, tasks.repo, tasks.base_commit, tasks.objective, tasks.details_json, tasks.packet_sha256, tasks.risk_class, tasks.preferred_agent, tasks.status, tasks.attempt_count, tasks.max_attempts, tasks.lease_token, tasks.leased_at, tasks.lease_expires_at, tasks.next_eligible_at, tasks.worker_id, tasks.depends_on_json, tasks.deleted_at, tasks.created_at, tasks.updated_at 
+FROM tasks 
+WHERE tasks.id = ?
+2026-08-29 12:27:30,152 INFO sqlalchemy.engine.Engine [generated in 0.00006s] ('tsk_chk_1',)
+2026-08-29 12:27:30,153 INFO sqlalchemy.engine.Engine INSERT INTO projects (id, org_id, client_id, name, repo_path, active_spec_version, status, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-08-29 12:27:30,153 INFO sqlalchemy.engine.Engine [generated in 0.00007s] ('prj_test_123', None, None, 'Default Project', None, 1, 'active', None, '2026-08-29 06:57:30.153119', '2026-08-29 06:57:30.153120')
+2026-08-29 12:27:30,153 INFO sqlalchemy.engine.Engine ROLLBACK
+------------------------------ Captured log call -------------------------------
+INFO     sqlalchemy.engine.Engine:base.py:2712 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1848 SELECT projects.id, projects.org_id, projects.client_id, projects.name, projects.repo_path, projects.active_spec_version, projects.status, projects.deleted_at, projects.created_at, projects.updated_at 
+FROM projects 
+WHERE projects.id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1848 [generated in 0.00007s] ('prj_test_123',)
+INFO     sqlalchemy.engine.Engine:base.py:1848 SELECT workers.id, workers.hostname, workers.platform, workers.capability_json, workers.status, workers.last_heartbeat_at, workers.registered_at 
+FROM workers 
+WHERE workers.id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1848 [generated in 0.00005s] ('wrk_test1',)
+INFO     sqlalchemy.engine.Engine:base.py:1848 SELECT tasks.id, tasks.project_id, tasks.org_id, tasks.repo, tasks.base_commit, tasks.objective, tasks.details_json, tasks.packet_sha256, tasks.risk_class, tasks.preferred_agent, tasks.status, tasks.attempt_count, tasks.max_attempts, tasks.lease_token, tasks.leased_at, tasks.lease_expires_at, tasks.next_eligible_at, tasks.worker_id, tasks.depends_on_json, tasks.deleted_at, tasks.created_at, tasks.updated_at 
+FROM tasks 
+WHERE tasks.id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1848 [generated in 0.00006s] ('tsk_chk_1',)
+INFO     sqlalchemy.engine.Engine:base.py:1848 INSERT INTO projects (id, org_id, client_id, name, repo_path, active_spec_version, status, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INFO     sqlalchemy.engine.Engine:base.py:1848 [generated in 0.00007s] ('prj_test_123', None, None, 'Default Project', None, 1, 'active', None, '2026-08-29 06:57:30.153119', '2026-08-29 06:57:30.153120')
+INFO     sqlalchemy.engine.Engine:base.py:2715 ROLLBACK
+=========================== short test summary info ============================
+FAILED testscript/test_checkpoints_api.py::test_checkpoint_adversarial - sqla...
+============================== 1 failed in 1.04s ===============================
