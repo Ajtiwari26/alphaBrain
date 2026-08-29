@@ -35,6 +35,7 @@ class ClaudeCLIAdapter(BaseAgentAdapter):
         task: TaskEnvelope,
         worktree_path: Path,
         base_commit: str,
+        emit_checkpoint: Callable[[str, str, str, dict], Awaitable[None]] | None = None,
     ) -> TaskResult:
         attempt_id = f"att_{task.task_id}_{uuid.uuid4().hex[:6]}"
         is_ready, reason = self.check_readiness()
