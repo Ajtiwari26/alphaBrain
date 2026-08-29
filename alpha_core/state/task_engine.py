@@ -1276,6 +1276,11 @@ class TaskEngine:
                 )
                 session.add(evidence_rec)
 
+        # Review approvals reference this attempt. PostgreSQL needs the parent
+        # attempt row inserted first; this flush remains inside the enclosing
+        # result transaction, so later failures still roll everything back.
+        await session.flush()
+
         TaskEngine._transition(task, target_status)
         task.lease_token = None
         task.lease_expires_at = None

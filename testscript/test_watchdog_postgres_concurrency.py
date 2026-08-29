@@ -7,9 +7,24 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from alpha_core.db.models import ApprovalRecord, AuditEventRecord, Base, TaskRecord
+from alpha_core.db.models import (
+    ApprovalRecord,
+    AttemptRecord,
+    AuditEventRecord,
+    Base,
+    TaskRecord,
+)
 from alpha_core.state.task_engine import TaskEngine
-from alpha_protocol import TaskEnvelope, TaskStatus
+from alpha_protocol import (
+    AgentType,
+    GateEvidence,
+    GateResult,
+    GateType,
+    TaskEnvelope,
+    TaskResult,
+    TaskStatus,
+    compute_packet_digest,
+)
 
 # Check for Docker before running
 try:
@@ -136,6 +151,72 @@ async def test_approval_task_submission_preserves_postgres_fk_order(postgres_db)
 
     assert task.status == TaskStatus.WAITING_APPROVAL.value
     assert persisted_task is not None
+    assert approval is not None
+    assert approval.status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_verified_result_preserves_attempt_review_fk_order(postgres_db):
+    task_id = f"tsk_{uuid.uuid4().hex[:8]}"
+    attempt_id = f"att_{uuid.uuid4().hex[:8]}"
+    envelope = TaskEnvelope(
+        task_id=task_id,
+        project_id="test_proj",
+        repo="/test",
+        objective="Prove attempt row exists before pending review approval insert",
+        allowed_paths=["proof.txt"],
+        require_packet_binding=True,
+    )
+
+    async with postgres_db() as session:
+        await TaskEngine.submit_task(session, envelope)
+        leased = await TaskEngine.lease_next_task(session, "worker_one")
+        assert leased is not None
+        task, _ = leased
+        result = TaskResult(
+            task_id=task_id,
+            attempt_id=attempt_id,
+            status=TaskStatus.COMPLETED,
+            agent=AgentType.ANTIGRAVITY,
+            model="gemini-3.1-pro-high",
+            base_commit="HEAD",
+            result_commit="result_commit",
+            files_changed=["proof.txt"],
+            packet_sha256=compute_packet_digest(envelope),
+            gate_result=GateResult(
+                task_id=task_id,
+                attempt_id=attempt_id,
+                all_passed=True,
+                evidence_items=[
+                    GateEvidence(
+                        evidence_id="evi_result_order_lint",
+                        gate_type=GateType.LINT,
+                        passed=True,
+                        summary="Lint gate passed",
+                    ),
+                    GateEvidence(
+                        evidence_id="evi_result_order_unit",
+                        gate_type=GateType.UNIT_TEST,
+                        passed=True,
+                        summary="Unit gate passed",
+                    ),
+                ],
+            ),
+        )
+        assert await TaskEngine.submit_result(session, result, task.lease_token, "worker_one")
+        await session.commit()
+
+    async with postgres_db() as session:
+        attempt = await session.get(AttemptRecord, attempt_id)
+        approval = await session.scalar(
+            sa.select(ApprovalRecord).where(
+                ApprovalRecord.task_id == task_id,
+                ApprovalRecord.attempt_id == attempt_id,
+                ApprovalRecord.approval_type == "task_review",
+            )
+        )
+
+    assert attempt is not None
     assert approval is not None
     assert approval.status == "pending"
 
