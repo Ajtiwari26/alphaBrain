@@ -3,6 +3,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/static/meet/:path*",
+      "destination": "/:path*"
+    },
+    {
       "source": "/meet",
       "destination": "/index.html"
     }
