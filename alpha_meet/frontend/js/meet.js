@@ -31,13 +31,8 @@ function authHeaders() {
   return apiToken ? { Authorization: `Bearer ${apiToken}` } : {};
 }
 
-// Determine backend URL based on host (local vs Vercel deployment)
-const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-const API_BASE_URL = IS_LOCAL ? "" : "https://alpha-brain-staging.onrender.com";
-
 async function fetchJson(url, options = {}) {
-  const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
-  const response = await fetch(fullUrl, options);
+  const response = await fetch(url, options);
   let data = {};
   try {
     data = await response.json();
