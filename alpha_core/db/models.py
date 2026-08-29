@@ -1,4 +1,5 @@
 import enum
+
 """
 Alpha Brain Database Models
 ============================
@@ -393,6 +394,7 @@ class SideEffectState(str, enum.Enum):
     COMMITTED = "committed"
     COMPENSATED = "compensated"
     UNKNOWN = "unknown"
+
 
 class TaskCheckpointRecord(Base):
     __tablename__ = "task_checkpoints"

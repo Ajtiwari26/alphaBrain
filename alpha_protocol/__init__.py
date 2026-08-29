@@ -36,9 +36,12 @@ from .routing import (
 )
 from .spec import Decision, OpenQuestion, Requirement, SpecDocument, SpecVersion
 from .task import (
+    AppendCheckpointRequest,
     ApprovalRequest,
     ApprovalResult,
     ConcurrencyPolicy,
+    ResumeDecisionRequest,
+    ResumeDecisionResponse,
     RetryPolicy,
     TaskAttempt,
     TaskDependency,
@@ -58,6 +61,7 @@ __all__ = [
     "AccountState",
     "AgentReadiness",
     "AgentType",
+    "AppendCheckpointRequest",
     "ApprovalRequest",
     "ApprovalResult",
     "ApprovalStatus",
@@ -83,6 +87,8 @@ __all__ = [
     "PersonaType",
     "ProvenanceRecord",
     "Requirement",
+    "ResumeDecisionRequest",
+    "ResumeDecisionResponse",
     "RetryPolicy",
     "RiskClass",
     "RollbackRequest",

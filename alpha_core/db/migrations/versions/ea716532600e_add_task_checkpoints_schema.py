@@ -51,7 +51,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("idempotency_key"),
-        sa.UniqueConstraint("task_id", "attempt_number", "sequence", name="uq_task_attempt_seq")
+        sa.UniqueConstraint("task_id", "attempt_number", "sequence", name="uq_task_attempt_seq"),
     )
 
 

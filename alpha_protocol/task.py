@@ -7,7 +7,9 @@ attempts, results, and approval contracts.
 Protocol version: 1
 """
 
+import json
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import PurePosixPath
 from typing import Any, Literal, Optional
 
@@ -197,7 +199,6 @@ class TaskEnvelope(BaseModel):
 def compute_packet_digest(envelope: TaskEnvelope) -> str:
     """Produce deterministic SHA-256 hex digest from canonical task-envelope JSON."""
     import hashlib
-    import json
 
     data = envelope.model_dump(mode="json")
     canonical_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
@@ -207,7 +208,6 @@ def compute_packet_digest(envelope: TaskEnvelope) -> str:
 def compute_review_digest(result: "TaskResult", worker_id: str) -> str:
     """Produce deterministic SHA-256 digest for founder review binding."""
     import hashlib
-    import json
 
     # Extract only authority fields
     data = {
@@ -258,6 +258,7 @@ class SideEffectState(str, Enum):
     COMMITTED = "committed"
     COMPENSATED = "compensated"
     UNKNOWN = "unknown"
+
 
 class TaskCheckpoint(BaseModel):
     """Durable checkpoint of agent progress for crash recovery."""
@@ -334,3 +335,25 @@ class UsageRecord(BaseModel):
 
 # Resolve forward reference
 TaskResult.model_rebuild()
+
+
+class AppendCheckpointRequest(BaseModel):
+    checkpoint: TaskCheckpoint
+    raw_lease_token: str
+
+
+class ResumeDecisionRequest(BaseModel):
+    worker_id: str
+    attempt_id: str
+    project_id: str
+    repo_reference: str
+    base_commit: str
+    worktree_path: str
+    conversation_id: str
+    latest_checkpoint_digest: str
+
+
+class ResumeDecisionResponse(BaseModel):
+    safe_to_resume: bool
+    reason: str | None = None
+    new_lease_token: str | None = None
