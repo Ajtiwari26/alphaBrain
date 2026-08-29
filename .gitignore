@@ -63,3 +63,4 @@ testscript/check_task.py
 testscript/run_s1_worker.py
 testscript/submit_s1.py
 add_endpoints.py
+testscript/reset_task.py
