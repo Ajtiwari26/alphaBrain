@@ -31,6 +31,25 @@ function authHeaders() {
   return apiToken ? { Authorization: `Bearer ${apiToken}` } : {};
 }
 
+// Determine backend URL based on host (local vs Vercel deployment)
+const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const API_BASE_URL = IS_LOCAL ? "" : "https://alpha-brain-staging.onrender.com";
+
+async function fetchJson(url, options = {}) {
+  const fullUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+  const response = await fetch(fullUrl, options);
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (_) {
+    // Non-JSON response
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || response.statusText || "Server error");
+  }
+  return data;
+}
+
 function withTimeout(promise, timeoutMs, label) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
