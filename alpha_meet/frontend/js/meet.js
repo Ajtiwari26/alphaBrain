@@ -273,6 +273,37 @@ function startMeetingTimer() {
 
 let lastSpeaker = null;
 let lastSegmentId = null;
+const translationTimers = new Map();
+
+async function requestLiveTranslation(element, text) {
+  if (!text || text.length < 3) return;
+  // If it's already purely simple english with no non-ASCII, skip
+  const hasNonAscii = /[^\x00-\x7F]/.test(text);
+  const words = text.split(/\s+/);
+  if (!hasNonAscii && words.length < 4 && !/\b(namaste|matlab|kya|hai|nahi|accha|theek)\b/i.test(text)) return;
+
+  try {
+    const data = await fetchJson("/api/meet/translate-text", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ text, target_language: "en" }),
+    });
+
+    if (data.is_translated && data.translated_text) {
+      let transEl = element.querySelector(".transcript-translation");
+      if (!transEl) {
+        transEl = document.createElement("p");
+        transEl.className = "transcript-translation font-mono text-[11px] text-neutral-600 dark:text-neutral-300 mt-1.5 pl-2.5 py-1 border-l-2 border-black/60 dark:border-white/60 bg-black/5 dark:bg-white/5 rounded-r";
+        element.querySelector(".space-y-1")?.appendChild(transEl);
+      }
+      transEl.innerHTML = `<span class="font-bold text-[10px] uppercase tracking-wider text-black dark:text-white mr-1.5 opacity-75">EN</span>${data.translated_text}`;
+      const list = document.getElementById("transcript-list");
+      if (list) list.scrollTop = list.scrollHeight;
+    }
+  } catch (err) {
+    console.debug("Live translation skipped:", err);
+  }
+}
 
 function appendTranscript(speaker, text, isEva = false, segmentId = "") {
   const list = document.getElementById("transcript-list");
@@ -317,6 +348,17 @@ function appendTranscript(speaker, text, isEva = false, segmentId = "") {
   if (contentEl) {
     contentEl.textContent = text.trim();
   }
+
+  // Trigger debounced live English translation
+  if (translationTimers.has(item)) {
+    clearTimeout(translationTimers.get(item));
+  }
+  const timer = setTimeout(() => {
+    requestLiveTranslation(item, text.trim());
+    translationTimers.delete(item);
+  }, 400);
+  translationTimers.set(item, timer);
+
   list.scrollTop = list.scrollHeight;
 }
 

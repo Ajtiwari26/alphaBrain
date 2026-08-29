@@ -453,6 +453,53 @@ async def get_meet_slide(
     return JSONResponse(slide)
 
 
+class TranslateTextRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=5000)
+    target_language: str = Field(default="en", max_length=10)
+
+
+@app.post("/api/meet/translate-text")
+async def translate_meet_text(
+    payload: TranslateTextRequest,
+):
+    """Translates speech transcript segments to clear English for live dual-language notes."""
+    text = payload.text.strip()
+    if not text:
+        return {"translated_text": "", "is_translated": False}
+
+    # If text is purely ASCII alphanumeric/punctuation and likely English, skip translation
+    if all(ord(c) < 128 for c in text):
+        words = text.split()
+        if len(words) > 0 and not any(w.lower() in {"namaste", "matlab", "kya", "hai", "nahi", "accha", "theek"} for w in words):
+            return {"translated_text": text, "is_translated": False}
+
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-3.1-flash-lite-preview",
+            contents=text,
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    "You are a real-time meeting translator for AlphaBrain. "
+                    "Translate the given transcript text into concise, natural, professional English. "
+                    "Preserve software engineering terms accurately. "
+                    "Output ONLY the translated English text. No notes, no explanations, no quotes."
+                ),
+                temperature=0.2,
+            ),
+        )
+        translated = (response.text or "").strip()
+        is_diff = bool(translated and translated.lower() != text.lower())
+        return {"translated_text": translated if is_diff else text, "is_translated": is_diff}
+    except Exception as exc:
+        logger.warning("Could not translate transcript text: %s", exc)
+        return {"translated_text": text, "is_translated": False}
+
+
 @app.post("/api/meet/speak")
 async def meet_speak(
     payload: dict[str, str],
