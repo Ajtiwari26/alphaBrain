@@ -976,7 +976,7 @@ from alpha_protocol.task import (  # noqa: E402
 async def append_task_checkpoint(
     task_id: str,
     payload: AppendCheckpointRequest,
-    _principal: AuthPrincipal = Depends(require_api_principal),
+    _principal: AuthPrincipal = Depends(require_worker_principal),
     session: AsyncSession = Depends(get_db_session),
 ):
     require_permission(_principal, "task:write")
@@ -989,8 +989,6 @@ async def append_task_checkpoint(
     task = res.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-
-    require_project_access(_principal, task.project_id)
 
     now = datetime.now(UTC)
     if task.status not in {TaskStatus.LEASED.value, TaskStatus.RUNNING.value}:
@@ -1080,7 +1078,7 @@ async def append_task_checkpoint(
 @app.get("/api/tasks/{task_id}/checkpoints/latest")
 async def get_latest_task_checkpoint(
     task_id: str,
-    _principal: AuthPrincipal = Depends(require_api_principal),
+    _principal: AuthPrincipal = Depends(require_worker_principal),
     session: AsyncSession = Depends(get_db_session),
 ):
     require_permission(_principal, "task:read")
@@ -1122,7 +1120,7 @@ async def get_latest_task_checkpoint(
 async def get_resume_decision(
     task_id: str,
     payload: ResumeDecisionRequest,
-    _principal: AuthPrincipal = Depends(require_api_principal),
+    _principal: AuthPrincipal = Depends(require_worker_principal),
     session: AsyncSession = Depends(get_db_session),
 ):
     require_permission(_principal, "task:write")
@@ -1131,8 +1129,6 @@ async def get_resume_decision(
     task = res.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-
-    require_project_access(_principal, task.project_id)
 
     # 1. Fetch latest checkpoint
     res_chk = await session.execute(

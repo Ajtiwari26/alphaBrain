@@ -66,8 +66,8 @@ def test_checkpoint_migration():
             # PostgreSQL specific query to check table schema
             result = conn.execute(
                 text("""
-                SELECT column_name, data_type 
-                FROM information_schema.columns 
+                SELECT column_name, data_type
+                FROM information_schema.columns
                 WHERE table_name = 'task_checkpoints'
             """)
             ).fetchall()

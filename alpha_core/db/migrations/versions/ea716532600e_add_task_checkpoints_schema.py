@@ -42,10 +42,6 @@ def upgrade() -> None:
         sa.Column("idempotency_key", sa.String(length=128), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
-            ["attempt_id"],
-            ["task_attempts.id"],
-        ),
-        sa.ForeignKeyConstraint(
             ["task_id"],
             ["tasks.id"],
         ),

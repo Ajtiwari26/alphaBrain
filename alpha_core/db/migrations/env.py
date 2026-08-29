@@ -23,6 +23,11 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode — emits SQL to stdout."""
     url = config.get_main_option("sqlalchemy.url")
+    if not url or url == "sqlite:///alpha_brain.db":
+        import os
+        url = os.environ.get("DATABASE_URL")
+    if url:
+        url = url.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -36,8 +41,17 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode — connects to the database."""
+    section = config.get_section(config.config_ini_section, {})
+    url = config.get_main_option("sqlalchemy.url")
+    if not url or url == "sqlite:///alpha_brain.db":
+        import os
+        url = os.environ.get("DATABASE_URL")
+    if url:
+        url = url.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")
+        section["sqlalchemy.url"] = url
+    
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

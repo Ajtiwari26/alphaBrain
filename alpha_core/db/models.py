@@ -401,7 +401,7 @@ class TaskCheckpointRecord(Base):
 
     id = Column(String(64), primary_key=True)
     task_id = Column(String(64), ForeignKey("tasks.id"), nullable=False)
-    attempt_id = Column(String(64), ForeignKey("task_attempts.id"), nullable=False)
+    attempt_id = Column(String(64), nullable=False)
     worker_id = Column(String(64), nullable=False)
     attempt_number = Column(Integer, nullable=False)
     sequence = Column(Integer, nullable=False)
@@ -420,7 +420,9 @@ class TaskCheckpointRecord(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
 
     task = relationship("TaskRecord")
-    attempt = relationship("AttemptRecord")
+    attempt = relationship(
+        "AttemptRecord", primaryjoin="TaskCheckpointRecord.attempt_id == foreign(AttemptRecord.id)"
+    )
 
     __table_args__ = (
         UniqueConstraint("task_id", "attempt_number", "sequence", name="uq_task_attempt_seq"),

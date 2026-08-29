@@ -501,8 +501,54 @@ class AlphaWorkerDaemon:
             )
             sleep_assertion = self._start_sleep_assertion()
             adapter = self.select_adapter(envelope.preferred_agent)
+            import hashlib
+
+            from alpha_protocol.task import AppendCheckpointRequest, SideEffectState, TaskCheckpoint
+
+            checkpoint_sequence = [0]
+
+            async def _emit_checkpoint(
+                attempt_id: str, stage: str, side_effect: str, digest: str, payload: dict
+            ) -> None:
+                assert self.control_plane
+                checkpoint_sequence[0] += 1
+                try:
+                    state_enum = SideEffectState(side_effect)
+                except ValueError:
+                    state_enum = SideEffectState.NONE
+
+                req = AppendCheckpointRequest(
+                    checkpoint=TaskCheckpoint(
+                        checkpoint_id=f"chk_{envelope.task_id}_{attempt_id}_{checkpoint_sequence[0]}",
+                        task_id=envelope.task_id,
+                        attempt_id=attempt_id,
+                        worker_id=self.worker_id,
+                        attempt_number=0,
+                        sequence=checkpoint_sequence[0],
+                        project_id=envelope.project_id,
+                        repo_reference=envelope.repo,
+                        base_commit=envelope.base_commit,
+                        worktree_path=str(worktree_path) if worktree_path else "",
+                        worktree_head=payload.get("worktree_head", envelope.base_commit),
+                        conversation_id=payload.get("conversation_id", "none"),
+                        execution_stage=stage,
+                        lease_token_hash=hashlib.sha256(
+                            lease.lease_token.encode("utf-8")
+                        ).hexdigest(),
+                        side_effect_state=state_enum,
+                        scrubbed_payload=payload,
+                        payload_digest=digest,
+                        idempotency_key=f"{envelope.task_id}_{attempt_id}_{stage}",
+                    ),
+                    raw_lease_token=lease.lease_token,
+                )
+                try:
+                    await self.control_plane.append_checkpoint(req, lease.lease_token)
+                except Exception as exc:
+                    logger.warning("Failed to append checkpoint %s: %s", stage, exc)
+
             execution_task = asyncio.create_task(
-                adapter.execute(envelope, worktree_path, envelope.base_commit)
+                adapter.execute(envelope, worktree_path, envelope.base_commit, _emit_checkpoint)
             )
             heartbeat_task = asyncio.create_task(
                 self._remote_heartbeat_loop(
@@ -737,8 +783,8 @@ class AlphaWorkerDaemon:
 
                 if not processed:
                     await asyncio.sleep(poll_interval_seconds)
-            except Exception as e:
-                logger.error(f"Worker loop exception: {e!s}")
+            except Exception:
+                logger.exception("Worker loop exception")
                 await asyncio.sleep(poll_interval_seconds)
 
         if self.control_plane:

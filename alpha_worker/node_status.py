@@ -23,7 +23,9 @@ def write_node_status(path: Path, report: WorkerHealthReport, *, paused: bool = 
         "paused": paused,
         "updated_at": datetime.now(UTC).isoformat(),
     }
-    temporary = path.with_suffix(".tmp")
+    import threading
+
+    temporary = path.with_suffix(f".tmp.{os.getpid()}.{threading.get_ident()}")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, "w") as output:
         json.dump(payload, output, separators=(",", ":"))

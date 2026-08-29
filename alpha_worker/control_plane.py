@@ -13,7 +13,16 @@ from typing import Any
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 
-from alpha_protocol import TaskEnvelope, TaskResult, WorkerHealthReport, WorkerRegistration, TaskCheckpoint, AppendCheckpointRequest, ResumeDecisionRequest, ResumeDecisionResponse
+from alpha_protocol import (
+    AppendCheckpointRequest,
+    ResumeDecisionRequest,
+    ResumeDecisionResponse,
+    TaskCheckpoint,
+    TaskEnvelope,
+    TaskResult,
+    WorkerHealthReport,
+    WorkerRegistration,
+)
 
 
 class ControlPlaneUnavailable(RuntimeError):
@@ -89,7 +98,7 @@ class DurableEventSpool:
                 except ControlPlaneProtocolError:
                     continue
                 if old_event.get("event_type") == event_type:
-                    stale.unlink()
+                    stale.unlink(missing_ok=True)
         return destination
 
     def pending(self) -> list[Path]:
@@ -113,7 +122,7 @@ class DurableEventSpool:
         for path in self.pending():
             event = self.read(path)
             await deliver(event["event_type"], event["payload"])
-            path.unlink()
+            path.unlink(missing_ok=True)
             delivered += 1
         return delivered
 
@@ -255,8 +264,6 @@ class ControlPlaneClient:
             {"lease_token": lease_token, "result": result.model_dump(mode="json")},
         )
 
-    
-
     async def get_latest_checkpoint(self, task_id: str) -> TaskCheckpoint | None:
         try:
             response = await self._request("GET", f"/api/tasks/{task_id}/checkpoints/latest")
@@ -266,23 +273,22 @@ class ControlPlaneClient:
                 return None
             raise
 
-    async def append_checkpoint(self, request: AppendCheckpointRequest, lease_token: str) -> TaskCheckpoint:
+    async def append_checkpoint(
+        self, request: AppendCheckpointRequest, lease_token: str
+    ) -> TaskCheckpoint:
         payload = request.model_dump(mode="json")
-        payload["lease_token"] = lease_token
+        payload["raw_lease_token"] = lease_token
         response = await self._request(
-            "POST",
-            f"/api/tasks/{request.checkpoint.task_id}/checkpoints",
-            payload
+            "POST", f"/api/tasks/{request.checkpoint.task_id}/checkpoints", payload
         )
         return TaskCheckpoint.model_validate(response)
 
-    async def get_resume_decision(self, request: ResumeDecisionRequest, lease_token: str) -> ResumeDecisionResponse:
+    async def get_resume_decision(
+        self, request: ResumeDecisionRequest, lease_token: str
+    ) -> ResumeDecisionResponse:
         payload = request.model_dump(mode="json")
-        payload["lease_token"] = lease_token
         response = await self._request(
-            "POST",
-            f"/api/tasks/{request.task_id}/resume-decision",
-            payload
+            "POST", f"/api/tasks/{request.task_id}/resume-decision", payload
         )
         return ResumeDecisionResponse.model_validate(response)
 
@@ -309,7 +315,7 @@ class ControlPlaneClient:
             raise ControlPlaneUnavailable(f"Control plane server error: {response.status_code}")
         if response.status_code >= 400:
             raise ControlPlaneProtocolError(
-                f"Control plane rejected request: {response.status_code}"
+                f"Control plane rejected request: {response.status_code} {response.text}"
             )
         try:
             parsed = response.json()

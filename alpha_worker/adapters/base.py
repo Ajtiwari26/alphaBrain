@@ -2,10 +2,10 @@ import shutil
 import subprocess
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from alpha_core.config import settings
-from typing import Callable, Awaitable
 from alpha_protocol import (
     AgentType,
     GateEvidence,
@@ -34,7 +34,7 @@ class BaseAgentAdapter(ABC):
         task: TaskEnvelope,
         worktree_path: Path,
         base_commit: str,
-        emit_checkpoint: Callable[[str, str, str, dict], Awaitable[None]] | None = None,
+        emit_checkpoint: Callable[[str, str, str, str, dict], Awaitable[None]] | None = None,
     ) -> TaskResult:
         """Executes the assigned task in the isolated worktree."""
         pass

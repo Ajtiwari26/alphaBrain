@@ -2,8 +2,9 @@ import json
 import logging
 import os
 import uuid
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import cast, Callable, Awaitable
+from typing import cast
 
 from alpha_core.config import settings
 from alpha_core.security import redact_dict, worker_kill_switch
@@ -78,11 +79,11 @@ class AntigravityAdapter(BaseAgentAdapter):
         task: TaskEnvelope,
         worktree_path: Path,
         base_commit: str,
-        emit_checkpoint: Callable[[str, str, str, dict], Awaitable[None]] | None = None,
+        emit_checkpoint: Callable[[str, str, str, str, dict], Awaitable[None]] | None = None,
     ) -> TaskResult:
         attempt_id = f"att_{task.task_id}_{uuid.uuid4().hex[:6]}"
         if emit_checkpoint:
-            await emit_checkpoint("worktree_validated", "none", "", {})
+            await emit_checkpoint(attempt_id, "worktree_validated", "none", "", {})
 
         from alpha_protocol import compute_packet_digest
 
@@ -109,12 +110,14 @@ class AntigravityAdapter(BaseAgentAdapter):
         # 1. Record task provenance locally; this is not execution proof.
         session_dir = self.setup_session_in_memory_graph(task, worktree_path)
         if emit_checkpoint:
-            await emit_checkpoint("conversation_bound", "none", "", {"session_dir": str(session_dir)})
+            await emit_checkpoint(
+                attempt_id, "conversation_bound", "none", "", {"session_dir": str(session_dir)}
+            )
 
         # 2. Execute through the project-dedicated Antigravity chat.
         try:
             if emit_checkpoint:
-                await emit_checkpoint("implementation_started", "started", "", {})
+                await emit_checkpoint(attempt_id, "implementation_started", "started", "", {})
             dispatch = await self.live_bridge.dispatch(task, worktree_path, attempt_id, session_dir)
         except Exception as exc:
             logger.error("Antigravity bridge dispatch failed: %s", exc)
@@ -137,7 +140,13 @@ class AntigravityAdapter(BaseAgentAdapter):
                 ],
             )
         if emit_checkpoint:
-            await emit_checkpoint("process_exited", "prepared", "", {"conversation_id": dispatch.conversation_id})
+            await emit_checkpoint(
+                attempt_id,
+                "process_exited",
+                "prepared",
+                "",
+                {"conversation_id": dispatch.conversation_id},
+            )
 
         # 3. Assemble agent-generated evidence
         additional_evidence: list[GateEvidence] = []
@@ -163,13 +172,19 @@ class AntigravityAdapter(BaseAgentAdapter):
 
         # 4. Run declared acceptance gates after explicit agent completion, merging additional evidence
         if emit_checkpoint:
-            await emit_checkpoint("gates_started", "prepared", "", {})
+            await emit_checkpoint(attempt_id, "gates_started", "prepared", "", {})
         gate_result = self.run_acceptance_gates(
             task, worktree_path, attempt_id, additional_evidence
         )
         gate_result.all_passed = gate_result.all_passed and dispatch.completed
         if emit_checkpoint:
-            await emit_checkpoint("gates_completed", "prepared", "", {"all_passed": gate_result.all_passed})
+            await emit_checkpoint(
+                attempt_id,
+                "gates_completed",
+                "prepared",
+                "",
+                {"all_passed": gate_result.all_passed},
+            )
 
         # 5. Inspect uncommitted files & commit adapter-owned changes
         uncommitted_files = self.worktree_mgr.get_uncommitted_files(worktree_path)
@@ -226,7 +241,13 @@ class AntigravityAdapter(BaseAgentAdapter):
         )
 
         if emit_checkpoint:
-            await emit_checkpoint("result_prepared", "committed" if gate_result.all_passed else "prepared", "", {})
+            await emit_checkpoint(
+                attempt_id,
+                "result_prepared",
+                "committed" if gate_result.all_passed else "prepared",
+                "",
+                {},
+            )
 
         return TaskResult(
             attempt_id=attempt_id,

@@ -12,7 +12,7 @@ from alpha_protocol.task import AgentType, RiskClass, TaskStatus
 
 
 @pytest.mark.asyncio
-async def test_checkpoint_adversarial(setup_db, api_headers):
+async def test_checkpoint_adversarial(setup_db, worker_headers):
     session_factory = get_session_factory()
     async with session_factory() as session:
         proj = ProjectRecord(
@@ -44,7 +44,7 @@ async def test_checkpoint_adversarial(setup_db, api_headers):
         session.add(attempt)
         await session.commit()
 
-    headers = api_headers
+    headers = worker_headers
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 1. Valid Append
