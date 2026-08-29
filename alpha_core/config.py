@@ -284,6 +284,12 @@ class Settings(BaseModel):
         "pytest,ruff,mypy,node,npm,npx,pnpm,yarn,swift,xcodebuild,cargo,go",
     )
     # LiveKit (Local or Cloud WebRTC)
+
+    # Live Translation
+    TRANSLATE_MODEL: str = os.getenv("TRANSLATE_MODEL", "gemini-3.5-live-translate-preview")
+    TRANSLATE_ENABLED: bool = os.getenv("TRANSLATE_ENABLED", "true").lower() == "true"
+    DEFAULT_FOUNDER_LANGUAGE: str = os.getenv("DEFAULT_FOUNDER_LANGUAGE", "hi")
+
     LIVEKIT_URL: str = os.getenv("LIVEKIT_URL", "ws://localhost:7880")
     LIVEKIT_API_KEY: str = os.getenv("LIVEKIT_API_KEY", "")
     LIVEKIT_API_SECRET: str = os.getenv("LIVEKIT_API_SECRET", "")

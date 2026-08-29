@@ -5,7 +5,7 @@
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <title>DeployMate Alpha Brain — Meeting</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link rel="stylesheet" href="/static/meet/css/meet.css"/>
+  <link rel="stylesheet" href="/static/meet/css/meet.css?v=20260829-3"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <style>
@@ -58,11 +58,33 @@
       </label>
 
       <label class="block text-xs font-semibold text-neutral-700">Room ID
-        <input id="room-input" required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}" value="deploymate-main" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"/>
+        <input id="room-input" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,127}" value="deploymate-main" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"/>
       </label>
 
       <label id="api-token-field" class="block text-xs font-semibold text-neutral-700">Access Token
         <input id="api-token-input" type="password" autocomplete="off" placeholder="Founder bearer token" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black focus:outline-none focus:ring-1 focus:ring-black"/>
+      </label>
+
+      <!-- Language Selection -->
+      <label class="block text-xs font-semibold text-neutral-700">Your Language
+        <select id="language-select" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm bg-white">
+          <option value="hi" selected>Hindi (हिन्दी)</option>
+          <option value="en">English</option>
+          <option value="zh">Chinese (中文)</option>
+          <option value="ja">Japanese (日本語)</option>
+          <option value="ko">Korean (한국어)</option>
+          <option value="ar">Arabic (العربية)</option>
+          <option value="es">Spanish (Español)</option>
+          <option value="fr">French (Français)</option>
+          <option value="de">German (Deutsch)</option>
+          <option value="pt">Portuguese (Português)</option>
+        </select>
+      </label>
+
+      <!-- Live Translate Toggle -->
+      <label class="flex items-center gap-2 text-xs font-semibold text-neutral-700">
+        <input id="translate-toggle" type="checkbox" checked class="accent-black w-4 h-4 rounded-none border-black"/>
+        Enable Live Translation
       </label>
 
       <p id="join-error" class="hidden text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert"></p>
@@ -247,6 +269,12 @@
       <button id="footer-invite-btn" type="button" class="control-btn-circle" title="Invite Client">
         <span class="material-symbols-outlined">person_add</span>
       </button>
+      <button id="dark-mode-btn" type="button" class="control-btn-circle" title="Toggle Dark Mode">
+        <span class="material-symbols-outlined">dark_mode</span>
+      </button>
+      <button id="language-btn" type="button" class="control-btn-circle" title="Change Language">
+        <span class="material-symbols-outlined">translate</span>
+      </button>
       
       <!-- Divider -->
       <div class="h-8 w-px bg-black/20 mx-2"></div>
@@ -267,6 +295,6 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.min.js"></script>
-  <script src="/static/meet/js/meet.js?v=20260825-2"></script>
+  <script src="/static/meet/js/meet.js?v=20260829-3"></script>
 </body>
 </html>

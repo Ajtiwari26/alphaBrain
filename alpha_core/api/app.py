@@ -382,7 +382,8 @@ async def generate_meet_token(
         raise HTTPException(status_code=503, detail="LiveKit credentials are not configured")
 
     try:
-        eva_status = await eva_room_manager.ensure_room(room_name)
+        language = payload.get("language", "hi")
+        eva_status = await eva_room_manager.ensure_room(room_name, language=language, identity=identity)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

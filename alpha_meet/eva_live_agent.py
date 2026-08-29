@@ -12,6 +12,7 @@ from livekit.plugins import google
 
 from alpha_core.config import settings
 from alpha_meet.tokens import LiveKitTokenGenerator
+from alpha_meet.translate_agent import TranslateAgent
 
 logger = logging.getLogger("alpha_meet.eva_live_agent")
 EVA_IDENTITY = "eva-cto"
@@ -48,6 +49,9 @@ class EvaRoomRuntime:
     error: str | None = None
     active_speaker: str | None = None
     human_participants: set[str] = field(default_factory=set)
+    participant_languages: dict[str, str] = field(default_factory=dict)
+    translate_agents: dict[str, Any] = field(default_factory=dict) # str -> TranslateAgent
+    translate_mode: str = "transcribe_only"
     ready: asyncio.Event = field(default_factory=asyncio.Event)
     stop: asyncio.Event = field(default_factory=asyncio.Event)
     task: asyncio.Task[None] | None = None
@@ -61,6 +65,8 @@ class EvaRoomRuntime:
             "model": settings.GEMINI_LIVE_MODEL,
             "active_speaker": self.active_speaker,
             "human_participants": len(self.human_participants),
+            "languages": list({lang for id_, lang in self.participant_languages.items() if id_ in self.human_participants}),
+            "translate_mode": self.translate_mode,
             "error": self.error,
         }
 
@@ -71,8 +77,9 @@ class EvaRoomManager:
     def __init__(self) -> None:
         self._rooms: dict[str, EvaRoomRuntime] = {}
         self._lock = asyncio.Lock()
+        self._bg_tasks = set()
 
-    async def ensure_room(self, room_name: str, timeout_seconds: float = 15.0) -> dict[str, Any]:
+    async def ensure_room(self, room_name: str, language: str = "en", identity: str = "", timeout_seconds: float = 15.0) -> dict[str, Any]:
         self._validate_configuration()
         async with self._lock:
             runtime = self._rooms.get(room_name)
@@ -83,6 +90,12 @@ class EvaRoomManager:
                     name=f"eva-live-{room_name}",
                 )
                 self._rooms[room_name] = runtime
+
+            if identity and language:
+                runtime.participant_languages[identity] = language
+                task = asyncio.create_task(self._reconcile_translate_agents(runtime))
+                self._bg_tasks.add(task)
+                task.add_done_callback(self._bg_tasks.discard)
 
         try:
             await asyncio.wait_for(runtime.ready.wait(), timeout=timeout_seconds)
@@ -112,6 +125,47 @@ class EvaRoomManager:
 
     @staticmethod
     def _validate_configuration() -> None:
+        if settings.GEMINI_USE_VERTEX and not settings.GOOGLE_CLOUD_PROJECT:
+            raise RuntimeError("Vertex AI project is not configured")
+        if not settings.GEMINI_USE_VERTEX and not settings.GOOGLE_API_KEY:
+            raise RuntimeError("Gemini Live API key is not configured")
+        if not settings.LIVEKIT_API_KEY or not settings.LIVEKIT_API_SECRET:
+            raise RuntimeError("LiveKit credentials are not configured")
+        if not settings.LIVEKIT_URL:
+            raise RuntimeError("LiveKit URL is not configured")
+    async def _reconcile_translate_agents(self, runtime: EvaRoomRuntime) -> None:
+        """Spawns or tears down TranslateAgents based on participant languages."""
+        if not settings.TRANSLATE_ENABLED:
+            return
+
+        async with self._lock:
+            active_identities = runtime.human_participants
+            # Only count languages for currently active human participants
+            active_langs = {
+                lang for id_, lang in runtime.participant_languages.items()
+                if id_ in active_identities
+            }
+
+            if len(active_langs) <= 1:
+                runtime.translate_mode = "transcribe_only"
+                # Tear down all translate agents
+                for agent in list(runtime.translate_agents.values()):
+                    await agent.stop()
+                runtime.translate_agents.clear()
+            else:
+                runtime.translate_mode = "live_translate"
+                # Start missing agents
+                for lang in active_langs:
+                    if lang not in runtime.translate_agents:
+                        agent = TranslateAgent(room_name=runtime.room_name, target_language=lang)
+                        runtime.translate_agents[lang] = agent
+                        await agent.start()
+
+                # Stop unneeded agents
+                unneeded_langs = set(runtime.translate_agents.keys()) - active_langs
+                for lang in unneeded_langs:
+                    agent = runtime.translate_agents.pop(lang)
+                    await agent.stop()
         if settings.GEMINI_USE_VERTEX and not settings.GOOGLE_CLOUD_PROJECT:
             raise RuntimeError("Vertex AI project is not configured")
         if not settings.GEMINI_USE_VERTEX and not settings.GOOGLE_API_KEY:
@@ -194,7 +248,13 @@ class EvaRoomManager:
 
         def on_participant_connected(participant: rtc.RemoteParticipant) -> None:
             nonlocal initial_join_timeout, empty_room_timeout
+            if participant.identity.startswith("translate-"):
+                return
             runtime.human_participants.add(participant.identity)
+            task = asyncio.create_task(self._reconcile_translate_agents(runtime))
+            self._bg_tasks.add(task)
+            task.add_done_callback(self._bg_tasks.discard)
+
             if initial_join_timeout is not None:
                 initial_join_timeout.cancel()
                 initial_join_timeout = None
@@ -206,7 +266,12 @@ class EvaRoomManager:
 
         def on_participant_disconnected(participant: rtc.RemoteParticipant) -> None:
             nonlocal empty_room_timeout
+            if participant.identity.startswith("translate-"):
+                return
             runtime.human_participants.discard(participant.identity)
+            task = asyncio.create_task(self._reconcile_translate_agents(runtime))
+            self._bg_tasks.add(task)
+            task.add_done_callback(self._bg_tasks.discard)
             if runtime.active_speaker == participant.identity:
                 runtime.active_speaker = next(iter(runtime.human_participants), None)
                 if runtime.active_speaker:

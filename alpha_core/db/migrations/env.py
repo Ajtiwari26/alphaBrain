@@ -49,7 +49,7 @@ def run_migrations_online() -> None:
     if url:
         url = url.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")
         section["sqlalchemy.url"] = url
-    
+
     connectable = engine_from_config(
         section,
         prefix="sqlalchemy.",
