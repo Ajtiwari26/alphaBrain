@@ -271,58 +271,56 @@ function startMeetingTimer() {
   }, 1000);
 }
 
+let lastSpeaker = null;
+let lastSegmentId = null;
+
 function appendTranscript(speaker, text, isEva = false, segmentId = "") {
   const list = document.getElementById("transcript-list");
-  if (!list || !text) return;
-  
+  if (!list || !text || !text.trim()) return;
+
   // Remove initial empty placeholder if present
   document.getElementById("transcript-empty")?.remove();
 
-  let item = segmentId ? transcriptElements.get(segmentId) : null;
+  const key = segmentId || (speaker === lastSpeaker ? lastSegmentId : null);
+  let item = key ? transcriptElements.get(key) : null;
+
   if (!item) {
+    const newId = segmentId || `seg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     item = document.createElement("div");
-    item.className = "p-4 flex gap-3 border-b border-black/10";
-    
+    item.className = "p-4 flex gap-3 border-b border-black/10 transition-opacity";
+
     const timeSpan = document.createElement("span");
-    timeSpan.className = "font-mono text-neutral-400 font-medium shrink-0";
+    timeSpan.className = "font-mono text-neutral-400 font-medium shrink-0 text-xs";
     const now = new Date();
     timeSpan.textContent = now.toTimeString().slice(3, 8); // MM:SS
 
     const contentDiv = document.createElement("div");
-    contentDiv.className = "space-y-1";
+    contentDiv.className = "space-y-1 flex-1";
 
     const nameDiv = document.createElement("div");
-    nameDiv.className = `font-mono font-bold ${isEva ? "text-[#E6391E]" : "text-black"}`;
-    nameDiv.textContent = speaker;
+    nameDiv.className = `font-mono font-bold text-xs ${isEva ? "text-[#E6391E]" : "text-black"}`;
+    nameDiv.textContent = isEva ? "Eva (DeployMate CTO)" : speaker;
 
     const textP = document.createElement("p");
-    textP.className = "transcript-content font-mono text-neutral-700 leading-relaxed text-[11px]";
+    textP.className = "transcript-content font-mono text-neutral-800 leading-relaxed text-xs";
 
     contentDiv.append(nameDiv, textP);
     item.append(timeSpan, contentDiv);
     list.appendChild(item);
-    if (segmentId) transcriptElements.set(segmentId, item);
+
+    transcriptElements.set(newId, item);
+    lastSegmentId = newId;
+    lastSpeaker = speaker;
   }
-  item.querySelector(".transcript-content").textContent = text;
+
+  const contentEl = item.querySelector(".transcript-content");
+  if (contentEl) {
+    contentEl.textContent = text.trim();
+  }
   list.scrollTop = list.scrollHeight;
 }
 
 function wireRoomEvents(activeRoom) {
-  activeRoom.registerTextStreamHandler("lk.transcription", async (reader, participantInfo) => {
-    const participant = activeRoom.getParticipantByIdentity(participantInfo.identity);
-    const speaker = participant?.name || participantInfo.identity || "Participant";
-    const isEva = participantInfo.identity === EVA_IDENTITY;
-    const segmentId = reader.info?.attributes?.["lk.segment_id"] || reader.info?.id || "";
-    let completeText = "";
-    try {
-      for await (const textChunk of reader) {
-        completeText += textChunk;
-        appendTranscript(speaker, completeText, isEva, segmentId);
-      }
-    } catch (error) {
-      console.warn("Could not read LiveKit transcription stream", error);
-    }
-  });
 
   activeRoom
     .on(RoomEvent.TrackPublished, (publication, participant) => {
