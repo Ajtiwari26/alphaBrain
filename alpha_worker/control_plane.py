@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 
-from alpha_protocol import TaskEnvelope, TaskResult, WorkerHealthReport, WorkerRegistration
+from alpha_protocol import TaskEnvelope, TaskResult, WorkerHealthReport, WorkerRegistration, TaskCheckpoint, AppendCheckpointRequest, ResumeDecisionRequest, ResumeDecisionResponse
 
 
 class ControlPlaneUnavailable(RuntimeError):
@@ -255,14 +255,46 @@ class ControlPlaneClient:
             {"lease_token": lease_token, "result": result.model_dump(mode="json")},
         )
 
+    
+
+    async def get_latest_checkpoint(self, task_id: str) -> TaskCheckpoint | None:
+        try:
+            response = await self._request("GET", f"/api/tasks/{task_id}/checkpoints/latest")
+            return TaskCheckpoint.model_validate(response)
+        except ControlPlaneProtocolError as e:
+            if "404" in str(e):
+                return None
+            raise
+
+    async def append_checkpoint(self, request: AppendCheckpointRequest, lease_token: str) -> TaskCheckpoint:
+        payload = request.model_dump(mode="json")
+        payload["lease_token"] = lease_token
+        response = await self._request(
+            "POST",
+            f"/api/tasks/{request.checkpoint.task_id}/checkpoints",
+            payload
+        )
+        return TaskCheckpoint.model_validate(response)
+
+    async def get_resume_decision(self, request: ResumeDecisionRequest, lease_token: str) -> ResumeDecisionResponse:
+        payload = request.model_dump(mode="json")
+        payload["lease_token"] = lease_token
+        response = await self._request(
+            "POST",
+            f"/api/tasks/{request.task_id}/resume-decision",
+            payload
+        )
+        return ResumeDecisionResponse.model_validate(response)
+
     async def _request(
-        self, method: str, path: str, payload: dict[str, Any], is_retry: bool = False
+        self, method: str, path: str, payload: dict[str, Any] | None = None, is_retry: bool = False
     ) -> dict[str, Any]:
         identity = await self._ensure_identity()
         headers = {"X-Alpha-Worker-Identity": identity}
 
         try:
-            response = await self._client.request(method, path, json=payload, headers=headers)
+            kwargs = {"json": payload} if payload is not None else {}
+            response = await self._client.request(method, path, headers=headers, **kwargs)
         except httpx.HTTPError as exc:
             raise ControlPlaneUnavailable(
                 f"Control plane unavailable: {exc.__class__.__name__}"
