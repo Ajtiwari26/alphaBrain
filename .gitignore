@@ -65,3 +65,4 @@ testscript/submit_s1.py
 add_endpoints.py
 testscript/reset_task.py
 testscript/delete_task.py
+testscript/reset_task_fix.py

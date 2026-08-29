@@ -25,7 +25,7 @@ async def main():
     
     plan = AcceptancePlan(
         commands=[
-            GateCommand(gate_type=GateType.LINT, executable="ruff", args=["check", "alpha_meet/"]),
+            GateCommand(gate_type=GateType.LINT, executable="python", args=["-m", "ruff", "check", "alpha_meet/"]),
         ],
         required_gates=[GateType.INDEPENDENT_REVIEW, GateType.CODE_REVIEW_GRAPH, GateType.LINT],
         require_independent_review=True,
