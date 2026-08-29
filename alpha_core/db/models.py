@@ -385,6 +385,20 @@ class AttemptRecord(Base):
     task = relationship("TaskRecord", back_populates="attempts")
 
 
+class TaskCheckpointRecord(Base):
+    __tablename__ = "task_checkpoints"
+
+    id = Column(String(64), primary_key=True)
+    task_id = Column(String(64), ForeignKey("tasks.id"), nullable=False)
+    attempt_id = Column(String(64), ForeignKey("task_attempts.id"), nullable=False)
+    lease_token_hash = Column(String(64), nullable=False)
+    scrubbed_payload = Column(JSON, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    task = relationship("TaskRecord")
+    attempt = relationship("AttemptRecord")
+
+
 class GateEvidenceRecord(Base):
     __tablename__ = "gate_evidence"
 

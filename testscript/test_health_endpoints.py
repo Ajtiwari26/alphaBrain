@@ -22,7 +22,7 @@ def test_readiness_exact_match(mock_get_session_factory):
     mock_session = AsyncMock()
     # Mocking rows returned by SELECT version_num FROM alembic_version
     mock_res = MagicMock()
-    mock_res.scalars.return_value.all.return_value = ["58b5b056d9e3"]
+    mock_res.scalars.return_value.all.return_value = ["ea716532600e"]
     mock_session.execute.side_effect = [None, mock_res]
 
     mock_factory = MagicMock()
@@ -48,7 +48,7 @@ def test_readiness_missing_table(mock_get_session_factory):
     assert response.json() == {"detail": "Service Unavailable"}
 
     resp_text = response.text.lower()
-    for secret in ["58b5b056d9e3", "url", "password", "token", "exception", "operationalerror"]:
+    for secret in ["ea716532600e", "url", "password", "token", "exception", "operationalerror"]:
         assert secret not in resp_text
 
 
@@ -104,7 +104,7 @@ def test_readiness_unknown_revision(mock_get_session_factory):
 def test_readiness_multiple_rows(mock_get_session_factory):
     mock_session = AsyncMock()
     mock_res = MagicMock()
-    mock_res.scalars.return_value.all.return_value = ["58b5b056d9e3", "e7a9c2f4d601"]
+    mock_res.scalars.return_value.all.return_value = ["ea716532600e", "e7a9c2f4d601"]
     mock_session.execute.side_effect = [None, mock_res]
 
     mock_factory = MagicMock()

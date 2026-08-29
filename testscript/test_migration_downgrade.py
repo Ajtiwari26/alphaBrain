@@ -114,7 +114,7 @@ def test_base_to_head_to_base_migration(disposable_pg):
 
     # Assert Head State
     version = get_alembic_version()
-    assert version == "58b5b056d9e3", f"Expected head version 58b5b056d9e3, got {version}"
+    assert version == "ea716532600e", f"Expected head version ea716532600e, got {version}"
     assert check_approvals_attempt_fk(), (
         "Missing attempt_id or foreign key on approvals table at head"
     )
@@ -136,7 +136,7 @@ def test_base_to_head_to_base_migration(disposable_pg):
 
     # Assert Second Head State
     version = get_alembic_version()
-    assert version == "58b5b056d9e3", f"Expected head version 58b5b056d9e3, got {version}"
+    assert version == "ea716532600e", f"Expected head version ea716532600e, got {version}"
     assert check_approvals_attempt_fk(), (
         "Missing attempt_id or foreign key on approvals table at second head"
     )

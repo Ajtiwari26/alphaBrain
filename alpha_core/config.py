@@ -129,7 +129,7 @@ class Settings(BaseModel):
     STITCH_MODEL_ID: str = "gemini-3.1-pro"
 
     # Database Configuration (Local SQLite or Postgres)
-    EXPECTED_ALEMBIC_REVISION: str = "58b5b056d9e3"
+    EXPECTED_ALEMBIC_REVISION: str = "ea716532600e"
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
         "sqlite+aiosqlite:///" + str(Path(__file__).resolve().parent.parent / "alpha_brain.db"),

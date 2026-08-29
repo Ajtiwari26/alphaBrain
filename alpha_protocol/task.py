@@ -247,6 +247,24 @@ class TaskAttempt(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Task Checkpoint
+# ---------------------------------------------------------------------------
+
+
+class TaskCheckpoint(BaseModel):
+    """Durable checkpoint of agent progress for crash recovery."""
+
+    checkpoint_id: str = Field(
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", description="Unique checkpoint ID"
+    )
+    task_id: str
+    attempt_id: str
+    lease_token_hash: str = Field(description="SHA-256 hash of the worker lease token")
+    scrubbed_payload: dict[str, Any] = Field(description="Agent state (no secrets/prompts)")
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+# ---------------------------------------------------------------------------
 # Task Result
 # ---------------------------------------------------------------------------
 
