@@ -486,6 +486,143 @@ class TaskEngine:
         return cast(TaskRecord, task)
 
     @staticmethod
+    async def submit_task_graph(
+        session: AsyncSession,
+        envelopes: list[TaskEnvelope],
+        *,
+        project_id: str,
+        actor: str = "founder",
+    ) -> list[TaskRecord]:
+        """Validate and atomically persist one bounded, acyclic project task graph."""
+        if not envelopes:
+            raise ValueError("Task graph requires at least one task")
+
+        project = await session.get(ProjectRecord, project_id)
+        if project is None:
+            raise ValueError(
+                f"Project '{project_id}' must be registered before task graph submission"
+            )
+
+        by_id: dict[str, TaskEnvelope] = {}
+        input_order: list[str] = []
+        external_dependency_ids: set[str] = set()
+        for envelope in envelopes:
+            if envelope.task_id in by_id:
+                raise ValueError(f"Duplicate task ID in graph: {envelope.task_id}")
+            if envelope.project_id != project_id:
+                raise ValueError(
+                    f"Task '{envelope.task_id}' project does not match graph project '{project_id}'"
+                )
+            if envelope.repo != project.repo_path:
+                raise ValueError(
+                    f"Task '{envelope.task_id}' repository does not match registered project"
+                )
+            if not envelope.requires_approval:
+                raise ValueError(
+                    f"Task '{envelope.task_id}' must require explicit execution approval"
+                )
+            declared_dependency_ids = [dependency.task_id for dependency in envelope.dependencies]
+            if len(declared_dependency_ids) != len(set(declared_dependency_ids)):
+                raise ValueError(f"Task '{envelope.task_id}' contains duplicate dependencies")
+            if envelope.task_id in declared_dependency_ids:
+                raise ValueError(f"Task '{envelope.task_id}' cannot depend on itself")
+            by_id[envelope.task_id] = envelope
+            input_order.append(envelope.task_id)
+
+        graph_ids = set(by_id)
+        for envelope in envelopes:
+            external_dependency_ids.update(
+                dependency.task_id
+                for dependency in envelope.dependencies
+                if dependency.task_id not in graph_ids
+            )
+
+        if external_dependency_ids:
+            external_result = await session.execute(
+                select(TaskRecord).where(TaskRecord.id.in_(external_dependency_ids))
+            )
+            external_tasks = {task.id: task for task in external_result.scalars().all()}
+            missing = sorted(external_dependency_ids - set(external_tasks))
+            if missing:
+                raise ValueError(
+                    f"Task graph references missing dependencies: {', '.join(missing)}"
+                )
+            for dependency in external_tasks.values():
+                if dependency.project_id != project_id:
+                    raise ValueError(f"Dependency '{dependency.id}' belongs to a different project")
+                if dependency.status not in {
+                    TaskStatus.VERIFIED.value,
+                    TaskStatus.COMPLETED.value,
+                }:
+                    raise ValueError(
+                        f"External dependency '{dependency.id}' is not verified or completed"
+                    )
+
+        existing_result = await session.execute(
+            select(TaskRecord).where(TaskRecord.id.in_(graph_ids))
+        )
+        existing_tasks = {task.id: task for task in existing_result.scalars().all()}
+        for task_id, existing in existing_tasks.items():
+            if existing.project_id != project_id:
+                raise ValueError(f"Task ID '{task_id}' already belongs to a different project")
+            if existing.details_json != by_id[task_id].model_dump(mode="json"):
+                raise ValueError(f"Task ID '{task_id}' already has a different frozen definition")
+
+        internal_dependencies = {
+            task_id: {
+                dependency.task_id
+                for dependency in envelope.dependencies
+                if dependency.task_id in graph_ids
+            }
+            for task_id, envelope in by_id.items()
+        }
+        children: dict[str, set[str]] = {task_id: set() for task_id in graph_ids}
+        for task_id, dependency_ids in internal_dependencies.items():
+            for dependency_id in dependency_ids:
+                children[dependency_id].add(task_id)
+
+        ready = [task_id for task_id in input_order if not internal_dependencies[task_id]]
+        ordered_ids: list[str] = []
+        while ready:
+            task_id = ready.pop(0)
+            ordered_ids.append(task_id)
+            for child_id in input_order:
+                if child_id not in children[task_id]:
+                    continue
+                internal_dependencies[child_id].remove(task_id)
+                if not internal_dependencies[child_id]:
+                    ready.append(child_id)
+
+        if len(ordered_ids) != len(envelopes):
+            cyclic_ids = sorted(graph_ids - set(ordered_ids))
+            raise ValueError(f"Task graph contains a dependency cycle: {', '.join(cyclic_ids)}")
+
+        records_by_id: dict[str, TaskRecord] = {}
+        async with session.begin_nested():
+            for task_id in ordered_ids:
+                records_by_id[task_id] = await TaskEngine.submit_task(
+                    session,
+                    by_id[task_id],
+                    project_id=project_id,
+                )
+            if set(records_by_id) - set(existing_tasks):
+                session.add(
+                    AuditEventRecord(
+                        id=f"evt_{uuid.uuid4().hex[:12]}",
+                        event_type="task_graph_submitted",
+                        project_id=project_id,
+                        actor=actor,
+                        details_json={
+                            "task_ids": input_order,
+                            "edge_count": sum(len(envelope.dependencies) for envelope in envelopes),
+                        },
+                    )
+                )
+            await session.flush()
+
+        return [records_by_id[task_id] for task_id in input_order]
+
+    @staticmethod
     async def cancel_task(
         session: AsyncSession,
         task_id: str,

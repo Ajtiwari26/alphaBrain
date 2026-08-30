@@ -236,6 +236,12 @@ Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
     founder approves; rejection cancels task.
 - [x] Enforce legal state-transition table in task-engine mutations.
 - [x] Implement dependency-aware DAG scheduling.
+- [x] Add founder-only atomic task-graph admission: validate complete bounded graph before write,
+  reject cycles, duplicates, missing/nonterminal external dependencies, cross-project/repository
+  bindings, and return frozen packet digests. Every admitted graph task still requires separate
+  execution approval.
+- [ ] Add approved-spec-to-task-graph planner with typed output and founder review before graph
+  admission; current endpoint accepts validated task envelopes but does not ask a model to plan.
 - [x] Add per-project and per-worker concurrency limits.
 - [x] Add risk-based approval policies.
 - [ ] Build typed action broker for shell, files, browser, deployment, MCP, and calls.
@@ -259,6 +265,7 @@ Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
 - [x] Worker crash leads to safe requeue after lease expiry and retry backoff.
 - [x] Late/stolen lease cannot submit result.
 - [x] Duplicate result produces no duplicate side effect.
+- [x] Invalid project task graph leaves no partially admitted tasks.
 - [ ] Missing required gate prevents verification.
 - [ ] Illegal state transitions fail.
 - [x] High-risk action waits for founder approval.

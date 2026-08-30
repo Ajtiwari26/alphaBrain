@@ -110,6 +110,12 @@ class ProjectRegistrationRequest(BaseModel):
     repo_path: str = Field(min_length=1, max_length=512)
 
 
+class TaskGraphSubmissionRequest(BaseModel):
+    """Founder-authored frozen task graph for one registered project."""
+
+    tasks: list[TaskEnvelope] = Field(min_length=1, max_length=50)
+
+
 def _validate_repo_reference(repo_path: str) -> str:
     """Validate repo syntax and configured-root binding without touching Render disk."""
     if any(ord(character) < 32 for character in repo_path):
@@ -622,6 +628,57 @@ async def submit_task(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"status": task.status, "task_id": task.id, "project_id": task.project_id}
+
+
+@app.post("/api/projects/{project_id}/task-graph", response_model=dict[str, Any])
+async def submit_task_graph(
+    project_id: str,
+    payload: TaskGraphSubmissionRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Validate and atomically queue one project task DAG."""
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(status_code=403, detail="Task graph submission requires founder access")
+    require_permission(principal, "task:write")
+    require_project_access(principal, project_id)
+    if not SAFE_EXTERNAL_ID.fullmatch(project_id):
+        raise HTTPException(status_code=422, detail="Invalid project ID")
+    if not worker_kill_switch.can_execute(project_id):
+        raise HTTPException(status_code=403, detail="Task execution is paused for this project")
+
+    project = await session.get(ProjectRecord, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project must be registered first")
+    for envelope in payload.tasks:
+        try:
+            _validate_repo_reference(envelope.repo)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
+        tasks = await TaskEngine.submit_task_graph(
+            session,
+            payload.tasks,
+            project_id=project_id,
+            actor=principal.subject,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return {
+        "status": "accepted",
+        "project_id": project_id,
+        "tasks": [
+            {
+                "task_id": task.id,
+                "status": task.status,
+                "packet_sha256": task.packet_sha256,
+                "depends_on": task.depends_on_json or [],
+            }
+            for task in tasks
+        ],
+    }
 
 
 @app.post("/api/self-development/tasks", response_model=dict[str, Any])

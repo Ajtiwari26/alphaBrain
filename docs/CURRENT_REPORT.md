@@ -2,20 +2,21 @@
 
 **Audit date:** 2026-08-31
 
-**Audited revision:** `1e42c62f02999e6ad7e59e61fb4f13c8e4a573a2` plus local stabilization changes
+**Audited revision:** `4e42ee8` plus local atomic task-graph changes
 
 **Remote mutation:** None during this work
 
-**Decision:** Local stabilization accepted. Changes remain local and are not deployed.
+**Decision:** Local stabilization and bounded task-graph admission accepted. Changes remain local
+and are not deployed.
 
 ## Verified local evidence
 
 | Area | Status | Evidence |
 |---|---|---|
-| Full pytest | Passing | `506 passed, 1 skipped in 39.19s` with Docker active |
+| Full pytest | Passing | `516 passed, 1 skipped in 41.98s` with Docker active |
 | PostgreSQL gates | Passing | 10/10 migration, checkpoint, and watchdog-concurrency tests |
 | Ruff lint | Passing | `ruff check .` reports zero findings |
-| Ruff formatting | Passing | 164 active files formatted |
+| Ruff formatting | Passing | 165 active files formatted |
 | Mypy | Passing | Zero errors across 63 files in core, protocol, worker, and meet packages |
 | JavaScript syntax | Passing | `node --check alpha_meet/frontend/js/meet.js` |
 | Patch integrity | Passing | `git diff --check` clean |
@@ -34,6 +35,12 @@
 - Removed translated-text `innerHTML` injection; provider output now renders through DOM text nodes.
 - Updated stale meeting mocks and retained current LiveKit `RoomEvent.TranscriptionReceived` contract.
 - Repaired repository-wide Ruff/format defects and checkpoint harness duplicate configuration.
+- Added founder/admin-only `POST /api/projects/{project_id}/task-graph` admission for 1–50 frozen
+  task envelopes.
+- Added atomic prevalidation for cycles, duplicate task/dependency IDs, missing or nonterminal
+  external dependencies, project/repository binding, and explicit per-task approval.
+- Added exact-resubmission idempotency proof and service-principal denial proof; admitted tasks
+  expose packet SHA-256 digests and remain `waiting_approval` until separately approved.
 
 ## Deployment truth
 
@@ -49,11 +56,15 @@
 3. Meeting-to-durable-spec pipeline, consent/retention, and cross-network TURN proof remain open.
 4. Temporal durable workflow, full agent adapters/router, client portal, AgentLine calls, deployment/rollback, and production hardening remain incomplete.
 5. Credential values previously copied into Antigravity chat history should be rotated before broader production use.
+6. Approved-spec-to-DAG model planning remains open; current kernel safely admits a founder-authored
+   graph but does not generate one autonomously.
 
 ## Safe next order
 
-1. Review and commit this local stabilization packet.
+1. Review and commit local atomic graph-admission packet.
 2. With separate founder approval, push and deploy only to staging.
-3. Run authenticated founder and invite-client endpoint smoke tests against staging.
-4. Run real two-language LiveKit room proof with audio capture evidence and feedback-loop checks.
-5. Continue P9 specification pipeline only after meeting evidence passes.
+3. Build typed approved-spec-to-DAG planner and validate its output through this atomic endpoint.
+4. Prove one small external project flow: approved graph, execution approvals, worker, QA, preview.
+5. Run authenticated founder and invite-client endpoint smoke tests against staging.
+6. Run real two-language LiveKit room proof with audio capture evidence and feedback-loop checks.
+7. Continue P9 specification pipeline only after meeting evidence passes.
