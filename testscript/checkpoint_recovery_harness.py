@@ -11,8 +11,6 @@ import subprocess
 import threading
 import time
 import uuid
-
-pass
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -339,7 +337,6 @@ async def run_proof() -> None:
                     "ALPHA_API_TOKEN": api_token,
                     "ALPHA_WORKER_TOKEN": worker_token,
                     "TASK_WATCHDOG_SCAN_INTERVAL_SECONDS": "1",
-                    "TASK_PROGRESS_STALL_TIMEOUT_SECONDS": "1",
                     "ALPHA_SIGNING_SECRET": signing_secret,
                     "PUBLIC_BASE_URL": api_url,
                     "CORS_ORIGINS": api_url,

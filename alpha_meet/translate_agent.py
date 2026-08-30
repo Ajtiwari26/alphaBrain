@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 
 import livekit.plugins.google.realtime.realtime_api as realtime_api
 from google.genai import types
@@ -15,16 +16,19 @@ logger = logging.getLogger("alpha_meet.translate_agent")
 # Monkey-patch livekit-plugins-google to support TranslationConfig
 original_build = realtime_api.RealtimeSession._build_connect_config
 
-def patched_build(self):
+
+def patched_build(self: Any) -> Any:
     conf = original_build(self)
     # Clear fields that break the audio-only translation pipeline
     conf.system_instruction = None
     conf.tools = None
     conf.history_config = None
 
-    if hasattr(self._realtime_model, "translation_config") and getattr(self._realtime_model, "translation_config", None):
-        conf.translation_config = self._realtime_model.translation_config
+    translation_config = getattr(self._realtime_model, "translation_config", None)
+    if translation_config is not None:
+        conf.translation_config = translation_config
     return conf
+
 
 realtime_api.RealtimeSession._build_connect_config = patched_build
 
@@ -38,11 +42,26 @@ class TranslateAgent:
         self.identity = f"translate-{target_language}"
         self.room = rtc.Room()
         self.stop_event = asyncio.Event()
-        self._task = None
+        self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         """Starts the translation agent in the background."""
         self._task = asyncio.create_task(self._run())
+
+    def _build_model(self) -> google.realtime.RealtimeModel:
+        """Build Gemini Live Translate with official audio transcript configuration."""
+        model = google.realtime.RealtimeModel(
+            model=settings.TRANSLATE_MODEL,
+            api_key=settings.GOOGLE_API_KEY if not settings.GEMINI_USE_VERTEX else None,
+            instructions="",
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+        )
+        model.translation_config = types.TranslationConfig(
+            target_language_code=self.target_language,
+            echo_target_language=False,
+        )
+        return model
 
     async def _run(self) -> None:
         try:
@@ -59,7 +78,7 @@ class TranslateAgent:
                 audio_input=True,
                 audio_output=True,
                 video_input=False,
-                text_input=False, # Audio only pipeline
+                text_input=False,  # Audio-only pipeline
                 text_output=False,
                 close_on_disconnect=False,
             )
@@ -67,15 +86,7 @@ class TranslateAgent:
             await self.room.connect(settings.LIVEKIT_URL, token)
 
             # Configure the translation model
-            model = google.realtime.RealtimeModel(
-                model=settings.TRANSLATE_MODEL,
-                api_key=settings.GOOGLE_API_KEY if not settings.GEMINI_USE_VERTEX else None,
-                instructions="", # Must be empty for translation mode
-            )
-            model.translation_config = types.TranslationConfig(
-                target_language_code=self.target_language,
-                echo_target_language=False,
-            )
+            model = self._build_model()
 
             session = AgentSession(
                 llm=model,
@@ -84,7 +95,9 @@ class TranslateAgent:
 
             @session.on("error")
             def on_session_error(event):
-                logger.error("TranslateAgent [%s] session error: %s", self.target_language, event.error)
+                logger.error(
+                    "TranslateAgent [%s] session error: %s", self.target_language, event.error
+                )
                 self.stop_event.set()
 
             @session.on("close")
@@ -101,7 +114,9 @@ class TranslateAgent:
                 record=False,
             )
 
-            logger.info("TranslateAgent [%s] ready in room %s", self.target_language, self.room_name)
+            logger.info(
+                "TranslateAgent [%s] ready in room %s", self.target_language, self.room_name
+            )
             await self.stop_event.wait()
 
         except Exception:

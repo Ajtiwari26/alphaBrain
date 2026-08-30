@@ -1,51 +1,59 @@
 # AlphaBrain Current Report
 
-**Audit date:** 2026-08-28
-**Audited base revision:** `15b1eb8`
-**Working tree status:** Uncommitted / dirty candidate (local P6-R2 / D2 implementation pending founder review)
-**Decision:** AlphaBrain has completed local P6-R2 model routing and credential lease mechanics, with a clean root and passing test suite. D2 kernel proof is VERIFIED but NOT ACCEPTED (founder review pending, unmerged). Baseline candidate is not yet founder-approved.
+**Audit date:** 2026-08-31
 
-## Current evidence
+**Audited revision:** `1e42c62f02999e6ad7e59e61fb4f13c8e4a573a2` plus local stabilization changes
+
+**Remote mutation:** None during this work
+
+**Decision:** Local stabilization accepted. Changes remain local and are not deployed.
+
+## Verified local evidence
 
 | Area | Status | Evidence |
 |---|---|---|
-| Automated tests | Passing | 426 tests passed (`pytest -q --disable-warnings`) |
-| Ruff lint | Passing | Zero findings (`ruff check .`) |
-| Ruff formatting | Passing | All active files formatted (`ruff format --check .`) |
-| Source mypy | Passing | Zero errors in `alpha_protocol`, `alpha_core`, `alpha_worker` |
-| Repository root | Clean & Organized | Historical/debug scripts archived under `testscript/dev_artifacts/` |
-| Archive isolation | Ignored | `testscript/dev_artifacts/` ignored by git, pytest, Ruff, and mypy |
-| Whitespace & diff | Passing | Clean `git diff --check` across modified working tree |
-| Implementation state | P6-R2 Complete (Local) | Model router, serialized credential leasing, durable lease transaction evidence, parser repair, isolated AGY dispatch |
-| Self-Task (`tsk_self_truth_005`) | GATES PASSED | TODO and CURRENT_REPORT documentation reconciled with exact 426 tests baseline, durable lease and parser repair confirmed |
-| D2 Self-Task Proof | VERIFIED (Not Accepted) | `d2_kernel_proof.json` shows task verified; `founder_reviewed=false`; no auto-merge |
-| AlphaBrain API | Not running | No active Uvicorn service |
-| Mac worker | Not running | LaunchAgent is not installed or loaded |
-| Render | Configured, not deployed | CLI authenticated; no AlphaBrain service deployed |
-| Supabase | Healthy, not wired | Cloud project active; runtime currently uses local SQLite |
-| Eva meeting | Historical local proof only | Not running during this audit; production network proof remains open |
-| Local preview | Stale | Port 4173 serves an old Health Status Page, not current project proof |
+| Full pytest | Passing | `506 passed, 1 skipped in 39.19s` with Docker active |
+| PostgreSQL gates | Passing | 10/10 migration, checkpoint, and watchdog-concurrency tests |
+| Ruff lint | Passing | `ruff check .` reports zero findings |
+| Ruff formatting | Passing | 164 active files formatted |
+| Mypy | Passing | Zero errors across 63 files in core, protocol, worker, and meet packages |
+| JavaScript syntax | Passing | `node --check alpha_meet/frontend/js/meet.js` |
+| Patch integrity | Passing | `git diff --check` clean |
+| Repository root | Organized | One-off repair scripts archived under `testscript/archive/legacy_repairs/`; historical logs under `testscript/evidence/legacy/` |
+| User-owned local state | Preserved | `alpha_meet/frontend/.gitignore` remains untracked and untouched |
 
-## Working foundation
+## Repairs completed
 
-- Local P6-R2 routing decisions and serialized global credential lease (`fcntl.flock`).
-- AGY live bridge integration with strict allowlist and process-group lifecycle control.
-- Task states, leases, heartbeats, typed gate submissions, audit events, and review provenance.
-- Clean working tree boundaries: historical diagnostic scripts moved to `testscript/dev_artifacts/`.
-- 426 repository tests passing with zero failures.
+- Restored adapter checkpoint callback compatibility across base, unsupported, and Claude adapters.
+- Removed unsafe duplicated Eva configuration logic and added concrete background-task/translator types.
+- Added internal non-admin LiveKit `translator` role.
+- Configured Gemini Live Translate with input/output transcription and official translation configuration.
+- Replaced translation scripts that swallowed provider errors with deterministic endpoint and configuration tests.
+- Protected `/api/meet/translate-text`: founder token or signed meeting invite now required.
+- Enforced validated BCP-47-style target language input and honored requested target language.
+- Removed translated-text `innerHTML` injection; provider output now renders through DOM text nodes.
+- Updated stale meeting mocks and retained current LiveKit `RoomEvent.TranscriptionReceived` contract.
+- Repaired repository-wide Ruff/format defects and checkpoint harness duplicate configuration.
 
-## Blocking gaps
+## Deployment truth
 
-1. Working tree is dirty; baseline candidate requires founder review and explicit approval before commit.
-2. D2 self-task kernel proof is VERIFIED but remains UNACCEPTED (pending separate founder decision).
-3. Persistent Mac worker daemon LaunchAgent is not installed.
-4. Render control plane is not deployed.
-5. Supabase Postgres is not connected as the primary system of record.
-6. Temporal SDLC workflow (P7) and future phases (P8–P13) still require packet-level implementation designs.
+- Render staging and AlphaMeet were online at deployed revision `1e42c62` during pre-change audit.
+- Current local fixes are **not pushed and not deployed**.
+- Deployed service therefore does not yet contain translation endpoint auth/XSS repairs.
+- No production deployment, migration, or GitHub push occurred.
 
-## Next steps
+## Open product gaps
 
-1. **Execute First Low-Risk AlphaBrain Self-Task (VERIFIED, PENDING REVIEW):**
-   - Run task through the complete autonomous kernel lifecycle: admission -> execution approval -> isolated AGY worktree -> typed gate evidence -> independent review -> founder acceptance.
-   - Recommended task scope: TODO documentation and test suite count reconciliation.
-   - Strict constraints: maximum 2 allowed files (`TODO.md`, `docs/CURRENT_REPORT.md`), zero runtime source changes, zero network calls, zero deployment side effects.
+1. Real Gemini 3.5 Live Translate audio proof is still open. Deterministic wiring tests do not prove provider audio.
+2. Translator source/target participant isolation and feedback-loop prevention need a real multi-language room proof.
+3. Meeting-to-durable-spec pipeline, consent/retention, and cross-network TURN proof remain open.
+4. Temporal durable workflow, full agent adapters/router, client portal, AgentLine calls, deployment/rollback, and production hardening remain incomplete.
+5. Credential values previously copied into Antigravity chat history should be rotated before broader production use.
+
+## Safe next order
+
+1. Review and commit this local stabilization packet.
+2. With separate founder approval, push and deploy only to staging.
+3. Run authenticated founder and invite-client endpoint smoke tests against staging.
+4. Run real two-language LiveKit room proof with audio capture evidence and feedback-loop checks.
+5. Continue P9 specification pipeline only after meeting evidence passes.

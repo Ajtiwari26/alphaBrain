@@ -44,7 +44,7 @@ class EvaRoomRuntime:
     active_speaker: str | None = None
     human_participants: set[str] = field(default_factory=set)
     participant_languages: dict[str, str] = field(default_factory=dict)
-    translate_agents: dict[str, Any] = field(default_factory=dict) # str -> TranslateAgent
+    translate_agents: dict[str, TranslateAgent] = field(default_factory=dict)
     translate_mode: str = "transcribe_only"
     ready: asyncio.Event = field(default_factory=asyncio.Event)
     stop: asyncio.Event = field(default_factory=asyncio.Event)
@@ -59,7 +59,13 @@ class EvaRoomRuntime:
             "model": settings.GEMINI_LIVE_MODEL,
             "active_speaker": self.active_speaker,
             "human_participants": len(self.human_participants),
-            "languages": list({lang for id_, lang in self.participant_languages.items() if id_ in self.human_participants}),
+            "languages": sorted(
+                {
+                    language
+                    for identity, language in self.participant_languages.items()
+                    if identity in self.human_participants
+                }
+            ),
             "translate_mode": self.translate_mode,
             "error": self.error,
         }
@@ -71,9 +77,15 @@ class EvaRoomManager:
     def __init__(self) -> None:
         self._rooms: dict[str, EvaRoomRuntime] = {}
         self._lock = asyncio.Lock()
-        self._bg_tasks = set()
+        self._bg_tasks: set[asyncio.Task[Any]] = set()
 
-    async def ensure_room(self, room_name: str, language: str = "en", identity: str = "", timeout_seconds: float = 15.0) -> dict[str, Any]:
+    async def ensure_room(
+        self,
+        room_name: str,
+        language: str = "en",
+        identity: str = "",
+        timeout_seconds: float = 15.0,
+    ) -> dict[str, Any]:
         self._validate_configuration()
         async with self._lock:
             runtime = self._rooms.get(room_name)
@@ -127,6 +139,7 @@ class EvaRoomManager:
             raise RuntimeError("LiveKit credentials are not configured")
         if not settings.LIVEKIT_URL:
             raise RuntimeError("LiveKit URL is not configured")
+
     async def _reconcile_translate_agents(self, runtime: EvaRoomRuntime) -> None:
         """Spawns or tears down TranslateAgents based on participant languages."""
         if not settings.TRANSLATE_ENABLED:
@@ -136,8 +149,9 @@ class EvaRoomManager:
             active_identities = runtime.human_participants
             # Only count languages for currently active human participants
             active_langs = {
-                lang for id_, lang in runtime.participant_languages.items()
-                if id_ in active_identities
+                language
+                for identity, language in runtime.participant_languages.items()
+                if identity in active_identities
             }
 
             if len(active_langs) <= 1:
@@ -160,14 +174,6 @@ class EvaRoomManager:
                 for lang in unneeded_langs:
                     agent = runtime.translate_agents.pop(lang)
                     await agent.stop()
-        if settings.GEMINI_USE_VERTEX and not settings.GOOGLE_CLOUD_PROJECT:
-            raise RuntimeError("Vertex AI project is not configured")
-        if not settings.GEMINI_USE_VERTEX and not settings.GOOGLE_API_KEY:
-            raise RuntimeError("Gemini Live API key is not configured")
-        if not settings.LIVEKIT_API_KEY or not settings.LIVEKIT_API_SECRET:
-            raise RuntimeError("LiveKit credentials are not configured")
-        if not settings.LIVEKIT_URL:
-            raise RuntimeError("LiveKit URL is not configured")
 
     @staticmethod
     def _model_options() -> dict[str, Any]:

@@ -1,4 +1,3 @@
-
 with open("testscript/tmp_c4/api.log") as f:
     lines = f.readlines()
 print(f"Total lines: {len(lines)}")

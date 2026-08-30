@@ -1,5 +1,3 @@
-import enum
-
 """
 Alpha Brain Database Models
 ============================
@@ -12,6 +10,7 @@ Uses JSON columns for structured data instead of stringified Python representati
 Enforces append-only immutable audit log guarantees via ORM event listeners.
 """
 
+import enum
 from datetime import UTC, datetime
 from typing import Any
 

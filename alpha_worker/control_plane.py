@@ -8,7 +8,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
@@ -267,7 +267,7 @@ class ControlPlaneClient:
     async def get_latest_checkpoint(self, task_id: str) -> TaskCheckpoint | None:
         try:
             response = await self._request("GET", f"/api/tasks/{task_id}/checkpoints/latest")
-            return TaskCheckpoint.model_validate(response)
+            return cast(TaskCheckpoint, TaskCheckpoint.model_validate(response))
         except ControlPlaneProtocolError as e:
             if "404" in str(e):
                 return None
@@ -281,7 +281,7 @@ class ControlPlaneClient:
         response = await self._request(
             "POST", f"/api/tasks/{request.checkpoint.task_id}/checkpoints", payload
         )
-        return TaskCheckpoint.model_validate(response)
+        return cast(TaskCheckpoint, TaskCheckpoint.model_validate(response))
 
     async def get_resume_decision(
         self, request: ResumeDecisionRequest, lease_token: str
@@ -290,7 +290,7 @@ class ControlPlaneClient:
         response = await self._request(
             "POST", f"/api/tasks/{request.task_id}/resume-decision", payload
         )
-        return ResumeDecisionResponse.model_validate(response)
+        return cast(ResumeDecisionResponse, ResumeDecisionResponse.model_validate(response))
 
     async def _request(
         self, method: str, path: str, payload: dict[str, Any] | None = None, is_retry: bool = False

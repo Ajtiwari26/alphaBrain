@@ -1,8 +1,9 @@
 import shutil
 import subprocess
 import uuid
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 from alpha_core.config import settings
 from alpha_protocol import (
@@ -36,7 +37,9 @@ class ClaudeCLIAdapter(BaseAgentAdapter):
         task: TaskEnvelope,
         worktree_path: Path,
         base_commit: str,
-        emit_checkpoint: Callable[[str, str, str, dict], Awaitable[None]] | None = None,
+        emit_checkpoint: (
+            Callable[[str, str, str, str, dict[str, Any]], Awaitable[None]] | None
+        ) = None,
     ) -> TaskResult:
         attempt_id = f"att_{task.task_id}_{uuid.uuid4().hex[:6]}"
         is_ready, reason = self.check_readiness()

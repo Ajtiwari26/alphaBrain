@@ -25,6 +25,7 @@ def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     if not url or url == "sqlite:///alpha_brain.db":
         import os
+
         url = os.environ.get("DATABASE_URL")
     if url:
         url = url.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")
@@ -45,6 +46,7 @@ def run_migrations_online() -> None:
     url = config.get_main_option("sqlalchemy.url")
     if not url or url == "sqlite:///alpha_brain.db":
         import os
+
         url = os.environ.get("DATABASE_URL")
     if url:
         url = url.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")

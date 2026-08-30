@@ -80,6 +80,7 @@ MEET_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "alpha_meet"
 eva_meet_agent = EvaMeetingAgent()
 logger = logging.getLogger("alpha_core.api")
 SAFE_EXTERNAL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+SAFE_LANGUAGE_CODE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
 
 
 class SelfDevelopmentTaskSubmission(BaseModel):
@@ -383,7 +384,9 @@ async def generate_meet_token(
 
     try:
         language = payload.get("language", "hi")
-        eva_status = await eva_room_manager.ensure_room(room_name, language=language, identity=identity)
+        eva_status = await eva_room_manager.ensure_room(
+            room_name, language=language, identity=identity
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -456,21 +459,35 @@ async def get_meet_slide(
 class TranslateTextRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=5000)
     target_language: str = Field(default="en", max_length=10)
+    invite_token: str | None = Field(default=None, max_length=4096)
 
 
 @app.post("/api/meet/translate-text")
 async def translate_meet_text(
     payload: TranslateTextRequest,
+    authorization: str | None = Header(default=None),
 ):
     """Translates speech transcript segments to clear English for live dual-language notes."""
+    if payload.invite_token:
+        if verify_meeting_invite(payload.invite_token) is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired meeting invite")
+    else:
+        require_api_principal(authorization)
+
     text = payload.text.strip()
     if not text:
         return {"translated_text": "", "is_translated": False}
+    target_language = payload.target_language.strip()
+    if not SAFE_LANGUAGE_CODE.fullmatch(target_language):
+        raise HTTPException(status_code=422, detail="Invalid target language")
 
     # If text is purely ASCII alphanumeric/punctuation and likely English, skip translation
-    if all(ord(c) < 128 for c in text):
+    if target_language.lower().startswith("en") and all(ord(c) < 128 for c in text):
         words = text.split()
-        if len(words) > 0 and not any(w.lower() in {"namaste", "matlab", "kya", "hai", "nahi", "accha", "theek"} for w in words):
+        if words and not any(
+            word.lower() in {"namaste", "matlab", "kya", "hai", "nahi", "accha", "theek"}
+            for word in words
+        ):
             return {"translated_text": text, "is_translated": False}
 
     try:
@@ -485,9 +502,9 @@ async def translate_meet_text(
             config=types.GenerateContentConfig(
                 system_instruction=(
                     "You are a real-time meeting translator for AlphaBrain. "
-                    "Translate the given transcript text into concise, natural, professional English. "
+                    f"Translate the transcript into concise, natural language code {target_language}. "
                     "Preserve software engineering terms accurately. "
-                    "Output ONLY the translated English text. No notes, no explanations, no quotes."
+                    "Output only translated text. No notes, explanations, or quotes."
                 ),
                 temperature=0.2,
             ),

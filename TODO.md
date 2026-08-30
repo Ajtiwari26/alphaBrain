@@ -6,10 +6,11 @@ Status: foundation prototype
 Target: secure, durable, evidence-backed system connecting Unifold, Alpha Brain,
 AgentLine, Inito, and local Mac execution worker.
 
-Latest verified progress: 25 August 2026 — Gemini 2.5 native-audio provider restored;
-direct provider, real LiveKit RTC, and same-machine founder/client/Eva browser room
-audio/transcript proofs pass. 110 tests, Ruff lint/format, mypy, compile, JavaScript
-syntax, dependency, migration, and source-secret gates pass.
+Latest verified progress: 31 August 2026 — local stabilization passes 506 tests with
+one intentional skip, including Docker-backed PostgreSQL migration, checkpoint, and
+watchdog-concurrency gates. Ruff lint/format, mypy across 63 source files, JavaScript
+syntax, and diff checks pass. Earlier Gemini 2.5 native-audio RTC proof remains valid;
+real Gemini 3.5 Live Translate provider-audio proof remains open.
 
 ## How to use this file
 
@@ -38,7 +39,8 @@ syntax, dependency, migration, and source-secret gates pass.
 - [x] Gemini Live setup/audio message formatter and parser.
 - [x] Plivo media message formatter and parser.
 - [x] Basic Mac battery/load health check.
-- [x] 110 deterministic tests pass without manual `PYTHONPATH` configuration.
+- [x] 506 deterministic/hermetic tests pass without manual `PYTHONPATH` configuration;
+  one explicitly skipped environment-dependent test remains visible.
 
 ### Not production-complete
 
@@ -440,6 +442,19 @@ Goal: deliver real three-participant room: founder, client, Eva.
 - [x] Add speaking policy: addressed, clarification needed, or critical risk.
 - [ ] Load versioned DeployMate knowledge instead of static marketing claims.
 - [x] Prevent Eva from claiming unimplemented security, deployment, or gates.
+
+### Live translation
+
+- [x] Configure `gemini-3.5-live-translate-preview` with audio input/output transcripts
+  and server-side `TranslationConfig`.
+- [x] Require founder authentication or signed meeting invite for text translation.
+- [x] Validate and honor requested target language at API boundary.
+- [x] Render provider translation output through DOM text nodes, never raw HTML.
+- [x] Replace exception-swallowing translation scripts with deterministic contract tests.
+- [ ] Prove real Gemini Live Translate audio input and translated audio output in a
+  two-language LiveKit room.
+- [ ] Isolate each translator to explicit source participant(s) and prove translator
+  output cannot feed another translator loop.
 
 ### Meeting state and safety
 

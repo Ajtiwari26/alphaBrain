@@ -50,7 +50,7 @@ def test_eva_meeting_agent():
 
 @pytest.mark.asyncio
 async def test_meet_api_endpoints(api_headers, monkeypatch):
-    async def fake_ensure_room(room_name):
+    async def fake_ensure_room(room_name, **_kwargs):
         return {
             "identity": "eva-cto",
             "room_name": room_name,
@@ -144,8 +144,9 @@ def test_meeting_frontend_uses_livekit_not_browser_voice_simulation():
     assert "new Room(" in javascript
     assert "setMicrophoneEnabled(true)" in javascript
     assert "setScreenShareEnabled" in javascript
-    assert 'registerTextStreamHandler("lk.transcription"' in javascript
     assert "RoomEvent.TranscriptionReceived" in javascript
+    assert "document.createTextNode(data.translated_text)" in javascript
+    assert "${data.translated_text}" not in javascript
     assert "speechSynthesis" not in javascript
     assert "SpeechRecognition" not in javascript
     assert "onclick=" not in html

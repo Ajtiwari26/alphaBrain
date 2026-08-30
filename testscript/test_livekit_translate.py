@@ -1,39 +1,49 @@
-import asyncio
-import os
-from google.genai import types
-from livekit import rtc
-from livekit.agents import Agent, AgentSession, room_io
-from livekit.plugins import google
-import livekit.plugins.google.realtime.realtime_api as realtime_api
+"""Deterministic contracts for AlphaMeet Gemini Live translation wiring."""
 
-original_build = realtime_api.RealtimeSession._build_connect_config
+from types import SimpleNamespace
+from typing import Any
 
-def patched_build(self):
-    conf = original_build(self)
-    # Clear out unsupported fields for Live Translate
-    conf.system_instruction = None
-    conf.tools = None
-    conf.history_config = None
-    
-    if hasattr(self._realtime_model, "translation_config") and self._realtime_model.translation_config:
-        conf.translation_config = self._realtime_model.translation_config
-    return conf
+from alpha_meet import translate_agent
+from alpha_meet.translate_agent import TranslateAgent
 
-realtime_api.RealtimeSession._build_connect_config = patched_build
 
-async def run_agent():
-    print("Monkey-patched successfully!")
-    model = google.realtime.RealtimeModel(
-        model="gemini-3.5-live-translate-preview",
-        api_key=os.environ.get("GOOGLE_API_KEY"),
-        instructions=""
+def test_translation_patch_forwards_only_translation_configuration(monkeypatch):
+    config = SimpleNamespace(
+        system_instruction="must-clear",
+        tools=["must-clear"],
+        history_config="must-clear",
+        translation_config=None,
     )
-    model.translation_config = types.TranslationConfig(
-        target_language_code="es",
-        echo_target_language=False,
+    translation_config = object()
+    session = SimpleNamespace(
+        _realtime_model=SimpleNamespace(translation_config=translation_config)
     )
-    
-    print("Model initialized. Patch is ready!")
-    
-if __name__ == "__main__":
-    asyncio.run(run_agent())
+    monkeypatch.setattr(translate_agent, "original_build", lambda _session: config)
+
+    result = translate_agent.patched_build(session)
+
+    assert result is config
+    assert result.system_instruction is None
+    assert result.tools is None
+    assert result.history_config is None
+    assert result.translation_config is translation_config
+
+
+def test_translate_agent_builds_official_audio_translation_config(monkeypatch):
+    captured: dict[str, Any] = {}
+
+    class FakeModel:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(translate_agent.google.realtime, "RealtimeModel", FakeModel)
+    agent = TranslateAgent(room_name="room-1", target_language="es")
+
+    model = agent._build_model()
+
+    assert captured["model"] == translate_agent.settings.TRANSLATE_MODEL
+    assert captured["instructions"] == ""
+    assert captured["input_audio_transcription"] is not None
+    assert captured["output_audio_transcription"] is not None
+    assert model.translation_config.target_language_code == "es"
+    assert model.translation_config.echo_target_language is False

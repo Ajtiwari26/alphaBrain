@@ -12,6 +12,7 @@ from alpha_worker.daemon import AlphaWorkerDaemon
 @pytest.mark.skip(reason="flaky in concurrent suite due to global logging state pollution")
 async def test_daemon_failed_submit_returns_false_and_does_not_log_completed(monkeypatch, caplog):
     from alpha_core.config import settings
+
     monkeypatch.setattr(settings, "WORKER_ALLOW_LOCAL_DB", True)
     daemon = AlphaWorkerDaemon(worker_id="test_worker")
     daemon.health_checker = MagicMock()
@@ -63,6 +64,7 @@ async def test_daemon_failed_submit_returns_false_and_does_not_log_completed(mon
     session = AsyncMock()
 
     import logging
+
     with caplog.at_level(logging.INFO, logger="alpha_worker"):
         res = await daemon.execute_task_cycle(session)
 

@@ -54,6 +54,7 @@ temp_worktrees/
 /d2_debug.log
 /r2_*_manifest.json
 testscript/dev_artifacts/
+testscript/archive/legacy_repairs/local/
 *.db-journal
 *.db-wal
 *.db-shm

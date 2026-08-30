@@ -91,7 +91,7 @@ async def test_worker_cannot_claim_another_worker_identity(worker_headers):
 
 @pytest.mark.asyncio
 async def test_meeting_admin_grant_is_server_controlled(api_headers, monkeypatch):
-    async def fake_ensure_room(room_name):
+    async def fake_ensure_room(room_name, **_kwargs):
         return {"identity": "eva-cto", "room_name": room_name, "state": "ready"}
 
     monkeypatch.setattr(eva_room_manager, "ensure_room", fake_ensure_room)
