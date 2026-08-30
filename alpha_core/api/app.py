@@ -57,6 +57,7 @@ from alpha_core.security import (
     worker_kill_switch,
 )
 from alpha_core.self_development import SelfImprovementRequest, create_self_improvement_task
+from alpha_core.state.spec_engine import SpecEngine, TaskGraphPlanningConstraints
 from alpha_core.state.task_engine import TaskEngine
 from alpha_meet.eva_agent import EvaMeetingAgent
 from alpha_meet.eva_live_agent import eva_room_manager
@@ -67,6 +68,7 @@ from alpha_protocol import (
     ApprovalStatus,
     CallJob,
     PersonaType,
+    SpecVersion,
     TaskEnvelope,
     TaskResult,
     TaskStatus,
@@ -114,6 +116,14 @@ class TaskGraphSubmissionRequest(BaseModel):
     """Founder-authored frozen task graph for one registered project."""
 
     tasks: list[TaskEnvelope] = Field(min_length=1, max_length=50)
+
+
+class SpecApprovalDecisionRequest(BaseModel):
+    """Founder decision bound to exact immutable specification digest."""
+
+    approved: bool
+    scope_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reason: str | None = Field(default=None, max_length=2000)
 
 
 def _validate_repo_reference(repo_path: str) -> str:
@@ -596,6 +606,97 @@ async def register_project(
         "name": project.name,
         "repo_path": project.repo_path,
     }
+
+
+@app.post("/api/projects/{project_id}/specs", response_model=dict[str, Any])
+async def submit_project_specification(
+    project_id: str,
+    spec: SpecVersion,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Persist one immutable pending specification version for founder review."""
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(
+            status_code=403, detail="Specification submission requires founder access"
+        )
+    require_permission(principal, "spec:write")
+    require_project_access(principal, project_id)
+    if spec.project_id != project_id:
+        raise HTTPException(status_code=422, detail="Specification project does not match URL")
+    try:
+        record, digest = await SpecEngine.submit_spec(session, spec, actor=principal.subject)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {
+        "status": record.status,
+        "project_id": record.project_id,
+        "spec_id": record.id,
+        "version": record.version,
+        "scope_sha256": digest,
+    }
+
+
+@app.post("/api/projects/{project_id}/specs/{spec_id}/approval", response_model=dict[str, Any])
+async def decide_project_specification(
+    project_id: str,
+    spec_id: str,
+    payload: SpecApprovalDecisionRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Record founder decision against exact pending specification digest."""
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(
+            status_code=403, detail="Specification approval requires founder access"
+        )
+    require_permission(principal, "spec:approve")
+    require_project_access(principal, project_id)
+    try:
+        record = await SpecEngine.decide_founder_approval(
+            session,
+            spec_id,
+            approved=payload.approved,
+            actor=principal.subject,
+            scope_sha256=payload.scope_sha256,
+            reason=payload.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if record.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Specification not found in project")
+    return {
+        "status": record.status,
+        "project_id": record.project_id,
+        "spec_id": record.id,
+        "version": record.version,
+        "founder_approved": bool(record.founder_approved),
+    }
+
+
+@app.post(
+    "/api/projects/{project_id}/specs/{spec_id}/task-graph-draft",
+    response_model=dict[str, Any],
+)
+async def draft_specification_task_graph(
+    project_id: str,
+    spec_id: str,
+    constraints: TaskGraphPlanningConstraints,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Draft deterministic non-executable task packets from one approved spec."""
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(status_code=403, detail="Task planning requires founder access")
+    require_permission(principal, "task:write")
+    require_project_access(principal, project_id)
+    try:
+        draft = await SpecEngine.draft_task_graph(session, spec_id, constraints)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if draft.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Specification not found in project")
+    return cast(dict[str, Any], draft.model_dump(mode="json"))
 
 
 @app.post("/api/tasks", response_model=dict[str, Any])

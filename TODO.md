@@ -240,8 +240,12 @@ Goal: make task scheduling deterministic, concurrent-safe, and evidence-backed.
   reject cycles, duplicates, missing/nonterminal external dependencies, cross-project/repository
   bindings, and return frozen packet digests. Every admitted graph task still requires separate
   execution approval.
-- [ ] Add approved-spec-to-task-graph planner with typed output and founder review before graph
-  admission; current endpoint accepts validated task envelopes but does not ask a model to plan.
+- [x] Add deterministic approved-spec-to-task-graph drafting with typed output, bounded paths,
+  exact base commit, typed evidence commands, spec/graph/task digests, and founder review before
+  atomic graph admission. It emits one delivery node until result-commit merge arbitration exists;
+  configured-model decomposition/refinement remains a later bounded layer.
+- [ ] Add verified result-commit integration and merge arbitration before allowing multiple code
+  tasks in one project DAG; downstream QA must run against integrated work, not original base.
 - [x] Add per-project and per-worker concurrency limits.
 - [x] Add risk-based approval policies.
 - [ ] Build typed action broker for shell, files, browser, deployment, MCP, and calls.
@@ -506,10 +510,16 @@ Goal: turn meeting conversation into traceable, editable, approved build specifi
   - [ ] Risk register.
   - [ ] Decision log.
 - [ ] Add founder edit/review/approval.
+  - [x] Persist immutable sequential spec versions and bind founder approve/reject to exact SHA-256.
+    Founder editing UI and edit-as-new-version workflow remain open.
 - [ ] Add client edit/review/approval.
 - [ ] Bind workflow to exact approved spec version.
+  - [x] Deterministic task drafts include exact spec digest in inputs, stable graph/task packet
+    digests, exact base commit, and packet binding. Durable workflow orchestration remains open.
 - [ ] Add change request and impact analysis.
 - [ ] Prevent build when unresolved blocking question exists.
+  - [x] Approved-spec task drafting fails closed on unresolved questions. Direct legacy task
+    submission still exists and is not spec-bound.
 
 ### P9 acceptance gate
 
@@ -517,6 +527,8 @@ Goal: turn meeting conversation into traceable, editable, approved build specifi
 - [ ] Every requirement links to source transcript or labeled inference.
 - [ ] Client correction creates new version without rewriting raw history.
 - [ ] Build cannot begin before exact version approval.
+  - [x] New spec-to-DAG lane cannot draft or admit work before digest-bound founder approval;
+    legacy direct-task route prevents marking this complete system-wide.
 
 ## P10 — AgentLine integration
 
