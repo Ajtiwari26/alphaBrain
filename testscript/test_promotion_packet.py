@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from cryptography.fernet import Fernet
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from alpha_core.api.app import app
@@ -17,6 +18,7 @@ from alpha_core.config import settings
 from alpha_core.db.connection import get_session_factory
 from alpha_core.db.models import (
     ApprovalRecord,
+    AttemptRecord,
     AuditEventRecord,
     TaskRecord,
 )
@@ -465,7 +467,7 @@ def test_07_already_at_result_recovery(real_git_repo, tmp_path):
 # ---------------------------------------------------------------------------
 def test_08_dirty_repo_fails_unchanged(real_git_repo, tmp_path):
     repo_dir, base_commit, result_commit = real_git_repo
-    (repo_dir / "untracked.txt").write_text("dirty\n")
+    (repo_dir / "file1.txt").write_text("uncommitted tracked changes\n")
 
     wm = WorktreeManager(tmp_path / "worktrees")
     with pytest.raises(RuntimeError, match="uncommitted changes"):
@@ -915,3 +917,275 @@ async def test_15_control_plane_outage_safety_and_spool_replay(
     async with session_factory() as session:
         task = await session.get(TaskRecord, task_id)
         assert task.status == TaskStatus.COMPLETED.value
+
+
+# ---------------------------------------------------------------------------
+# Explicit Repair Tests: Fail-closed DB state on malformed commit/path & untracked file safety
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_malformed_result_commit_fails_closed_db_state_unchanged(real_git_repo):
+    repo_dir, base_commit, result_commit = real_git_repo
+    task_id, _project_id, _worker_id, _ = await create_completed_review_fixture(
+        repo_dir, base_commit, result_commit, task_id="tsk_malformed_commit"
+    )
+
+    session_factory = get_session_factory()
+    # Mutate attempt result_commit to an invalid format (not 40-char hex SHA)
+    async with session_factory() as session:
+        att = (
+            await session.execute(select(AttemptRecord).where(AttemptRecord.task_id == task_id))
+        ).scalar_one()
+        att.result_commit = "invalid_short_commit"
+        tr = TaskResult(
+            attempt_id=att.id,
+            task_id=att.task_id,
+            status=TaskStatus(att.status),
+            agent=AgentType(att.agent),
+            model=att.model,
+            base_commit=base_commit,
+            result_commit="invalid_short_commit",
+            packet_sha256=att.packet_sha256,
+            files_changed=["file1.txt"],
+            gate_result=(
+                GateResult.model_validate(att.gate_result_json)
+                if isinstance(att.gate_result_json, dict)
+                else (
+                    GateResult.model_validate_json(att.gate_result_json)
+                    if att.gate_result_json
+                    else None
+                )
+            ),
+        )
+        new_review_sha = compute_review_digest(tr, att.worker_id or "")
+        review_appr = (
+            await session.execute(
+                select(ApprovalRecord).where(
+                    ApprovalRecord.task_id == task_id,
+                    ApprovalRecord.approval_type == "task_review",
+                )
+            )
+        ).scalar_one()
+        review_appr.scope_sha256 = new_review_sha
+        await session.commit()
+
+    # decide_task_approval must fail validation and raise
+    async with session_factory() as session:
+        with pytest.raises(ValidationError):
+            await TaskEngine.decide_task_approval(
+                session, task_id, approved=True, decided_by="founder", review_sha256=new_review_sha
+            )
+
+    # Verify DB state is strictly unchanged: task VERIFIED, review PENDING, 0 promo approvals, 0 completion audits
+    async with session_factory() as session:
+        task = await session.get(TaskRecord, task_id)
+        assert task.status == TaskStatus.VERIFIED.value
+
+        review_appr = (
+            await session.execute(
+                select(ApprovalRecord).where(
+                    ApprovalRecord.task_id == task_id,
+                    ApprovalRecord.approval_type == "task_review",
+                )
+            )
+        ).scalar_one()
+        assert review_appr.status == ApprovalStatus.PENDING.value
+
+        promos = (
+            (
+                await session.execute(
+                    select(ApprovalRecord).where(
+                        ApprovalRecord.task_id == task_id,
+                        ApprovalRecord.approval_type == "task_promotion",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(promos) == 0
+
+        audits = (
+            (
+                await session.execute(
+                    select(AuditEventRecord).where(
+                        AuditEventRecord.task_id == task_id,
+                        AuditEventRecord.event_type.in_(
+                            ["task_review_approved", "task_promotion_approved", "task_completed"]
+                        ),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(audits) == 0
+
+
+@pytest.mark.asyncio
+async def test_malformed_changed_path_fails_closed_db_state_unchanged(real_git_repo):
+    repo_dir, base_commit, result_commit = real_git_repo
+    task_id, _project_id, _worker_id, _ = await create_completed_review_fixture(
+        repo_dir, base_commit, result_commit, task_id="tsk_malformed_path"
+    )
+
+    session_factory = get_session_factory()
+    # Mutate attempt files_changed_json to contain an invalid path (e.g. "../escape.txt")
+    async with session_factory() as session:
+        att = (
+            await session.execute(select(AttemptRecord).where(AttemptRecord.task_id == task_id))
+        ).scalar_one()
+        att.files_changed_json = ["../escape.txt"]
+        tr = TaskResult(
+            attempt_id=att.id,
+            task_id=att.task_id,
+            status=TaskStatus(att.status),
+            agent=AgentType(att.agent),
+            model=att.model,
+            base_commit=base_commit,
+            result_commit=result_commit,
+            packet_sha256=att.packet_sha256,
+            files_changed=["../escape.txt"],
+            gate_result=(
+                GateResult.model_validate(att.gate_result_json)
+                if isinstance(att.gate_result_json, dict)
+                else (
+                    GateResult.model_validate_json(att.gate_result_json)
+                    if att.gate_result_json
+                    else None
+                )
+            ),
+        )
+        new_review_sha = compute_review_digest(tr, att.worker_id or "")
+        review_appr = (
+            await session.execute(
+                select(ApprovalRecord).where(
+                    ApprovalRecord.task_id == task_id,
+                    ApprovalRecord.approval_type == "task_review",
+                )
+            )
+        ).scalar_one()
+        review_appr.scope_sha256 = new_review_sha
+        await session.commit()
+
+    # decide_task_approval must fail validation and raise
+    async with session_factory() as session:
+        with pytest.raises(ValidationError):
+            await TaskEngine.decide_task_approval(
+                session, task_id, approved=True, decided_by="founder", review_sha256=new_review_sha
+            )
+
+    # Verify DB state is strictly unchanged: task VERIFIED, review PENDING, 0 promo approvals, 0 completion audits
+    async with session_factory() as session:
+        task = await session.get(TaskRecord, task_id)
+        assert task.status == TaskStatus.VERIFIED.value
+
+        review_appr = (
+            await session.execute(
+                select(ApprovalRecord).where(
+                    ApprovalRecord.task_id == task_id,
+                    ApprovalRecord.approval_type == "task_review",
+                )
+            )
+        ).scalar_one()
+        assert review_appr.status == ApprovalStatus.PENDING.value
+
+        promos = (
+            (
+                await session.execute(
+                    select(ApprovalRecord).where(
+                        ApprovalRecord.task_id == task_id,
+                        ApprovalRecord.approval_type == "task_promotion",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(promos) == 0
+
+        audits = (
+            (
+                await session.execute(
+                    select(AuditEventRecord).where(
+                        AuditEventRecord.task_id == task_id,
+                        AuditEventRecord.event_type.in_(
+                            ["task_review_approved", "task_promotion_approved", "task_completed"]
+                        ),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(audits) == 0
+
+
+def test_unrelated_untracked_file_survives_promotion_byte_for_byte(real_git_repo, tmp_path):
+    repo_dir, base_commit, result_commit = real_git_repo
+    untracked_content = b"# preserved user config\nSECRET_OR_NOTE=12345\n"
+    untracked_file = repo_dir / "user_notes.txt"
+    untracked_file.write_bytes(untracked_content)
+
+    wm = WorktreeManager(tmp_path / "worktrees")
+    wm.promote_task_result(
+        repo_path=str(repo_dir),
+        task_id="tsk_promo_01",
+        base_commit=base_commit,
+        result_commit=result_commit,
+        allowed_paths=["file1.txt"],
+        expected_files_changed=["file1.txt"],
+    )
+
+    assert run_git(repo_dir, "rev-parse", "HEAD") == result_commit
+    assert run_git(repo_dir, "status", "--porcelain", "--untracked-files=no") == ""
+    assert untracked_file.exists()
+    assert untracked_file.read_bytes() == untracked_content
+
+
+def test_overlapping_untracked_target_aborts_head_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", [tmp_path])
+    repo_dir = tmp_path / "overlap_repo"
+    repo_dir.mkdir(parents=True, exist_ok=True)
+
+    subprocess.run(
+        ["git", "init", "-b", "main"], cwd=str(repo_dir), check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@alphabrain.ai"], cwd=str(repo_dir), check=True
+    )
+    subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True)
+
+    (repo_dir / "base.txt").write_text("base\n")
+    subprocess.run(["git", "add", "base.txt"], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "commit", "-m", "Base commit"], cwd=str(repo_dir), check=True)
+    base_commit = run_git(repo_dir, "rev-parse", "HEAD")
+
+    (repo_dir / "new_file.txt").write_text("incoming from worker\n")
+    subprocess.run(["git", "add", "new_file.txt"], cwd=str(repo_dir), check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Result commit adding new_file.txt"], cwd=str(repo_dir), check=True
+    )
+    result_commit = run_git(repo_dir, "rev-parse", "HEAD")
+
+    subprocess.run(["git", "reset", "--hard", base_commit], cwd=str(repo_dir), check=True)
+    subprocess.run(
+        ["git", "branch", "alpha/tsk_overlap_01", result_commit], cwd=str(repo_dir), check=True
+    )
+
+    # Place untracked file at the exact path of the incoming new file
+    untracked_target = repo_dir / "new_file.txt"
+    untracked_target.write_text("local untracked collision\n")
+
+    wm = WorktreeManager(tmp_path / "worktrees")
+    with pytest.raises(RuntimeError, match="Fast-forward merge failed"):
+        wm.promote_task_result(
+            repo_path=str(repo_dir),
+            task_id="tsk_overlap_01",
+            base_commit=base_commit,
+            result_commit=result_commit,
+            allowed_paths=["new_file.txt"],
+            expected_files_changed=["new_file.txt"],
+        )
+
+    assert run_git(repo_dir, "rev-parse", "HEAD") == base_commit
+    assert untracked_target.read_text() == "local untracked collision\n"

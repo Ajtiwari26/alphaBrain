@@ -815,14 +815,7 @@ class TaskEngine:
                     raise ValueError("Conflicting replay decision rejects")
                 return task
 
-            now = utc_now()
-            approval.status = (
-                ApprovalStatus.APPROVED.value if approved else ApprovalStatus.REJECTED.value
-            )
-            approval.decided_by = decided_by
-            approval.reason = reason
-            approval.decided_at = now
-
+            promo_digest: str | None = None
             if approved:
                 from alpha_protocol.task import PromotionRequest, compute_promotion_digest
 
@@ -837,32 +830,40 @@ class TaskEngine:
                     )
                 )
                 if has_changes and changed_files:
-                    try:
-                        promo_req = PromotionRequest(
-                            task_id=task.id,
-                            project_id=task.project_id,
-                            attempt_id=attempt.id,
-                            worker_id=attempt.worker_id or "",
-                            repo=envelope.repo,
-                            base_commit=envelope.base_commit,
-                            result_commit=attempt.result_commit,
-                            files_changed=changed_files,
-                            allowed_paths=envelope.allowed_paths,
-                            review_sha256=review_sha256,
-                        )
-                        promo_digest = compute_promotion_digest(promo_req)
-                        prom_approval = ApprovalRecord(
-                            id=f"appr_{uuid.uuid4().hex[:12]}",
-                            task_id=task.id,
-                            attempt_id=attempt.id,
-                            approval_type="task_promotion",
-                            scope_sha256=promo_digest,
-                            status=ApprovalStatus.PENDING.value,
-                            created_at=now,
-                        )
-                        session.add(prom_approval)
-                    except Exception:
-                        TaskEngine._transition(task, TaskStatus.COMPLETED)
+                    promo_req = PromotionRequest(
+                        task_id=task.id,
+                        project_id=task.project_id,
+                        attempt_id=attempt.id,
+                        worker_id=attempt.worker_id or "",
+                        repo=envelope.repo,
+                        base_commit=envelope.base_commit,
+                        result_commit=attempt.result_commit,
+                        files_changed=changed_files,
+                        allowed_paths=envelope.allowed_paths,
+                        review_sha256=review_sha256,
+                    )
+                    promo_digest = compute_promotion_digest(promo_req)
+
+            now = utc_now()
+            approval.status = (
+                ApprovalStatus.APPROVED.value if approved else ApprovalStatus.REJECTED.value
+            )
+            approval.decided_by = decided_by
+            approval.reason = reason
+            approval.decided_at = now
+
+            if approved:
+                if promo_digest is not None:
+                    prom_approval = ApprovalRecord(
+                        id=f"appr_{uuid.uuid4().hex[:12]}",
+                        task_id=task.id,
+                        attempt_id=attempt.id,
+                        approval_type="task_promotion",
+                        scope_sha256=promo_digest,
+                        status=ApprovalStatus.PENDING.value,
+                        created_at=now,
+                    )
+                    session.add(prom_approval)
                 else:
                     TaskEngine._transition(task, TaskStatus.COMPLETED)
             else:

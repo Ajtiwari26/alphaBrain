@@ -364,6 +364,8 @@ async def test_unchanged_bound_digest_approves_and_completes(db_session: AsyncSe
     task_rec, _ = leased
 
     res = make_passing_result(env)
+    res.result_commit = env.base_commit
+    res.files_changed = []
     assert await TaskEngine.submit_result(db_session, res, task_rec.lease_token, "worker-1") is True
 
     approval = (

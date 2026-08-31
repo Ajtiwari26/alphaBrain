@@ -232,7 +232,7 @@ async def test_duplicate_result_is_idempotent(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_founder_review_completes_task(db_session: AsyncSession):
+async def test_founder_review_completes_unchanged_task(db_session: AsyncSession):
     env = make_test_envelope(require_packet_binding=True)
     await TaskEngine.submit_task(db_session, env)
     leased = await TaskEngine.lease_next_task(db_session, "w1")
@@ -240,6 +240,8 @@ async def test_founder_review_completes_task(db_session: AsyncSession):
     task_rec, _ = leased
 
     res = make_passing_result(env)
+    res.result_commit = env.base_commit
+    res.files_changed = []
     await TaskEngine.submit_result(db_session, res, task_rec.lease_token, "w1")
 
     from sqlalchemy import select

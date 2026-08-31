@@ -256,7 +256,7 @@ class WorktreeManager:
         validated_repo = self.validate_repo_path(repo_path)
 
         # 1. Source repo clean
-        if self._git(validated_repo, ["status", "--porcelain"]):
+        if self._git(validated_repo, ["status", "--porcelain", "--untracked-files=no"]):
             raise RuntimeError("Source repository has uncommitted changes")
 
         # 2. Resolvable commits
@@ -325,5 +325,5 @@ class WorktreeManager:
         new_head = self._git(validated_repo, ["rev-parse", "HEAD"])
         if new_head != resolved_result:
             raise RuntimeError("Post-merge HEAD does not match result commit")
-        if self._git(validated_repo, ["status", "--porcelain"]):
+        if self._git(validated_repo, ["status", "--porcelain", "--untracked-files=no"]):
             raise RuntimeError("Source repository dirty after merge")
