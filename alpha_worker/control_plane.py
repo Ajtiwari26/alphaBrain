@@ -15,6 +15,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from alpha_protocol import (
     AppendCheckpointRequest,
+    PromotionResult,
     ResumeDecisionRequest,
     ResumeDecisionResponse,
     TaskCheckpoint,
@@ -324,3 +325,18 @@ class ControlPlaneClient:
         if not isinstance(parsed, dict):
             raise ControlPlaneProtocolError("Control plane response must be object")
         return parsed
+
+    async def fetch_next_promotion(self, worker_id: str) -> dict[str, Any] | None:
+        response = await self._request("POST", f"/api/workers/{worker_id}/promotions/next")
+        if response.get("status") == "no_promotions_available":
+            return None
+        if response.get("status") == "promotion_available":
+            return response.get("promotion")
+        raise ControlPlaneProtocolError("Unexpected promotion fetch response")
+
+    async def submit_promotion_result(self, task_id: str, result: PromotionResult) -> None:
+        await self._request(
+            "POST",
+            f"/api/tasks/{task_id}/promotions/result",
+            {"result": result.model_dump(mode="json")},
+        )

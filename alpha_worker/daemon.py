@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import logging
 import platform
@@ -27,12 +28,15 @@ from alpha_core.security import redact_secrets, worker_kill_switch
 from alpha_core.state.task_engine import TaskEngine
 from alpha_protocol import (
     AgentType,
+    PromotionRequest,
+    PromotionResult,
     TaskEnvelope,
     TaskResult,
     TaskStatus,
     WorkerHealth,
     WorkerHealthReport,
     WorkerRegistration,
+    compute_promotion_digest,
 )
 
 from .adapters.antigravity import AntigravityAdapter
@@ -451,6 +455,68 @@ class AlphaWorkerDaemon:
             logger.warning("Worker is draining; remote task intake paused")
             return False
 
+        promotion_dict = None
+        if hasattr(self.control_plane, "fetch_next_promotion") and callable(
+            self.control_plane.fetch_next_promotion
+        ):
+            try:
+                fetch_call = self.control_plane.fetch_next_promotion(self.worker_id)
+                if inspect.isawaitable(fetch_call):
+                    promotion_dict = await fetch_call
+                elif isinstance(fetch_call, dict):
+                    promotion_dict = fetch_call
+            except ControlPlaneUnavailable as exc:
+                logger.warning("Control plane unavailable while fetching promotion: %s", exc)
+                return False
+            except Exception as exc:
+                logger.error("Unexpected error fetching promotion: %s", exc)
+                return False
+
+        if promotion_dict and isinstance(promotion_dict, dict):
+            try:
+                req = PromotionRequest.model_validate(promotion_dict)
+            except Exception as exc:
+                logger.error("Corrupted or invalid promotion payload: %s", exc)
+                return False
+
+            result = PromotionResult(
+                task_id=req.task_id,
+                worker_id=self.worker_id,
+                promotion_digest=compute_promotion_digest(req),
+                status="failed",
+            )
+            try:
+                self.worktree_mgr.promote_task_result(
+                    repo_path=req.repo,
+                    task_id=req.task_id,
+                    base_commit=req.base_commit,
+                    result_commit=req.result_commit,
+                    allowed_paths=req.allowed_paths,
+                    expected_files_changed=req.files_changed,
+                )
+            except Exception as exc:
+                result.status = "failed"
+                result.reason = str(exc)
+                logger.error("Promotion failed: %s", exc)
+            else:
+                result.status = "succeeded"
+                logger.info("Promotion succeeded for task %s", req.task_id)
+
+            try:
+                sub_call = self.control_plane.submit_promotion_result(req.task_id, result)
+                if inspect.isawaitable(sub_call):
+                    await sub_call
+            except ControlPlaneUnavailable:
+                logger.warning(
+                    "Spooling promotion result for task %s until control plane returns",
+                    req.task_id,
+                )
+                self.spool.enqueue(
+                    "promotion_result",
+                    {"task_id": req.task_id, "result": result.model_dump(mode="json")},
+                )
+            return True
+
         lease = await self.control_plane.lease_next(self.worker_id, AgentType.ANTIGRAVITY.value)
         if not lease:
             return False
@@ -482,6 +548,15 @@ class AlphaWorkerDaemon:
                 raise ValueError("Invalid spooled result event")
             await self.control_plane.submit_result(
                 TaskResult.model_validate(result_payload), lease_token
+            )
+            return
+        if event_type == "promotion_result":
+            task_id = payload.get("task_id")
+            result_payload = payload.get("result")
+            if not isinstance(task_id, str) or not isinstance(result_payload, dict):
+                raise ValueError("Invalid spooled promotion_result event")
+            await self.control_plane.submit_promotion_result(
+                task_id, PromotionResult.model_validate(result_payload)
             )
             return
         raise ValueError(f"Unsupported spooled event: {event_type}")

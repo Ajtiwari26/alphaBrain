@@ -18,6 +18,13 @@ def get_free_port():
 
 def test_checkpoint_migration():
     """Hermetic PostgreSQL 17 migration proof."""
+    import pytest
+
+    try:
+        subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5.0)
+    except Exception:
+        pytest.skip("Docker is required for real PostgreSQL 17 migration proof")
+
     container_name = f"pg17-checkpoint-test-{uuid.uuid4().hex[:8]}"
     db_port = get_free_port()
     db_url = f"postgresql+psycopg://postgres:postgres@localhost:{db_port}/postgres"

@@ -42,11 +42,15 @@ def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
 async def test_cancelled_agy_turn_kills_process_group(tmp_path):
     fake_agy = tmp_path / "fake-agy-cancellable"
     pid_path = tmp_path / "agy.pid"
+    import sys
+
     fake_agy.write_text(
-        "#!/usr/bin/env python3\n"
+        f"#!{sys.executable}\n"
         "import os\n"
         "import time\n"
-        f"open({str(pid_path)!r}, 'w').write(str(os.getpid()))\n"
+        f"with open({str(pid_path)!r}, 'w') as f:\n"
+        "    f.write(str(os.getpid()))\n"
+        "    f.flush()\n"
         "time.sleep(30)\n"
     )
     fake_agy.chmod(0o755)

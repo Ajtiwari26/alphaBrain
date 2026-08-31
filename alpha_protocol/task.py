@@ -357,3 +357,95 @@ class ResumeDecisionResponse(BaseModel):
     safe_to_resume: bool
     reason: str | None = None
     new_lease_token: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Promotion Protocol
+# ---------------------------------------------------------------------------
+
+
+class PromotionRequest(BaseModel):
+    """Worker-fetched approved promotion directive."""
+
+    task_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+    project_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+    attempt_id: str = Field(pattern=r"^att_[A-Za-z0-9._-]{1,100}$")
+    worker_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    repo: str = Field(min_length=1, max_length=512)
+    base_commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+    result_commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+    files_changed: list[str] = Field(min_length=0)
+    allowed_paths: list[str] = Field(min_length=1)
+    review_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @field_validator("files_changed")
+    @classmethod
+    def validate_files_changed(cls, paths: list[str]) -> list[str]:
+        seen = set()
+        for raw_path in paths:
+            if not raw_path or "\\" in raw_path:
+                raise ValueError("Empty or backslash not allowed")
+            if raw_path == ".":
+                raise ValueError("Dot not allowed in files_changed")
+            path = PurePosixPath(raw_path)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError("Paths must be safe relative paths")
+            normalized = str(path)
+            if normalized != raw_path:
+                raise ValueError(f"Path must be normalized, expected {normalized}")
+            if normalized in seen:
+                raise ValueError(f"Duplicate path '{normalized}'")
+            seen.add(normalized)
+        return paths
+
+    @field_validator("allowed_paths")
+    @classmethod
+    def validate_allowed_paths(cls, paths: list[str]) -> list[str]:
+        seen = set()
+        for raw_path in paths:
+            if not raw_path or "\\" in raw_path:
+                raise ValueError("Empty or backslash not allowed")
+            if raw_path == ".":
+                if raw_path in seen:
+                    raise ValueError("Duplicate path '.'")
+                seen.add(raw_path)
+                continue
+            path = PurePosixPath(raw_path)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError("Paths must be safe relative paths")
+            normalized = str(path)
+            if normalized != raw_path:
+                raise ValueError(f"Path must be normalized, expected {normalized}")
+            if normalized in seen:
+                raise ValueError(f"Duplicate path '{normalized}'")
+            seen.add(normalized)
+        return paths
+
+
+def compute_promotion_digest(request: PromotionRequest) -> str:
+    """Canonical promotion digest required for founder approval."""
+    import hashlib
+
+    data = {
+        "task_id": request.task_id,
+        "project_id": request.project_id,
+        "attempt_id": request.attempt_id,
+        "worker_id": request.worker_id,
+        "repo": request.repo,
+        "base_commit": request.base_commit,
+        "result_commit": request.result_commit,
+        "files_changed": sorted(request.files_changed) if request.files_changed else [],
+        "review_sha256": request.review_sha256,
+    }
+    canonical_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
+class PromotionResult(BaseModel):
+    """Result of worker applying a promotion."""
+
+    task_id: str
+    worker_id: str
+    promotion_digest: str
+    status: Literal["succeeded", "failed"]
+    reason: str | None = None

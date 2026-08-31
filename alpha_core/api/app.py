@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import time
+import uuid
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
@@ -32,10 +33,12 @@ from alpha_core.db.connection import get_db_session, get_session_factory, init_d
 from alpha_core.db.models import (
     ApprovalRecord,
     AttemptRecord,
+    AuditEventRecord,
     ProjectRecord,
     TaskRecord,
     WorkerHealthRecord,
     WorkerRecord,
+    utc_now,
 )
 from alpha_core.security import (
     AuthPrincipal,
@@ -68,12 +71,15 @@ from alpha_protocol import (
     ApprovalStatus,
     CallJob,
     PersonaType,
+    PromotionRequest,
+    PromotionResult,
     SpecVersion,
     TaskEnvelope,
     TaskResult,
     TaskStatus,
     WorkerHealthReport,
     WorkerRegistration,
+    compute_promotion_digest,
 )
 from alpha_voice.extractor import SpecExtractor
 from alpha_voice.plivo_bridge import PlivoVoiceBridge
@@ -1432,3 +1438,358 @@ async def get_resume_decision(
     await session.commit()
 
     return ResumeDecisionResponse(safe_to_resume=True, new_lease_token=new_token).model_dump()
+
+
+# ==========================================
+# Result Promotion Endpoints
+# ==========================================
+
+
+class PromotionDecisionRequest(BaseModel):
+    promotion_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    approved: bool
+    reason: str | None = None
+
+
+@app.post("/api/projects/{project_id}/promotions/decision")
+async def decide_promotion(
+    project_id: str,
+    payload: PromotionDecisionRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(status_code=403, detail="Promotion approval requires founder access")
+    require_project_access(principal, project_id)
+
+    # Find the task_promotion approval by digest
+    res = await session.execute(
+        select(ApprovalRecord).where(
+            and_(
+                ApprovalRecord.approval_type == "task_promotion",
+                ApprovalRecord.scope_sha256 == payload.promotion_digest,
+            )
+        )
+    )
+    approval = res.scalar_one_or_none()
+    if not approval:
+        raise HTTPException(
+            status_code=404, detail="Promotion approval not found or digest mismatch"
+        )
+
+    task = await session.get(TaskRecord, approval.task_id)
+    if not task or task.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Task not found in project")
+
+    # Reconstruct digest to be absolutely sure
+    att_res = await session.execute(
+        select(AttemptRecord).where(AttemptRecord.id == approval.attempt_id)
+    )
+    attempt = att_res.scalar_one_or_none()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    envelope = TaskEngine._parse_task_envelope(task.details_json)
+
+    # Fetch the approved task_review to get its digest
+    review_res = await session.execute(
+        select(ApprovalRecord)
+        .where(
+            and_(
+                ApprovalRecord.task_id == task.id,
+                ApprovalRecord.attempt_id == attempt.id,
+                ApprovalRecord.approval_type == "task_review",
+                ApprovalRecord.status == ApprovalStatus.APPROVED.value,
+            )
+        )
+        .order_by(ApprovalRecord.decided_at.desc())
+        .limit(1)
+    )
+    review_approval = review_res.scalar_one_or_none()
+    if not review_approval:
+        raise HTTPException(status_code=409, detail="Missing approved task_review for this attempt")
+
+    changed_files = (
+        attempt.files_changed_json
+        if isinstance(attempt.files_changed_json, list)
+        else (json.loads(attempt.files_changed_json) if attempt.files_changed_json else [])
+    )
+
+    req = PromotionRequest(
+        task_id=task.id,
+        project_id=task.project_id,
+        attempt_id=attempt.id,
+        worker_id=attempt.worker_id or "",
+        repo=envelope.repo,
+        base_commit=envelope.base_commit,
+        result_commit=attempt.result_commit or "",
+        files_changed=changed_files,
+        allowed_paths=envelope.allowed_paths,
+        review_sha256=review_approval.scope_sha256,
+    )
+    recomputed = compute_promotion_digest(req)
+    if recomputed != payload.promotion_digest:
+        raise HTTPException(status_code=409, detail="Promotion digest mismatch")
+
+    if approval.status != ApprovalStatus.PENDING.value:
+        expected_status = (
+            ApprovalStatus.APPROVED.value if payload.approved else ApprovalStatus.REJECTED.value
+        )
+        if approval.status != expected_status:
+            raise HTTPException(status_code=409, detail="Conflicting replay decision rejects")
+        return {"status": approval.status, "task_id": task.id}
+
+    now = utc_now()
+    approval.status = (
+        ApprovalStatus.APPROVED.value if payload.approved else ApprovalStatus.REJECTED.value
+    )
+    approval.decided_by = principal.subject
+    approval.decided_at = now
+    approval.reason = payload.reason
+
+    if not payload.approved:
+        TaskEngine._transition(task, TaskStatus.BLOCKED)
+
+    session.add(
+        AuditEventRecord(
+            id=f"evt_{uuid.uuid4().hex[:12]}",
+            event_type="task_promotion_approved" if payload.approved else "task_promotion_rejected",
+            project_id=task.project_id,
+            task_id=task.id,
+            actor=principal.subject,
+            details_json={"attempt_id": attempt.id, "reason": payload.reason},
+            timestamp=now,
+        )
+    )
+    await session.flush()
+    return {"status": approval.status, "task_id": task.id}
+
+
+@app.post("/api/workers/{worker_id}/promotions/next")
+async def fetch_next_promotion(
+    worker_id: str,
+    principal: AuthPrincipal = Depends(require_worker_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    if worker_id != principal.subject:
+        raise HTTPException(status_code=403, detail="Worker ID mismatch")
+
+    # Find an approved task_promotion for an attempt by this worker, where task is still VERIFIED
+    res = await session.execute(
+        select(ApprovalRecord)
+        .join(TaskRecord, TaskRecord.id == ApprovalRecord.task_id)
+        .join(AttemptRecord, AttemptRecord.id == ApprovalRecord.attempt_id)
+        .where(
+            and_(
+                ApprovalRecord.approval_type == "task_promotion",
+                ApprovalRecord.status == ApprovalStatus.APPROVED.value,
+                TaskRecord.status == TaskStatus.VERIFIED.value,
+                AttemptRecord.worker_id == worker_id,
+            )
+        )
+        .order_by(ApprovalRecord.decided_at.asc())
+        .limit(1)
+    )
+    approval = res.scalar_one_or_none()
+    if not approval:
+        return {"status": "no_promotions_available"}
+
+    task = await session.get(TaskRecord, approval.task_id)
+    attempt = await session.get(AttemptRecord, approval.attempt_id)
+    if not task or not attempt:
+        raise HTTPException(status_code=500, detail="Task or attempt record missing")
+
+    review_res = await session.execute(
+        select(ApprovalRecord)
+        .where(
+            and_(
+                ApprovalRecord.task_id == task.id,
+                ApprovalRecord.attempt_id == attempt.id,
+                ApprovalRecord.approval_type == "task_review",
+                ApprovalRecord.status == ApprovalStatus.APPROVED.value,
+            )
+        )
+        .order_by(ApprovalRecord.decided_at.desc())
+        .limit(1)
+    )
+    review_approval = review_res.scalar_one_or_none()
+    if not review_approval:
+        raise HTTPException(status_code=500, detail="Approved task_review record missing")
+
+    envelope = TaskEngine._parse_task_envelope(task.details_json)
+    changed_files = (
+        attempt.files_changed_json
+        if isinstance(attempt.files_changed_json, list)
+        else (json.loads(attempt.files_changed_json) if attempt.files_changed_json else [])
+    )
+
+    req = PromotionRequest(
+        task_id=task.id,
+        project_id=task.project_id,
+        attempt_id=attempt.id,
+        worker_id=worker_id,
+        repo=envelope.repo,
+        base_commit=envelope.base_commit,
+        result_commit=attempt.result_commit or "",
+        files_changed=changed_files,
+        allowed_paths=envelope.allowed_paths,
+        review_sha256=review_approval.scope_sha256,
+    )
+
+    recomputed = compute_promotion_digest(req)
+    if recomputed != approval.scope_sha256:
+        raise HTTPException(status_code=500, detail="Digest corruption in DB")
+
+    return {"status": "promotion_available", "promotion": req.model_dump(mode="json")}
+
+
+@app.post("/api/tasks/{task_id}/promotions/result")
+async def submit_promotion_result(
+    task_id: str,
+    payload: dict[str, Any],
+    principal: AuthPrincipal = Depends(require_worker_principal),
+    session: AsyncSession = Depends(get_db_session),
+):
+    result_data = payload.get("result", {})
+    try:
+        result = PromotionResult.model_validate(result_data)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Invalid result payload") from exc
+
+    if result.task_id != task_id:
+        raise HTTPException(status_code=422, detail="Task ID mismatch")
+    if result.worker_id != principal.subject:
+        raise HTTPException(status_code=403, detail="Worker ID mismatch")
+
+    task = await session.get(TaskRecord, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    res_promo = await session.execute(
+        select(ApprovalRecord).where(
+            and_(
+                ApprovalRecord.task_id == task_id,
+                ApprovalRecord.approval_type == "task_promotion",
+                ApprovalRecord.scope_sha256 == result.promotion_digest,
+                ApprovalRecord.status == ApprovalStatus.APPROVED.value,
+            )
+        )
+    )
+    promo_appr = res_promo.scalar_one_or_none()
+    if not promo_appr:
+        raise HTTPException(
+            status_code=404, detail="Approved promotion not found or digest mismatch"
+        )
+
+    att_res = await session.execute(
+        select(AttemptRecord).where(AttemptRecord.id == promo_appr.attempt_id)
+    )
+    attempt = att_res.scalar_one_or_none()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    if attempt.worker_id != principal.subject:
+        raise HTTPException(status_code=403, detail="Not the producing worker")
+
+    envelope = TaskEngine._parse_task_envelope(task.details_json)
+
+    review_res = await session.execute(
+        select(ApprovalRecord)
+        .where(
+            and_(
+                ApprovalRecord.task_id == task.id,
+                ApprovalRecord.attempt_id == attempt.id,
+                ApprovalRecord.approval_type == "task_review",
+                ApprovalRecord.status == ApprovalStatus.APPROVED.value,
+            )
+        )
+        .order_by(ApprovalRecord.decided_at.desc())
+        .limit(1)
+    )
+    review_approval = review_res.scalar_one_or_none()
+    if not review_approval:
+        raise HTTPException(status_code=409, detail="Missing approved task_review for this attempt")
+
+    changed_files = (
+        attempt.files_changed_json
+        if isinstance(attempt.files_changed_json, list)
+        else (json.loads(attempt.files_changed_json) if attempt.files_changed_json else [])
+    )
+    promo_req = PromotionRequest(
+        task_id=task.id,
+        project_id=task.project_id,
+        attempt_id=attempt.id,
+        worker_id=attempt.worker_id or "",
+        repo=envelope.repo,
+        base_commit=envelope.base_commit,
+        result_commit=attempt.result_commit or "",
+        files_changed=changed_files,
+        allowed_paths=envelope.allowed_paths,
+        review_sha256=review_approval.scope_sha256,
+    )
+    fresh_digest = compute_promotion_digest(promo_req)
+    if fresh_digest != result.promotion_digest:
+        raise HTTPException(
+            status_code=409, detail="Promotion digest mismatch with recomputed state"
+        )
+
+    if task.status != TaskStatus.VERIFIED.value:
+        if task.status == TaskStatus.COMPLETED.value and result.status == "succeeded":
+            audit_res = await session.execute(
+                select(AuditEventRecord).where(
+                    and_(
+                        AuditEventRecord.task_id == task_id,
+                        AuditEventRecord.event_type == "task_promotion_succeeded",
+                        AuditEventRecord.actor == principal.subject,
+                    )
+                )
+            )
+            for audit in audit_res.scalars():
+                if (
+                    isinstance(audit.details_json, dict)
+                    and audit.details_json.get("promotion_digest") == result.promotion_digest
+                ):
+                    return {"status": "ok"}
+        elif task.status == TaskStatus.BLOCKED.value and result.status == "failed":
+            audit_res = await session.execute(
+                select(AuditEventRecord).where(
+                    and_(
+                        AuditEventRecord.task_id == task_id,
+                        AuditEventRecord.event_type == "task_promotion_failed",
+                        AuditEventRecord.actor == principal.subject,
+                    )
+                )
+            )
+            for audit in audit_res.scalars():
+                if (
+                    isinstance(audit.details_json, dict)
+                    and audit.details_json.get("promotion_digest") == result.promotion_digest
+                ):
+                    return {"status": "ok"}
+        raise HTTPException(
+            status_code=409, detail=f"Arbitrary replay rejected. Task status is {task.status}"
+        )
+
+    now = utc_now()
+    if result.status == "succeeded":
+        TaskEngine._transition(task, TaskStatus.COMPLETED)
+        event_type = "task_promotion_succeeded"
+    else:
+        TaskEngine._transition(task, TaskStatus.BLOCKED)
+        event_type = "task_promotion_failed"
+
+    session.add(
+        AuditEventRecord(
+            id=f"evt_{uuid.uuid4().hex[:12]}",
+            event_type=event_type,
+            project_id=task.project_id,
+            task_id=task.id,
+            actor=principal.subject,
+            details_json={"promotion_digest": result.promotion_digest, "reason": result.reason},
+            timestamp=now,
+        )
+    )
+
+    # No auto-retry
+    await session.flush()
+    return {"status": "ok"}

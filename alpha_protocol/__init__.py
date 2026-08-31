@@ -40,6 +40,8 @@ from .task import (
     ApprovalRequest,
     ApprovalResult,
     ConcurrencyPolicy,
+    PromotionRequest,
+    PromotionResult,
     ResumeDecisionRequest,
     ResumeDecisionResponse,
     RetryPolicy,
@@ -50,6 +52,7 @@ from .task import (
     TaskResult,
     UsageRecord,
     compute_packet_digest,
+    compute_promotion_digest,
     compute_review_digest,
 )
 from .worker import WorkerCapability, WorkerHealthReport, WorkerRegistration
@@ -86,6 +89,8 @@ __all__ = [
     "MeetingSession",
     "OpenQuestion",
     "PersonaType",
+    "PromotionRequest",
+    "PromotionResult",
     "ProvenanceRecord",
     "Requirement",
     "ResumeDecisionRequest",
@@ -112,6 +117,7 @@ __all__ = [
     "WorkerRegistration",
     "WorkflowPhase",
     "compute_packet_digest",
+    "compute_promotion_digest",
     "compute_review_digest",
     "is_legal_transition",
 ]

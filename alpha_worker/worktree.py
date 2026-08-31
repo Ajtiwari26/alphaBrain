@@ -243,3 +243,87 @@ class WorktreeManager:
             cwd=str(validated_repo),
             capture_output=True,
         )
+
+    def promote_task_result(
+        self,
+        repo_path: str,
+        task_id: str,
+        base_commit: str,
+        result_commit: str,
+        allowed_paths: list[str],
+        expected_files_changed: list[str],
+    ) -> None:
+        validated_repo = self.validate_repo_path(repo_path)
+
+        # 1. Source repo clean
+        if self._git(validated_repo, ["status", "--porcelain"]):
+            raise RuntimeError("Source repository has uncommitted changes")
+
+        # 2. Resolvable commits
+        try:
+            resolved_base = self._git(
+                validated_repo, ["rev-parse", "--verify", f"{base_commit}^{{commit}}"]
+            )
+            resolved_result = self._git(
+                validated_repo, ["rev-parse", "--verify", f"{result_commit}^{{commit}}"]
+            )
+        except RuntimeError as exc:
+            raise RuntimeError("Base or result commit does not resolve to a valid commit") from exc
+
+        # 3. Base is ancestor of result
+        try:
+            self._git(
+                validated_repo, ["merge-base", "--is-ancestor", resolved_base, resolved_result]
+            )
+        except RuntimeError as exc:
+            raise RuntimeError("Base commit is not an ancestor of result commit") from exc
+
+        # 4. Current HEAD matches base or result
+        current_head = self._git(validated_repo, ["rev-parse", "HEAD"])
+        is_recovery = False
+        if current_head == resolved_result:
+            is_recovery = True
+        elif current_head != resolved_base:
+            raise RuntimeError(
+                f"Source HEAD ({current_head}) does not match expected base ({resolved_base}) or result ({resolved_result})"
+            )
+
+        # 5. Task branch exists and points to result
+        branch_name = f"alpha/{task_id}"
+        try:
+            branch_head = self._git(
+                validated_repo, ["rev-parse", "--verify", f"refs/heads/{branch_name}"]
+            )
+            if branch_head != resolved_result:
+                raise RuntimeError(f"Task branch {branch_name} does not point to result commit")
+        except RuntimeError as exc:
+            raise RuntimeError(f"Task branch {branch_name} missing or invalid") from exc
+
+        # 6. Diff equals exactly expected_files_changed
+        diff_out = self._git(
+            validated_repo, ["diff", "--name-only", f"{resolved_base}..{resolved_result}"]
+        )
+        actual_files = sorted([f.strip() for f in diff_out.splitlines() if f.strip()])
+        if actual_files != sorted(expected_files_changed):
+            raise RuntimeError("Changed files mismatch between diff and expected files")
+
+        # 7. Allowed paths check
+        violations = self.find_disallowed_changes(actual_files, allowed_paths)
+        if violations:
+            raise RuntimeError(f"Changed files violate allowed_paths constraint: {violations}")
+
+        if is_recovery:
+            return
+
+        # Mutation: ff-only merge
+        try:
+            self._git(validated_repo, ["merge", "--ff-only", resolved_result])
+        except RuntimeError as exc:
+            raise RuntimeError(f"Fast-forward merge failed: {exc}") from exc
+
+        # Verify post-mutation
+        new_head = self._git(validated_repo, ["rev-parse", "HEAD"])
+        if new_head != resolved_result:
+            raise RuntimeError("Post-merge HEAD does not match result commit")
+        if self._git(validated_repo, ["status", "--porcelain"]):
+            raise RuntimeError("Source repository dirty after merge")

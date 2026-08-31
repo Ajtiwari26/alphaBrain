@@ -730,10 +730,11 @@ class TaskEngine:
             .where(
                 and_(
                     ApprovalRecord.task_id == task_id,
-                    ApprovalRecord.status == ApprovalStatus.PENDING.value,
+                    ApprovalRecord.approval_type.in_(["task_execution", "task_review"]),
                 )
             )
             .order_by(ApprovalRecord.created_at.desc())
+            .limit(1)
         )
         approval = res.scalar_one_or_none()
         if not approval:
@@ -743,6 +744,10 @@ class TaskEngine:
             select(TaskRecord).where(TaskRecord.id == task_id)
         )
         if not task:
+            return None
+
+        already_decided = approval.status != ApprovalStatus.PENDING.value
+        if already_decided and approval.approval_type != "task_review":
             return None
 
         envelope = TaskEngine._parse_task_envelope(task.details_json)
@@ -802,6 +807,14 @@ class TaskEngine:
             if review_sha256 != recomputed:
                 raise ValueError("Founder review digest mismatch with recomputed state")
 
+            if already_decided:
+                expected_status = (
+                    ApprovalStatus.APPROVED.value if approved else ApprovalStatus.REJECTED.value
+                )
+                if approval.status != expected_status:
+                    raise ValueError("Conflicting replay decision rejects")
+                return task
+
             now = utc_now()
             approval.status = (
                 ApprovalStatus.APPROVED.value if approved else ApprovalStatus.REJECTED.value
@@ -811,7 +824,47 @@ class TaskEngine:
             approval.decided_at = now
 
             if approved:
-                TaskEngine._transition(task, TaskStatus.COMPLETED)
+                from alpha_protocol.task import PromotionRequest, compute_promotion_digest
+
+                has_changes = (
+                    attempt.result_commit and attempt.result_commit != envelope.base_commit
+                )
+                changed_files = (
+                    attempt.files_changed_json
+                    if isinstance(attempt.files_changed_json, list)
+                    else (
+                        json.loads(attempt.files_changed_json) if attempt.files_changed_json else []
+                    )
+                )
+                if has_changes and changed_files:
+                    try:
+                        promo_req = PromotionRequest(
+                            task_id=task.id,
+                            project_id=task.project_id,
+                            attempt_id=attempt.id,
+                            worker_id=attempt.worker_id or "",
+                            repo=envelope.repo,
+                            base_commit=envelope.base_commit,
+                            result_commit=attempt.result_commit,
+                            files_changed=changed_files,
+                            allowed_paths=envelope.allowed_paths,
+                            review_sha256=review_sha256,
+                        )
+                        promo_digest = compute_promotion_digest(promo_req)
+                        prom_approval = ApprovalRecord(
+                            id=f"appr_{uuid.uuid4().hex[:12]}",
+                            task_id=task.id,
+                            attempt_id=attempt.id,
+                            approval_type="task_promotion",
+                            scope_sha256=promo_digest,
+                            status=ApprovalStatus.PENDING.value,
+                            created_at=now,
+                        )
+                        session.add(prom_approval)
+                    except Exception:
+                        TaskEngine._transition(task, TaskStatus.COMPLETED)
+                else:
+                    TaskEngine._transition(task, TaskStatus.COMPLETED)
             else:
                 TaskEngine._transition(task, TaskStatus.BLOCKED)
 
@@ -841,6 +894,14 @@ class TaskEngine:
                 or packet_sha256 != fresh_digest
             ):
                 raise ValueError("Task packet digest mismatch or missing")
+
+        if already_decided:
+            expected_status = (
+                ApprovalStatus.APPROVED.value if approved else ApprovalStatus.REJECTED.value
+            )
+            if approval.status != expected_status:
+                raise ValueError("Conflicting replay decision rejects")
+            return task
 
         now = utc_now()
         approval.decided_by = decided_by
