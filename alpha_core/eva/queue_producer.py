@@ -103,9 +103,7 @@ class EvaQueueProducer:
 
         # 4. Serialize envelope to dict for queue storage
         envelope_dict: dict[str, Any] = (
-            envelope.model_dump(mode="json")
-            if hasattr(envelope, "model_dump")
-            else json.loads(envelope.json())
+            envelope.model_dump(mode="json") if hasattr(envelope, "model_dump") else envelope.dict()
         )
 
         # 5. Enqueue with status = PENDING_REVIEW (Law 1: No Direct Path)

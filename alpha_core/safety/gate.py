@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
 import re
+import shlex
+from pathlib import Path
 from typing import Any
 
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
@@ -35,32 +38,112 @@ PROTECTED_PATHS: tuple[str, ...] = (
     "docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md",
 )
 
-# Forbidden execution patterns in gate commands
-FORBIDDEN_COMMAND_PATTERNS: tuple[str, ...] = (
-    "rm -rf",
-    "sudo ",
-    "chmod ",
-    "chown ",
-    "curl ",
-    "wget ",
-    "nc ",
-    "ncat ",
-    "bash -i",
-    "/dev/tcp",
-    "python -c 'import socket",
+# Forbidden binary names in gate execution
+FORBIDDEN_BINARIES: tuple[str, ...] = (
+    "curl",
+    "wget",
+    "nc",
+    "ncat",
+    "netcat",
+    "sudo",
+    "su",
+    "chmod",
+    "chown",
+    "ssh",
+    "scp",
+    "rsync",
+    "bash",
+    "sh",
+    "zsh",
 )
 
 # Known prompt injection and adversarial intent regexes
 ADVERSARIAL_REGEXES: tuple[re.Pattern[str], ...] = (
     re.compile(r"ignore\s+(all\s+)?previous\s+instructions", re.IGNORECASE),
-    re.compile(r"delete\s+all\s+(files|code|repositories)", re.IGNORECASE),
+    re.compile(r"delete\s+all\s+(files|code|repositories|data)", re.IGNORECASE),
     re.compile(r"drop\s+database", re.IGNORECASE),
     re.compile(r"drop\s+table", re.IGNORECASE),
-    re.compile(r"exfiltrate\s+(keys?|secrets?|tokens?)", re.IGNORECASE),
-    re.compile(r"leak\s+(keys?|secrets?|tokens?)", re.IGNORECASE),
+    re.compile(r"exfiltrate\s+(keys?|secrets?|tokens?|data|env)", re.IGNORECASE),
+    re.compile(r"leak\s+(keys?|secrets?|tokens?|env)", re.IGNORECASE),
 )
 
 MAX_ALLOWED_FILES = 10
+
+
+def is_protected_path(
+    path_str: str, protected_paths: tuple[str, ...] = PROTECTED_PATHS
+) -> tuple[bool, str]:
+    """
+    Validates a file path using canonical path normalization and discrete component matching.
+    Prevents directory traversal attacks (e.g. '../') and avoids substring false-positives.
+    """
+    cleaned = path_str.strip()
+    if not cleaned or cleaned in (".", "/", "*"):
+        return True, f"Invalid wildcard or root path '{path_str}' is forbidden."
+
+    # Disallow explicit traversal sequences
+    if "/../" in cleaned or cleaned.startswith("../") or cleaned.endswith("/.."):
+        return True, f"Directory traversal sequence detected in '{path_str}'."
+
+    # Normalize path
+    norm = os.path.normpath(cleaned.lstrip("/"))
+    if norm.startswith(".."):
+        return True, f"Path traversal outside project root detected in '{path_str}'."
+
+    # Disallow wildcard globs that circumvent blast radius limits
+    if "*" in norm:
+        return True, f"Wildcard glob pattern in path '{path_str}' is forbidden."
+
+    parts = Path(norm).parts
+    if not parts:
+        return True, f"Path '{path_str}' resolved to empty destination."
+
+    for prot in protected_paths:
+        prot_norm = os.path.normpath(prot.strip().lstrip("/"))
+        prot_parts = Path(prot_norm).parts
+
+        # Component prefix matching: e.g. ('alpha_core', 'eva', '...') matches ('alpha_core', 'eva')
+        if len(parts) >= len(prot_parts) and parts[: len(prot_parts)] == prot_parts:
+            return True, f"Path '{path_str}' targets protected directory '{prot}'."
+
+        # Protected file match anywhere: e.g. .env or .env.local
+        if prot_norm.startswith(".env") and parts[-1] == prot_norm:
+            return True, f"Path '{path_str}' targets protected file '{prot}'."
+
+    return False, ""
+
+
+def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
+    """
+    Tokenizes and inspects a command string for unauthorized network binaries,
+    privilege escalation, or dangerous destructive operations.
+    """
+    try:
+        tokens = shlex.split(cmd_str)
+    except Exception as e:
+        return True, f"Malformed command failed shell parsing: '{cmd_str}' ({e})"
+
+    if not tokens:
+        return False, ""
+
+    executable = tokens[0]
+    base_exe = Path(executable).name.lower()
+
+    if base_exe in FORBIDDEN_BINARIES:
+        return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
+
+    # Check for destructive recursive removals
+    if base_exe == "rm":
+        for tok in tokens[1:]:
+            if tok in ("-r", "-rf", "-fr", "--recursive") or (tok.startswith("-") and "r" in tok):
+                return True, f"Destructive recursive removal detected in gate command: '{cmd_str}'"
+
+    # Check for raw shell reverse connection patterns
+    cmd_lower = cmd_str.lower()
+    if "bash -i" in cmd_lower or "/dev/tcp" in cmd_lower or "python -c 'import socket" in cmd_lower:
+        return True, f"Reverse shell pattern detected in gate command: '{cmd_str}'"
+
+    return False, ""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -93,29 +176,39 @@ class SafetyGate:
         """
         violations: list[str] = []
 
-        # Convert dict to access fields consistently
+        # 1. Extract fields defensively with None-safe guards
         commands: list[str] = []
+        text_blobs_to_scan: list[str] = []
+
         if isinstance(envelope, TaskEnvelope):
-            objective = envelope.objective
-            allowed_paths = envelope.allowed_paths
+            objective = envelope.objective or ""
+            allowed_paths = envelope.allowed_paths or []
+            detailed_instructions = envelope.detailed_instructions or ""
+            text_blobs_to_scan.extend([objective, detailed_instructions])
+
             acceptance_plan = envelope.acceptance_plan
             if acceptance_plan and hasattr(acceptance_plan, "commands"):
                 for cmd_obj in acceptance_plan.commands:
                     cmd_str = f"{getattr(cmd_obj, 'executable', '')} {' '.join(getattr(cmd_obj, 'args', []))}"
-                    commands.append(cmd_str)
+                    commands.append(cmd_str.strip())
         else:
-            objective = str(envelope.get("objective", ""))
-            allowed_paths = envelope.get("allowed_paths", [])
-            plan = envelope.get("acceptance_plan", {})
+            obj_val = envelope.get("objective")
+            objective = str(obj_val) if obj_val is not None else ""
+            allowed_paths = envelope.get("allowed_paths") or []
+            inst_val = envelope.get("detailed_instructions")
+            detailed_instructions = str(inst_val) if inst_val is not None else ""
+            text_blobs_to_scan.extend([objective, detailed_instructions])
+
+            plan = envelope.get("acceptance_plan") or {}
             if isinstance(plan, dict):
                 for cmd_obj in plan.get("commands", []):
                     if isinstance(cmd_obj, dict):
                         cmd_str = (
                             f"{cmd_obj.get('executable', '')} {' '.join(cmd_obj.get('args', []))}"
                         )
-                        commands.append(cmd_str)
+                        commands.append(cmd_str.strip())
                     elif isinstance(cmd_obj, str):
-                        commands.append(cmd_obj)
+                        commands.append(cmd_obj.strip())
 
         # Check 1: Blast Radius (Max files)
         if len(allowed_paths) > self.max_allowed_files:
@@ -124,33 +217,28 @@ class SafetyGate:
                 f"exceeding max allowed limit of {self.max_allowed_files}."
             )
 
-        # Check 2: Protected Paths
+        # Check 2: Protected Paths & Traversal
         for path in allowed_paths:
-            clean_path = path.strip().lstrip("/")
-            for protected in self.protected_paths:
-                if (
-                    clean_path == protected
-                    or clean_path.startswith(f"{protected}/")
-                    or protected in clean_path
-                ):
-                    violations.append(f"Protected path violation: Path '{path}' is immutable.")
-                    break
+            is_blocked, reason = is_protected_path(path, self.protected_paths)
+            if is_blocked:
+                violations.append(f"Protected path violation: {reason}")
 
         # Check 3: Forbidden Command Patterns in Acceptance Gates
         for cmd in commands:
-            for pattern in FORBIDDEN_COMMAND_PATTERNS:
-                if pattern in cmd:
-                    violations.append(
-                        f"Forbidden command violation: Command '{cmd}' contains '{pattern}'."
-                    )
+            is_forbidden, cmd_reason = is_forbidden_command(cmd)
+            if is_forbidden:
+                violations.append(cmd_reason)
 
-        # Check 4: Adversarial Intent & Prompt Injection
-        for adv_regex in ADVERSARIAL_REGEXES:
-            if adv_regex.search(objective):
-                violations.append(
-                    f"Adversarial pattern violation: Objective matched suspicious pattern '{adv_regex.pattern}'."
-                )
-                break
+        # Check 4: Deep Adversarial Intent & Prompt Injection Scan
+        for text in text_blobs_to_scan:
+            for adv_regex in ADVERSARIAL_REGEXES:
+                match = adv_regex.search(text)
+                if match:
+                    violations.append(
+                        f"Adversarial pattern violation: Matched suspicious pattern '{adv_regex.pattern}' "
+                        f"in text excerpt: '{match.group(0)}'."
+                    )
+                    break
 
         if violations:
             logger.warning("Safety gate REJECTED envelope: %s", violations)

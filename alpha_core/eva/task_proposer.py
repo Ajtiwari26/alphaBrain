@@ -7,6 +7,7 @@ docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 4.2)
 """
 
 import hashlib
+import shlex
 import time
 import uuid
 
@@ -64,7 +65,10 @@ class EvaTaskProposer:
         if spec.required_gates:
             for g in spec.required_gates:
                 if isinstance(g, str) and g not in ("unit_test", "lint", "typecheck"):
-                    parts = g.strip().split()
+                    try:
+                        parts = shlex.split(g.strip())
+                    except Exception:
+                        parts = g.strip().split()
                     if parts:
                         exec_name = parts[0].split("/")[-1]
                         commands.append(
