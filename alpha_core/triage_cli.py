@@ -393,6 +393,54 @@ def cmd_worker_cycle(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    from alpha_core.eva.queue_producer import EvaQueueProducer
+    from alpha_core.eva.spec_extractor import ExtractedSpecification
+
+    allowed_paths = [p.strip() for p in args.allowed_paths.split(",") if p.strip()]
+    criteria = [c.strip() for c in args.criteria.split(",") if c.strip()] if args.criteria else []
+    requirements = [args.objective]
+
+    spec = ExtractedSpecification(
+        title=args.title,
+        summary=args.objective,
+        requirements=requirements,
+        acceptance_criteria=criteria,
+        allowed_paths=allowed_paths,
+        required_gates=["unit_test", "lint"],
+        confidence_score=0.99,
+        is_actionable=True,
+    )
+
+    producer = EvaQueueProducer(queue)
+    repo = str(Path.cwd().resolve())
+    task_id, _envelope, _provenance = producer.enqueue_specification(
+        spec=spec,
+        project_id=args.project_id,
+        meeting_id="cli_admit",
+        transcript_excerpt=args.objective,
+        speaker_id="founder_cli",
+        repo=repo,
+        base_commit="HEAD",
+    )
+
+    if args.json:
+        print(json.dumps({"task_id": task_id, "status": "pending_review", "title": args.title}))
+    else:
+        print("=" * 60)
+        print("📥 Task Admitted into AlphaBrain Triage Queue!")
+        print(f"Task ID:        {task_id}")
+        print(f"Title:          {args.title}")
+        print("Status:         pending_review")
+        print(f"Allowed paths:  {', '.join(allowed_paths)}")
+        print("=" * 60)
+        print("\nNext Autonomous Steps:")
+        print(f"  1. Review Safety:  .venv/bin/python -m alpha_core.triage_cli review {task_id}")
+        print(f"  2. Founder Approve:.venv/bin/python -m alpha_core.triage_cli approve {task_id}")
+        print("  3. Worker Cycle:   .venv/bin/python -m alpha_core.triage_cli worker-cycle")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="alphabrain triage",
@@ -476,6 +524,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_worker.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # admit
+    p_admit = subparsers.add_parser("admit", help="Admit a new task into the triage queue")
+    p_admit.add_argument("title", help="Task title")
+    p_admit.add_argument("--objective", required=True, help="Detailed task objective")
+    p_admit.add_argument(
+        "--allowed-paths", required=True, help="Comma-separated allowed file paths"
+    )
+    p_admit.add_argument(
+        "--criteria",
+        default="Unit tests pass, Lint checks pass",
+        help="Comma-separated acceptance criteria",
+    )
+    p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
+    p_admit.add_argument("--json", action="store_true", help="Output JSON format")
+
     return parser
 
 
@@ -489,6 +552,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     handlers = {
+        "admit": cmd_admit,
         "list": cmd_list,
         "show": cmd_show,
         "review": cmd_review,
