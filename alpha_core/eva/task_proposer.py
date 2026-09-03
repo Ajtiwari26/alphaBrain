@@ -7,6 +7,7 @@ docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 4.2)
 """
 
 import hashlib
+import re
 import shlex
 import time
 import uuid
@@ -71,14 +72,26 @@ class EvaTaskProposer:
                     except Exception:
                         parts = g.strip().split()
                     if parts:
-                        exec_name = parts[0].split("/")[-1]
-                        commands.append(
-                            GateCommand(
-                                gate_type=GateType.UNIT_TEST,
-                                executable=exec_name,
-                                args=parts[1:],
+                        idx = 0
+                        while idx < len(parts) and re.match(
+                            r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$", parts[idx]
+                        ):
+                            idx += 1
+                        if idx < len(parts):
+                            raw_candidate = parts[idx].split("/")[-1]
+                            if re.match(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$", raw_candidate):
+                                exec_name = raw_candidate
+                                cmd_args = parts[idx + 1 :]
+                            else:
+                                exec_name = "sh"
+                                cmd_args = parts
+                            commands.append(
+                                GateCommand(
+                                    gate_type=GateType.UNIT_TEST,
+                                    executable=exec_name,
+                                    args=cmd_args,
+                                )
                             )
-                        )
 
         acceptance_plan = AcceptancePlan(
             required_gates=[GateType.UNIT_TEST, GateType.LINT],

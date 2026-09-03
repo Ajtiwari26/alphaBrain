@@ -125,8 +125,22 @@ def is_protected_path(
     return False, ""
 
 
-OPERATOR_TOKENS: tuple[str, ...] = (";", "&&", "||", "&", "|", ">", ">>", "<", "<<")
+OPERATOR_TOKENS: tuple[str, ...] = (
+    ";",
+    "&&",
+    "||",
+    "&",
+    "|",
+    ">",
+    ">>",
+    "<",
+    "<<",
+    "(",
+    ")",
+    "!",
+)
 RECURSIVE_FLAG_PATTERN: re.Pattern[str] = re.compile(r"^-[a-zA-Z]*[rR][a-zA-Z]*$")
+ENV_VAR_PREFIX_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")
 
 
 def has_active_command_substitution(cmd_str: str) -> tuple[bool, str]:
@@ -134,19 +148,29 @@ def has_active_command_substitution(cmd_str: str) -> tuple[bool, str]:
     Checks for active command substitutions ($(...) or `...`).
     In POSIX shells, substitutions remain active inside double quotes and unquoted text;
     only literal single quotes ('...') neutralize command substitutions.
+    Symmetrically tracks single and double quote states.
     """
     in_single_quote = False
+    in_double_quote = False
     escaped = False
     i = 0
     while i < len(cmd_str):
         c = cmd_str[i]
-        if c == "\\" and not in_single_quote:
-            escaped = not escaped
+        if escaped:
+            escaped = False
             i += 1
             continue
-        if c == "'" and not escaped:
+
+        if c == "\\" and not in_single_quote:
+            escaped = True
+            i += 1
+            continue
+
+        if c == "'" and not in_double_quote:
             in_single_quote = not in_single_quote
-        elif not in_single_quote and not escaped:
+        elif c == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+        elif not in_single_quote:
             if c == "`":
                 return (
                     True,
@@ -157,7 +181,6 @@ def has_active_command_substitution(cmd_str: str) -> tuple[bool, str]:
                     True,
                     f"Active subshell $(...) command substitution detected in gate command: '{cmd_str}'",
                 )
-        escaped = False
         i += 1
     return False, ""
 
@@ -166,7 +189,7 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     """
     Tokenizes and inspects a command string for unauthorized network binaries,
     privilege escalation, execution wrappers, shell control chaining, or dangerous operations.
-    Enforces a strict zero-wrapper and anti-privilege-escalation policy.
+    Enforces a strict zero-wrapper and anti-privilege-escalation policy with iterative resolution.
     """
     # 1. Check for active command substitutions (only single quotes neutralize them in POSIX)
     has_sub, sub_reason = has_active_command_substitution(cmd_str)
@@ -187,15 +210,23 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
         if tok in OPERATOR_TOKENS:
             return True, f"Shell control operator '{tok}' is forbidden in gate command: '{cmd_str}'"
 
-    # 3. Direct executable inspection (zero-wrapper policy)
-    executable = tokens[0]
+    # 3. Iterative executable resolution: skip leading environment assignments (e.g. PYTHONPATH=. or FOO=bar)
+    idx = 0
+    while idx < len(tokens) and ENV_VAR_PREFIX_PATTERN.match(tokens[idx]):
+        idx += 1
+
+    if idx >= len(tokens):
+        # Empty command or variable assignment only
+        return False, ""
+
+    executable = tokens[idx]
     base_exe = Path(executable).name.lower()
     if base_exe in FORBIDDEN_BINARIES:
         return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
 
     # 4. Check for destructive recursive rm removals
     if base_exe == "rm":
-        for tok in tokens[1:]:
+        for tok in tokens[idx + 1 :]:
             if RECURSIVE_FLAG_PATTERN.match(tok) or tok in ("--recursive", "--recursive=true"):
                 return (
                     True,
