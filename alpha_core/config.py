@@ -99,6 +99,10 @@ class Settings(BaseModel):
 
     # AI Model Credentials (Provided by User)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_LIVE_API_KEY: str = os.getenv(
+        "GEMINI_LIVE_API_KEY",
+        os.getenv("EVA_GEMINI_LIVE_API_KEY", os.getenv("GEMINI_API_KEY", "")),
+    )
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
     GOOGLE_APPLICATION_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
     GEMINI_USE_VERTEX: bool = USE_VERTEX
