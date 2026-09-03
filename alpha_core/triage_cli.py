@@ -360,6 +360,39 @@ def cmd_emergency_status(args: argparse.Namespace, queue: TaskTriageQueue) -> in
     return 0
 
 
+def cmd_worker_cycle(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    from alpha_worker.triage_dispatcher import TriageTaskDispatcher
+
+    dispatcher = TriageTaskDispatcher(queue=queue)
+    if queue.is_emergency_stopped():
+        msg = "Emergency stop active. Worker execution halted."
+        if args.json:
+            print(json.dumps({"error": msg, "emergency_stop": True}))
+        else:
+            print(f"🚨 {msg}", file=sys.stderr)
+        return 1
+
+    proposal = dispatcher.execute_next_cycle()
+    if not proposal:
+        if args.json:
+            print(json.dumps({"status": "idle", "task": None}))
+        else:
+            print("No approved tasks available in triage queue.")
+        return 0
+
+    if args.json:
+        print(json.dumps({"status": "completed", "pr_proposal": proposal.to_dict()}, indent=2))
+    else:
+        print("=" * 60)
+        print(f"✅ Worker executed task: {proposal.task_id}")
+        print(f"Branch:      {proposal.branch_name}")
+        print(f"Head Commit: {proposal.head_commit}")
+        print(f"Title:       {proposal.title}")
+        print(f"Gates Pass:  {proposal.gates_passed}")
+        print("=" * 60)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="alphabrain triage",
@@ -437,6 +470,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = subparsers.add_parser("emergency-status", help="Check emergency stop status")
     p_status.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # worker-cycle
+    p_worker = subparsers.add_parser(
+        "worker-cycle", help="Run a worker polling and execution cycle"
+    )
+    p_worker.add_argument("--json", action="store_true", help="Output JSON format")
+
     return parser
 
 
@@ -459,6 +498,7 @@ def main(argv: list[str] | None = None) -> int:
         "emergency-stop": cmd_emergency_stop,
         "emergency-resume": cmd_emergency_resume,
         "emergency-status": cmd_emergency_status,
+        "worker-cycle": cmd_worker_cycle,
     }
 
     handler = handlers.get(args.subcommand)

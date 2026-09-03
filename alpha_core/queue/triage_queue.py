@@ -521,7 +521,7 @@ class TaskTriageQueue:
     def fail_task(
         self,
         task_id: str,
-        error_details: dict[str, Any],
+        error_details: dict[str, Any] | str,
         allow_retry: bool = True,
         max_retries: int = 2,
     ) -> bool:
@@ -530,6 +530,7 @@ class TaskTriageQueue:
         returns the task to APPROVED status for retry. Otherwise sets to FAILED.
         """
         now = time.time()
+        payload = {"error": error_details} if isinstance(error_details, str) else error_details
 
         def _fail(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
@@ -553,7 +554,7 @@ class TaskTriageQueue:
                     (
                         TriageStatus.APPROVED.value,
                         next_retries,
-                        json.dumps(error_details),
+                        json.dumps(payload),
                         now,
                         task_id,
                     ),
@@ -570,7 +571,7 @@ class TaskTriageQueue:
                     """,
                     (
                         TriageStatus.FAILED.value,
-                        json.dumps(error_details),
+                        json.dumps(payload),
                         now,
                         now,
                         task_id,

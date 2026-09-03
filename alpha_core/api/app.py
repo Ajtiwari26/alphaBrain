@@ -2349,3 +2349,75 @@ async def post_triage_emergency_resume(
     require_triage_access(principal)
     resumed = queue.emergency_resume()
     return {"emergency_stop": False, "resumed": resumed}
+
+
+class TriageWorkerLeaseRequest(BaseModel):
+    worker_id: str | None = None
+
+
+class TriageTaskResultRequest(BaseModel):
+    status: str  # "completed" | "failed"
+    result: dict[str, Any] = {}
+    worktree_path: str | None = None
+    branch_name: str | None = None
+    error: str | None = None
+
+
+def require_triage_worker_access(principal: AuthPrincipal) -> None:
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN, PrincipalRole.WORKER}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Triage worker operations require founder, admin, or worker access",
+        )
+
+
+@app.post("/api/triage/tasks/lease")
+async def post_triage_lease_task(
+    payload: TriageWorkerLeaseRequest = TriageWorkerLeaseRequest(),
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_worker_access(principal)
+    if queue.is_emergency_stopped():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Emergency stop active. Worker leasing suspended.",
+        )
+    task = queue.lease_next_approved_task()
+    return {"status": "ok", "task": task}
+
+
+@app.post("/api/triage/tasks/{task_id}/result")
+async def post_triage_task_result(
+    task_id: str,
+    payload: TriageTaskResultRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_worker_access(principal)
+    if not SAFE_EXTERNAL_ID.fullmatch(task_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid task ID"
+        )
+
+    if payload.status == "completed":
+        success = queue.complete_task(
+            task_id,
+            result=payload.result,
+            worktree_path=payload.worktree_path,
+            branch_name=payload.branch_name,
+        )
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Task '{task_id}' not found or not in EXECUTING state",
+            )
+        return {"status": "ok", "task_id": task_id, "state": "completed"}
+    elif payload.status == "failed":
+        queue.fail_task(task_id, error_details={"error": payload.error or "Unknown worker failure"})
+        return {"status": "ok", "task_id": task_id, "state": "failed"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid status '{payload.status}'. Must be 'completed' or 'failed'",
+        )

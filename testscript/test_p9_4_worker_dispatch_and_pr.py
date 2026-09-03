@@ -1,0 +1,429 @@
+"""
+testscript/test_p9_4_worker_dispatch_and_pr.py
+Hermetic tests for Phase 9.4: Worker Dispatch & PR Generation Pipeline.
+
+Verifies:
+1. Strict worker blindness: workers ignore PENDING_REVIEW and REJECTED tasks.
+2. Emergency stop fail-closed behavior across dispatcher, CLI, and REST API.
+3. Content hash integrity check prior to execution.
+4. End-to-end worker execution: Worktree isolation -> Git commit -> Gate evidence -> PR proposal -> COMPLETED queue state.
+5. P9 Blast radius containment: Worktree modification outside allowed_paths fails closed.
+6. Acceptance gate failure handling and retry.
+7. Worker REST API lease and result lifecycle, including RBAC and emergency stop checks.
+8. Worker CLI cycle execution.
+
+Authoritative Reference:
+docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 6.5 & Section 6.6)
+"""
+
+import json
+import subprocess
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from alpha_core.api.app import app, get_triage_queue
+from alpha_core.config import settings
+from alpha_core.queue.triage_queue import (
+    TaskProvenance,
+    TaskTriageQueue,
+    TriageStatus,
+)
+from alpha_core.security import AuthPrincipal, PrincipalRole, require_api_principal
+from alpha_core.triage_cli import main as cli_main
+from alpha_worker.triage_dispatcher import PRProposal, TriageTaskDispatcher
+from alpha_worker.worktree import WorktreeManager
+
+
+def create_fixture_git_repo(repo_dir: Path) -> Path:
+    """Initializes a clean Git repository with an initial commit."""
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "init", "-b", "main"], cwd=str(repo_dir), check=True, capture_output=True
+    )
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(repo_dir), check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@alphabrain.ai"], cwd=str(repo_dir), check=True
+    )
+
+    readme = repo_dir / "README.md"
+    readme.write_text("# Test Fixture Repo\n")
+    subprocess.run(["git", "add", "README.md"], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(repo_dir), check=True)
+    return repo_dir
+
+
+@pytest.fixture
+def isolated_queue(tmp_path: Path) -> TaskTriageQueue:
+    db_path = tmp_path / "test_triage.db"
+    lock_path = tmp_path / "emergency_stop.lock"
+    return TaskTriageQueue(db_path=db_path, emergency_lock_path=lock_path)
+
+
+@pytest.fixture
+def fixture_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    repo = create_fixture_git_repo(tmp_path / "repo")
+    # Allow this tmp_path repo root in settings
+    monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", [tmp_path])
+    monkeypatch.setattr(settings, "WORKTREE_BASE_DIR", tmp_path / "worktrees")
+    return repo
+
+
+def make_test_provenance(task_id: str, content_hash: str) -> TaskProvenance:
+    return TaskProvenance(
+        meeting_id="meet_fixture_123",
+        speaker_id="founder_1",
+        utterance_timestamp=1725345600.0,
+        transcript_excerpt="Operator approved task",
+        extraction_model="gemini-3.1-pro-high",
+        extraction_confidence=0.98,
+        eva_session_id="eva_sess_001",
+        created_at=1725345600.0,
+        content_hash=content_hash,
+    )
+
+
+def test_worker_blindness_to_unapproved_tasks(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path
+) -> None:
+    """Worker dispatcher strictly leases APPROVED tasks; ignores PENDING_REVIEW and REJECTED."""
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue)
+
+    # 1. Enqueue task in PENDING_REVIEW
+    env1 = {
+        "task_id": "task_unvetted_1",
+        "objective": "Unvetted task",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["README.md"],
+    }
+    prov1 = make_test_provenance("task_unvetted_1", "hash_1")
+    isolated_queue.enqueue_task("task_unvetted_1", env1, prov1)
+
+    # 2. Worker attempts to lease -> MUST return None
+    assert dispatcher.lease_task() is None
+
+    # 3. Enqueue another task and reject it
+    env2 = {
+        "task_id": "task_rejected_2",
+        "objective": "Rejected task",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["README.md"],
+    }
+    prov2 = make_test_provenance("task_rejected_2", "hash_2")
+    isolated_queue.enqueue_task("task_rejected_2", env2, prov2)
+    isolated_queue.reject_task("task_rejected_2", reason="Security rejection")
+
+    # 4. Worker attempts to lease -> MUST still return None
+    assert dispatcher.lease_task() is None
+
+
+def test_emergency_stop_halts_worker_leasing(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path
+) -> None:
+    """Active emergency stop halts worker leasing fail-closed."""
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue)
+
+    env = {
+        "task_id": "task_appr_1",
+        "objective": "Approved task",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["README.md"],
+    }
+    prov = make_test_provenance("task_appr_1", "hash_appr_1")
+    isolated_queue.enqueue_task("task_appr_1", env, prov)
+    isolated_queue.approve_task("task_appr_1")
+
+    # Activate emergency stop
+    isolated_queue.emergency_stop("Security incident underway")
+
+    # Worker lease MUST fail-closed
+    assert dispatcher.lease_task() is None
+    assert dispatcher.execute_next_cycle() is None
+
+    # Resume emergency stop
+    isolated_queue.emergency_resume()
+
+    # Now leasing succeeds
+    leased = dispatcher.lease_task()
+    assert leased is not None
+    assert leased["id"] == "task_appr_1"
+    assert leased["status"] == TriageStatus.EXECUTING.value
+
+
+def test_content_hash_mismatch_fails_closed(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path
+) -> None:
+    """If stored content_hash does not match recomputed envelope hash, execution fails closed."""
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue)
+
+    env = {
+        "task_id": "task_tampered_1",
+        "objective": "Legitimate objective",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["README.md"],
+    }
+    # Provide intentionally mismatched hash
+    prov = make_test_provenance("task_tampered_1", "tampered_fake_hash_123")
+    isolated_queue.enqueue_task("task_tampered_1", env, prov)
+    isolated_queue.approve_task("task_tampered_1")
+
+    # Dispatcher runs cycle
+    proposal = dispatcher.execute_next_cycle()
+    assert proposal is None
+
+    # Verify task was marked FAILED with security violation in queue
+    task = isolated_queue.get_task("task_tampered_1")
+    assert task is not None
+    assert task["status"] == TriageStatus.FAILED.value
+    assert "Security Violation: Content hash mismatch" in str(task["result_json"])
+
+
+def test_end_to_end_worker_dispatch_and_pr_generation(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path, tmp_path: Path
+) -> None:
+    """Full execution lifecycle: lease -> worktree branch -> git commit -> PR proposal -> queue COMPLETED."""
+    wt_mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue, worktree_mgr=wt_mgr)
+
+    env = {
+        "task_id": "task_valid_e2e",
+        "project_id": "proj_alpha",
+        "objective": "Add features doc",
+        "detailed_instructions": "Create FEATURES.md with feature list",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["FEATURES.md"],
+        "acceptance_plan": {
+            "commands": [{"executable": "python", "args": ["-c", "import sys; sys.exit(0)"]}]
+        },
+    }
+    # Deterministic content hash
+    env_json = json.dumps(env, default=str)
+    import hashlib
+
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("task_valid_e2e", content_hash)
+
+    isolated_queue.enqueue_task("task_valid_e2e", env, prov)
+    isolated_queue.approve_task("task_valid_e2e")
+
+    # Simulate agent writing the file inside worktree prior to commit
+    # We can pre-create or let execute_task create worktree
+    # To simulate file change:
+    wt_path = wt_mgr.create_or_resume_worktree(
+        repo_path=str(fixture_repo),
+        task_id="task_valid_e2e",
+        base_commit="HEAD",
+    )
+    features_file = wt_path / "FEATURES.md"
+    features_file.write_text("# Feature List\n- Feature A\n- Feature B\n")
+
+    # Run dispatcher cycle
+    proposal = dispatcher.execute_next_cycle()
+    assert proposal is not None
+    assert isinstance(proposal, PRProposal)
+    assert proposal.task_id == "task_valid_e2e"
+    assert proposal.project_id == "proj_alpha"
+    assert proposal.branch_name == "alpha/task_valid_e2e"
+    assert proposal.gates_passed is True
+    assert "FEATURES.md" in proposal.files_changed
+    assert proposal.head_commit != "HEAD"
+
+    # Queue state check
+    task = isolated_queue.get_task("task_valid_e2e")
+    assert task is not None
+    assert task["status"] == TriageStatus.COMPLETED.value
+    assert task["branch_name"] == "alpha/task_valid_e2e"
+    assert task["worktree_path"] == str(wt_path)
+
+    # Result payload in queue
+    result_data = json.loads(task["result_json"])
+    assert result_data["head_commit"] == proposal.head_commit
+    assert result_data["gates_passed"] is True
+
+
+def test_worker_disallowed_path_fails_closed(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path, tmp_path: Path
+) -> None:
+    """Worker modifying files outside allowed_paths is rejected and marked FAILED."""
+    wt_mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue, worktree_mgr=wt_mgr)
+
+    env = {
+        "task_id": "task_disallowed_paths",
+        "objective": "Modify restricted file",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["docs/safe.md"],
+        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(0)"]}]},
+    }
+    import hashlib
+
+    env_json = json.dumps(env, default=str)
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("task_disallowed_paths", content_hash)
+
+    isolated_queue.enqueue_task("task_disallowed_paths", env, prov)
+    isolated_queue.approve_task("task_disallowed_paths")
+
+    # Pre-create worktree and write to disallowed file outside allowed_paths
+    wt_path = wt_mgr.create_or_resume_worktree(
+        repo_path=str(fixture_repo),
+        task_id="task_disallowed_paths",
+        base_commit="HEAD",
+    )
+    forbidden_file = wt_path / "danger.sh"
+    forbidden_file.write_text("echo hacked\n")
+
+    proposal = dispatcher.execute_next_cycle()
+    assert proposal is None
+
+    # Check task failed
+    task = isolated_queue.get_task("task_disallowed_paths")
+    assert task is not None
+    assert task["status"] == TriageStatus.FAILED.value
+    assert "Security Violation: Modified files outside allowed_paths" in str(task["result_json"])
+
+
+def test_worker_acceptance_gate_failure(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path, tmp_path: Path
+) -> None:
+    """Failing acceptance gate prevents commit/completion and marks task for retry/failed."""
+    wt_mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue, worktree_mgr=wt_mgr)
+
+    env = {
+        "task_id": "task_gate_fail",
+        "objective": "Broken test task",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["test.py"],
+        "acceptance_plan": {
+            "commands": [{"executable": "python", "args": ["-c", "import sys; sys.exit(42)"]}]
+        },
+    }
+    import hashlib
+
+    env_json = json.dumps(env, default=str)
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("task_gate_fail", content_hash)
+
+    isolated_queue.enqueue_task("task_gate_fail", env, prov)
+    isolated_queue.approve_task("task_gate_fail")
+
+    proposal = dispatcher.execute_next_cycle()
+    assert proposal is None
+
+    task = isolated_queue.get_task("task_gate_fail")
+    assert task is not None
+    # Gate failure moves task to APPROVED with retry_count incremented
+    assert task["status"] in {TriageStatus.APPROVED.value, TriageStatus.FAILED.value}
+    assert task["retry_count"] >= 1
+    assert "Acceptance gates failed" in str(task["result_json"])
+
+
+def test_api_worker_endpoints_and_rbac(
+    isolated_queue: TaskTriageQueue,
+    fixture_repo: Path,
+) -> None:
+    """Verifies REST API endpoints /api/triage/tasks/lease and result."""
+    app.dependency_overrides[get_triage_queue] = lambda: isolated_queue
+    client = TestClient(app)
+
+    # 1. Anonymous request returns 401
+    res = client.post("/api/triage/tasks/lease")
+    assert res.status_code == 401
+
+    # 2. Client role returns 403
+    client_principal = AuthPrincipal(subject="client_charlie", role=PrincipalRole.CLIENT)
+    app.dependency_overrides[require_api_principal] = lambda: client_principal
+    res = client.post("/api/triage/tasks/lease")
+    assert res.status_code == 403
+
+    # 3. Worker role succeeds on empty queue
+    worker_principal = AuthPrincipal(subject="worker_bob", role=PrincipalRole.WORKER)
+    app.dependency_overrides[require_api_principal] = lambda: worker_principal
+    res = client.post("/api/triage/tasks/lease")
+    assert res.status_code == 200
+    assert res.json()["task"] is None
+
+    # 4. Enqueue and approve a task
+    env = {
+        "task_id": "api_worker_task_1",
+        "objective": "API worker task",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["doc.md"],
+    }
+    prov = make_test_provenance("api_worker_task_1", "hash_api_1")
+    isolated_queue.enqueue_task("api_worker_task_1", env, prov)
+    isolated_queue.approve_task("api_worker_task_1")
+
+    # 5. Worker leases task
+    res = client.post("/api/triage/tasks/lease")
+    assert res.status_code == 200
+    leased = res.json()["task"]
+    assert leased is not None
+    assert leased["id"] == "api_worker_task_1"
+    assert leased["status"] == TriageStatus.EXECUTING.value
+
+    # 6. Worker posts completion result
+    res = client.post(
+        "/api/triage/tasks/api_worker_task_1/result",
+        json={
+            "status": "completed",
+            "result": {"pr_url": "https://github.com/org/repo/pull/1"},
+            "branch_name": "alpha/api_worker_task_1",
+            "worktree_path": "/tmp/wt/1",
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["state"] == "completed"
+
+    task = isolated_queue.get_task("api_worker_task_1")
+    assert task is not None
+    assert task["status"] == TriageStatus.COMPLETED.value
+
+    # 7. Emergency stop blocks lease with 409
+    isolated_queue.emergency_stop("API test stop")
+    res = client.post("/api/triage/tasks/lease")
+    assert res.status_code == 409
+
+    app.dependency_overrides.clear()
+
+
+def test_cli_worker_cycle_command(
+    isolated_queue: TaskTriageQueue,
+    fixture_repo: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CLI worker-cycle executes approved tasks or exits cleanly when empty."""
+    db_arg = str(isolated_queue.db_path)
+    lock_arg = str(isolated_queue.emergency_lock_path)
+
+    # 1. Idle queue
+    ret = cli_main(["--db-path", db_arg, "--emergency-lock", lock_arg, "worker-cycle", "--json"])
+    assert ret == 0
+
+    # 2. Enqueue and approve task
+    env = {
+        "task_id": "cli_worker_task_1",
+        "project_id": "cli_proj",
+        "objective": "CLI worker test",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["cli.txt"],
+        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(0)"]}]},
+    }
+    import hashlib
+
+    env_json = json.dumps(env, default=str)
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("cli_worker_task_1", content_hash)
+    isolated_queue.enqueue_task("cli_worker_task_1", env, prov)
+    isolated_queue.approve_task("cli_worker_task_1")
+
+    # 3. Run worker-cycle via CLI
+    ret = cli_main(["--db-path", db_arg, "--emergency-lock", lock_arg, "worker-cycle"])
+    assert ret == 0
+
+    task = isolated_queue.get_task("cli_worker_task_1")
+    assert task is not None
+    assert task["status"] == TriageStatus.COMPLETED.value
