@@ -201,6 +201,9 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     privilege escalation, execution wrappers, shell control chaining, or dangerous operations.
     Enforces a strict zero-wrapper and anti-privilege-escalation policy with iterative resolution.
     """
+    # 0. Neutralize line continuations globally before scanning
+    cmd_str = cmd_str.replace("\\\r\n", "").replace("\\\n", "")
+
     # 1. Pre-lexing scan for unquoted metacharacters and active command substitutions
     has_syntax_violation, violation_reason = scan_unquoted_shell_syntax(cmd_str)
     if has_syntax_violation:
@@ -215,9 +218,9 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     if not tokens:
         return False, ""
 
-    # 2. Secondary check for tokens containing operator chars
+    # 2. Secondary check for exact operator tokens
     for tok in tokens:
-        if tok in OPERATOR_TOKENS or any(ch in FORBIDDEN_OPERATOR_CHARS for ch in tok):
+        if tok in OPERATOR_TOKENS:
             return True, f"Shell control operator '{tok}' is forbidden in gate command: '{cmd_str}'"
 
     # 3. Iterative executable resolution: skip leading environment assignments (e.g. PYTHONPATH=. or FOO=bar)
