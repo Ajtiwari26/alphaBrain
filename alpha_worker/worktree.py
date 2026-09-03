@@ -182,7 +182,29 @@ class WorktreeManager:
         )
         if branch.returncode != 0 or branch.stdout.strip() != expected_branch:
             raise RuntimeError("Existing worktree does not match task branch; refusing resume")
-        self._git(worktree_path, ["merge-base", "--is-ancestor", resolved_base, "HEAD"])
+
+        # Verify worktree branch is compatible with repository history
+        is_anc = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", resolved_base, "HEAD"],
+            cwd=str(worktree_path),
+            capture_output=True,
+        )
+        if is_anc.returncode != 0:
+            # Check if HEAD is ancestor of resolved_base (main moved forward)
+            rev_anc = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", "HEAD", resolved_base],
+                cwd=str(worktree_path),
+                capture_output=True,
+            )
+            if rev_anc.returncode != 0:
+                # Ensure they share a valid common ancestor
+                mb = subprocess.run(
+                    ["git", "merge-base", resolved_base, "HEAD"],
+                    cwd=str(worktree_path),
+                    capture_output=True,
+                )
+                if mb.returncode != 0 or not mb.stdout.strip():
+                    raise RuntimeError("Existing worktree shares no common history with repository")
         return worktree_path
 
     def assert_base_commit_ancestor(self, worktree_path: Path, base_commit: str) -> None:
