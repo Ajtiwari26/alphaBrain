@@ -5,8 +5,9 @@
    - If we have enough quota left for further reviewing or planning, use Opus (`claude-opus-4-6-thinking`).
    - Else, use Pro on high mode (`gemini-3.1-pro-high`) invoked via `agy` CLI.
 
-2. **Canonical Architecture & Conflict Resolution Authority**:
-   - All Pro and Flash models, executors, and subagents MUST consult `docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md` for architectural guidance and system design.
+2. **Canonical Architecture & Conflict Resolution Authority (Opus Exclusive Authoring)**:
+   - `docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md` is authored and maintained EXCLUSIVELY by Claude Opus (`claude-opus-4-6-thinking`).
+   - All Pro and Flash models, executors, and subagents have STRICT READ-ONLY access to this file and MUST consult it for architectural guidance and system design.
    - In case of any discrepancy or conflict, `docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md` is the supreme source of truth.
    - Under no circumstances may any agent modify `alphaBrain/alpha_meet/` (strictly immutable).
 
