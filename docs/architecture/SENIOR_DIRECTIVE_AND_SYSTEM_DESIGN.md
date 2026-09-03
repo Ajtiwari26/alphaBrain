@@ -1072,3 +1072,350 @@ Authority:  Senior Architect (Opus)
 Invariants: I-21 through I-30 (10 invariants, all binding)
 Next:       P9.5 — End-to-End Pipeline Integration & Chaos Testing
 ```
+
+---
+
+### 6.7 Phase 9 System Delivery, Chaos Resilience & Production Handover (P9.5 Approved)
+
+**Approval Gate:** Senior Architectural Review — Claude Opus 4.6 (Thinking)
+**Date:** 2026-09-03T16:10:02+05:30
+**Commit Range:** `7e4bbee..ade69bc`
+**Prior Gate:** Mid-Level Adversarial Review (Gemini 3.1 Pro High) — APPROVED (44/44 tests)
+**Test Artifact:** [`testscript/test_p9_5_e2e_and_chaos.py`](file:///Users/ajaytiwari/Desktop/projects/alphabrain/testscript/test_p9_5_e2e_and_chaos.py) — 6 tests, 494 lines
+
+> [!IMPORTANT]
+> Phase 9 represents the culmination of AlphaBrain's autonomous coding pipeline. This section documents the end-to-end architectural closed loop, validates five chaos resilience scenarios under production-realistic conditions, establishes the master invariant matrix (I-1 through I-30), and provides the operational runbook for production deployment. All agents (Pro, Flash, subagents) MUST consult this section before modifying any pipeline component.
+
+---
+
+#### 6.7.1 End-to-End Architectural Closed Loop
+
+The Phase 9 pipeline forms a **cryptographically sealed, fail-closed loop** from transcript ingestion to PR proposal delivery. Every stage enforces at least one invariant, and no stage can be bypassed without triggering a security violation.
+
+```mermaid
+flowchart TD
+    A["📝 Transcript Ingestion<br/>(Raw user/agent conversation)"] -->|"Parse & extract"| B["🧠 Eva Spec Generation<br/>(TaskProvenance + Envelope)"]
+    B -->|"SHA-256 content_hash sealed"| C["🔒 AST Safety Gate<br/>(SafetyGate.evaluate_envelope)"]
+    C -->|"PASS verdict + P9 Constitution"| D["👤 Operator HITL Gate<br/>(CLI cli_main / API)"]
+    D -->|"PENDING_REVIEW → APPROVED"| E["⚙️ Worker Dispatch<br/>(triage_dispatcher.py)"]
+    E -->|"Lease acquisition<br/>(atomic, zero-duplicate)"| F["📂 Worktree Execution<br/>(alpha/{task_id})"]
+    F -->|"git status --porcelain -uall"| G["🛡️ Blast Radius Check<br/>(allowed_paths enforcement)"]
+    G -->|"All files within bounds"| H["✅ Acceptance Gates<br/>(Unit tests + invariant checks)"]
+    H -->|"All gates pass"| I["📋 PRProposal Generation"]
+    I -->|"complete_task(SUCCESS)"| J["🏁 Queue Completion<br/>(EXECUTING → COMPLETED)"]
+
+    C -->|"FAIL verdict"| X1["❌ Rejected<br/>(Zero retry)"]
+    E -->|"Hash mismatch detected"| X2["❌ Security Violation<br/>(FAILED, 0 retries)"]
+    G -->|"Files outside allowed_paths"| X3["❌ Sandbox Violation<br/>(FAILED, violation report)"]
+
+    style A fill:#1a1a2e,stroke:#e94560,color:#fff
+    style B fill:#1a1a2e,stroke:#e94560,color:#fff
+    style C fill:#0f3460,stroke:#e94560,color:#fff
+    style D fill:#533483,stroke:#e94560,color:#fff
+    style E fill:#1a1a2e,stroke:#e94560,color:#fff
+    style F fill:#1a1a2e,stroke:#e94560,color:#fff
+    style G fill:#0f3460,stroke:#e94560,color:#fff
+    style H fill:#1a1a2e,stroke:#e94560,color:#fff
+    style I fill:#1a1a2e,stroke:#e94560,color:#fff
+    style J fill:#16213e,stroke:#0f0,color:#fff
+    style X1 fill:#4a0000,stroke:#f00,color:#fff
+    style X2 fill:#4a0000,stroke:#f00,color:#fff
+    style X3 fill:#4a0000,stroke:#f00,color:#fff
+```
+
+**Closed-Loop Guarantees:**
+
+| Property | Mechanism | Invariants |
+|----------|-----------|------------|
+| **Provenance Integrity** | `TaskProvenance` with SHA-256 `content_hash` sealed at Eva spec generation | I-11 through I-15 |
+| **Pre-execution Tamper Detection** | Dispatcher recomputes hash before worker launch; mismatch → permanent `FAILED` | I-21 through I-25 |
+| **Human-in-the-Loop Gating** | No task reaches worker dispatch without explicit `APPROVED` state transition | I-19, I-20 |
+| **Sandbox Containment** | `git status --porcelain -uall` + quote stripping; every individual file checked against `allowed_paths` | I-26 through I-28 |
+| **Fail-Closed Default** | Every security gate defaults to rejection; no silent pass-through on error | I-29, I-30 |
+
+> [!CAUTION]
+> The closed loop is **non-negotiable**. Any agent proposing to bypass a stage (e.g., skipping HITL for "low-risk" tasks, or relaxing blast radius checks for "trusted" directories) MUST submit a formal architectural amendment through this document. No runtime configuration or environment variable may disable any stage.
+
+---
+
+#### 6.7.2 Chaos Resilience & Threat Models Verified
+
+Phase 9.5 validates five chaos scenarios under production-realistic conditions. All scenarios use **real concurrency, real SQLite contention, and real cryptographic verification** — no mocking of security-critical paths.
+
+##### 6.7.2.1 Worker Crash & Stall Recovery
+
+| Attribute | Detail |
+|-----------|--------|
+| **Threat Model** | Worker process crashes or hangs indefinitely after leasing a task |
+| **Attack Surface** | Tasks stuck in `EXECUTING` state, blocking queue capacity |
+| **Mechanism** | `started_at` time-warp by 7200s; `reap_stale_executing_tasks(timeout_seconds=3600)` identifies stalled task |
+| **Verified Behavior** | Task transitions to `FAILED` with message `"Watchdog timeout: execution stalled"` |
+| **Negative Case** | Threshold below stall time (10800s) correctly returns 0 reaped — no premature reaping |
+| **Verdict** | ✅ **PASS** |
+
+##### 6.7.2.2 Concurrent Multi-Worker Lease Race
+
+| Attribute | Detail |
+|-----------|--------|
+| **Threat Model** | Multiple workers simultaneously attempt to lease the same task pool |
+| **Attack Surface** | Duplicate lease assignments causing conflicting worktree modifications |
+| **Mechanism** | 10 `ThreadPoolExecutor` workers race to lease 5 approved tasks under real SQLite contention |
+| **Verified Behavior** | Exactly 5 leases, exactly 5 `None` returns, strict set equality (zero duplicate claims) |
+| **Concurrency Primitive** | SQLite retry backoff handles contention without deadlock |
+| **Verdict** | ✅ **PASS** |
+
+> [!NOTE]
+> The lease race test uses **real threads with real SQLite contention**, not asyncio mocks. This is intentional — SQLite's locking behavior under `ThreadPoolExecutor` faithfully represents the production deployment model where multiple worker processes share a single queue database.
+
+##### 6.7.2.3 Emergency Stop Interruption & Resumption
+
+| Attribute | Detail |
+|-----------|--------|
+| **Threat Model** | Operator triggers emergency stop while tasks are mid-execution |
+| **Attack Surface** | Partial state corruption; in-flight tasks orphaned; post-resume inconsistency |
+| **Mechanism** | Emergency stop activated mid-pipeline; all four forward operations blocked |
+| **Blocked Operations** | `enqueue`, `approve`, `modify`, `lease` — all raise `EmergencyStopActiveError` |
+| **In-Flight Survival** | `complete_task` returns `True` during emergency — in-flight tasks complete normally |
+| **Resumption** | Post-resume `lease` succeeds; no state corruption observed |
+| **Verdict** | ✅ **PASS** |
+
+##### 6.7.2.4 Cryptographic Tamper Detection (SHA-256 Fail-Closed)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Threat Model** | Adversary modifies `envelope_json` directly in the database (e.g., injecting `/etc/shadow` into `allowed_paths`) |
+| **Attack Surface** | Bypassing AST Safety Gate and HITL approval via post-approval envelope tampering |
+| **Mechanism** | Direct SQL injection modifies `envelope_json` without updating `content_hash` |
+| **Verified Behavior** | Dispatcher catches hash mismatch; task permanently fails with `"Security Violation: Content hash mismatch"` |
+| **Retry Policy** | `retry_count == 0` — **zero retries on cryptographic violation** |
+| **Verdict** | ✅ **PASS** |
+
+> [!WARNING]
+> The zero-retry policy on cryptographic violations is **by design**. A hash mismatch indicates either database corruption or active tampering — both require human investigation, not automated retry. Any proposal to add retry logic for hash mismatches will be rejected as a security regression.
+
+##### 6.7.2.5 Sandbox Escape & Blast Radius Containment
+
+| Attribute | Detail |
+|-----------|--------|
+| **Threat Model** | Worker creates or modifies files outside the declared `allowed_paths` |
+| **Attack Surface** | Unauthorized filesystem modifications; exfiltration via untracked subdirectories |
+| **Pre-Fix Vector** | `git status --porcelain` (without `-uall`) shows untracked directories as single entries (e.g., `?? malicious_dir/`), hiding individual files from blast radius checks |
+| **Fix Applied** | [`triage_dispatcher.py`](file:///Users/ajaytiwari/Desktop/projects/alphabrain/alpha_worker/triage_dispatcher.py): `-uall` flag + `.strip('"')` |
+| **Mirror Fix** | [`worktree.py`](file:///Users/ajaytiwari/Desktop/projects/alphabrain/alpha_worker/worktree.py): identical hardening |
+| **Verified Behavior** | Task fails with `"Security Violation: Modified files outside allowed_paths"` including `"secret_keys.env"` in violation report; no `PRProposal` generated |
+| **Verdict** | ✅ **PASS** |
+
+**The `-uall` Vector — Before & After:**
+
+```
+# BEFORE (vulnerable): untracked directory hides contents
+$ git status --porcelain
+?? malicious_dir/          # Individual files INVISIBLE
+
+# AFTER (hardened): every file individually enumerated
+$ git status --porcelain -uall
+?? malicious_dir/secret_keys.env    # VISIBLE → caught by allowed_paths
+?? malicious_dir/exfil_payload.sh   # VISIBLE → caught by allowed_paths
+```
+
+---
+
+#### 6.7.3 Master Invariant Matrix
+
+> [!IMPORTANT]
+> This is the **authoritative invariant registry** for AlphaBrain Phase 9. All 30 invariants are listed with their enforcement points, failure modes, and current status. Any agent modifying pipeline code MUST verify that no invariant transitions from ✅ to any other state without Senior Architect approval through this document.
+
+##### I-1 through I-10: Queue Foundation & State Machine
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| I-1 | Task ID uniqueness (UUID v4) | `TaskQueue.enqueue()` | Duplicate key rejection at DB level | ✅ Maintained |
+| I-2 | State machine transitions are valid | `TaskQueue._transition()` | `InvalidStateTransition` raised on illegal edge | ✅ Maintained |
+| I-3 | PENDING → PENDING_REVIEW is the only enqueue target | `TaskQueue.enqueue()` | Hard-coded initial state; no parameter override | ✅ Maintained |
+| I-4 | PENDING_REVIEW → APPROVED requires explicit operator action | `TaskQueue.approve_task()` | No auto-approval path exists | ✅ Maintained |
+| I-5 | APPROVED → EXECUTING via atomic lease only | `TaskQueue.lease_next_approved()` | Single SQL UPDATE with WHERE clause; returns None on contention loss | ✅ Maintained |
+| I-6 | EXECUTING → COMPLETED or FAILED are the only terminal transitions | `TaskQueue.complete_task()` / `TaskQueue.fail_task()` | State machine enforced; no EXECUTING → APPROVED regression | ✅ Maintained |
+| I-7 | Queue persistence survives process restart | SQLite WAL mode | DB file on disk; no in-memory state dependency | ✅ Maintained |
+| I-8 | Task metadata immutable after enqueue | `envelope_json` column; no UPDATE path in API | Content hash detects post-enqueue tampering | ✅ Maintained |
+| I-9 | Timestamp ordering preserved | `created_at` DEFAULT CURRENT_TIMESTAMP | Monotonic within single-writer SQLite | ✅ Maintained |
+| I-10 | Queue depth queryable for backpressure | `TaskQueue.get_queue_depth()` | COUNT(*) by state; O(n) but sufficient for expected scale | ✅ Maintained |
+
+##### I-11 through I-15: Eva Provenance & Content Integrity
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| I-11 | Every task has a `TaskProvenance` with full fields | `Eva.generate_spec()` | Missing field → `ValidationError` at Pydantic level | ✅ Maintained |
+| I-12 | `content_hash` is SHA-256 of canonical `envelope_json` | `TaskProvenance.compute_hash()` | Hash mismatch → permanent FAILED (I-23) | ✅ Maintained |
+| I-13 | Provenance includes source transcript reference | `TaskProvenance.source_ref` | Traceability from task to originating conversation | ✅ Maintained |
+| I-14 | Eva spec is deterministic for identical inputs | Pure function; no RNG in spec generation | Reproducible hash for identical transcripts | ✅ Maintained |
+| I-15 | Envelope schema validated before enqueue | Pydantic model validation | `ValidationError` raised; task never enters queue | ✅ Maintained |
+
+##### I-16 through I-18: Safety AST Gate
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| I-16 | `SafetyGate.evaluate_envelope()` returns explicit PASS/FAIL | AST evaluation against P9 Constitution | FAIL → task rejected pre-enqueue; no silent pass | ✅ Maintained |
+| I-17 | P9 Constitution is versioned and immutable per release | Constitution loaded from versioned config | Runtime modification raises `ConstitutionLockError` | ✅ Maintained |
+| I-18 | AST evaluation is deterministic | Pure function; no external state | Same envelope + same constitution = same verdict | ✅ Maintained |
+
+##### I-19 through I-20: HITL CLI/API
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| I-19 | CLI `cli_main` provides interactive approval workflow | `cli_main()` entry point | Operator sees task details before PENDING_REVIEW → APPROVED | ✅ Maintained |
+| I-20 | No programmatic bypass of HITL gate | No API endpoint auto-approves | `approve_task()` requires explicit call with operator context | ✅ Maintained |
+
+##### I-21 through I-25: Worker Dispatch & Execution
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| I-21 | Dispatcher produces `PRProposal` on successful execution | `TriageDispatcher.dispatch()` | Return type enforced; None only on failure path | ✅ Maintained |
+| I-22 | Venv binary resolution is generalized (not hardcoded) | `TriageDispatcher._resolve_venv()` | Searches `sys.prefix`, falls back to `shutil.which` | ✅ Maintained |
+| I-23 | Pre-execution hash verification is mandatory | `TriageDispatcher._verify_hash()` | Hash mismatch → `FAILED` with 0 retries (Chaos 4 verified) | ✅ Maintained |
+| I-24 | Worker execution is isolated to `alpha/{task_id}` worktree | `Worktree.create()` | Worktree path derived from task_id; no shared state | ✅ Maintained |
+| I-25 | Worker lease is atomic and contention-safe | `lease_next_approved()` SQL atomicity | 10-worker race: exactly N leases for N tasks (Chaos 2 verified) | ✅ Maintained |
+
+##### I-26 through I-28: Blast Radius Containment
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| I-26 | `git status --porcelain -uall` enumerates all individual files | [`triage_dispatcher.py`](file:///Users/ajaytiwari/Desktop/projects/alphabrain/alpha_worker/triage_dispatcher.py), [`worktree.py`](file:///Users/ajaytiwari/Desktop/projects/alphabrain/alpha_worker/worktree.py) | Without `-uall`, untracked directories hide contents (escape vector) | ✅ **Strengthened** |
+| I-27 | Quote stripping normalizes git output paths | `.strip('"')` on every parsed path | Without stripping, paths with spaces bypass `allowed_paths` matching | ✅ **Strengthened** |
+| I-28 | Every modified/added/untracked file checked against `allowed_paths` | Blast radius checker loop | File outside bounds → `FAILED` with violation report listing offending files | ✅ **Strengthened** |
+
+> [!TIP]
+> Invariants I-26 through I-28 were **actively strengthened** in P9.5. The `-uall` flag and quote stripping changes are the security headline of this milestone — they close a real sandbox escape vector where adversarial workers could hide unauthorized files in untracked subdirectories.
+
+##### I-29 through I-30: Emergency Survival & Fail-Closed Semantics
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| I-29 | Emergency stop blocks all forward operations | `EmergencyStopActiveError` on `enqueue`, `approve`, `modify`, `lease` | Fail-closed: no new work enters pipeline during emergency | ✅ Maintained |
+| I-30 | In-flight tasks survive emergency stop | `complete_task()` permitted during emergency | Work already executing completes normally; no orphaned state | ✅ Maintained |
+
+---
+
+#### 6.7.4 Production Deployment, Runbook & Operational Directives
+
+##### 6.7.4.1 Deployment Prerequisites
+
+| Prerequisite | Verification Command | Expected Output |
+|--------------|---------------------|-----------------|
+| Python ≥ 3.11 | `python3 --version` | `Python 3.11.x` or higher |
+| SQLite ≥ 3.35.0 (WAL mode) | `sqlite3 --version` | `3.35.0` or higher |
+| Git ≥ 2.30.0 (`-uall` support) | `git --version` | `2.30.0` or higher |
+| All 44 tests pass | `python3 -m pytest testscript/ -v` | `44 passed` |
+| Venv binary resolution functional | `python3 -c "import sys; print(sys.prefix)"` | Valid venv path |
+
+##### 6.7.4.2 Startup Sequence
+
+```bash
+# 1. Initialize the task queue database (creates schema if not exists)
+python3 -m alpha_worker.queue init
+
+# 2. Verify database integrity and WAL mode
+sqlite3 alpha_queue.db "PRAGMA integrity_check; PRAGMA journal_mode;"
+# Expected: ok / wal
+
+# 3. Start the watchdog (background process)
+python3 -m alpha_worker.watchdog --timeout 3600 --interval 300 &
+
+# 4. Start worker pool (N workers, recommended: CPU_COUNT - 1)
+python3 -m alpha_worker.dispatcher --workers $(( $(sysctl -n hw.ncpu) - 1 ))
+```
+
+##### 6.7.4.3 Operational Runbook
+
+| Scenario | Action | Command / Procedure |
+|----------|--------|-------------------|
+| **Worker appears stalled** | Check watchdog logs; verify `reap_stale_executing_tasks` is running | `tail -f logs/watchdog.log` |
+| **Suspected envelope tampering** | Query task status; check for `"Content hash mismatch"` failure | `python3 -m alpha_worker.queue status --task-id <ID>` |
+| **Blast radius violation** | Review violation report in task failure message; verify `allowed_paths` in original envelope | `python3 -m alpha_worker.queue inspect --task-id <ID>` |
+| **Emergency stop required** | Activate emergency stop; verify forward ops blocked; in-flight tasks will complete | `python3 -m alpha_worker.emergency stop` |
+| **Resume after emergency** | Verify root cause resolved; resume operations; verify lease succeeds | `python3 -m alpha_worker.emergency resume` |
+| **Queue backpressure** | Check queue depth by state; pause enqueue if APPROVED backlog > threshold | `python3 -m alpha_worker.queue depth` |
+| **Database corruption suspected** | Stop all workers; run integrity check; restore from WAL checkpoint if needed | `sqlite3 alpha_queue.db "PRAGMA integrity_check;"` |
+
+##### 6.7.4.4 Monitoring & Alerting Directives
+
+> [!WARNING]
+> The following alerts MUST be configured before production deployment. Any alert firing on a security-critical invariant (I-12, I-23, I-26–I-28) requires **immediate human investigation** — do not auto-remediate security violations.
+
+| Alert | Trigger Condition | Severity | Response |
+|-------|-------------------|----------|----------|
+| **Watchdog Reap** | `reap_stale_executing_tasks` returns > 0 | ⚠️ Warning | Investigate worker health; check for resource exhaustion |
+| **Hash Mismatch** | Task fails with `"Content hash mismatch"` | 🔴 Critical | Immediate investigation; potential active tampering |
+| **Blast Radius Violation** | Task fails with `"Modified files outside allowed_paths"` | 🔴 Critical | Review worker behavior; check for compromised execution |
+| **Emergency Stop Activated** | `EmergencyStopActiveError` raised | 🔴 Critical | Pipeline halted; operator intervention required |
+| **Lease Contention Spike** | > 50% of lease attempts return `None` in 5-minute window | ⚠️ Warning | Review worker count vs. approved task throughput |
+| **Queue Depth Threshold** | APPROVED tasks > 100 without corresponding EXECUTING | ⚠️ Warning | Scale worker pool or investigate dispatch bottleneck |
+
+##### 6.7.4.5 Prohibited Modifications
+
+> [!CAUTION]
+> The following modifications are **architecturally prohibited** without a formal amendment to this document, approved by the Senior Architect:
+>
+> 1. **Removing `-uall` from any `git status` invocation** — reopens sandbox escape vector (I-26)
+> 2. **Adding retry logic to hash mismatch failures** — undermines tamper detection (I-23)
+> 3. **Auto-approving tasks without HITL** — bypasses operator gate (I-19, I-20)
+> 4. **Allowing `complete_task` to transition FAILED → COMPLETED** — violates terminal state semantics (I-6)
+> 5. **Disabling emergency stop via environment variable or config** — removes fail-safe (I-29)
+> 6. **Removing quote stripping from path parsing** — reopens path comparison bypass (I-27)
+
+---
+
+#### 6.7.5 Phase 9 Architectural Sign-off & Milestone Completion Signature
+
+##### Review Chain
+
+| Gate | Reviewer | Date | Verdict | Tests |
+|------|----------|------|---------|-------|
+| Unit & Integration Testing | Automated (pytest) | 2026-09-03 | ✅ 44/44 PASS | 44 tests |
+| Mid-Level Adversarial Review | Gemini 3.1 Pro High | 2026-09-03 | ✅ APPROVED | 44/44 verified |
+| Senior Architectural Review | Claude Opus 4.6 (Thinking) | 2026-09-03 | ✅ APPROVED | 30/30 invariants, 5/5 chaos |
+
+##### Production Delivery Criteria — Final Checklist
+
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | All unit & integration tests pass (44/44) | ✅ |
+| 2 | Mid-Level Adversarial Review approved | ✅ |
+| 3 | Senior Architectural Review approved | ✅ |
+| 4 | All Phase 9 invariants (I-1 through I-30) maintained or strengthened | ✅ |
+| 5 | All 5 chaos scenarios pass with correct fail-closed behavior | ✅ |
+| 6 | No regression in existing functionality | ✅ |
+| 7 | Security-critical changes surgically scoped (3 changes, 2 files) | ✅ |
+| 8 | Test coverage proportional to risk (494 lines for 3 production changes) | ✅ |
+| 9 | Operational runbook documented | ✅ |
+| 10 | Prohibited modification list established | ✅ |
+
+##### Architectural Completion Statement
+
+> **Phase 9 — AlphaBrain Autonomous Coding Pipeline — is architecturally complete and production-ready.**
+>
+> The pipeline forms a cryptographically sealed, fail-closed loop from transcript ingestion through PR proposal delivery. Thirty invariants govern the system's behavior across queue management, provenance integrity, safety evaluation, human-in-the-loop gating, worker dispatch, blast radius containment, and emergency operations. Five chaos scenarios validate resilience under worker crash, concurrent contention, emergency interruption, cryptographic tampering, and sandbox escape — all using real concurrency and real cryptographic verification.
+>
+> The `-uall` fix (I-26) and quote stripping (I-27) are the security headline: they close a real sandbox escape vector where adversarial workers could hide unauthorized files in untracked subdirectories. Production code changes are surgically scoped — 3 focused modifications across 2 files, backed by 494 lines of chaos testing.
+>
+> **This milestone marks the transition from development to operational stewardship.**
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║                  PHASE 9 — MILESTONE P9.5 SIGNED                   ║
+║                                                                      ║
+║  Status:      APPROVED — PRODUCTION READY                           ║
+║  Signed:      Claude Opus 4.6 (Thinking) — Senior Architect        ║
+║  Authority:   Exclusive write access to SENIOR_DIRECTIVE            ║
+║  Date:        2026-09-03T16:10:02+05:30                             ║
+║  Commit:      ade69bc                                                ║
+║  Invariants:  I-1 through I-30 — ALL MAINTAINED OR STRENGTHENED     ║
+║  Chaos:       5/5 PASS — fail-closed verified                       ║
+║  Tests:       44/44 PASS — zero regression                          ║
+║                                                                      ║
+║  Phase 9 Status: ██████████████████████████████████████████ COMPLETE ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+*End of Section 6.7 — Phase 9 System Delivery, Chaos Resilience & Production Handover*
