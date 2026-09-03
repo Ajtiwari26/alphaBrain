@@ -34,10 +34,10 @@ async def main():
     }
     
     async with httpx.AsyncClient(timeout=30.0) as client:
-        print("Creating project...")
+        print("Creating project...", flush=True)
         r = await client.post(f"{BASE_URL}/api/projects", json=project_payload, headers=headers)
         if r.status_code not in (200, 201) and r.status_code != 409:
-            print(f"Failed to create project: {r.status_code} {r.text}")
+            print(f"Failed to create project: {r.status_code} {r.text}", flush=True)
             return
         
         # 2. Enqueue an idempotent task
@@ -62,13 +62,13 @@ async def main():
             "acceptance_plan": {"criteria": ["Linter results are printed"]}
         }
         
-        print(f"Enqueuing task {task_id}...")
+        print(f"Enqueuing task {task_id}...", flush=True)
         r = await client.post(f"{BASE_URL}/api/tasks", json=task_payload, headers=headers)
         if r.status_code not in (200, 201):
-            print(f"Failed to enqueue task: {r.status_code} {r.text}")
+            print(f"Failed to enqueue task: {r.status_code} {r.text}", flush=True)
             return
             
-        print("Task enqueued. Waiting for completion...")
+        print("Task enqueued. Waiting for completion...", flush=True)
         
         # 3. Poll for completion
         deadline = time.time() + 300
@@ -77,27 +77,27 @@ async def main():
             if r.status_code == 200:
                 task = r.json()
                 status = task.get("status")
-                print(f"Status: {status}")
-                if status in ("completed", "failed"):
-                    print(f"Final status: {status}")
+                print(f"Status: {status}", flush=True)
+                if status in ("completed", "failed", "blocked"):
+                    print(f"Final status: {status}", flush=True)
                     
                     # Get execution events
                     r_events = await client.get(f"{BASE_URL}/api/tasks/{task_id}/events", headers=headers)
                     if r_events.status_code == 200:
                         with open("testscript/evidence/p6_4_trace.json", "w") as f:
                             json.dump(r_events.json(), f, indent=2)
-                        print("Trace saved to testscript/evidence/p6_4_trace.json")
+                        print("Trace saved to testscript/evidence/p6_4_trace.json", flush=True)
                     
                     if status == "completed":
-                        print("P6.4 PROOF SUCCESSFUL")
+                        print("P6.4 PROOF SUCCESSFUL", flush=True)
                         return
                     else:
-                        print("P6.4 PROOF FAILED")
+                        print("P6.4 PROOF FAILED", flush=True)
                         return
             
             await asyncio.sleep(5)
             
-        print("Timed out waiting for task completion.")
+        print("Timed out waiting for task completion.", flush=True)
 
 if __name__ == "__main__":
     asyncio.run(main())
