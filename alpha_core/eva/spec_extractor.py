@@ -8,6 +8,7 @@ docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 4.2)
 
 import json
 import logging
+import subprocess
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -64,22 +65,60 @@ JSON SCHEMA:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gemini-3.6-flash",
+        model: str = "gemini-3.8-flash-high",
     ) -> None:
         self.api_key = api_key or settings.GEMINI_API_KEY
         self.model = model
-        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        self.agy_bin = settings.ANTIGRAVITY_CLI_BIN
+        self.client: genai.Client | None = None
+
+    def _call_agy(self, prompt: str) -> str | None:
+        """Invokes AGY CLI using the active Google Cloud Code account."""
+        if not self.agy_bin.is_file() or not (self.agy_bin.stat().st_mode & 0o111):
+            return None
+        cmd = [
+            str(self.agy_bin),
+            "-p",
+            prompt,
+            "--model",
+            self.model,
+        ]
+        try:
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            if res.returncode != 0:
+                logger.warning(
+                    "AGY extraction returned non-zero code %d: %s",
+                    res.returncode,
+                    res.stderr,
+                )
+                return None
+            return res.stdout.strip()
+        except Exception as e:
+            logger.warning("AGY extraction execution error: %s", e)
+            return None
+
+    @staticmethod
+    def _parse_json_payload(raw: str) -> dict[str, Any]:
+        text = raw.strip()
+        if "```json" in text:
+            text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in text:
+            text = text.split("```", 1)[1].split("```", 1)[0].strip()
+        res = json.loads(text)
+        return dict(res) if isinstance(res, dict) else {}
 
     def extract_from_transcript(
         self,
         formatted_transcript: str,
     ) -> ExtractedSpecification | None:
-        """Parses the dialogue and returns an ExtractedSpecification, or None if not actionable."""
+        """Parses dialogue and returns an ExtractedSpecification via AGY active account."""
         if not formatted_transcript or not formatted_transcript.strip():
-            return None
-
-        if not self.client:
-            logger.warning("No Gemini API key configured for specification extraction.")
             return None
 
         prompt = (
@@ -88,43 +127,59 @@ JSON SCHEMA:
             f"Provide JSON response only:"
         )
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json",
-                    "temperature": 0.1,
-                },
-            )
+        parsed: dict[str, Any] | None = None
 
-            text = response.text or ""
-            parsed = json.loads(text)
+        # 1. Primary: Use AGY CLI via active Google Cloud Code account (free Pro quota)
+        raw_text = self._call_agy(prompt)
+        if raw_text:
+            try:
+                parsed = self._parse_json_payload(raw_text)
+            except Exception as e:
+                logger.warning("Failed to parse AGY JSON response: %s", e)
 
-            is_actionable = bool(parsed.get("is_actionable", False))
-            confidence = float(parsed.get("confidence_score", 0.0))
-
-            if not is_actionable or confidence < 0.6:
-                return ExtractedSpecification(
-                    title=parsed.get("title", "Non-actionable dialogue"),
-                    summary=parsed.get("summary", ""),
-                    is_actionable=False,
-                    confidence_score=confidence,
-                    raw_response=parsed,
+        # 2. Secondary fallback: Use GenAI client only if AGY failed or is unavailable
+        if parsed is None and self.api_key:
+            try:
+                if self.client is None:
+                    self.client = genai.Client(api_key=self.api_key)
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        "temperature": 0.1,
+                    },
                 )
+                text = response.text or ""
+                parsed = json.loads(text)
+            except Exception as e:
+                logger.error("Failed to extract specification via fallback API: %s", e)
+                return None
 
+        if not parsed:
+            logger.error("Could not obtain specification from AGY or fallback API.")
+            return None
+
+        is_actionable = bool(parsed.get("is_actionable", False))
+        confidence = float(parsed.get("confidence_score", 0.0))
+
+        if not is_actionable or confidence < 0.6:
             return ExtractedSpecification(
-                title=str(parsed.get("title", "Proposed Feature")),
-                summary=str(parsed.get("summary", "")),
-                requirements=list(parsed.get("requirements", [])),
-                acceptance_criteria=list(parsed.get("acceptance_criteria", [])),
-                allowed_paths=list(parsed.get("allowed_paths", [])),
-                required_gates=list(parsed.get("required_gates", ["unit_test", "lint"])),
+                title=parsed.get("title", "Non-actionable dialogue"),
+                summary=parsed.get("summary", ""),
+                is_actionable=False,
                 confidence_score=confidence,
-                is_actionable=True,
                 raw_response=parsed,
             )
 
-        except Exception as e:
-            logger.error("Failed to extract specification from dialogue: %s", e)
-            return None
+        return ExtractedSpecification(
+            title=str(parsed.get("title", "Proposed Feature")),
+            summary=str(parsed.get("summary", "")),
+            requirements=list(parsed.get("requirements", [])),
+            acceptance_criteria=list(parsed.get("acceptance_criteria", [])),
+            allowed_paths=list(parsed.get("allowed_paths", [])),
+            required_gates=list(parsed.get("required_gates", ["unit_test", "lint"])),
+            confidence_score=confidence,
+            is_actionable=True,
+            raw_response=parsed,
+        )
