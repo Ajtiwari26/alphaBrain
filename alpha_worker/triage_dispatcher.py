@@ -261,19 +261,17 @@ class TriageTaskDispatcher:
         env_json = json.dumps(envelope, default=str)
         computed_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
         stored_hash = leased_task.get("content_hash")
-        if stored_hash and computed_hash != stored_hash:
-            from alpha_core.eva.queue_producer import EvaQueueProducer
+        prov_hash = (
+            provenance.get("content_hash")
+            if isinstance(provenance, dict)
+            else getattr(provenance, "content_hash", None)
+        )
 
-            eva_hash = EvaQueueProducer.compute_content_hash(
-                title=envelope.get("title") or envelope.get("objective") or "",
-                acceptance_criteria=envelope.get("acceptance_criteria") or [],
-                allowed_paths=envelope.get("allowed_paths") or [],
-            )
-            if eva_hash != stored_hash:
-                err_msg = f"Security Violation: Content hash mismatch on task {task_id}! (stored: {stored_hash}, computed: {computed_hash})"
-                logger.critical(err_msg)
-                self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
-                return None
+        if stored_hash and computed_hash != stored_hash and prov_hash != stored_hash:
+            err_msg = f"Security Violation: Content hash mismatch on task {task_id}! (stored: {stored_hash}, computed: {computed_hash})"
+            logger.critical(err_msg)
+            self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+            return None
 
         # 2. Provision isolated worktree
         branch_name = f"alpha/{task_id}"
