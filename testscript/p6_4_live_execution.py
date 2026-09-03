@@ -46,6 +46,7 @@ async def main():
             "task_id": task_id,
             "project_id": project_id,
             "repo": os.getcwd(),
+            "commit_sha": head_sha,
             "objective": "Lint the codebase",
             "description": "Run a dry-run linter check on the codebase. Do NOT write any files. Output the linter results.",
             "status": "pending",

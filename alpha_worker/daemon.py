@@ -705,7 +705,7 @@ class AlphaWorkerDaemon:
 
         if not cancel_requested.is_set():
             try:
-                await self.control_plane.submit_result(result, lease.lease_token)
+                logger.error("SUBMITTING RESULT: " + result.model_dump_json()); await self.control_plane.submit_result(result, lease.lease_token)
             except ControlPlaneUnavailable:
                 self._record_escalation(
                     envelope.task_id, "result_delivery_deferred", "control plane unavailable"
