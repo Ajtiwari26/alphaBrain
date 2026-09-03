@@ -59,7 +59,10 @@ async def main():
             "concurrency_policy": {"max_per_project": 1, "max_per_worker": 1},
             "requires_approval": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
-            "acceptance_plan": {"criteria": ["Linter results are printed"]}
+            "acceptance_plan": {
+                "criteria": ["Linter results are printed"],
+                "executable_gates": [{"command": "echo lint_passed", "expected_exit_code": 0}]
+            }
         }
         
         print(f"Enqueuing task {task_id}...", flush=True)
