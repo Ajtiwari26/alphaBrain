@@ -38,12 +38,14 @@ class DebouncedTranscriptBuffer:
         self,
         debounce_seconds: float = 30.0,
         max_history_segments: int = 1000,
+        max_continuous_window_seconds: float = 300.0,
     ) -> None:
         self.debounce_seconds = debounce_seconds
         self.max_history_segments = max_history_segments
+        self.max_continuous_window_seconds = max_continuous_window_seconds
         self._history: deque[TranscriptSegment] = deque(maxlen=max_history_segments)
         self._last_speech_time: float = 0.0
-        self._last_extracted_timestamp: float = 0.0
+        self._last_extracted_timestamp: float = -1.0
 
     def add_segment(
         self,
@@ -71,15 +73,24 @@ class DebouncedTranscriptBuffer:
         return seg
 
     def is_extraction_due(self, current_time: float | None = None) -> bool:
-        """Returns True if there is unextracted speech and the debounce silence period has elapsed."""
+        """Returns True if there is unextracted speech and either:
+        1. The debounce silence period has elapsed (natural pause).
+        2. The continuous conversation window exceeds max_continuous_window_seconds (buffer overflow guard).
+        """
         now = current_time if current_time is not None else time.time()
         unextracted = self.get_unextracted_segments()
         if not unextracted:
             return False
 
-        # If enough silence has passed since the last utterance
+        # Silence debounce
         silence_duration = now - self._last_speech_time
-        return silence_duration >= self.debounce_seconds
+        if silence_duration >= self.debounce_seconds:
+            return True
+
+        # Continuous conversation fallback
+        earliest_pending_ts = unextracted[0].timestamp
+        continuous_duration = now - earliest_pending_ts
+        return continuous_duration >= self.max_continuous_window_seconds
 
     def get_unextracted_segments(self) -> list[TranscriptSegment]:
         """Returns all speech segments recorded after the last successful extraction timestamp."""
