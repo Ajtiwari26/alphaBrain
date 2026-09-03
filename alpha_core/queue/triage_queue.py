@@ -391,7 +391,9 @@ class TaskTriageQueue:
                 if "description" in env_dict:
                     env_dict["description"] = str(description)
 
-            new_envelope_json = json.dumps(env_dict, default=str)
+            new_envelope_json = json.dumps(
+                env_dict, sort_keys=True, separators=(",", ":"), default=str
+            )
             new_content_hash = hashlib.sha256(new_envelope_json.encode("utf-8")).hexdigest()
 
             provenance_dict = json.loads(row["provenance_json"])

@@ -421,7 +421,16 @@ def test_cli_worker_cycle_command(
     isolated_queue.enqueue_task("cli_worker_task_1", env, prov)
     isolated_queue.approve_task("cli_worker_task_1")
 
-    # 3. Run worker-cycle via CLI
+    # 3. Simulate worktree modification prior to worker-cycle
+    wt_mgr = WorktreeManager()
+    wt_path = wt_mgr.create_or_resume_worktree(
+        repo_path=str(fixture_repo),
+        task_id="cli_worker_task_1",
+        base_commit="HEAD",
+    )
+    (wt_path / "cli.txt").write_text("CLI test output\n")
+
+    # 4. Run worker-cycle via CLI
     ret = cli_main(["--db-path", db_arg, "--emergency-lock", lock_arg, "worker-cycle"])
     assert ret == 0
 
@@ -531,3 +540,37 @@ def test_reap_stale_executing_tasks_recovers_orphaned_tasks(
     assert task is not None
     assert task["status"] == TriageStatus.FAILED.value
     assert "Watchdog timeout" in str(task["result_json"])
+
+
+def test_zero_diff_worktree_fails_closed(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path, tmp_path: Path
+) -> None:
+    """R1 (P0): If an agent produces 0 modified files, the dispatcher must fail closed."""
+    wt_mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue, worktree_mgr=wt_mgr)
+
+    env = {
+        "task_id": "task_zero_diff",
+        "objective": "Zero diff task",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["README.md"],
+        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(0)"]}]},
+    }
+    import hashlib
+
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("task_zero_diff", content_hash)
+
+    isolated_queue.enqueue_task("task_zero_diff", env, prov)
+    isolated_queue.approve_task("task_zero_diff")
+
+    # Do not modify any files in the worktree
+    proposal = dispatcher.execute_next_cycle()
+    assert proposal is None
+
+    task = isolated_queue.get_task("task_zero_diff")
+    assert task is not None
+    assert task["status"] in (TriageStatus.APPROVED.value, TriageStatus.FAILED.value)
+    assert "Fail-Closed Violation" in str(task["result_json"])
+

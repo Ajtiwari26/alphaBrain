@@ -256,10 +256,11 @@ class TriageTaskDispatcher:
         base_commit = envelope.get("base_commit", self.default_base_commit)
 
         # 1. Verify content_hash integrity
-        env_json = json.dumps(envelope, default=str)
+        env_json = json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str)
         computed_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
         stored_hash = leased_task.get("content_hash")
-        if stored_hash and computed_hash != stored_hash:
+        legacy_hash = hashlib.sha256(json.dumps(envelope, default=str).encode("utf-8")).hexdigest()
+        if stored_hash and computed_hash != stored_hash and legacy_hash != stored_hash:
             from alpha_core.eva.queue_producer import EvaQueueProducer
 
             eva_hash = EvaQueueProducer.compute_content_hash(
@@ -320,6 +321,7 @@ class TriageTaskDispatcher:
 
             # 3. Check for worktree modifications and diff
             changed_files, diff_stat = self.get_git_diff_and_changed_files(worktree_path)
+
             allowed_paths = envelope.get("allowed_paths", [])
             if changed_files:
                 violations = WorktreeManager.find_disallowed_changes(changed_files, allowed_paths)
@@ -341,6 +343,20 @@ class TriageTaskDispatcher:
                 self.queue.fail_task(
                     task_id,
                     error_details={"error": err_msg, "evidence": evidence},
+                )
+                return None
+
+            # R1 (P0): Fail-Closed Law Enforcement — zero modified files with passing gates MUST fail task
+            if not changed_files:
+                err_msg = (
+                    f"Fail-Closed Violation: Task {task_id} produced zero file modifications. "
+                    "No work product detected — failing task."
+                )
+                logger.error(err_msg)
+                self.queue.fail_task(
+                    task_id,
+                    error_details={"error": err_msg, "diff_stat": diff_stat},
+                    allow_retry=True,
                 )
                 return None
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -464,6 +465,93 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    task = queue.get_task(args.task_id)
+    if not task:
+        print(f"Error: Task '{args.task_id}' not found.", file=sys.stderr)
+        return 1
+
+    if task["status"] != TriageStatus.COMPLETED.value:
+        print(
+            f"Error: Task '{args.task_id}' is not completed. Current status: {task['status']}",
+            file=sys.stderr,
+        )
+        return 1
+
+    result = task.get("result") or {}
+    if not result.get("gates_passed", False):
+        print(
+            f"Error: Acceptance gates failed or not run for task '{args.task_id}'.",
+            file=sys.stderr,
+        )
+        return 1
+
+    worktree_path = task.get("worktree_path")
+    branch_name = task.get("branch_name")
+    repo_path = task.get("envelope", {}).get("repo", ".")
+
+    if not branch_name:
+        print(f"Error: Missing branch name in task record '{args.task_id}'.", file=sys.stderr)
+        return 1
+
+    print(f"Verifying gates passed for '{args.task_id}'... OK")
+    print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")
+    try:
+        subprocess.run(
+            ["git", "checkout", "main"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        res = subprocess.run(
+            ["git", "merge", "--ff-only", branch_name],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        if res.stdout.strip():
+            print(res.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Fast-forward merge failed.\n{e.stderr}", file=sys.stderr)
+        return 1
+
+    if worktree_path and Path(worktree_path).exists():
+        print(f"Pruning git worktree '{worktree_path}'...")
+        try:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", worktree_path],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(
+                f"Warning: Failed to prune worktree '{worktree_path}'.\n{e.stderr}",
+                file=sys.stderr,
+            )
+
+    print(f"Deleting task branch '{branch_name}'...")
+    try:
+        subprocess.run(
+            ["git", "branch", "-d", branch_name],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to delete branch '{branch_name}'.\n{e.stderr}", file=sys.stderr)
+
+    if getattr(args, "json", False):
+        print(json.dumps({"task_id": args.task_id, "status": "merged"}))
+    else:
+        print(f"✅ Successfully merged and pruned task '{args.task_id}'.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="alphabrain triage",
@@ -559,6 +647,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
     p_admit.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # merge
+    p_merge = subparsers.add_parser(
+        "merge", help="Fast-forward merge a completed task branch and prune worktree"
+    )
+    p_merge.add_argument("task_id", help="ID of the task to merge")
+    p_merge.add_argument("--json", action="store_true", help="Output JSON format")
+
     return parser
 
 
@@ -583,6 +678,7 @@ def main(argv: list[str] | None = None) -> int:
         "emergency-resume": cmd_emergency_resume,
         "emergency-status": cmd_emergency_status,
         "worker-cycle": cmd_worker_cycle,
+        "merge": cmd_merge,
     }
 
     handler = handlers.get(args.subcommand)
