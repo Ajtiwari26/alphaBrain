@@ -15,6 +15,7 @@ import logging
 import sqlite3
 import time
 from collections.abc import Callable
+from contextlib import closing
 from enum import Enum
 from pathlib import Path
 from typing import Any, TypeVar
@@ -101,7 +102,7 @@ class TaskTriageQueue:
         return conn
 
     def _init_db(self) -> None:
-        with self._get_connection() as conn:
+        with closing(self._get_connection()) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS task_triage_queue (
@@ -442,7 +443,7 @@ class TaskTriageQueue:
 
     def get_task(self, task_id: str) -> dict[str, Any] | None:
         """Reads a single task by ID."""
-        with self._get_connection() as conn:
+        with closing(self._get_connection()) as conn:
             cursor = conn.execute("SELECT * FROM task_triage_queue WHERE id = ?;", (task_id,))
             row = cursor.fetchone()
             if not row:
@@ -460,7 +461,7 @@ class TaskTriageQueue:
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Lists tasks with optional status filtering."""
-        with self._get_connection() as conn:
+        with closing(self._get_connection()) as conn:
             if status:
                 cursor = conn.execute(
                     """
