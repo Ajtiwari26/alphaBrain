@@ -18,6 +18,7 @@ docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 6.5 & Section 6
 
 import json
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -427,3 +428,106 @@ def test_cli_worker_cycle_command(
     task = isolated_queue.get_task("cli_worker_task_1")
     assert task is not None
     assert task["status"] == TriageStatus.COMPLETED.value
+
+
+def test_empty_allowed_paths_strictly_blocks_any_file_modification(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path, tmp_path: Path
+) -> None:
+    """Regression test for Finding 1 (P0): Empty allowed_paths must strictly block ANY file modification."""
+    wt_mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue, worktree_mgr=wt_mgr)
+
+    env = {
+        "task_id": "task_empty_allowed",
+        "objective": "Read only task",
+        "repo": str(fixture_repo),
+        "allowed_paths": [],  # STRICTLY NO FILES ALLOWED
+    }
+    import hashlib
+
+    env_json = json.dumps(env, default=str)
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("task_empty_allowed", content_hash)
+
+    isolated_queue.enqueue_task("task_empty_allowed", env, prov)
+    isolated_queue.approve_task("task_empty_allowed")
+
+    # Modify a file in worktree
+    wt_path = wt_mgr.create_or_resume_worktree(
+        repo_path=str(fixture_repo),
+        task_id="task_empty_allowed",
+        base_commit="HEAD",
+    )
+    mod_file = wt_path / "rogue.txt"
+    mod_file.write_text("unauthorized write\n")
+
+    proposal = dispatcher.execute_next_cycle()
+    assert proposal is None
+
+    task = isolated_queue.get_task("task_empty_allowed")
+    assert task is not None
+    assert task["status"] == TriageStatus.FAILED.value
+    assert "Security Violation: Modified files outside allowed_paths" in str(task["result_json"])
+
+
+def test_in_flight_task_completion_and_failure_survive_emergency_stop(
+    isolated_queue: TaskTriageQueue,
+) -> None:
+    """Regression test for Finding 2 (P2): Active in-flight tasks must complete/fail cleanly under emergency stop."""
+    env = {"task_id": "task_in_flight", "objective": "In flight task"}
+    prov = make_test_provenance("task_in_flight", "hash_in_flight")
+    isolated_queue.enqueue_task("task_in_flight", env, prov)
+    isolated_queue.approve_task("task_in_flight")
+
+    # Worker leases task (moves to EXECUTING)
+    leased = isolated_queue.lease_next_approved_task()
+    assert leased is not None
+    assert leased["id"] == "task_in_flight"
+
+    # Emergency stop is triggered while worker is executing
+    isolated_queue.emergency_stop("Critical incident")
+    assert isolated_queue.is_emergency_stopped() is True
+
+    # In-flight worker completes execution without crashing with EmergencyStopActiveError
+    success = isolated_queue.complete_task(
+        "task_in_flight",
+        result={"summary": "Successfully finished before stop"},
+        worktree_path="/tmp/wt/in_flight",
+        branch_name="alpha/task_in_flight",
+    )
+    assert success is True
+
+    task = isolated_queue.get_task("task_in_flight")
+    assert task is not None
+    assert task["status"] == TriageStatus.COMPLETED.value
+    assert task["result"]["summary"] == "Successfully finished before stop"
+
+
+def test_reap_stale_executing_tasks_recovers_orphaned_tasks(
+    isolated_queue: TaskTriageQueue,
+) -> None:
+    """Watchdog reaper recovers executing tasks if a worker crashes or reboots."""
+    env = {"task_id": "task_orphaned", "objective": "Orphaned worker task"}
+    prov = make_test_provenance("task_orphaned", "hash_orphaned")
+    isolated_queue.enqueue_task("task_orphaned", env, prov)
+    isolated_queue.approve_task("task_orphaned")
+
+    leased = isolated_queue.lease_next_approved_task()
+    assert leased is not None
+
+    # Artificially age the started_at timestamp by 2 hours
+    with isolated_queue._get_connection() as conn:
+        conn.execute(
+            "UPDATE task_triage_queue SET started_at = ? WHERE id = ?;",
+            (time.time() - 7200.0, "task_orphaned"),
+        )
+        conn.commit()
+
+    # Run reaper with 1-hour timeout
+    reaped = isolated_queue.reap_stale_executing_tasks(timeout_seconds=3600.0)
+    assert reaped == 1
+
+    task = isolated_queue.get_task("task_orphaned")
+    assert task is not None
+    assert task["status"] == TriageStatus.FAILED.value
+    assert "Watchdog timeout" in str(task["result_json"])

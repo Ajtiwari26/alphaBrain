@@ -264,7 +264,7 @@ class TriageTaskDispatcher:
             # 3. Check for worktree modifications and diff
             changed_files, diff_stat = self.get_git_diff_and_changed_files(worktree_path)
             allowed_paths = envelope.get("allowed_paths", [])
-            if allowed_paths and changed_files:
+            if changed_files:
                 violations = WorktreeManager.find_disallowed_changes(changed_files, allowed_paths)
                 if violations:
                     err_msg = (

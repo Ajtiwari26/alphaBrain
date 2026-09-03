@@ -182,12 +182,13 @@ class TaskTriageQueue:
         func: Callable[[sqlite3.Connection], T],
         max_retries: int = 3,
         base_delay_sec: float = 0.5,
+        allow_during_emergency: bool = False,
     ) -> T:
         """
         Executes a database write transaction with exponential backoff on lock contention.
         P9 Consensus Amendment 1: 3 retries (0.5s, 1.0s, 2.0s) before failing.
         """
-        if self.is_emergency_stopped():
+        if not allow_during_emergency and self.is_emergency_stopped():
             raise EmergencyStopActiveError(
                 f"Emergency stop tombstone active at {self.emergency_lock_path}. Write rejected."
             )
@@ -335,7 +336,7 @@ class TaskTriageQueue:
             )
             return cursor.rowcount > 0
 
-        return bool(self._execute_write_with_retry(_reject))
+        return bool(self._execute_write_with_retry(_reject, allow_during_emergency=True))
 
     def modify_task(
         self,
@@ -516,7 +517,7 @@ class TaskTriageQueue:
             )
             return cursor.rowcount > 0
 
-        return bool(self._execute_write_with_retry(_complete))
+        return bool(self._execute_write_with_retry(_complete, allow_during_emergency=True))
 
     def fail_task(
         self,
@@ -582,7 +583,50 @@ class TaskTriageQueue:
                 )
             return True
 
-        return bool(self._execute_write_with_retry(_fail))
+        return bool(self._execute_write_with_retry(_fail, allow_during_emergency=True))
+
+    def reap_stale_executing_tasks(self, timeout_seconds: float = 3600.0) -> int:
+        """
+        Scans for EXECUTING tasks that have stalled beyond timeout_seconds,
+        failing them so tasks never remain permanently stranded if a worker crashes.
+        """
+        now = time.time()
+        cutoff = now - timeout_seconds
+
+        def _reap(conn: sqlite3.Connection) -> int:
+            cursor = conn.execute(
+                """
+                SELECT id FROM task_triage_queue
+                WHERE status = ? AND started_at < ?;
+                """,
+                (TriageStatus.EXECUTING.value, cutoff),
+            )
+            rows = cursor.fetchall()
+            reaped = 0
+            for row in rows:
+                task_id = row["id"]
+                conn.execute(
+                    """
+                    UPDATE task_triage_queue
+                    SET status = ?, result_json = ?, updated_at = ?
+                    WHERE id = ? AND status = ?;
+                    """,
+                    (
+                        TriageStatus.FAILED.value,
+                        json.dumps(
+                            {
+                                "error": f"Watchdog timeout: execution stalled for >{timeout_seconds}s"
+                            }
+                        ),
+                        now,
+                        task_id,
+                        TriageStatus.EXECUTING.value,
+                    ),
+                )
+                reaped += 1
+            return reaped
+
+        return int(self._execute_write_with_retry(_reap, allow_during_emergency=True))
 
     def get_task(self, task_id: str) -> dict[str, Any] | None:
         """Reads a single task by ID."""
