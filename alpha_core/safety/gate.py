@@ -113,46 +113,68 @@ def is_protected_path(
     return False, ""
 
 
-SHELL_CONTROL_OPERATORS: tuple[str, ...] = (";", "&&", "||", "|", "`", "$(", ">", "<", "\n", "\r")
+OPERATOR_TOKENS: tuple[str, ...] = (";", "&&", "||", "&", "|", ">", ">>", "<", "<<")
+PROCESS_WRAPPERS: tuple[str, ...] = ("env", "nohup", "time", "xargs", "sudo", "su", "exec")
+RECURSIVE_FLAG_PATTERN: re.Pattern[str] = re.compile(r"^-[a-zA-Z]*[rR][a-zA-Z]*$")
 
 
 def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     """
     Tokenizes and inspects a command string for unauthorized network binaries,
     privilege escalation, shell control chaining, or dangerous destructive operations.
+    Uses quote-aware lexing (shlex punctuation_chars=True) to avoid false-positives
+    on quoted semicolons or redirect characters.
     """
-    # 1. Deny unescaped shell control and redirection operators
-    for op in SHELL_CONTROL_OPERATORS:
-        if op in cmd_str:
-            return True, f"Shell control operator '{op}' is forbidden in gate command: '{cmd_str}'"
+    if "`" in cmd_str:
+        return True, f"Backtick command substitution is forbidden in gate command: '{cmd_str}'"
+    if "$(" in cmd_str:
+        return True, f"Command substitution '$()' is forbidden in gate command: '{cmd_str}'"
 
     try:
-        tokens = shlex.split(cmd_str)
+        lexer = shlex.shlex(cmd_str, posix=True, punctuation_chars=True)
+        tokens = list(lexer)
     except Exception as e:
         return True, f"Malformed command failed shell parsing: '{cmd_str}' ({e})"
 
     if not tokens:
         return False, ""
 
-    # 2. Inspect ALL tokens for forbidden binaries (handles process wrappers like `env rm`, `nohup curl`, etc.)
-    for idx, tok in enumerate(tokens):
-        base_exe = Path(tok).name.lower()
-        if base_exe in FORBIDDEN_BINARIES:
-            return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
+    expect_command = True
+    in_rm_command = False
 
-        # 3. Check for destructive recursive removals (case-insensitive -r / -R)
-        if base_exe == "rm":
-            for sub_tok in tokens[idx + 1 :]:
-                sub_lower = sub_tok.lower()
-                if sub_lower in ("-r", "-rf", "-fr", "--recursive") or (
-                    sub_lower.startswith("-") and "r" in sub_lower
-                ):
+    for tok in tokens:
+        # 1. Reject unquoted shell control and redirection operators
+        if tok in OPERATOR_TOKENS:
+            return True, f"Shell control operator '{tok}' is forbidden in gate command: '{cmd_str}'"
+
+        if expect_command:
+            # If token is an option flag to a process wrapper (e.g. `env -i`), continue looking for command
+            if tok.startswith("-"):
+                continue
+
+            base_exe = Path(tok).name.lower()
+            if base_exe in FORBIDDEN_BINARIES:
+                return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
+
+            if base_exe == "rm":
+                in_rm_command = True
+                expect_command = False
+            elif base_exe in PROCESS_WRAPPERS:
+                in_rm_command = False
+                expect_command = True
+            else:
+                in_rm_command = False
+                expect_command = False
+        else:
+            # 2. Inspect arguments for active rm commands
+            if in_rm_command:
+                if RECURSIVE_FLAG_PATTERN.match(tok) or tok in ("--recursive", "--recursive=true"):
                     return (
                         True,
-                        f"Destructive recursive removal detected in gate command: '{cmd_str}'",
+                        f"Destructive recursive removal flag '{tok}' detected in gate command: '{cmd_str}'",
                     )
 
-    # 4. Check for raw shell reverse connection patterns
+    # 3. Check for raw reverse socket patterns
     cmd_lower = cmd_str.lower()
     if "bash -i" in cmd_lower or "/dev/tcp" in cmd_lower or "python -c 'import socket" in cmd_lower:
         return True, f"Reverse shell pattern detected in gate command: '{cmd_str}'"
@@ -203,8 +225,11 @@ class SafetyGate:
             acceptance_plan = envelope.acceptance_plan
             if acceptance_plan and hasattr(acceptance_plan, "commands"):
                 for cmd_obj in acceptance_plan.commands:
-                    cmd_str = f"{getattr(cmd_obj, 'executable', '')} {' '.join(getattr(cmd_obj, 'args', []))}"
-                    commands.append(cmd_str.strip())
+                    cmd_tokens = [
+                        getattr(cmd_obj, "executable", ""),
+                        *getattr(cmd_obj, "args", []),
+                    ]
+                    commands.append(shlex.join(cmd_tokens).strip())
         else:
             obj_val = envelope.get("objective")
             objective = str(obj_val) if obj_val is not None else ""
@@ -217,10 +242,11 @@ class SafetyGate:
             if isinstance(plan, dict):
                 for cmd_obj in plan.get("commands", []):
                     if isinstance(cmd_obj, dict):
-                        cmd_str = (
-                            f"{cmd_obj.get('executable', '')} {' '.join(cmd_obj.get('args', []))}"
-                        )
-                        commands.append(cmd_str.strip())
+                        cmd_tokens = [
+                            cmd_obj.get("executable", ""),
+                            *cmd_obj.get("args", []),
+                        ]
+                        commands.append(shlex.join(cmd_tokens).strip())
                     elif isinstance(cmd_obj, str):
                         commands.append(cmd_obj.strip())
 
