@@ -65,8 +65,8 @@ async def main():
                 "commands": [
                     {
                         "gate_type": "unit_test",
-                        "executable": "echo",
-                        "args": ["lint_passed"]
+                        "executable": "pytest",
+                        "args": ["--version"]
                     }
                 ]
             }
