@@ -123,3 +123,206 @@ To prevent race conditions, tasks strictly move through three queue states:
 *   **The Tombstone Pattern:** On `emergency-stop`, the daemon drains active tasks for 30s, reaps children, closes DB connections, and writes an `.emergency_stop.lock` tombstone. It idles safely without crashing `launchd`. Removing the file triggers a clean re-exec restart.
 *   **Worktree Garbage Collection:** Strict `git worktree remove --force` upon task completion/rejection. Added a startup orphan sweep (to catch worktrees left by hard crashes) and a periodic `git gc --auto` every 20 tasks or 24h.
 *   **Anti-Infinite-Loop Guarantees:** Semantic cosine-similarity deduplication rejects tasks >0.92 similar to recent tasks. Hard budgets: Eva generates max 30 tasks/day, Worker executes max 10 tasks/day.
+### 6.4 Deterministic Safety Gate Architecture & Invariants (P9.2 Approved)
+
+**Milestone:** P9.2 — Deterministic Safety Gate & Eva Integration Pipeline
+**Commit:** `db400ee`
+**Review Status:** 🟢 **APPROVED** by Claude Opus 4.6 (Thinking), 2026-09-03
+**Scope:** Defines the layered, deterministic command validation pipeline that sits between Eva's semantic task output and the Worker daemon's execution surface. Every command proposed by any upstream producer—Eva, manual enqueue, or future federated sources—must survive all five layers without exception.
+
+---
+
+#### 6.4.1 The 5-Layer Deterministic Defense Architecture
+
+> [!IMPORTANT]
+> Layers are evaluated **strictly in order, 0 → 4**. A rejection at any layer is **final and non-retriable** within the same task envelope. There is no "soft fail" or "warn-and-continue" mode. Each layer is a pure function: deterministic, side-effect-free, and unit-testable in isolation.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    INBOUND COMMAND STRING                          │
+│              (from TaskEnvelope.command_argv)                      │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  LAYER 0: Global Line-Continuation Neutralization                  │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Unconditionally strip all `\<newline>` (0x5C 0x0A) sequences.     │
+│  Collapse the command into a single logical line BEFORE any        │
+│  lexical analysis. Prevents adversarial line-split obfuscation.    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  LAYER 1: Symmetric POSIX Quote State Machine                      │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Function: `scan_unquoted_shell_syntax(cmd: str)`                  │
+│  Tracks quote state via a 3-state FSM:                             │
+│    • STATE_UNQUOTED  — shell metacharacters are active             │
+│    • STATE_SINGLE_QUOTED — no interpolation, only `'` exits        │
+│    • STATE_DOUBLE_QUOTED — `$`, `` ` ``, `\` active; `"` exits    │
+│  Only characters in STATE_UNQUOTED are inspected for dangerous     │
+│  shell operators. Quoted content is inert by definition.           │
+│  REJECT if unterminated quotes detected (asymmetric state).        │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  LAYER 2: Post-Tokenization Operator Token Check                   │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Using unquoted regions from Layer 1, scan for forbidden           │
+│  shell operators in the UNQUOTED state:                            │
+│    • Command chaining:    `;`   `&&`   `||`                        │
+│    • Piping:              `|`   `|&`                               │
+│    • Subshell/grouping:   `(`   `)`   `{`   `}`                   │
+│    • Redirection:         `>`   `>>`  `<`   `2>`  `&>`            │
+│    • Command substitution: `` ` ``   `$(`                          │
+│    • Process substitution: `<(`  `>(`                              │
+│    • Background:          `&` (trailing)                           │
+│  ANY match in unquoted context → immediate REJECT.                 │
+│  This guarantees: one command, no composition, no I/O redirection. │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  LAYER 3: Iterative Executable Resolution                          │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Resolve the actual executable by iteratively skipping leading     │
+│  environment variable prefix tokens matching:                      │
+│    `ENV_VAR_PREFIX_PATTERN = r'^[A-Za-z_][A-Za-z0-9_]*=.*$'`      │
+│  Walk argv[0], argv[1], ... until the first token NOT matching     │
+│  the pattern is found. That token is the resolved executable.      │
+│  Validate the resolved executable against the Gate Allowlist       │
+│  (Section 3.2) AND the Zero-Wrapper Forbidden List (§6.4.2).      │
+│  REJECT if executable is not on allowlist or is on forbidden list. │
+│  REJECT if no non-prefix token is found (pure env-var command).    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  LAYER 4: Semantic Pattern Scan                                    │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Final deep-content inspection across the full (neutralized)       │
+│  command string. Matches against curated threat signatures:        │
+│    • Recursive deletion:  `rm -rf /`, `rm -rf ~`, `rm -rf .`      │
+│    • Reverse shells:      `/dev/tcp/`, `mkfifo`, `nc -e`,         │
+│                           `bash -i >& /dev/tcp`                    │
+│    • Adversarial prompt injection:  `IGNORE PREVIOUS`, `SYSTEM:`,  │
+│                           `<|im_start|>`, encoded variants         │
+│    • Fork bombs:          `:(){ :|:& };:`                          │
+│    • Disk/network exfil:  `curl | sh`, `wget -O- | bash`          │
+│  Pattern library is append-only (new threats added, none removed). │
+│  REJECT on any signature match.                                    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               ▼
+                      ┌────────────────┐
+                      │   ✅ APPROVED   │
+                      │  (all 5 layers  │
+                      │    passed)      │
+                      └────────────────┘
+```
+
+---
+
+#### 6.4.2 Zero-Wrapper & Anti-Escalation Policy
+
+> [!CAUTION]
+> Wrapper binaries allow arbitrary command execution by design. Permitting any wrapper binary as the resolved executable in Layer 3 would collapse the entire defense stack into a single-point bypass. This list is **non-negotiable and immutable**.
+
+The following binaries are **unconditionally forbidden** as resolved executables, regardless of arguments:
+
+| Category | Forbidden Binaries |
+| :--- | :--- |
+| **Privilege Escalation** | `sudo`, `su`, `doas`, `pkexec` |
+| **Shell Interpreters** | `sh`, `bash`, `zsh`, `fish`, `dash`, `csh`, `tcsh`, `ksh` |
+| **Generic Wrappers** | `env`, `nohup`, `time`, `nice`, `ionice`, `timeout`, `strace`, `ltrace` |
+| **Argument Dispatch** | `xargs`, `parallel`, `find` (with `-exec`/`-execdir`) |
+| **Eval / Exec Builtins** | `exec`, `eval` (caught as shell builtins, but also matched lexically) |
+| **Containerized Escape** | `docker`, `podman`, `kubectl`, `nsenter`, `chroot`, `unshare` |
+
+**Resolution rule:** If Layer 3's iterative walk resolves to any binary on this list, the task is **immediately REJECTED** with reason code `FORBIDDEN_EXECUTABLE`. No fallback, no override, no "safe arguments" exception.
+
+**Non-alphanumeric executable fallback:** If the resolved executable name contains no alphanumeric characters (e.g., purely symbolic or obfuscated), the gate conservatively maps it to `"sh"` and rejects. This prevents null-name or Unicode-homoglyph bypass attempts.
+
+---
+
+#### 6.4.3 Path Protection Engine
+
+All file path arguments in the command are validated through a three-stage canonicalization and matching pipeline:
+
+**Stage A — Canonicalization:**
+Every path argument is processed through `os.path.normpath()` to collapse `.`, `..`, redundant separators, and resolve symbolic traversal sequences. This produces a deterministic absolute or relative canonical form before any matching occurs.
+
+**Stage B — Discrete Component Prefix Matching:**
+Protected paths (from §6.1, Law 3) are checked using `pathlib.Path.parts` component-by-component prefix matching, NOT string prefix matching. This prevents the classic bypass where `/alpha_core/eva_utils/` would false-positive match a string prefix of `/alpha_core/eva/`.
+
+```
+Protected Path Set (discrete component tuples):
+  (".git",)
+  ("alpha_core", "eva")
+  ("config", "secrets")
+  ("Library", "LaunchAgents", "com.deploymate.alphabrain.*")
+  ("docs", "architecture", "SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md")
+```
+
+A command path is blocked if its `Path.parts` tuple starts with any protected tuple (component-wise `==` comparison, not substring).
+
+**Stage C — Wildcard Glob Blocking:**
+Any path argument containing the characters `*`, `?`, `[`, or `]` in an unquoted context is **unconditionally rejected**. Glob expansion is a shell-level feature; since Layer 2 already forbids shell composition, any glob characters reaching the gate indicate either a misconfigured command or an attempted expansion bypass. Reject with reason code `GLOB_IN_PATH`.
+
+> [!WARNING]
+> String-based `startswith()` path matching is **explicitly prohibited** in the Safety Gate implementation. All path protection MUST use the discrete `Path.parts` tuple method described above. Any PR introducing string prefix path matching will be rejected at senior review.
+
+---
+
+#### 6.4.4 Eva Integration Contract
+
+This subsection defines the exact interface between Eva's spec extraction pipeline (§4.2) and the Safety Gate (§6.2), ensuring provenance integrity and safe command construction.
+
+**`EvaQueueProducer` Provenance Metadata:**
+Every task inserted into the `PENDING_REVIEW` queue by Eva's `EvaQueueProducer` must carry the following provenance fields:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `source_meeting_id` | `str` | LiveKit room name / session identifier |
+| `transcript_window` | `tuple[float, float]` | Start/end timestamps (epoch) of the transcript segment that generated this task |
+| `extraction_model` | `str` | Model ID used for spec extraction (e.g., `gemini-3.1-pro`) |
+| `extraction_confidence` | `float [0.0, 1.0]` | Model's self-assessed confidence score |
+| `spec_hash` | `str` | SHA-256 of the raw extracted spec text (for deduplication in §6.3) |
+| `created_at` | `datetime` | UTC insertion timestamp |
+| `eva_version` | `str` | Semantic version of the Eva service that produced this task |
+
+**`TaskEnvelope` Construction Rules:**
+
+1. **`posix=False` Quote Preservation:** When Eva constructs `TaskEnvelope.command_argv`, it must use `shlex.join()` with the underlying `shlex.quote()` behavior, but the envelope stores the **pre-joined argv list**, not a shell string. The Safety Gate reconstructs the command string with `posix=False` during Layer 1 analysis to preserve quote characters as literal tokens rather than interpreting them. This ensures the gate analyzes exactly what the worker will execute.
+
+2. **Argv-First Contract:** Eva must populate `command_argv: list[str]` as the primary command representation. The `command_string: str` field is derived (via `shlex.join()`) and treated as informational only. The Safety Gate validates the argv list directly for Layers 3–4 and reconstructs a string only for Layers 0–2 syntax analysis.
+
+3. **Non-Alphanumeric Executable Fallback:** If `command_argv[0]` (after Layer 3 env-prefix stripping) contains zero alphanumeric characters (`re.search(r'[a-zA-Z0-9]', resolved_exe)` returns `None`), the gate maps it to the canonical form `"sh"` and applies the Zero-Wrapper rejection (§6.4.2). This closes the class of attacks using Unicode homoglyphs, zero-width joiners, or purely symbolic executable names to bypass the forbidden list.
+
+4. **Envelope Immutability:** Once `EvaQueueProducer` inserts a `TaskEnvelope` into the queue, no component (Eva, Safety Gate, or Worker) may mutate its fields. The Safety Gate reads the envelope, renders a verdict (`APPROVED` / `REJECTED` with reason code), and writes a **separate** `SafetyVerdict` record referencing the envelope by `task_id`. The original envelope is append-only evidence.
+
+---
+
+#### 6.4.5 Invariants & Guarantees Summary
+
+> [!NOTE]
+> These invariants are the **acceptance criteria** for P9.2. Any future modification to the Safety Gate must preserve all listed guarantees or undergo a full senior architecture review (§5).
+
+| # | Invariant | Enforcement Point |
+| :--- | :--- | :--- |
+| I-1 | No multi-command composition can reach the worker | Layer 2 (operator token check) |
+| I-2 | No shell interpreter can be invoked as the resolved executable | Layer 3 + §6.4.2 forbidden list |
+| I-3 | No privilege escalation binary can execute | Layer 3 + §6.4.2 forbidden list |
+| I-4 | No protected path can be modified by an automated task | §6.4.3 Path Protection Engine |
+| I-5 | No line-continuation obfuscation can split a command across lexer boundaries | Layer 0 (neutralization) |
+| I-6 | No unquoted glob can expand against the filesystem | §6.4.3 Stage C |
+| I-7 | No reverse shell or recursive deletion pattern survives to execution | Layer 4 (semantic scan) |
+| I-8 | Every task carries full provenance from meeting-to-execution | §6.4.4 `EvaQueueProducer` metadata |
+| I-9 | No envelope mutation occurs post-insertion | §6.4.4 Envelope Immutability |
+| I-10 | All layers are pure functions: deterministic, no I/O, independently testable | Architecture-wide constraint |
+
+---
+
+*Section 6.4 authored and approved by Claude Opus 4.6 (Thinking) on 2026-09-03. Commit reference: `db400ee`. Next section: §6.5 (Worker Dispatch & PR Generation Pipeline) — to be authored upon P9.3 completion.*
