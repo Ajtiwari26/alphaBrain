@@ -15,8 +15,8 @@ TARGET="$HOME/Library/LaunchAgents/$LABEL.plist"
 [[ "${WORKER_ALLOW_LOCAL_DB:-true}" = false ]] || { echo "WORKER_ALLOW_LOCAL_DB=false required" >&2; exit 2; }
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/AlphaBrain"
-sed -e "s#^  <string>/ABSOLUTE/PATH/TO/alphaBrain/.venv/bin/python</string>#  <string>$PROJECT_DIR/.venv/bin/python</string>#" \
-    -e "s#^  <key>WorkingDirectory</key><string>/ABSOLUTE/PATH/TO/alphaBrain</string>#  <key>WorkingDirectory</key><string>$PROJECT_DIR</string>#" \
+sed -e "s#^[[:space:]]*<string>/ABSOLUTE/PATH/TO/alphaBrain/.venv/bin/python</string>#    <string>$PROJECT_DIR/.venv/bin/python</string>#" \
+    -e "s#^[[:space:]]*<key>WorkingDirectory</key><string>/ABSOLUTE/PATH/TO/alphaBrain</string>#  <key>WorkingDirectory</key><string>$PROJECT_DIR</string>#" \
     -e "s#WORKER_USER#$USER#g" "$PLIST_TEMPLATE" > "$TARGET"
 chmod 600 "$TARGET"
 

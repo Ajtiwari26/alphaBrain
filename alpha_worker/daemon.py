@@ -469,8 +469,11 @@ class AlphaWorkerDaemon:
                 logger.warning("Control plane unavailable while fetching promotion: %s", exc)
                 return False
             except Exception as exc:
-                logger.error("Unexpected error fetching promotion: %s", exc)
-                return False
+                if "404" in str(exc) or "Not Found" in str(exc):
+                    pass # Promotion endpoint not deployed yet
+                else:
+                    logger.error("Unexpected error fetching promotion: %s", exc)
+                promotion_dict = None
 
         if promotion_dict and isinstance(promotion_dict, dict):
             try:
