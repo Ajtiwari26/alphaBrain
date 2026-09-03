@@ -139,16 +139,17 @@ OPERATOR_TOKENS: tuple[str, ...] = (
     ")",
     "!",
 )
+FORBIDDEN_OPERATOR_CHARS: set[str] = {";", "&", "|", ">", "<", "(", ")", "!"}
 RECURSIVE_FLAG_PATTERN: re.Pattern[str] = re.compile(r"^-[a-zA-Z]*[rR][a-zA-Z]*$")
 ENV_VAR_PREFIX_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")
 
 
-def has_active_command_substitution(cmd_str: str) -> tuple[bool, str]:
+def scan_unquoted_shell_syntax(cmd_str: str) -> tuple[bool, str]:
     """
-    Checks for active command substitutions ($(...) or `...`).
-    In POSIX shells, substitutions remain active inside double quotes and unquoted text;
-    only literal single quotes ('...') neutralize command substitutions.
-    Symmetrically tracks single and double quote states.
+    Scans the raw command string character-by-character tracking POSIX quote states.
+    - Metacharacters (;, &, |, >, <, (, ), !) outside single and double quotes are immediately rejected.
+    - Active command substitutions (`...` or $(...)) outside single quotes are immediately rejected.
+    - Quoted metacharacters inside strings (e.g. "Refactor; bug <1>" or "<html>") are safely preserved.
     """
     in_single_quote = False
     in_double_quote = False
@@ -170,17 +171,26 @@ def has_active_command_substitution(cmd_str: str) -> tuple[bool, str]:
             in_single_quote = not in_single_quote
         elif c == '"' and not in_single_quote:
             in_double_quote = not in_double_quote
-        elif not in_single_quote:
-            if c == "`":
-                return (
-                    True,
-                    f"Active backtick command substitution detected in gate command: '{cmd_str}'",
-                )
-            if c == "$" and i + 1 < len(cmd_str) and cmd_str[i + 1] == "(":
-                return (
-                    True,
-                    f"Active subshell $(...) command substitution detected in gate command: '{cmd_str}'",
-                )
+        else:
+            # 1. Unquoted shell metacharacters (redirections, pipes, sequences, subshells, negations)
+            if not in_single_quote and not in_double_quote:
+                if c in FORBIDDEN_OPERATOR_CHARS:
+                    return (
+                        True,
+                        f"Unquoted shell metacharacter '{c}' is forbidden in gate command: '{cmd_str}'",
+                    )
+            # 2. Active command substitutions (active outside single quotes, including inside double quotes)
+            if not in_single_quote:
+                if c == "`":
+                    return (
+                        True,
+                        f"Active backtick command substitution detected in gate command: '{cmd_str}'",
+                    )
+                if c == "$" and i + 1 < len(cmd_str) and cmd_str[i + 1] == "(":
+                    return (
+                        True,
+                        f"Active subshell $(...) command substitution detected in gate command: '{cmd_str}'",
+                    )
         i += 1
     return False, ""
 
@@ -191,10 +201,10 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     privilege escalation, execution wrappers, shell control chaining, or dangerous operations.
     Enforces a strict zero-wrapper and anti-privilege-escalation policy with iterative resolution.
     """
-    # 1. Check for active command substitutions (only single quotes neutralize them in POSIX)
-    has_sub, sub_reason = has_active_command_substitution(cmd_str)
-    if has_sub:
-        return True, sub_reason
+    # 1. Pre-lexing scan for unquoted metacharacters and active command substitutions
+    has_syntax_violation, violation_reason = scan_unquoted_shell_syntax(cmd_str)
+    if has_syntax_violation:
+        return True, violation_reason
 
     try:
         lexer = shlex.shlex(cmd_str, posix=True, punctuation_chars=True)
@@ -205,9 +215,9 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     if not tokens:
         return False, ""
 
-    # 2. Reject unquoted shell control and redirection operators
+    # 2. Secondary check for tokens containing operator chars
     for tok in tokens:
-        if tok in OPERATOR_TOKENS:
+        if tok in OPERATOR_TOKENS or any(ch in FORBIDDEN_OPERATOR_CHARS for ch in tok):
             return True, f"Shell control operator '{tok}' is forbidden in gate command: '{cmd_str}'"
 
     # 3. Iterative executable resolution: skip leading environment assignments (e.g. PYTHONPATH=. or FOO=bar)
