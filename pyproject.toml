@@ -29,6 +29,9 @@ dependencies = [
     "temporalio>=1.8.0",
 ]
 
+[project.scripts]
+alphabrain-triage = "alpha_core.triage_cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.0",

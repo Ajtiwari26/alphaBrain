@@ -10,6 +10,7 @@ Debate Consensus: Claude Opus 4.6 (Architect) + Gemini 3.1 Pro (Reliability)
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import logging
 import sqlite3
@@ -88,6 +89,50 @@ class TaskTriageQueue:
     def is_emergency_stopped(self) -> bool:
         """Returns True if the operator tombstone lockfile is active."""
         return self.emergency_lock_path.exists()
+
+    def emergency_stop(self, reason: str = "operator_requested") -> Path:
+        """
+        Activates the emergency stop tombstone lockfile.
+        Halts all task intake and worker leasing safely.
+        """
+        self.emergency_lock_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "timestamp": time.time(),
+            "reason": reason,
+        }
+        self.emergency_lock_path.write_text(json.dumps(payload), encoding="utf-8")
+        logger.warning("EMERGENCY STOP ACTIVATED at %s: %s", self.emergency_lock_path, reason)
+        return self.emergency_lock_path
+
+    def emergency_resume(self) -> bool:
+        """
+        Removes the emergency stop tombstone lockfile, resuming operations.
+        Returns True if the lock existed and was removed, False if it was not active.
+        """
+        if self.emergency_lock_path.exists():
+            self.emergency_lock_path.unlink()
+            logger.info("EMERGENCY STOP CLEARED at %s", self.emergency_lock_path)
+            return True
+        return False
+
+    def get_emergency_status(self) -> dict[str, Any]:
+        """Returns details about the emergency stop lockfile."""
+        if not self.emergency_lock_path.exists():
+            return {"active": False, "lock_path": str(self.emergency_lock_path)}
+        try:
+            content = json.loads(self.emergency_lock_path.read_text(encoding="utf-8"))
+            return {
+                "active": True,
+                "lock_path": str(self.emergency_lock_path),
+                "timestamp": content.get("timestamp"),
+                "reason": content.get("reason", "unknown"),
+            }
+        except Exception:
+            return {
+                "active": True,
+                "lock_path": str(self.emergency_lock_path),
+                "reason": "unparseable_lockfile",
+            }
 
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(
@@ -291,6 +336,103 @@ class TaskTriageQueue:
             return cursor.rowcount > 0
 
         return bool(self._execute_write_with_retry(_reject))
+
+    def modify_task(
+        self,
+        task_id: str,
+        new_envelope: dict[str, Any] | Any | None = None,
+        allowed_paths: list[str] | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        reviewer_notes: str | None = None,
+    ) -> bool:
+        """
+        Safely modifies an existing task in PENDING_REVIEW status.
+        Allows updating the envelope or specific fields (allowed_paths, title, description).
+        Recomputes content_hash, resets safety verdict/reason to None, and records
+        the modification in the audit trail.
+        Returns True if modified successfully, False if task not found or not in PENDING_REVIEW.
+        """
+        if self.is_emergency_stopped():
+            raise EmergencyStopActiveError(
+                f"Emergency stop is active at {self.emergency_lock_path}. Task modification blocked."
+            )
+
+        now = time.time()
+
+        def _modify(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute(
+                "SELECT envelope_json, provenance_json FROM task_triage_queue WHERE id = ? AND status IN (?, ?);",
+                (task_id, TriageStatus.PENDING_REVIEW.value, TriageStatus.APPROVED.value),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            if new_envelope is not None:
+                if hasattr(new_envelope, "model_dump"):
+                    env_dict = new_envelope.model_dump(mode="json")
+                elif isinstance(new_envelope, dict):
+                    env_dict = dict(new_envelope)
+                else:
+                    raise ValueError(f"Invalid envelope type: {type(new_envelope)}")
+            else:
+                env_dict = json.loads(row["envelope_json"])
+
+            if allowed_paths is not None:
+                env_dict["allowed_paths"] = list(allowed_paths)
+            if title is not None:
+                env_dict["objective"] = str(title)
+                if "title" in env_dict:
+                    env_dict["title"] = str(title)
+            if description is not None:
+                env_dict["detailed_instructions"] = str(description)
+                if "description" in env_dict:
+                    env_dict["description"] = str(description)
+
+            new_envelope_json = json.dumps(env_dict, default=str)
+            new_content_hash = hashlib.sha256(new_envelope_json.encode("utf-8")).hexdigest()
+
+            provenance_dict = json.loads(row["provenance_json"])
+            if "audit_history" not in provenance_dict:
+                provenance_dict["audit_history"] = []
+            provenance_dict["audit_history"].append(
+                {
+                    "action": "task_modified",
+                    "timestamp": now,
+                    "notes": reviewer_notes or "Operator modified task envelope",
+                    "new_hash": new_content_hash,
+                }
+            )
+            provenance_dict["content_hash"] = new_content_hash
+            new_provenance_json = json.dumps(provenance_dict, default=str)
+
+            update_cursor = conn.execute(
+                """
+                UPDATE task_triage_queue
+                SET envelope_json = ?,
+                    provenance_json = ?,
+                    content_hash = ?,
+                    status = ?,
+                    safety_verdict = NULL,
+                    safety_reason = NULL,
+                    updated_at = ?
+                WHERE id = ? AND status IN (?, ?);
+                """,
+                (
+                    new_envelope_json,
+                    new_provenance_json,
+                    new_content_hash,
+                    TriageStatus.PENDING_REVIEW.value,
+                    now,
+                    task_id,
+                    TriageStatus.PENDING_REVIEW.value,
+                    TriageStatus.APPROVED.value,
+                ),
+            )
+            return update_cursor.rowcount > 0
+
+        return bool(self._execute_write_with_retry(_modify))
 
     def lease_next_approved_task(self) -> dict[str, Any] | None:
         """

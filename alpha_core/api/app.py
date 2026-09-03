@@ -43,6 +43,12 @@ from alpha_core.db.models import (
     WorkerRecord,
     utc_now,
 )
+from alpha_core.queue.triage_queue import (
+    EmergencyStopActiveError,
+    TaskTriageQueue,
+    TriageStatus,
+)
+from alpha_core.safety.gate import SafetyGate
 from alpha_core.security import (
     AuthPrincipal,
     PrincipalRole,
@@ -2097,3 +2103,249 @@ async def submit_promotion_result(
     # No auto-retry
     await session.flush()
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 9: Task Triage Queue & Human-in-the-Loop (HITL) Review Endpoints
+# ---------------------------------------------------------------------------
+
+
+class TriageApproveRequest(BaseModel):
+    notes: str | None = None
+    force: bool = False
+
+
+class TriageRejectRequest(BaseModel):
+    reason: str
+
+
+class TriageModifyRequest(BaseModel):
+    allowed_paths: list[str] | None = None
+    title: str | None = None
+    description: str | None = None
+    notes: str | None = None
+    new_envelope: dict[str, Any] | None = None
+
+
+class TriageEmergencyStopRequest(BaseModel):
+    reason: str = "operator_requested_via_api"
+
+
+_default_triage_queue: TaskTriageQueue | None = None
+
+
+def get_triage_queue() -> TaskTriageQueue:
+    global _default_triage_queue
+    if _default_triage_queue is None:
+        _default_triage_queue = TaskTriageQueue()
+    return _default_triage_queue
+
+
+def require_triage_access(principal: AuthPrincipal) -> None:
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Triage queue operations require founder or admin access",
+        )
+
+
+@app.get("/api/triage/tasks")
+async def list_triage_tasks(
+    status_filter: str | None = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=100),
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    parsed_status = None
+    if status_filter and status_filter.lower() != "all":
+        try:
+            parsed_status = TriageStatus(status_filter.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid status '{status_filter}'. Choices: {[s.value for s in TriageStatus]}",
+            ) from None
+    tasks = queue.list_tasks(status=parsed_status, limit=limit)
+    return {"tasks": tasks, "count": len(tasks)}
+
+
+@app.get("/api/triage/tasks/{task_id}")
+async def get_triage_task(
+    task_id: str,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    task = queue.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
+    return dict(task)
+
+
+@app.post("/api/triage/tasks/{task_id}/review")
+async def review_triage_task(
+    task_id: str,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    task = queue.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
+    safety_gate = SafetyGate()
+    verdict = safety_gate.evaluate_envelope(task["envelope"])
+    return {
+        "task_id": task_id,
+        "passed": verdict.passed,
+        "status": verdict.verdict,
+        "reason": verdict.reason,
+        "violations": verdict.violations,
+    }
+
+
+@app.post("/api/triage/tasks/{task_id}/approve")
+async def approve_triage_task(
+    task_id: str,
+    payload: TriageApproveRequest = TriageApproveRequest(),
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    task = queue.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
+
+    if queue.is_emergency_stopped():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Emergency stop is active. Cannot approve tasks.",
+        )
+
+    # Validate SafetyGate verdict
+    safety_gate = SafetyGate()
+    verdict = safety_gate.evaluate_envelope(task["envelope"])
+    if not verdict.passed and not payload.force:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Safety Gate rejected task: {verdict.reason}. Pass force=true to override.",
+        )
+
+    notes = payload.notes or f"Approved by {principal.subject} via API"
+    success = queue.approve_task(task_id, safety_verdict=verdict.verdict, safety_reason=notes)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot approve task '{task_id}'. Ensure current status is 'pending_review'.",
+        )
+    return {"status": "ok", "task_id": task_id, "state": "approved"}
+
+
+@app.post("/api/triage/tasks/{task_id}/reject")
+async def reject_triage_task(
+    task_id: str,
+    payload: TriageRejectRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    task = queue.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
+
+    success = queue.reject_task(task_id, reason=payload.reason)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot reject task '{task_id}'. Current status: {task['status']}",
+        )
+    return {"status": "ok", "task_id": task_id, "state": "rejected"}
+
+
+@app.post("/api/triage/tasks/{task_id}/modify")
+async def modify_triage_task(
+    task_id: str,
+    payload: TriageModifyRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    task = queue.get_task(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
+        )
+
+    try:
+        success = queue.modify_task(
+            task_id,
+            new_envelope=payload.new_envelope,
+            allowed_paths=payload.allowed_paths,
+            title=payload.title,
+            description=payload.description,
+            reviewer_notes=payload.notes or f"Modified by {principal.subject} via API",
+        )
+    except EmergencyStopActiveError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot modify task '{task_id}'. Task must be in 'pending_review' status.",
+        )
+
+    # Re-evaluate safety gate immediately after modification
+    updated_task = queue.get_task(task_id)
+    if not updated_task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task '{task_id}' not found after modification",
+        )
+    safety_gate = SafetyGate()
+    verdict = safety_gate.evaluate_envelope(updated_task["envelope"])
+    return {
+        "status": "ok",
+        "task_id": task_id,
+        "safety_passed": verdict.passed,
+        "safety_verdict": verdict.verdict,
+        "safety_reason": verdict.reason,
+        "safety_violations": verdict.violations,
+    }
+
+
+@app.get("/api/triage/emergency-status")
+async def get_triage_emergency_status(
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    return dict(queue.get_emergency_status())
+
+
+@app.post("/api/triage/emergency-stop")
+async def post_triage_emergency_stop(
+    payload: TriageEmergencyStopRequest = TriageEmergencyStopRequest(),
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    lock_path = queue.emergency_stop(reason=payload.reason)
+    return {"emergency_stop": True, "lock_path": str(lock_path), "reason": payload.reason}
+
+
+@app.post("/api/triage/emergency-resume")
+async def post_triage_emergency_resume(
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    require_triage_access(principal)
+    resumed = queue.emergency_resume()
+    return {"emergency_stop": False, "resumed": resumed}
