@@ -55,6 +55,7 @@ FORBIDDEN_BINARIES: tuple[str, ...] = (
     "bash",
     "sh",
     "zsh",
+    "xargs",
 )
 
 # Known prompt injection and adversarial intent regexes
@@ -114,7 +115,7 @@ def is_protected_path(
 
 
 OPERATOR_TOKENS: tuple[str, ...] = (";", "&&", "||", "&", "|", ">", ">>", "<", "<<")
-PROCESS_WRAPPERS: tuple[str, ...] = ("env", "nohup", "time", "xargs", "sudo", "su", "exec")
+PROCESS_WRAPPERS: tuple[str, ...] = ("env", "nohup", "time", "nice")
 RECURSIVE_FLAG_PATTERN: re.Pattern[str] = re.compile(r"^-[a-zA-Z]*[rR][a-zA-Z]*$")
 
 
@@ -123,13 +124,8 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     Tokenizes and inspects a command string for unauthorized network binaries,
     privilege escalation, shell control chaining, or dangerous destructive operations.
     Uses quote-aware lexing (shlex punctuation_chars=True) to avoid false-positives
-    on quoted semicolons or redirect characters.
+    on quoted semicolons, redirect characters, or backticks.
     """
-    if "`" in cmd_str:
-        return True, f"Backtick command substitution is forbidden in gate command: '{cmd_str}'"
-    if "$(" in cmd_str:
-        return True, f"Command substitution '$()' is forbidden in gate command: '{cmd_str}'"
-
     try:
         lexer = shlex.shlex(cmd_str, posix=True, punctuation_chars=True)
         tokens = list(lexer)
@@ -139,18 +135,41 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     if not tokens:
         return False, ""
 
-    expect_command = True
-    in_rm_command = False
+    # 1. Check for unquoted backtick or $( command substitution in token sequence
+    for i, tok in enumerate(tokens):
+        if tok == "`":
+            return (
+                True,
+                f"Unquoted backtick command substitution is forbidden in gate command: '{cmd_str}'",
+            )
+        if tok == "$" and i + 1 < len(tokens) and tokens[i + 1] == "(":
+            return (
+                True,
+                f"Unquoted '$()' command substitution is forbidden in gate command: '{cmd_str}'",
+            )
 
+    # 2. Reject unquoted shell control and redirection operators
     for tok in tokens:
-        # 1. Reject unquoted shell control and redirection operators
         if tok in OPERATOR_TOKENS:
             return True, f"Shell control operator '{tok}' is forbidden in gate command: '{cmd_str}'"
 
+    # 3. Contextual command execution extraction
+    expect_command = True
+    in_rm_command = False
+    active_wrapper: str | None = None
+
+    for tok in tokens:
         if expect_command:
-            # If token is an option flag to a process wrapper (e.g. `env -i`), continue looking for command
-            if tok.startswith("-"):
-                continue
+            if active_wrapper == "env":
+                # env skips options (starts with -) and variable assignments (contains =)
+                if tok.startswith("-") or "=" in tok:
+                    continue
+            elif active_wrapper in ("time", "nohup", "nice"):
+                if tok.startswith("-"):
+                    continue
+            else:
+                if tok.startswith("-"):
+                    continue
 
             base_exe = Path(tok).name.lower()
             if base_exe in FORBIDDEN_BINARIES:
@@ -159,14 +178,15 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
             if base_exe == "rm":
                 in_rm_command = True
                 expect_command = False
+                active_wrapper = None
             elif base_exe in PROCESS_WRAPPERS:
-                in_rm_command = False
+                active_wrapper = base_exe
                 expect_command = True
             else:
                 in_rm_command = False
                 expect_command = False
+                active_wrapper = None
         else:
-            # 2. Inspect arguments for active rm commands
             if in_rm_command:
                 if RECURSIVE_FLAG_PATTERN.match(tok) or tok in ("--recursive", "--recursive=true"):
                     return (
@@ -174,7 +194,7 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
                         f"Destructive recursive removal flag '{tok}' detected in gate command: '{cmd_str}'",
                     )
 
-    # 3. Check for raw reverse socket patterns
+    # 4. Check for raw reverse socket patterns
     cmd_lower = cmd_str.lower()
     if "bash -i" in cmd_lower or "/dev/tcp" in cmd_lower or "python -c 'import socket" in cmd_lower:
         return True, f"Reverse shell pattern detected in gate command: '{cmd_str}'"
