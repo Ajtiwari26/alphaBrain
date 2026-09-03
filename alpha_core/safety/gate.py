@@ -91,7 +91,7 @@ def is_protected_path(
         return True, f"Path traversal outside project root detected in '{path_str}'."
 
     # Disallow wildcard globs that circumvent blast radius limits
-    if "*" in norm:
+    if any(char in norm for char in ("*", "?", "[", "]")):
         return True, f"Wildcard glob pattern in path '{path_str}' is forbidden."
 
     parts = Path(norm).parts
@@ -113,11 +113,19 @@ def is_protected_path(
     return False, ""
 
 
+SHELL_CONTROL_OPERATORS: tuple[str, ...] = (";", "&&", "||", "|", "`", "$(", ">", "<", "\n", "\r")
+
+
 def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     """
     Tokenizes and inspects a command string for unauthorized network binaries,
-    privilege escalation, or dangerous destructive operations.
+    privilege escalation, shell control chaining, or dangerous destructive operations.
     """
+    # 1. Deny unescaped shell control and redirection operators
+    for op in SHELL_CONTROL_OPERATORS:
+        if op in cmd_str:
+            return True, f"Shell control operator '{op}' is forbidden in gate command: '{cmd_str}'"
+
     try:
         tokens = shlex.split(cmd_str)
     except Exception as e:
@@ -126,19 +134,25 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     if not tokens:
         return False, ""
 
-    executable = tokens[0]
-    base_exe = Path(executable).name.lower()
+    # 2. Inspect ALL tokens for forbidden binaries (handles process wrappers like `env rm`, `nohup curl`, etc.)
+    for idx, tok in enumerate(tokens):
+        base_exe = Path(tok).name.lower()
+        if base_exe in FORBIDDEN_BINARIES:
+            return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
 
-    if base_exe in FORBIDDEN_BINARIES:
-        return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
+        # 3. Check for destructive recursive removals (case-insensitive -r / -R)
+        if base_exe == "rm":
+            for sub_tok in tokens[idx + 1 :]:
+                sub_lower = sub_tok.lower()
+                if sub_lower in ("-r", "-rf", "-fr", "--recursive") or (
+                    sub_lower.startswith("-") and "r" in sub_lower
+                ):
+                    return (
+                        True,
+                        f"Destructive recursive removal detected in gate command: '{cmd_str}'",
+                    )
 
-    # Check for destructive recursive removals
-    if base_exe == "rm":
-        for tok in tokens[1:]:
-            if tok in ("-r", "-rf", "-fr", "--recursive") or (tok.startswith("-") and "r" in tok):
-                return True, f"Destructive recursive removal detected in gate command: '{cmd_str}'"
-
-    # Check for raw shell reverse connection patterns
+    # 4. Check for raw shell reverse connection patterns
     cmd_lower = cmd_str.lower()
     if "bash -i" in cmd_lower or "/dev/tcp" in cmd_lower or "python -c 'import socket" in cmd_lower:
         return True, f"Reverse shell pattern detected in gate command: '{cmd_str}'"

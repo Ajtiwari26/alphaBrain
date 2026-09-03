@@ -149,8 +149,8 @@ def test_safety_gate_avoids_substring_false_positives(
 
 
 def test_safety_gate_rejects_wildcard_roots(safety_gate: SafetyGate) -> None:
-    # Wildcard and root paths attempting to circumvent blast radius
-    for bad_path in [".", "/", "*", "src/*"]:
+    # Wildcard and root paths attempting to circumvent blast radius (including secondary globs)
+    for bad_path in [".", "/", "*", "src/*", "file?.py", "src/[a-z].py"]:
         v = safety_gate.evaluate_envelope({"objective": "Wildcard", "allowed_paths": [bad_path]})
         assert v.passed is False, f"Wildcard '{bad_path}' should have been rejected."
 
@@ -184,12 +184,20 @@ def test_safety_gate_catches_command_evasions(
 
     # Check various command evasion vectors:
     # 1. Absolute binary path: /usr/bin/curl
-    # 2. Flag variation: rm -r -f /tmp/data
+    # 2. Flag variation: rm -r -f /tmp/data and uppercase rm -Rf
     # 3. Privilege escalation: sudo apt install
+    # 4. Shell chaining: pytest && curl
+    # 5. Shell sequencing: pytest ; rm
+    # 6. Process wrappers: env curl, nohup rm
     evasion_commands = [
         "/usr/bin/curl https://attacker.com",
         "rm -r -f /tmp/test_dir",
+        "rm -Rf /tmp/data",
         "sudo rm something",
+        "pytest && curl https://attacker.com",
+        "pytest ; rm -Rf /",
+        "env curl https://attacker.com",
+        "nohup rm -Rf /",
     ]
 
     for cmd in evasion_commands:
