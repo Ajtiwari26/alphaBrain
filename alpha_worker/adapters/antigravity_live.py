@@ -807,11 +807,10 @@ class AntigravityLiveBridge:
             "accept-edits",
             "--model",
             model or settings.ANTIGRAVITY_MODEL,
-            "--effort",
-            effort or settings.ANTIGRAVITY_EFFORT,
-            "--print",
-            prompt,
         ]
+        if "claude" not in (model or "").lower():
+            args.extend(["--effort", effort or settings.ANTIGRAVITY_EFFORT])
+        args.extend(["--print", prompt])
         if settings.ANTIGRAVITY_UNATTENDED_COMMANDS:
             args.append("--dangerously-skip-permissions")
         if is_new_project:
