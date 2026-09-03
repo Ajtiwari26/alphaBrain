@@ -225,8 +225,8 @@ class TaskTriageQueue:
                 (
                     task_id,
                     initial_status.value,
-                    json.dumps(envelope),
-                    json.dumps(provenance.to_dict()),
+                    json.dumps(envelope, default=str),
+                    json.dumps(provenance.to_dict(), default=str),
                     safety_verdict,
                     safety_reason,
                     provenance.content_hash,

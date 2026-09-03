@@ -61,6 +61,19 @@ class EvaTaskProposer:
                 args=["check", "."],
             ),
         ]
+        if spec.required_gates:
+            for g in spec.required_gates:
+                if isinstance(g, str) and g not in ("unit_test", "lint", "typecheck"):
+                    parts = g.strip().split()
+                    if parts:
+                        exec_name = parts[0].split("/")[-1]
+                        commands.append(
+                            GateCommand(
+                                gate_type=GateType.UNIT_TEST,
+                                executable=exec_name,
+                                args=parts[1:],
+                            )
+                        )
 
         acceptance_plan = AcceptancePlan(
             required_gates=[GateType.UNIT_TEST, GateType.LINT],
@@ -68,7 +81,9 @@ class EvaTaskProposer:
             pass_threshold=1.0,
         )
 
-        allowed_paths = list(spec.allowed_paths) if spec.allowed_paths else ["alpha_core", "testscript"]
+        allowed_paths = (
+            list(spec.allowed_paths) if spec.allowed_paths else ["alpha_core", "testscript"]
+        )
 
         return TaskEnvelope(
             task_id=task_id,
