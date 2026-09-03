@@ -1,5 +1,3 @@
-import json
-import os
 
 slides_data = [
     {
@@ -8,7 +6,7 @@ slides_data = [
         "subtitle": "The Autonomous Multi-Agent Developer Cockpit",
         "tag": "iQOO PUNE HACKATHON SUBMISSION",
         "body": "A voice-native, hermetically sealed engineering swarm powered by Gemini and Antigravity.",
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide1_brain_1788285056050.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide1_brain_1788285056050.jpg",
     },
     {
         "type": "content",
@@ -16,11 +14,23 @@ slides_data = [
         "title": "Breaking the Desktop Chain",
         "subtitle": "Why AlphaBrain Fits the iQOO AgentKit Track perfectly",
         "cards": [
-            {"title": "Phone-First UI", "body": "100% controlled via a real-time voice duplex interface on the iQOO phone.", "accent": "#E85D04"},
-            {"title": "AgentKit Core", "body": "Built entirely around Antigravity orchestrating the LiveKit voice bridge.", "accent": "#0077B6"},
-            {"title": "Deep QA", "body": "Enforces a rigid 'Red Light / Green Light' test-driven paradigm.", "accent": "#2A9D8F"}
+            {
+                "title": "Phone-First UI",
+                "body": "100% controlled via a real-time voice duplex interface on the iQOO phone.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "AgentKit Core",
+                "body": "Built entirely around Antigravity orchestrating the LiveKit voice bridge.",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "Deep QA",
+                "body": "Enforces a rigid 'Red Light / Green Light' test-driven paradigm.",
+                "accent": "#2A9D8F",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/broken_chain_light_1788284781223.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/broken_chain_light_1788284781223.jpg",
     },
     {
         "type": "content",
@@ -28,10 +38,18 @@ slides_data = [
         "title": "Meet Your New Lead Engineer",
         "subtitle": "AlphaBrain doesn't just write code; it leads the project.",
         "cards": [
-            {"title": "Voice Driven", "body": "Speak naturally to Eva (Gemini Live). She understands context and architecture.", "accent": "#7209B7"},
-            {"title": "Autonomous Execution", "body": "Headless Antigravity workers take over, write code, and run tests locally.", "accent": "#E85D04"}
+            {
+                "title": "Voice Driven",
+                "body": "Speak naturally to Eva (Gemini Live). She understands context and architecture.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "Autonomous Execution",
+                "body": "Headless Antigravity workers take over, write code, and run tests locally.",
+                "accent": "#E85D04",
+            },
         ],
-        "custom_art": "voice-orb"
+        "custom_art": "voice-orb",
     },
     {
         "type": "content",
@@ -39,11 +57,23 @@ slides_data = [
         "title": "System Topology",
         "subtitle": "Three modular components working in perfect synchronization.",
         "cards": [
-            {"title": "AlphaMeet", "body": "WebRTC client on the phone for sub-second latency.", "accent": "#2A9D8F"},
-            {"title": "AlphaCore", "body": "FastAPI orchestration layer managing states via SQLite.", "accent": "#7209B7"},
-            {"title": "AlphaWorker", "body": "Background daemon running Antigravity in isolated worktrees.", "accent": "#E85D04"}
+            {
+                "title": "AlphaMeet",
+                "body": "WebRTC client on the phone for sub-second latency.",
+                "accent": "#2A9D8F",
+            },
+            {
+                "title": "AlphaCore",
+                "body": "FastAPI orchestration layer managing states via SQLite.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "AlphaWorker",
+                "body": "Background daemon running Antigravity in isolated worktrees.",
+                "accent": "#E85D04",
+            },
         ],
-        "custom_art": "topology-rings"
+        "custom_art": "topology-rings",
     },
     {
         "type": "content",
@@ -51,10 +81,18 @@ slides_data = [
         "title": "The Antigravity Engine",
         "subtitle": "Moving beyond simple chatbots into true agentic workflows.",
         "cards": [
-            {"title": "Filesystem Access", "body": "Agents read, edit, and navigate the project autonomously.", "accent": "#0077B6"},
-            {"title": "Command Execution", "body": "Agents run CLI commands, compile, and verify their own work.", "accent": "#7209B7"}
+            {
+                "title": "Filesystem Access",
+                "body": "Agents read, edit, and navigate the project autonomously.",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "Command Execution",
+                "body": "Agents run CLI commands, compile, and verify their own work.",
+                "accent": "#7209B7",
+            },
         ],
-        "custom_art": "engine-cube"
+        "custom_art": "engine-cube",
     },
     {
         "type": "content",
@@ -62,10 +100,18 @@ slides_data = [
         "title": "Red Light / Green Light",
         "subtitle": "Deterministic gates ensuring pipeline integrity.",
         "cards": [
-            {"title": "Pre-flight Lints", "body": "Code is formatted and type-checked strictly. Failures block the pipeline.", "accent": "#E85D04"},
-            {"title": "No-Merge Policy", "body": "If Red, the agent is forced to iteratively debug until Green.", "accent": "#2A9D8F"}
+            {
+                "title": "Pre-flight Lints",
+                "body": "Code is formatted and type-checked strictly. Failures block the pipeline.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "No-Merge Policy",
+                "body": "If Red, the agent is forced to iteratively debug until Green.",
+                "accent": "#2A9D8F",
+            },
         ],
-        "custom_art": "qa-split"
+        "custom_art": "qa-split",
     },
     {
         "type": "content",
@@ -73,10 +119,18 @@ slides_data = [
         "title": "Zero Side Effects",
         "subtitle": "Safe, reproducible testing environments.",
         "cards": [
-            {"title": "Git Worktrees", "body": "Executed in a temp worktree, keeping main repository untouched.", "accent": "#7209B7"},
-            {"title": "100% Pass Rate", "body": "AlphaBrain currently boasts 506 passing tests. Rock solid.", "accent": "#0077B6"}
+            {
+                "title": "Git Worktrees",
+                "body": "Executed in a temp worktree, keeping main repository untouched.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "100% Pass Rate",
+                "body": "AlphaBrain currently boasts 506 passing tests. Rock solid.",
+                "accent": "#0077B6",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/data_cube_light_1788284806138.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/data_cube_light_1788284806138.jpg",
     },
     {
         "type": "content",
@@ -84,10 +138,18 @@ slides_data = [
         "title": "Continuous Delivery",
         "subtitle": "From voice command to deployed feature.",
         "cards": [
-            {"title": "Voice to Task", "body": "Meeting synthesized into strict JSON plan.", "accent": "#2A9D8F"},
-            {"title": "Code to Prod", "body": "Feature is staged for one-tap human approval.", "accent": "#E85D04"}
+            {
+                "title": "Voice to Task",
+                "body": "Meeting synthesized into strict JSON plan.",
+                "accent": "#2A9D8F",
+            },
+            {
+                "title": "Code to Prod",
+                "body": "Feature is staged for one-tap human approval.",
+                "accent": "#E85D04",
+            },
         ],
-        "custom_art": "cicd-lines"
+        "custom_art": "cicd-lines",
     },
     {
         "type": "content",
@@ -95,10 +157,18 @@ slides_data = [
         "title": "The User Experience",
         "subtitle": "How a developer uses AlphaBrain daily.",
         "cards": [
-            {"title": "1. Initialize", "body": "User says 'Hey Eva, let's build the auth module.'", "accent": "#0077B6"},
-            {"title": "3. Execute", "body": "User sees live progress on their phone as code is written.", "accent": "#7209B7"}
+            {
+                "title": "1. Initialize",
+                "body": "User says 'Hey Eva, let's build the auth module.'",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "3. Execute",
+                "body": "User sees live progress on their phone as code is written.",
+                "accent": "#7209B7",
+            },
         ],
-        "custom_art": "phone-mockup"
+        "custom_art": "phone-mockup",
     },
     {
         "type": "content",
@@ -106,10 +176,18 @@ slides_data = [
         "title": "Scaling the Swarm",
         "subtitle": "The future of autonomous engineering.",
         "cards": [
-            {"title": "Next: Swarm Logic", "body": "Multi-agent DAG workflows and automated arbitration.", "accent": "#0077B6"},
-            {"title": "Future: Enterprise Ops", "body": "Carrier phone integration and air-gapped deployments.", "accent": "#2A9D8F"}
+            {
+                "title": "Next: Swarm Logic",
+                "body": "Multi-agent DAG workflows and automated arbitration.",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "Future: Enterprise Ops",
+                "body": "Carrier phone integration and air-gapped deployments.",
+                "accent": "#2A9D8F",
+            },
         ],
-        "custom_art": "roadmap-grid"
+        "custom_art": "roadmap-grid",
     },
     {
         "type": "content",
@@ -117,11 +195,19 @@ slides_data = [
         "title": "Project Verification",
         "subtitle": "Everything is backed by verifiable code.",
         "cards": [
-            {"title": "Source Code", "body": "Clean, modular Python structure available on GitHub.", "accent": "#7209B7"},
-            {"title": "Automated QA", "body": "Run `pytest` to see the 506 passing tests.", "accent": "#0077B6"}
+            {
+                "title": "Source Code",
+                "body": "Clean, modular Python structure available on GitHub.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "Automated QA",
+                "body": "Run `pytest` to see the 506 passing tests.",
+                "accent": "#0077B6",
+            },
         ],
-        "custom_art": "terminal-window"
-    }
+        "custom_art": "terminal-window",
+    },
 ]
 
 html_template = """
@@ -230,6 +316,7 @@ html_template = """
 <body>
 """
 
+
 def render_custom_art(art_type):
     if art_type == "voice-orb":
         return '<div class="css-art voice-orb"><div class="ring r1"></div><div class="ring r2"></div><div class="core"></div></div>'
@@ -246,7 +333,7 @@ def render_custom_art(art_type):
     elif art_type == "roadmap-grid":
         return '<div class="css-art roadmap-grid"><div class="grid"></div></div>'
     elif art_type == "terminal-window":
-        return '''
+        return """
         <div class="css-art terminal-window">
             <div class="window">
                 <div class="header"><div class="dot d1"></div><div class="dot d2"></div><div class="dot d3"></div></div>
@@ -260,54 +347,59 @@ def render_custom_art(art_type):
                     <span class="ok">============= 506 passed in 1.42s =============</span>
                 </div>
             </div>
-        </div>'''
-    return ''
+        </div>"""
+    return ""
+
 
 for i, slide in enumerate(slides_data):
     has_img = "image" in slide
     has_art = "custom_art" in slide
-    
-    html_template += f'<div class="slide">'
-    html_template += '<div class="ambient-blob blob-1"></div><div class="ambient-blob blob-2"></div>'
-    html_template += f'<div class="content-wrapper">'
-    
+
+    html_template += '<div class="slide">'
+    html_template += (
+        '<div class="ambient-blob blob-1"></div><div class="ambient-blob blob-2"></div>'
+    )
+    html_template += '<div class="content-wrapper">'
+
     html_template += '<div class="text-col">'
     if slide["type"] == "title":
-        html_template += f'''
+        html_template += f"""
             <div class="tag" style="color: #E85D04;">{slide["tag"]}</div>
             <h1>{slide["title"]}</h1>
             <div class="subtitle">{slide["subtitle"]}<br><br><span style="font-size: 24px; color: #888;">{slide["body"]}</span></div>
-        '''
+        """
     else:
-        html_template += f'''
+        html_template += f"""
             <div class="tag">{slide["tag"]}</div>
             <h2>{slide["title"]}</h2>
             <div class="subtitle">{slide["subtitle"]}</div>
             <div class="card-container">
-        '''
+        """
         for card in slide["cards"]:
-            html_template += f'''
+            html_template += f"""
                 <div class="glass-card" style="--accent: {card["accent"]};">
                     <h3 class="card-title">{card["title"]}</h3>
                     <div class="card-body">{card["body"]}</div>
                 </div>
-            '''
-        html_template += '</div>'
-    html_template += '</div>' # end text-col
+            """
+        html_template += "</div>"
+    html_template += "</div>"  # end text-col
 
     if has_img:
-        html_template += f'<div class="img-col"><img src="file://{slide["image"]}" alt="Slide Visual"></div>'
+        html_template += (
+            f'<div class="img-col"><img src="file://{slide["image"]}" alt="Slide Visual"></div>'
+        )
     elif has_art:
         html_template += f'<div class="img-col">{render_custom_art(slide["custom_art"])}</div>'
 
-    html_template += '</div>' # end content-wrapper
-    html_template += f'''
+    html_template += "</div>"  # end content-wrapper
+    html_template += f"""
         <div class="footer-bar">
             <span>AlphaBrain // Autonomous Dev Cockpit</span>
-            <span>{i+1} / {len(slides_data)}</span>
+            <span>{i + 1} / {len(slides_data)}</span>
         </div>
-    '''
-    html_template += '</div>' # end slide
+    """
+    html_template += "</div>"  # end slide
 
 html_template += "</body></html>"
 

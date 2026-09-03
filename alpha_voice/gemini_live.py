@@ -37,9 +37,7 @@ You welcome clients, capture high-level requirements, and coordinate technical r
         system_instruction: str | None = None,
     ):
         self.api_key = (
-            api_key
-            or getattr(settings, "GEMINI_LIVE_API_KEY", None)
-            or settings.GEMINI_API_KEY
+            api_key or getattr(settings, "GEMINI_LIVE_API_KEY", None) or settings.GEMINI_API_KEY
         )
         self.model = model
         self.persona = persona.lower()

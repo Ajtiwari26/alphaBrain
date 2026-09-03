@@ -261,7 +261,10 @@ async def test_keyset_cursor_produces_stable_non_overlapping_pages(setup_db, fou
 
     async with session_factory() as session:
         proj = ProjectRecord(
-            id="prj_page_test", name="Pagination Test Proj", repo_path="/repos/page", status="active"
+            id="prj_page_test",
+            name="Pagination Test Proj",
+            repo_path="/repos/page",
+            status="active",
         )
         session.add(proj)
 
@@ -523,9 +526,7 @@ async def test_founder_sees_sanitized_actor_and_details(setup_db, founder_header
 
 
 @pytest.mark.asyncio
-async def test_client_sees_system_actor_and_redacted_details(
-    setup_db, client_headers_factory
-):
+async def test_client_sees_system_actor_and_redacted_details(setup_db, client_headers_factory):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 18, 0, 0, tzinfo=UTC)
 

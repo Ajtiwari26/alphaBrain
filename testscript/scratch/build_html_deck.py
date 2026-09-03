@@ -1,5 +1,3 @@
-import json
-import os
 
 slides_data = [
     {
@@ -8,7 +6,7 @@ slides_data = [
         "subtitle": "The Autonomous Multi-Agent Developer Cockpit",
         "tag": "iQOO PUNE HACKATHON SUBMISSION",
         "body": "A voice-native, hermetically sealed engineering swarm powered by Gemini and Antigravity.",
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide1_brain_1788285056050.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide1_brain_1788285056050.jpg",
     },
     {
         "type": "content",
@@ -16,11 +14,23 @@ slides_data = [
         "title": "Breaking the Desktop Chain",
         "subtitle": "Why AlphaBrain Fits the iQOO AgentKit Track perfectly",
         "cards": [
-            {"title": "Phone-First UI", "body": "100% controlled via a real-time voice duplex interface on the iQOO phone, eliminating the need for a laptop keyboard.", "accent": "#E85D04"},
-            {"title": "AgentKit Core", "body": "Built entirely around Antigravity (Google's agentic framework) orchestrating the LiveKit voice bridge.", "accent": "#0077B6"},
-            {"title": "Deep QA", "body": "Enforces a rigid 'Red Light / Green Light' test-driven paradigm before any code is ever merged.", "accent": "#2A9D8F"}
+            {
+                "title": "Phone-First UI",
+                "body": "100% controlled via a real-time voice duplex interface on the iQOO phone, eliminating the need for a laptop keyboard.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "AgentKit Core",
+                "body": "Built entirely around Antigravity (Google's agentic framework) orchestrating the LiveKit voice bridge.",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "Deep QA",
+                "body": "Enforces a rigid 'Red Light / Green Light' test-driven paradigm before any code is ever merged.",
+                "accent": "#2A9D8F",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/broken_chain_light_1788284781223.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/broken_chain_light_1788284781223.jpg",
     },
     {
         "type": "content",
@@ -28,10 +38,22 @@ slides_data = [
         "title": "Meet Your New Lead Engineer",
         "subtitle": "AlphaBrain doesn't just write code; it leads the project.",
         "cards": [
-            {"title": "Voice Driven", "body": "Speak naturally to Eva (the Gemini Live agent). She understands context, codebase history, and complex architectural needs.", "accent": "#7209B7"},
-            {"title": "Autonomous Execution", "body": "Once you agree on a plan, headless Antigravity workers take over, write the code, and run the tests in the background.", "accent": "#E85D04"},
-            {"title": "Verifiable Results", "body": "No code is blindly merged. AlphaBrain provides test output, diffs, and staging links for approval.", "accent": "#0077B6"}
-        ]
+            {
+                "title": "Voice Driven",
+                "body": "Speak naturally to Eva (the Gemini Live agent). She understands context, codebase history, and complex architectural needs.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "Autonomous Execution",
+                "body": "Once you agree on a plan, headless Antigravity workers take over, write the code, and run the tests in the background.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "Verifiable Results",
+                "body": "No code is blindly merged. AlphaBrain provides test output, diffs, and staging links for approval.",
+                "accent": "#0077B6",
+            },
+        ],
     },
     {
         "type": "content",
@@ -39,10 +61,22 @@ slides_data = [
         "title": "System Topology",
         "subtitle": "Three modular components working in perfect synchronization.",
         "cards": [
-            {"title": "AlphaMeet (Frontend)", "body": "WebRTC LiveKit client running on the user's phone for sub-second latency voice interactions.", "accent": "#2A9D8F"},
-            {"title": "AlphaCore (API)", "body": "FastAPI orchestration layer managing states, session history, and task queues via SQLite.", "accent": "#7209B7"},
-            {"title": "AlphaWorker (Runner)", "body": "Background daemon running the headless Antigravity CLI in isolated git worktrees.", "accent": "#E85D04"}
-        ]
+            {
+                "title": "AlphaMeet (Frontend)",
+                "body": "WebRTC LiveKit client running on the user's phone for sub-second latency voice interactions.",
+                "accent": "#2A9D8F",
+            },
+            {
+                "title": "AlphaCore (API)",
+                "body": "FastAPI orchestration layer managing states, session history, and task queues via SQLite.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "AlphaWorker (Runner)",
+                "body": "Background daemon running the headless Antigravity CLI in isolated git worktrees.",
+                "accent": "#E85D04",
+            },
+        ],
     },
     {
         "type": "content",
@@ -50,10 +84,22 @@ slides_data = [
         "title": "The Antigravity Engine",
         "subtitle": "Moving beyond simple chatbots into true agentic workflows.",
         "cards": [
-            {"title": "Filesystem Access", "body": "Agents can read, edit, and navigate the entire project directory autonomously.", "accent": "#0077B6"},
-            {"title": "Subagent Delegation", "body": "Complex tasks are broken down and delegated to specialized subagents for parallel execution.", "accent": "#2A9D8F"},
-            {"title": "Command Execution", "body": "Agents run CLI commands, compile code, and run tests locally to verify their own work.", "accent": "#7209B7"}
-        ]
+            {
+                "title": "Filesystem Access",
+                "body": "Agents can read, edit, and navigate the entire project directory autonomously.",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "Subagent Delegation",
+                "body": "Complex tasks are broken down and delegated to specialized subagents for parallel execution.",
+                "accent": "#2A9D8F",
+            },
+            {
+                "title": "Command Execution",
+                "body": "Agents run CLI commands, compile code, and run tests locally to verify their own work.",
+                "accent": "#7209B7",
+            },
+        ],
     },
     {
         "type": "content",
@@ -61,10 +107,22 @@ slides_data = [
         "title": "Red Light / Green Light",
         "subtitle": "Deterministic gates ensuring pipeline integrity.",
         "cards": [
-            {"title": "Pre-flight Lints", "body": "Code is formatted (Ruff) and type-checked (mypy) strictly. Failures block the pipeline immediately.", "accent": "#E85D04"},
-            {"title": "Test Isolation", "body": "Every unit test runs against a fresh, in-memory or isolated SQLite database to prevent state bleed.", "accent": "#0077B6"},
-            {"title": "No-Merge Policy", "body": "If the pipeline is Red, the agent is forced to iteratively debug until it goes Green.", "accent": "#2A9D8F"}
-        ]
+            {
+                "title": "Pre-flight Lints",
+                "body": "Code is formatted (Ruff) and type-checked (mypy) strictly. Failures block the pipeline immediately.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "Test Isolation",
+                "body": "Every unit test runs against a fresh, in-memory or isolated SQLite database to prevent state bleed.",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "No-Merge Policy",
+                "body": "If the pipeline is Red, the agent is forced to iteratively debug until it goes Green.",
+                "accent": "#2A9D8F",
+            },
+        ],
     },
     {
         "type": "content",
@@ -72,11 +130,23 @@ slides_data = [
         "title": "Zero Side Effects",
         "subtitle": "Safe, reproducible testing environments.",
         "cards": [
-            {"title": "Git Worktrees", "body": "Every task is executed in a temporary git worktree, keeping the main repository completely untouched.", "accent": "#7209B7"},
-            {"title": "Contract Mocks", "body": "External API calls (like LLM generations) are strictly mocked during unit tests to guarantee determinism.", "accent": "#E85D04"},
-            {"title": "100% Pass Rate", "body": "AlphaBrain currently boasts 506 passing tests. The foundation is rock solid.", "accent": "#0077B6"}
+            {
+                "title": "Git Worktrees",
+                "body": "Every task is executed in a temporary git worktree, keeping the main repository completely untouched.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "Contract Mocks",
+                "body": "External API calls (like LLM generations) are strictly mocked during unit tests to guarantee determinism.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "100% Pass Rate",
+                "body": "AlphaBrain currently boasts 506 passing tests. The foundation is rock solid.",
+                "accent": "#0077B6",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/data_cube_light_1788284806138.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/data_cube_light_1788284806138.jpg",
     },
     {
         "type": "content",
@@ -84,10 +154,22 @@ slides_data = [
         "title": "Continuous Delivery",
         "subtitle": "From voice command to deployed feature.",
         "cards": [
-            {"title": "Voice to Task", "body": "The meeting transcript is synthesized into a strict JSON implementation plan.", "accent": "#2A9D8F"},
-            {"title": "Task to Code", "body": "Antigravity executes the JSON plan, writing code and tests in a dedicated branch.", "accent": "#7209B7"},
-            {"title": "Code to Prod", "body": "Upon passing the QA gates, the feature is staged for one-tap human approval.", "accent": "#E85D04"}
-        ]
+            {
+                "title": "Voice to Task",
+                "body": "The meeting transcript is synthesized into a strict JSON implementation plan.",
+                "accent": "#2A9D8F",
+            },
+            {
+                "title": "Task to Code",
+                "body": "Antigravity executes the JSON plan, writing code and tests in a dedicated branch.",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "Code to Prod",
+                "body": "Upon passing the QA gates, the feature is staged for one-tap human approval.",
+                "accent": "#E85D04",
+            },
+        ],
     },
     {
         "type": "content",
@@ -95,10 +177,22 @@ slides_data = [
         "title": "The User Experience",
         "subtitle": "How a developer uses AlphaBrain daily.",
         "cards": [
-            {"title": "1. Initialize", "body": "User opens the AlphaMeet UI on their phone and says 'Hey Eva, let's build the auth module.'", "accent": "#0077B6"},
-            {"title": "2. Collaborate", "body": "Eva discusses the architecture, asks clarifying questions, and finalizes the spec.", "accent": "#2A9D8F"},
-            {"title": "3. Execute", "body": "Eva spins up a worker. The user sees live progress indicators on their phone as code is written and tested.", "accent": "#7209B7"}
-        ]
+            {
+                "title": "1. Initialize",
+                "body": "User opens the AlphaMeet UI on their phone and says 'Hey Eva, let's build the auth module.'",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "2. Collaborate",
+                "body": "Eva discusses the architecture, asks clarifying questions, and finalizes the spec.",
+                "accent": "#2A9D8F",
+            },
+            {
+                "title": "3. Execute",
+                "body": "Eva spins up a worker. The user sees live progress indicators on their phone as code is written and tested.",
+                "accent": "#7209B7",
+            },
+        ],
     },
     {
         "type": "content",
@@ -106,10 +200,22 @@ slides_data = [
         "title": "Scaling the Swarm",
         "subtitle": "The future of autonomous engineering.",
         "cards": [
-            {"title": "Current: Foundation", "body": "Voice cockpit, headless runner, and strict testing gates.", "accent": "#E85D04"},
-            {"title": "Next: Swarm Logic", "body": "Multi-agent DAG workflows and automated merge conflict arbitration.", "accent": "#0077B6"},
-            {"title": "Future: Enterprise Ops", "body": "Carrier phone integration, self-healing CI/CD, and air-gapped deployments.", "accent": "#2A9D8F"}
-        ]
+            {
+                "title": "Current: Foundation",
+                "body": "Voice cockpit, headless runner, and strict testing gates.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "Next: Swarm Logic",
+                "body": "Multi-agent DAG workflows and automated merge conflict arbitration.",
+                "accent": "#0077B6",
+            },
+            {
+                "title": "Future: Enterprise Ops",
+                "body": "Carrier phone integration, self-healing CI/CD, and air-gapped deployments.",
+                "accent": "#2A9D8F",
+            },
+        ],
     },
     {
         "type": "content",
@@ -117,11 +223,23 @@ slides_data = [
         "title": "Project Verification",
         "subtitle": "Everything is backed by verifiable code.",
         "cards": [
-            {"title": "Source Code", "body": "Clean, modular Python structure available at github.com/Ajtiwari26/alphaBrain", "accent": "#7209B7"},
-            {"title": "Local Setup", "body": "Easily reproducible locally with LiveKit and Uvicorn. Scripts included.", "accent": "#E85D04"},
-            {"title": "Automated QA", "body": "Run `pytest` to see the 506 passing tests. Zero residual state.", "accent": "#0077B6"}
-        ]
-    }
+            {
+                "title": "Source Code",
+                "body": "Clean, modular Python structure available at github.com/Ajtiwari26/alphaBrain",
+                "accent": "#7209B7",
+            },
+            {
+                "title": "Local Setup",
+                "body": "Easily reproducible locally with LiveKit and Uvicorn. Scripts included.",
+                "accent": "#E85D04",
+            },
+            {
+                "title": "Automated QA",
+                "body": "Run `pytest` to see the 506 passing tests. Zero residual state.",
+                "accent": "#0077B6",
+            },
+        ],
+    },
 ]
 
 html_template = """
@@ -186,51 +304,51 @@ html_template = """
 
 for i, slide in enumerate(slides_data):
     has_img = "image" in slide
-    html_template += f'<div class="slide">'
+    html_template += '<div class="slide">'
     html_template += '<div class="ambient-blob blob-1"></div>'
     html_template += '<div class="ambient-blob blob-2"></div>'
-    
+
     html_template += f'<div class="content-wrapper {"" if has_img else "no-img"}">'
-    
+
     html_template += '<div class="text-col">'
     if slide["type"] == "title":
-        html_template += f'''
+        html_template += f"""
             <div class="tag" style="color: #E85D04;">{slide["tag"]}</div>
             <h1>{slide["title"]}</h1>
             <div class="subtitle">{slide["subtitle"]}<br><br><span style="font-size: 24px; color: #888;">{slide["body"]}</span></div>
-        '''
+        """
     else:
-        html_template += f'''
+        html_template += f"""
             <div class="tag">{slide["tag"]}</div>
             <h2>{slide["title"]}</h2>
             <div class="subtitle">{slide["subtitle"]}</div>
             <div class="card-container">
-        '''
+        """
         for card in slide["cards"]:
-            html_template += f'''
+            html_template += f"""
                 <div class="glass-card" style="--accent: {card["accent"]};">
                     <h3 class="card-title">{card["title"]}</h3>
                     <div class="card-body">{card["body"]}</div>
                 </div>
-            '''
-        html_template += '</div>'
-    html_template += '</div>' # end text-col
+            """
+        html_template += "</div>"
+    html_template += "</div>"  # end text-col
 
     if has_img:
-        html_template += f'''
+        html_template += f"""
         <div class="img-col">
             <img src="file://{slide["image"]}" alt="Slide Visual">
         </div>
-        '''
+        """
 
-    html_template += '</div>' # end content-wrapper
-    html_template += f'''
+    html_template += "</div>"  # end content-wrapper
+    html_template += f"""
         <div class="footer-bar">
             <span>AlphaBrain // Autonomous Dev Cockpit</span>
-            <span>{i+1} / {len(slides_data)}</span>
+            <span>{i + 1} / {len(slides_data)}</span>
         </div>
-    '''
-    html_template += '</div>' # end slide
+    """
+    html_template += "</div>"  # end slide
 
 html_template += """
 </body>

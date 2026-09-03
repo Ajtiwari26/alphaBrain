@@ -322,7 +322,11 @@ async def test_executor_supplied_review_evidence_rejected(db_session: AsyncSessi
     # Assert task did not complete or enter approval
     task = await db_session.get(TaskRecord, envelope.task_id)
     assert task is not None
-    assert task.status not in {TaskStatus.COMPLETED.value, TaskStatus.VERIFIED.value, TaskStatus.WAITING_APPROVAL.value}
+    assert task.status not in {
+        TaskStatus.COMPLETED.value,
+        TaskStatus.VERIFIED.value,
+        TaskStatus.WAITING_APPROVAL.value,
+    }
 
 
 @pytest.mark.asyncio

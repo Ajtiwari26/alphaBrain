@@ -470,7 +470,7 @@ class AlphaWorkerDaemon:
                 return False
             except Exception as exc:
                 if "404" in str(exc) or "Not Found" in str(exc):
-                    pass # Promotion endpoint not deployed yet
+                    pass  # Promotion endpoint not deployed yet
                 else:
                     logger.error("Unexpected error fetching promotion: %s", exc)
                 promotion_dict = None
@@ -705,7 +705,8 @@ class AlphaWorkerDaemon:
 
         if not cancel_requested.is_set():
             try:
-                logger.error("SUBMITTING RESULT: " + result.model_dump_json()); await self.control_plane.submit_result(result, lease.lease_token)
+                logger.debug("Submitting result: %s", result.task_id)
+                await self.control_plane.submit_result(result, lease.lease_token)
             except ControlPlaneUnavailable:
                 self._record_escalation(
                     envelope.task_id, "result_delivery_deferred", "control plane unavailable"

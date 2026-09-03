@@ -10,7 +10,7 @@ slides_data = [
         "subtitle": "The Autonomous Multi-Agent Developer Cockpit",
         "tag": "iQOO PUNE HACKATHON 2026",
         "body": "A voice-native, hermetically sealed engineering swarm powered by Gemini & Antigravity.",
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide1_brain_1788285056050.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide1_brain_1788285056050.jpg",
     },
     {
         "type": "content",
@@ -18,11 +18,23 @@ slides_data = [
         "title": "Breaking the Desktop Chain",
         "subtitle": "Why AlphaBrain Fits the iQOO AgentKit Track perfectly",
         "items": [
-            {"idx": "01", "title": "Phone-First UI", "body": "100% controlled via real-time voice duplex on the iQOO phone. No laptop keyboard needed."},
-            {"idx": "02", "title": "AgentKit Core", "body": "Built entirely around Antigravity orchestrating the LiveKit voice bridge."},
-            {"idx": "03", "title": "Deep QA Gates", "body": "Enforces 'Red Light / Green Light' test-driven paradigm before any code merges."}
+            {
+                "idx": "01",
+                "title": "Phone-First UI",
+                "body": "100% controlled via real-time voice duplex on the iQOO phone. No laptop keyboard needed.",
+            },
+            {
+                "idx": "02",
+                "title": "AgentKit Core",
+                "body": "Built entirely around Antigravity orchestrating the LiveKit voice bridge.",
+            },
+            {
+                "idx": "03",
+                "title": "Deep QA Gates",
+                "body": "Enforces 'Red Light / Green Light' test-driven paradigm before any code merges.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/broken_chain_light_1788284781223.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/broken_chain_light_1788284781223.jpg",
     },
     {
         "type": "content",
@@ -30,11 +42,23 @@ slides_data = [
         "title": "Meet Your New Lead Engineer",
         "subtitle": "AlphaBrain doesn't just write code — it leads the project.",
         "items": [
-            {"idx": "01", "title": "Voice Driven", "body": "Speak naturally to Eva (Gemini Live). She understands context, codebase history, and architecture."},
-            {"idx": "02", "title": "Autonomous Execution", "body": "Headless Antigravity workers write code and run tests in the background."},
-            {"idx": "03", "title": "Verifiable Results", "body": "No code is blindly merged. Test output, diffs, and staging links for approval."}
+            {
+                "idx": "01",
+                "title": "Voice Driven",
+                "body": "Speak naturally to Eva (Gemini Live). She understands context, codebase history, and architecture.",
+            },
+            {
+                "idx": "02",
+                "title": "Autonomous Execution",
+                "body": "Headless Antigravity workers write code and run tests in the background.",
+            },
+            {
+                "idx": "03",
+                "title": "Verifiable Results",
+                "body": "No code is blindly merged. Test output, diffs, and staging links for approval.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide3_voice_1788285813249.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide3_voice_1788285813249.jpg",
     },
     {
         "type": "content",
@@ -42,11 +66,23 @@ slides_data = [
         "title": "System Topology",
         "subtitle": "Three modular components in perfect synchronization.",
         "items": [
-            {"idx": "01", "title": "AlphaMeet", "body": "WebRTC LiveKit client on the phone for sub-second latency voice interactions."},
-            {"idx": "02", "title": "AlphaCore", "body": "FastAPI orchestration layer managing states, history, and task queues."},
-            {"idx": "03", "title": "AlphaWorker", "body": "Background daemon running headless Antigravity in isolated git worktrees."}
+            {
+                "idx": "01",
+                "title": "AlphaMeet",
+                "body": "WebRTC LiveKit client on the phone for sub-second latency voice interactions.",
+            },
+            {
+                "idx": "02",
+                "title": "AlphaCore",
+                "body": "FastAPI orchestration layer managing states, history, and task queues.",
+            },
+            {
+                "idx": "03",
+                "title": "AlphaWorker",
+                "body": "Background daemon running headless Antigravity in isolated git worktrees.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide4_topology_1788285826678.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide4_topology_1788285826678.jpg",
     },
     {
         "type": "content",
@@ -54,11 +90,23 @@ slides_data = [
         "title": "The Antigravity Engine",
         "subtitle": "Beyond chatbots — true agentic workflows.",
         "items": [
-            {"idx": "01", "title": "Filesystem Access", "body": "Agents read, edit, and navigate the entire project directory autonomously."},
-            {"idx": "02", "title": "Subagent Delegation", "body": "Complex tasks broken down and delegated to specialized subagents in parallel."},
-            {"idx": "03", "title": "Command Execution", "body": "Agents run CLI commands, compile code, and run tests to verify their own work."}
+            {
+                "idx": "01",
+                "title": "Filesystem Access",
+                "body": "Agents read, edit, and navigate the entire project directory autonomously.",
+            },
+            {
+                "idx": "02",
+                "title": "Subagent Delegation",
+                "body": "Complex tasks broken down and delegated to specialized subagents in parallel.",
+            },
+            {
+                "idx": "03",
+                "title": "Command Execution",
+                "body": "Agents run CLI commands, compile code, and run tests to verify their own work.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide5_engine_1788285861175.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide5_engine_1788285861175.jpg",
     },
     {
         "type": "content",
@@ -66,11 +114,23 @@ slides_data = [
         "title": "Red Light / Green Light",
         "subtitle": "Deterministic gates ensuring pipeline integrity.",
         "items": [
-            {"idx": "01", "title": "Pre-flight Lints", "body": "Code formatted (Ruff) and type-checked (mypy). Failures block the pipeline."},
-            {"idx": "02", "title": "Test Isolation", "body": "Every test runs against a fresh, isolated SQLite database. Zero state bleed."},
-            {"idx": "03", "title": "No-Merge Policy", "body": "If Red, the agent iteratively debugs until Green. No exceptions."}
+            {
+                "idx": "01",
+                "title": "Pre-flight Lints",
+                "body": "Code formatted (Ruff) and type-checked (mypy). Failures block the pipeline.",
+            },
+            {
+                "idx": "02",
+                "title": "Test Isolation",
+                "body": "Every test runs against a fresh, isolated SQLite database. Zero state bleed.",
+            },
+            {
+                "idx": "03",
+                "title": "No-Merge Policy",
+                "body": "If Red, the agent iteratively debugs until Green. No exceptions.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide6_redgreen_1788285873303.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide6_redgreen_1788285873303.jpg",
     },
     {
         "type": "content",
@@ -78,11 +138,23 @@ slides_data = [
         "title": "Zero Side Effects",
         "subtitle": "Safe, reproducible testing environments.",
         "items": [
-            {"idx": "01", "title": "Git Worktrees", "body": "Every task in a temporary worktree. Main repository stays completely untouched."},
-            {"idx": "02", "title": "Contract Mocks", "body": "External API calls strictly mocked during tests to guarantee determinism."},
-            {"idx": "03", "title": "506 Tests Passing", "body": "AlphaBrain boasts 506 hermetic tests with zero failures. Rock solid."}
+            {
+                "idx": "01",
+                "title": "Git Worktrees",
+                "body": "Every task in a temporary worktree. Main repository stays completely untouched.",
+            },
+            {
+                "idx": "02",
+                "title": "Contract Mocks",
+                "body": "External API calls strictly mocked during tests to guarantee determinism.",
+            },
+            {
+                "idx": "03",
+                "title": "506 Tests Passing",
+                "body": "AlphaBrain boasts 506 hermetic tests with zero failures. Rock solid.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/data_cube_light_1788284806138.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/data_cube_light_1788284806138.jpg",
     },
     {
         "type": "content",
@@ -90,11 +162,23 @@ slides_data = [
         "title": "Continuous Delivery",
         "subtitle": "From voice command to deployed feature.",
         "items": [
-            {"idx": "01", "title": "Voice → Task", "body": "Meeting transcript synthesized into a strict JSON implementation plan."},
-            {"idx": "02", "title": "Task → Code", "body": "Antigravity executes the plan, writing code and tests in a dedicated branch."},
-            {"idx": "03", "title": "Code → Prod", "body": "Upon passing QA gates, staged for one-tap human approval on the phone."}
+            {
+                "idx": "01",
+                "title": "Voice → Task",
+                "body": "Meeting transcript synthesized into a strict JSON implementation plan.",
+            },
+            {
+                "idx": "02",
+                "title": "Task → Code",
+                "body": "Antigravity executes the plan, writing code and tests in a dedicated branch.",
+            },
+            {
+                "idx": "03",
+                "title": "Code → Prod",
+                "body": "Upon passing QA gates, staged for one-tap human approval on the phone.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide8_pipeline_1788285908076.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide8_pipeline_1788285908076.jpg",
     },
     {
         "type": "content",
@@ -102,11 +186,23 @@ slides_data = [
         "title": "The User Experience",
         "subtitle": "How a developer uses AlphaBrain daily.",
         "items": [
-            {"idx": "01", "title": "Initialize", "body": "Open AlphaMeet on phone: 'Hey Eva, let's build the auth module.'"},
-            {"idx": "02", "title": "Collaborate", "body": "Eva discusses architecture, asks clarifying questions, finalizes the spec."},
-            {"idx": "03", "title": "Execute & Ship", "body": "Worker spins up. Live progress on phone as code is written, tested, and staged."}
+            {
+                "idx": "01",
+                "title": "Initialize",
+                "body": "Open AlphaMeet on phone: 'Hey Eva, let's build the auth module.'",
+            },
+            {
+                "idx": "02",
+                "title": "Collaborate",
+                "body": "Eva discusses architecture, asks clarifying questions, finalizes the spec.",
+            },
+            {
+                "idx": "03",
+                "title": "Execute & Ship",
+                "body": "Worker spins up. Live progress on phone as code is written, tested, and staged.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide9_phone_1788285919917.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide9_phone_1788285919917.jpg",
     },
     {
         "type": "content",
@@ -114,11 +210,23 @@ slides_data = [
         "title": "Scaling the Swarm",
         "subtitle": "The future of autonomous engineering.",
         "items": [
-            {"idx": "01", "title": "Foundation (Current)", "body": "Voice cockpit, headless runner, and strict testing gates."},
-            {"idx": "02", "title": "Swarm Logic (Next)", "body": "Multi-agent DAG workflows and automated merge conflict arbitration."},
-            {"idx": "03", "title": "Enterprise Ops (Future)", "body": "Carrier phone integration, self-healing CI/CD, air-gapped deployments."}
+            {
+                "idx": "01",
+                "title": "Foundation (Current)",
+                "body": "Voice cockpit, headless runner, and strict testing gates.",
+            },
+            {
+                "idx": "02",
+                "title": "Swarm Logic (Next)",
+                "body": "Multi-agent DAG workflows and automated merge conflict arbitration.",
+            },
+            {
+                "idx": "03",
+                "title": "Enterprise Ops (Future)",
+                "body": "Carrier phone integration, self-healing CI/CD, air-gapped deployments.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide10_roadmap_1788285954615.jpg"
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide10_roadmap_1788285954615.jpg",
     },
     {
         "type": "content",
@@ -126,12 +234,24 @@ slides_data = [
         "title": "Built. Tested. Proven.",
         "subtitle": "Everything is backed by verifiable code.",
         "items": [
-            {"idx": "01", "title": "Source Code", "body": "Clean, modular Python — github.com/Ajtiwari26/alphaBrain"},
-            {"idx": "02", "title": "Local Quickstart", "body": "LiveKit + Uvicorn + pytest. Reproducible in under 60 seconds."},
-            {"idx": "03", "title": "Automated QA", "body": "506 passing tests. Zero residual state. 100% pipeline success."}
+            {
+                "idx": "01",
+                "title": "Source Code",
+                "body": "Clean, modular Python — github.com/Ajtiwari26/alphaBrain",
+            },
+            {
+                "idx": "02",
+                "title": "Local Quickstart",
+                "body": "LiveKit + Uvicorn + pytest. Reproducible in under 60 seconds.",
+            },
+            {
+                "idx": "03",
+                "title": "Automated QA",
+                "body": "506 passing tests. Zero residual state. 100% pipeline success.",
+            },
         ],
-        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide11_terminal_1788285972901.jpg"
-    }
+        "image": "/Users/ajaytiwari/.gemini/antigravity/brain/52fc9ef8-23aa-4045-a4de-2257c2c0a58f/slide11_terminal_1788285972901.jpg",
+    },
 ]
 
 html = """<!DOCTYPE html>
@@ -352,7 +472,7 @@ total = len(slides_data)
 for i, slide in enumerate(slides_data):
     progress_pct = ((i + 1) / total) * 100
 
-    html += f'<div class="slide">'
+    html += '<div class="slide">'
     html += f'<div class="slide-inner {"title-slide" if slide["type"] == "title" else ""}">'
 
     # Text column
@@ -366,14 +486,14 @@ for i, slide in enumerate(slides_data):
     else:
         html += '<div class="index-list">'
         for item in slide["items"]:
-            html += f'''<div class="index-row">
+            html += f"""<div class="index-row">
                 <span class="index-num">{item["idx"]}</span>
                 <span class="index-title">{item["title"]}</span>
                 <span class="index-body">{item["body"]}</span>
-            </div>'''
-        html += '</div>'
+            </div>"""
+        html += "</div>"
 
-    html += '</div>'  # col-text
+    html += "</div>"  # col-text
 
     # Vertical divider
     html += '<div class="col-divider"></div>'
@@ -382,18 +502,18 @@ for i, slide in enumerate(slides_data):
     if "image" in slide:
         html += f'<div class="col-image"><img src="file://{slide["image"]}" alt="{slide["title"]}"></div>'
 
-    html += '</div>'  # slide-inner
+    html += "</div>"  # slide-inner
 
     # Footer
-    html += f'''<div class="footer-bar">
+    html += f"""<div class="footer-bar">
         <span>AlphaBrain · Autonomous Dev Cockpit</span>
-        <span>{str(i+1).zfill(2)} / {str(total).zfill(2)}</span>
-    </div>'''
+        <span>{str(i + 1).zfill(2)} / {str(total).zfill(2)}</span>
+    </div>"""
 
     # Accent progress bar
     html += f'<div class="accent-bar" style="width: {progress_pct}%;"></div>'
 
-    html += '</div>'  # slide
+    html += "</div>"  # slide
 
 html += "</body></html>"
 

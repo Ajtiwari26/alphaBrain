@@ -1,4 +1,3 @@
-import sys
 """Official AGY CLI bridge for one isolated Alpha Brain project conversation."""
 
 import asyncio
@@ -7,6 +6,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from contextlib import asynccontextmanager
@@ -444,6 +444,7 @@ class AntigravityLiveBridge:
     def _resolve_executable(exe: str) -> str:
         import sys
         from pathlib import Path
+
         bin_dir = Path(sys.executable).parent
         resolved = bin_dir / exe
         if resolved.exists():
@@ -806,7 +807,6 @@ class AntigravityLiveBridge:
             "accept-edits",
             "--model",
             model or settings.ANTIGRAVITY_MODEL,
-            "--dangerously-skip-permissions",
             "--effort",
             effort or settings.ANTIGRAVITY_EFFORT,
             "--print",

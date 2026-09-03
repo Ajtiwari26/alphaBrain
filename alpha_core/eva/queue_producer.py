@@ -81,14 +81,19 @@ class EvaQueueProducer:
             base_commit=base_commit,
         )
 
-        # 2. Compute canonical content hash
-        content_hash = self.compute_content_hash(
-            title=spec.title,
-            acceptance_criteria=spec.acceptance_criteria,
-            allowed_paths=spec.allowed_paths,
+        # 2. Serialize envelope to dict for queue storage
+        envelope_dict: dict[str, Any] = (
+            envelope.model_dump(mode="json") if hasattr(envelope, "model_dump") else envelope.dict()
         )
+        envelope_dict["acceptance_criteria"] = spec.acceptance_criteria
+        envelope_dict["title"] = spec.title
 
-        # 3. Create immutable provenance record
+        # 3. Compute canonical content hash
+        content_hash = hashlib.sha256(
+            json.dumps(envelope_dict, default=str).encode("utf-8")
+        ).hexdigest()
+
+        # 4. Create immutable provenance record
         provenance = TaskProvenance(
             meeting_id=meeting_id,
             speaker_id=speaker_id,
@@ -99,11 +104,6 @@ class EvaQueueProducer:
             eva_session_id=eva_session_id,
             created_at=time.time(),
             content_hash=content_hash,
-        )
-
-        # 4. Serialize envelope to dict for queue storage
-        envelope_dict: dict[str, Any] = (
-            envelope.model_dump(mode="json") if hasattr(envelope, "model_dump") else envelope.dict()
         )
 
         # 5. Enqueue with status = PENDING_REVIEW (Law 1: No Direct Path)
