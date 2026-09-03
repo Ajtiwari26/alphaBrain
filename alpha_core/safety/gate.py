@@ -38,24 +38,35 @@ PROTECTED_PATHS: tuple[str, ...] = (
     "docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md",
 )
 
-# Forbidden binary names in gate execution
+# Forbidden binary names in gate execution (zero-wrapper & anti-escalation policy)
 FORBIDDEN_BINARIES: tuple[str, ...] = (
+    # Network & Exfiltration
     "curl",
     "wget",
     "nc",
     "ncat",
     "netcat",
+    "ssh",
+    "scp",
+    "rsync",
+    # Privilege Escalation & Process Wrappers
     "sudo",
     "su",
     "chmod",
     "chown",
-    "ssh",
-    "scp",
-    "rsync",
+    "env",
+    "nohup",
+    "time",
+    "nice",
+    "xargs",
+    "exec",
+    "eval",
+    # Shell Invocations
     "bash",
     "sh",
     "zsh",
-    "xargs",
+    "dash",
+    "ksh",
 )
 
 # Known prompt injection and adversarial intent regexes
@@ -115,17 +126,53 @@ def is_protected_path(
 
 
 OPERATOR_TOKENS: tuple[str, ...] = (";", "&&", "||", "&", "|", ">", ">>", "<", "<<")
-PROCESS_WRAPPERS: tuple[str, ...] = ("env", "nohup", "time", "nice")
 RECURSIVE_FLAG_PATTERN: re.Pattern[str] = re.compile(r"^-[a-zA-Z]*[rR][a-zA-Z]*$")
+
+
+def has_active_command_substitution(cmd_str: str) -> tuple[bool, str]:
+    """
+    Checks for active command substitutions ($(...) or `...`).
+    In POSIX shells, substitutions remain active inside double quotes and unquoted text;
+    only literal single quotes ('...') neutralize command substitutions.
+    """
+    in_single_quote = False
+    escaped = False
+    i = 0
+    while i < len(cmd_str):
+        c = cmd_str[i]
+        if c == "\\" and not in_single_quote:
+            escaped = not escaped
+            i += 1
+            continue
+        if c == "'" and not escaped:
+            in_single_quote = not in_single_quote
+        elif not in_single_quote and not escaped:
+            if c == "`":
+                return (
+                    True,
+                    f"Active backtick command substitution detected in gate command: '{cmd_str}'",
+                )
+            if c == "$" and i + 1 < len(cmd_str) and cmd_str[i + 1] == "(":
+                return (
+                    True,
+                    f"Active subshell $(...) command substitution detected in gate command: '{cmd_str}'",
+                )
+        escaped = False
+        i += 1
+    return False, ""
 
 
 def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     """
     Tokenizes and inspects a command string for unauthorized network binaries,
-    privilege escalation, shell control chaining, or dangerous destructive operations.
-    Uses quote-aware lexing (shlex punctuation_chars=True) to avoid false-positives
-    on quoted semicolons, redirect characters, or backticks.
+    privilege escalation, execution wrappers, shell control chaining, or dangerous operations.
+    Enforces a strict zero-wrapper and anti-privilege-escalation policy.
     """
+    # 1. Check for active command substitutions (only single quotes neutralize them in POSIX)
+    has_sub, sub_reason = has_active_command_substitution(cmd_str)
+    if has_sub:
+        return True, sub_reason
+
     try:
         lexer = shlex.shlex(cmd_str, posix=True, punctuation_chars=True)
         tokens = list(lexer)
@@ -135,66 +182,27 @@ def is_forbidden_command(cmd_str: str) -> tuple[bool, str]:
     if not tokens:
         return False, ""
 
-    # 1. Check for unquoted backtick or $( command substitution in token sequence
-    for i, tok in enumerate(tokens):
-        if tok == "`":
-            return (
-                True,
-                f"Unquoted backtick command substitution is forbidden in gate command: '{cmd_str}'",
-            )
-        if tok == "$" and i + 1 < len(tokens) and tokens[i + 1] == "(":
-            return (
-                True,
-                f"Unquoted '$()' command substitution is forbidden in gate command: '{cmd_str}'",
-            )
-
     # 2. Reject unquoted shell control and redirection operators
     for tok in tokens:
         if tok in OPERATOR_TOKENS:
             return True, f"Shell control operator '{tok}' is forbidden in gate command: '{cmd_str}'"
 
-    # 3. Contextual command execution extraction
-    expect_command = True
-    in_rm_command = False
-    active_wrapper: str | None = None
+    # 3. Direct executable inspection (zero-wrapper policy)
+    executable = tokens[0]
+    base_exe = Path(executable).name.lower()
+    if base_exe in FORBIDDEN_BINARIES:
+        return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
 
-    for tok in tokens:
-        if expect_command:
-            if active_wrapper == "env":
-                # env skips options (starts with -) and variable assignments (contains =)
-                if tok.startswith("-") or "=" in tok:
-                    continue
-            elif active_wrapper in ("time", "nohup", "nice"):
-                if tok.startswith("-"):
-                    continue
-            else:
-                if tok.startswith("-"):
-                    continue
+    # 4. Check for destructive recursive rm removals
+    if base_exe == "rm":
+        for tok in tokens[1:]:
+            if RECURSIVE_FLAG_PATTERN.match(tok) or tok in ("--recursive", "--recursive=true"):
+                return (
+                    True,
+                    f"Destructive recursive removal flag '{tok}' detected in gate command: '{cmd_str}'",
+                )
 
-            base_exe = Path(tok).name.lower()
-            if base_exe in FORBIDDEN_BINARIES:
-                return True, f"Forbidden binary '{base_exe}' detected in gate command: '{cmd_str}'"
-
-            if base_exe == "rm":
-                in_rm_command = True
-                expect_command = False
-                active_wrapper = None
-            elif base_exe in PROCESS_WRAPPERS:
-                active_wrapper = base_exe
-                expect_command = True
-            else:
-                in_rm_command = False
-                expect_command = False
-                active_wrapper = None
-        else:
-            if in_rm_command:
-                if RECURSIVE_FLAG_PATTERN.match(tok) or tok in ("--recursive", "--recursive=true"):
-                    return (
-                        True,
-                        f"Destructive recursive removal flag '{tok}' detected in gate command: '{cmd_str}'",
-                    )
-
-    # 4. Check for raw reverse socket patterns
+    # 5. Check for raw reverse socket patterns
     cmd_lower = cmd_str.lower()
     if "bash -i" in cmd_lower or "/dev/tcp" in cmd_lower or "python -c 'import socket" in cmd_lower:
         return True, f"Reverse shell pattern detected in gate command: '{cmd_str}'"
@@ -249,7 +257,7 @@ class SafetyGate:
                         getattr(cmd_obj, "executable", ""),
                         *getattr(cmd_obj, "args", []),
                     ]
-                    commands.append(shlex.join(cmd_tokens).strip())
+                    commands.append(" ".join(cmd_tokens).strip())
         else:
             obj_val = envelope.get("objective")
             objective = str(obj_val) if obj_val is not None else ""
@@ -266,7 +274,7 @@ class SafetyGate:
                             cmd_obj.get("executable", ""),
                             *cmd_obj.get("args", []),
                         ]
-                        commands.append(shlex.join(cmd_tokens).strip())
+                        commands.append(" ".join(cmd_tokens).strip())
                     elif isinstance(cmd_obj, str):
                         commands.append(cmd_obj.strip())
 

