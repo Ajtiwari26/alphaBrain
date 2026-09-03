@@ -161,6 +161,36 @@ def cmd_show(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_export_audit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    task = queue.get_task(args.task_id)
+    if not task:
+        print(f"Error: Task '{args.task_id}' not found.", file=sys.stderr)
+        return 1
+
+    prov = task.get("provenance", {})
+    res = task.get("result", {})
+
+    audit_data = {
+        "task_id": task["id"],
+        "status": task["status"],
+        "created_at": task.get("created_at"),
+        "updated_at": task.get("updated_at"),
+        "provenance": prov,
+        "execution_history": res
+    }
+
+    output_path = getattr(args, "output", None) or f"audit_export_{task['id']}.json"
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(audit_data, f, indent=2, default=str)
+        print(f"Audit exported successfully to {output_path}")
+    except OSError as e:
+        print(f"Error: Could not write to {output_path} - {e}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
 def cmd_review(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     task = queue.get_task(args.task_id)
     if not task:
@@ -654,6 +684,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_merge.add_argument("task_id", help="ID of the task to merge")
     p_merge.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # export-audit
+    p_export_audit = subparsers.add_parser(
+        "export-audit", help="Export full cryptographic provenance and execution history"
+    )
+    p_export_audit.add_argument("task_id", help="ID of the task to export")
+    p_export_audit.add_argument("--output", help="Output JSON file path")
+    p_export_audit.add_argument("--json", action="store_true", help="Output JSON format (ignored)")
+
     return parser
 
 
@@ -679,6 +717,7 @@ def main(argv: list[str] | None = None) -> int:
         "emergency-status": cmd_emergency_status,
         "worker-cycle": cmd_worker_cycle,
         "merge": cmd_merge,
+        "export-audit": cmd_export_audit,
     }
 
     handler = handlers.get(args.subcommand)
