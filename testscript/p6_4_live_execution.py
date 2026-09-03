@@ -60,8 +60,14 @@ async def main():
             "requires_approval": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "acceptance_plan": {
-                "criteria": ["Linter results are printed"],
-                "executable_gates": [{"command": "echo lint_passed", "expected_exit_code": 0}]
+                "required_gates": ["unit_test"],
+                "commands": [
+                    {
+                        "gate_type": "unit_test",
+                        "executable": "echo",
+                        "args": ["lint_passed"]
+                    }
+                ]
             }
         }
         
