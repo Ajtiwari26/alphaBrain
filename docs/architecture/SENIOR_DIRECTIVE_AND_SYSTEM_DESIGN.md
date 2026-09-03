@@ -1,6 +1,6 @@
 # AlphaBrain — Canonical Senior Architecture & System Design Reference
-**Authoritative Senior Reviewer:** Claude Opus 4.6 (Thinking)  
-**Target Audience & Consumers:** Gemini 3.1 Pro High, Gemini 3.8 Flash High, and all autonomous AGY subagents  
+**Authoritative Senior Reviewer:** Claude Opus 4.6 (Thinking)
+**Target Audience & Consumers:** Gemini 3.1 Pro High, Gemini 3.8 Flash High, and all autonomous AGY subagents
 **Purpose:** Single source of truth for architectural invariants, phase roadmaps, security boundaries, and conflict resolution across models.
 
 ---
@@ -107,7 +107,7 @@ All Eva code must live cleanly outside `alpha_meet` in:
 
 ### 6.1 The Five Laws of P9
 1. **NO DIRECT PATH:** Eva's output shall NEVER connect directly to the Worker's input. The Safety Gate is a mandatory intermediary.
-2. **BLAST RADIUS CONTAINMENT:** No task shall modify >10 files or >500 lines. 
+2. **BLAST RADIUS CONTAINMENT:** No task shall modify >10 files or >500 lines.
 3. **PROTECTED PATHS:** Automated tasks cannot modify `.git/`, `alpha_core/eva/`, `config/secrets/`, launchd plists, or this architecture doc.
 4. **FINITE EXECUTION:** 15 min hard timeout. Max 2 retries. Queue depth max 20. Exceeding limits halts the pipeline.
 5. **REVERSIBILITY:** Tasks execute in ephemeral Git worktrees on dedicated branches. No force-pushes or merging to main.
@@ -540,4 +540,535 @@ This enforces strict separation: **operators control the queue, workers execute 
 
 ---
 
-*Section 6.5 authored and approved by Claude Opus 4.6 (Thinking) on 2026-09-03. Commit reference: `4bc570d`. Next section: §6.6 (Worker Dispatch & PR Generation Pipeline) — to be authored upon P9.4 completion.*
+*Section 6.5 authored and approved by Claude Opus 4.6 (Thinking) on 2026-09-03. Commit reference: `4bc570d`.*
+
+---
+
+### 6.6 Worker Dispatch, Blast Radius Containment & PR Generation Pipeline (P9.4 Approved)
+
+> [!IMPORTANT]
+> **Milestone P9.4 — Approved 2026-09-03 by Senior Architect (Opus)**
+> This section defines the complete closed-loop lifecycle from task lease acquisition through isolated worktree execution to PR proposal artifact generation. All invariants (I-21 through I-30) are **MANDATORY** and must be enforced at the code level with zero exceptions.
+
+---
+
+#### 6.6.1 Architectural Role & Closed-Loop Lifecycle
+
+The Worker Dispatch subsystem occupies the **terminal execution boundary** of the AlphaBrain triage pipeline. It is the only component authorized to mutate source code, and it does so exclusively within cryptographically-gated, blast-radius-contained worktree isolates.
+
+**Lifecycle State Machine:**
+
+```mermaid
+stateDiagram-v2
+    [*] --> LEASE_ACQUIRED : POST /api/triage/tasks/lease
+    LEASE_ACQUIRED --> HASH_VERIFIED : SHA-256 content_hash passes
+    HASH_VERIFIED --> WORKTREE_CREATED : git worktree add alpha/{task_id}
+    WORKTREE_CREATED --> EXECUTING : Worker applies changes
+    EXECUTING --> ACCEPTANCE_GATE : All modifications complete
+    ACCEPTANCE_GATE --> BLAST_RADIUS_CHECK : Acceptance commands pass
+    BLAST_RADIUS_CHECK --> PR_PROPOSAL_GENERATED : changed_files ⊆ allowed_paths
+    PR_PROPOSAL_GENERATED --> RESULT_SUBMITTED : PUT /api/triage/tasks/{task_id}/result
+    RESULT_SUBMITTED --> [*]
+
+    HASH_VERIFIED --> REJECTED : content_hash mismatch (TAMPER)
+    EXECUTING --> FAILED : Unrecoverable error
+    ACCEPTANCE_GATE --> FAILED : Command exit ≠ 0
+    BLAST_RADIUS_CHECK --> REJECTED : Disallowed file mutations detected
+    REJECTED --> [*]
+    FAILED --> [*]
+```
+
+> [!NOTE]
+> The lifecycle is **strictly linear and non-reversible**. There is no retry loop from `REJECTED` or `FAILED` back to any prior state. A failed or rejected task must be re-queued as a new task with a fresh `task_id`. This prevents infinite retry storms and ensures every execution attempt is independently auditable.
+
+**Design Principles:**
+
+| Principle | Enforcement |
+|---|---|
+| **Hermetic Isolation** | Every task executes in its own `git worktree`; no shared mutable state between concurrent workers |
+| **Fail-Closed** | Any gate failure (hash, blast radius, acceptance) terminates the pipeline with `REJECTED` or `FAILED` — never proceeds |
+| **Cryptographic Provenance** | Task content is hash-verified before execution begins; PR proposals carry the verified hash as metadata |
+| **Auditable Artifacts** | Every lifecycle transition emits a structured log entry; PR proposals are frozen dataclass instances |
+
+---
+
+#### 6.6.2 Cryptographic Pre-Execution Gate
+
+Before any worker begins modifying source code, the task payload undergoes mandatory SHA-256 content hash verification. This gate ensures that the task the worker executes is **byte-identical** to the task the triage engine approved.
+
+**Hash Calculation Algorithm:**
+
+```python
+import hashlib
+import json
+
+def calculate_content_hash(task: dict) -> str:
+    """
+    Deterministic SHA-256 hash of the canonical task payload.
+
+    Fields included (sorted, normalized):
+      - task_id, title, description, project_id, priority,
+      - allowed_paths, acceptance_commands, context_refs
+
+    Fields EXCLUDED (mutable metadata):
+      - status, assigned_to, leased_at, updated_at
+    """
+    hashable_fields = {
+        k: task[k] for k in sorted(task.keys())
+        if k not in {"status", "assigned_to", "leased_at", "updated_at", "result"}
+    }
+    canonical = json.dumps(hashable_fields, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+```
+
+**Gate Logic:**
+
+```python
+def verify_content_hash(task: dict) -> None:
+    """
+    Fail-closed hash verification. Zero retries on mismatch.
+    Raises TamperDetectedError immediately — no fallback path.
+    """
+    expected = task["content_hash"]
+    actual = calculate_content_hash(task)
+    if not hmac.compare_digest(expected, actual):
+        logger.critical(
+            "TAMPER_DETECTED",
+            task_id=task["task_id"],
+            expected_hash=expected,
+            actual_hash=actual,
+        )
+        raise TamperDetectedError(
+            task_id=task["task_id"],
+            expected=expected,
+            actual=actual,
+            retry_permitted=False,  # I-22: Zero retries on tampering
+        )
+```
+
+> [!CAUTION]
+> **Invariant I-22 is absolute.** If `content_hash` verification fails, the worker MUST terminate the task as `REJECTED` with reason `CONTENT_TAMPERED`. There is no retry, no re-fetch, no "maybe the hash was stale" path. The task is dead. A human operator or the triage engine must investigate and re-issue if appropriate. This is a **security boundary**, not a reliability optimization.
+
+**Timing-Safe Comparison:** The gate uses `hmac.compare_digest()` rather than `==` to prevent timing side-channel attacks against the hash comparison. While the threat model for internal worker dispatch is lower than for external APIs, defense-in-depth demands constant-time comparison at all cryptographic boundaries.
+
+---
+
+#### 6.6.3 Blast Radius & Worktree Isolation Invariants
+
+The blast radius containment system ensures that no worker can modify files outside its explicitly authorized scope. This is the **primary defense** against a misbehaving or compromised worker corrupting unrelated parts of the codebase.
+
+**Worktree Creation Protocol:**
+
+```python
+WORKTREE_BRANCH_PREFIX = "alpha/"
+
+async def create_isolated_worktree(task_id: str, base_ref: str = "main") -> Path:
+    """
+    Create a git worktree on branch alpha/{task_id}.
+    The worktree is the ONLY filesystem location the worker may write to.
+    """
+    branch_name = f"{WORKTREE_BRANCH_PREFIX}{task_id}"
+    worktree_path = WORKTREE_ROOT / task_id
+
+    await run_git(["worktree", "add", "-b", branch_name, str(worktree_path), base_ref])
+
+    # Verify worktree was created successfully
+    if not worktree_path.exists():
+        raise WorktreeCreationError(task_id=task_id)
+
+    return worktree_path
+```
+
+**Blast Radius Verification — `find_disallowed_changes`:**
+
+```python
+def find_disallowed_changes(
+    changed_files: list[str],
+    allowed_paths: list[str],
+) -> list[str]:
+    """
+    Returns list of changed files that are NOT covered by allowed_paths.
+
+    CRITICAL INVARIANT (I-23):
+      If allowed_paths is empty, ALL changes are disallowed.
+      An empty allowed_paths means "this task may not modify any files."
+
+    CRITICAL INVARIANT (I-24):
+      If changed_files is non-empty AND any file is not in allowed_paths,
+      the task MUST be rejected. No partial acceptance.
+    """
+    if not allowed_paths:
+        # I-23: Empty allowed_paths = zero modifications permitted
+        return list(changed_files)
+
+    disallowed = []
+    for filepath in changed_files:
+        if not any(_path_matches(filepath, pattern) for pattern in allowed_paths):
+            disallowed.append(filepath)
+
+    return disallowed
+```
+
+> [!WARNING]
+> **Empty `allowed_paths` is not a wildcard — it is a hard deny.** This is a deliberate design choice that inverts the common "empty = allow all" pattern. In a security-critical blast radius check, the safe default is **deny all**. If the triage engine intended the worker to modify files, it must explicitly enumerate the permitted paths. This prevents accidental unrestricted writes when `allowed_paths` is omitted or misconfigured.
+
+**Path Matching Rules:**
+
+| Pattern | Matches | Example |
+|---|---|---|
+| `src/api/routes.py` | Exact file only | `src/api/routes.py` ✅, `src/api/routes.pyc` ❌ |
+| `src/api/*` | All files directly in `src/api/` | `src/api/routes.py` ✅, `src/api/v2/routes.py` ❌ |
+| `src/api/**` | All files recursively under `src/api/` | `src/api/v2/routes.py` ✅, `tests/api/test.py` ❌ |
+| `*.py` | All Python files at any depth | `src/main.py` ✅, `README.md` ❌ |
+
+**Worktree Cleanup Protocol:**
+
+```python
+async def cleanup_worktree(task_id: str) -> None:
+    """
+    Remove worktree and prune branch after task completion.
+    Called unconditionally — success, failure, or rejection.
+    """
+    branch_name = f"{WORKTREE_BRANCH_PREFIX}{task_id}"
+    worktree_path = WORKTREE_ROOT / task_id
+
+    await run_git(["worktree", "remove", "--force", str(worktree_path)])
+    await run_git(["branch", "-D", branch_name])
+```
+
+---
+
+#### 6.6.4 Acceptance Gate Verification
+
+After the worker completes its modifications, the acceptance gate runs a set of pre-defined commands to verify the changes are correct. These commands are specified in the task payload and execute **within the worktree isolate**.
+
+**Safe Command Execution:**
+
+```python
+async def run_acceptance_commands(
+    commands: list[str],
+    worktree_path: Path,
+    timeout: float = 120.0,
+) -> AcceptanceResult:
+    """
+    Execute acceptance commands sequentially. ALL must pass.
+
+    CRITICAL (I-25): shell=True is NEVER used.
+    Commands are passed as argument lists to subprocess, not shell strings.
+
+    CRITICAL (I-26): Each command has a hard timeout of 120 seconds.
+    No command may run indefinitely. Timeout = failure.
+    """
+    evidence: list[CommandEvidence] = []
+
+    for cmd_str in commands:
+        cmd_args = shlex.split(cmd_str)  # Safe argument splitting
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd_args,
+                cwd=worktree_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                # I-25: No shell=True. Ever.
+            )
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=timeout,  # I-26: 120s hard ceiling
+            )
+        except asyncio.TimeoutError:
+            evidence.append(CommandEvidence(
+                command=cmd_str,
+                exit_code=-1,
+                stdout=b"",
+                stderr=b"TIMEOUT after 120s",
+                passed=False,
+            ))
+            return AcceptanceResult(passed=False, evidence=evidence)
+
+        passed = proc.returncode == 0
+        evidence.append(CommandEvidence(
+            command=cmd_str,
+            exit_code=proc.returncode,
+            stdout=stdout[-4096:],   # Truncate to last 4KB
+            stderr=stderr[-4096:],
+            passed=passed,
+        ))
+
+        if not passed:
+            return AcceptanceResult(passed=False, evidence=evidence)
+
+    return AcceptanceResult(passed=True, evidence=evidence)
+```
+
+> [!IMPORTANT]
+> **Why `shell=True` is banned (I-25):** Shell injection is the single most common vector for blast radius escape. A crafted task title like `fix bug; rm -rf /` would execute destructively if passed through a shell. By using `subprocess_exec` with argument lists, the command is invoked directly without shell interpretation. The `shlex.split()` call handles quoted arguments safely. This invariant has **no exceptions, no escape hatches, no admin override**.
+
+**Evidence Collection:**
+
+All acceptance command outputs are captured and attached to the `PRProposal` artifact. This serves two purposes:
+
+1. **Audit Trail:** Reviewers can verify what tests were run and what they produced
+2. **Debugging:** If a PR is later found defective, the acceptance evidence reveals what was (and wasn't) checked
+
+Evidence is truncated to the last 4KB per stream (stdout/stderr) to prevent memory exhaustion from pathologically verbose commands.
+
+---
+
+#### 6.6.5 Git Commit & PRProposal Structure
+
+Successfully validated changes are committed to the worktree branch and packaged into a `PRProposal` frozen dataclass for submission to the triage engine.
+
+**Conventional Commit Format:**
+
+```
+feat({project_id}): {title}
+
+Task-ID: {task_id}
+Content-Hash: {content_hash}
+Worker-ID: {worker_id}
+Acceptance-Passed: true
+Changed-Files: {count}
+```
+
+> [!NOTE]
+> The commit message format follows [Conventional Commits 1.0.0](https://www.conventionalcommits.org/). The `feat` prefix is used because all worker-generated changes represent feature delivery against a triage task. Bug fixes, refactors, and other change types are captured in the task `title` field, not the commit type prefix. This simplifies automated changelog generation and release note tooling.
+
+**PRProposal Frozen Dataclass:**
+
+```python
+from dataclasses import dataclass
+from typing import FrozenSet
+
+@dataclass(frozen=True)
+class PRProposal:
+    """
+    Immutable artifact representing a completed worker execution.
+
+    frozen=True ensures no field can be mutated after construction.
+    This is a SECURITY property, not just a style choice — it prevents
+    post-construction tampering with the proposal before submission.
+    """
+    # === Identity ===
+    task_id: str
+    project_id: str
+    worker_id: str
+
+    # === Content ===
+    title: str
+    description: str
+    branch_name: str                    # alpha/{task_id}
+    base_ref: str                       # typically "main"
+    commit_sha: str                     # SHA of the worktree commit
+
+    # === Provenance ===
+    content_hash: str                   # SHA-256 from pre-execution gate
+    changed_files: FrozenSet[str]       # Immutable set of modified paths
+
+    # === Verification ===
+    acceptance_passed: bool             # Must be True for submission
+    acceptance_evidence: tuple          # Frozen tuple of CommandEvidence
+
+    # === Metadata ===
+    created_at: str                     # ISO 8601 timestamp
+    execution_duration_seconds: float   # Wall-clock time for worker execution
+
+    def to_result_payload(self) -> dict:
+        """Serialize to API result payload for PUT /api/triage/tasks/{task_id}/result."""
+        return {
+            "status": "COMPLETED",
+            "result": {
+                "pr_proposal": {
+                    "branch": self.branch_name,
+                    "base": self.base_ref,
+                    "commit_sha": self.commit_sha,
+                    "title": f"feat({self.project_id}): {self.title}",
+                    "changed_files": sorted(self.changed_files),
+                    "content_hash": self.content_hash,
+                    "acceptance_passed": self.acceptance_passed,
+                    "evidence_count": len(self.acceptance_evidence),
+                    "execution_duration_s": self.execution_duration_seconds,
+                },
+                "worker_id": self.worker_id,
+                "completed_at": self.created_at,
+            },
+        }
+```
+
+**Field Immutability Rationale:**
+
+| Field Type | Why Frozen |
+|---|---|
+| `changed_files: FrozenSet[str]` | Prevents post-blast-radius-check injection of additional files |
+| `acceptance_evidence: tuple` | Prevents post-gate fabrication of passing evidence |
+| `content_hash: str` | Ensures the submitted hash matches the pre-execution verification |
+| All fields via `frozen=True` | Dataclass-level immutability prevents any field mutation after `__init__` |
+
+---
+
+#### 6.6.6 Emergency Stop & Watchdog Invariants
+
+The worker dispatch system must degrade gracefully under emergency conditions and must not allow stale or zombie task leases to block the pipeline.
+
+**Emergency Stop Behavior:**
+
+```python
+# Operations BLOCKED during emergency stop
+BLOCKED_OPERATIONS = {
+    "lease_task",           # No new work may be acquired
+    "create_worktree",      # No new worktrees may be created
+    "execute_task",         # No modifications may begin
+}
+
+# Operations PERMITTED during emergency stop (I-27)
+PERMITTED_OPERATIONS = {
+    "submit_result_complete",   # allow_during_emergency=True
+    "submit_result_failed",     # allow_during_emergency=True
+    "submit_result_rejected",   # allow_during_emergency=True
+    "cleanup_worktree",         # Must always be permitted for hygiene
+}
+```
+
+> [!WARNING]
+> **Invariant I-27: Terminal state transitions are ALWAYS permitted.** During an emergency stop, in-flight workers must be able to report their final status (`complete`, `failed`, or `rejected`). Blocking these transitions would create phantom tasks that appear "executing" forever, corrupting the task queue and requiring manual database intervention. The emergency stop halts **new** work, not **finishing** work.
+
+**Stale Task Watchdog — `reap_stale_executing_tasks`:**
+
+```python
+STALE_THRESHOLD_SECONDS = 900  # 15 minutes
+
+async def reap_stale_executing_tasks() -> list[str]:
+    """
+    Watchdog that identifies and force-fails tasks stuck in EXECUTING.
+
+    CRITICAL (I-28): A task in EXECUTING state for longer than
+    STALE_THRESHOLD_SECONDS is presumed dead. The watchdog:
+      1. Transitions the task to FAILED with reason WATCHDOG_REAPED
+      2. Cleans up the orphaned worktree
+      3. Emits a WATCHDOG_REAP structured log event
+
+    This prevents resource exhaustion from zombie workers.
+    """
+    now = datetime.utcnow()
+    stale_tasks = await db.find_tasks(
+        status="EXECUTING",
+        leased_before=now - timedelta(seconds=STALE_THRESHOLD_SECONDS),
+    )
+
+    reaped_ids = []
+    for task in stale_tasks:
+        await db.update_task_status(
+            task_id=task["task_id"],
+            status="FAILED",
+            reason="WATCHDOG_REAPED",
+            detail=f"Stale after {STALE_THRESHOLD_SECONDS}s with no result submission",
+        )
+        await cleanup_worktree(task["task_id"])
+        reaped_ids.append(task["task_id"])
+        logger.warning("WATCHDOG_REAP", task_id=task["task_id"])
+
+    return reaped_ids
+```
+
+**Forward Progress Invariant (I-29):**
+
+```
+IF emergency_stop IS active:
+  THEN no new task leases may be granted
+  AND  no new worktrees may be created
+  AND  no new executions may begin
+  BUT  terminal transitions (complete/fail/reject) MUST proceed
+  AND  watchdog reaping MUST continue
+
+IF emergency_stop IS cleared:
+  THEN normal lease/execute/submit cycle resumes within 1 polling interval
+```
+
+> [!NOTE]
+> The watchdog runs on a separate scheduling loop (default: every 60 seconds) and is **independent** of the emergency stop flag. Even during an emergency stop, the watchdog continues reaping stale tasks. This prevents a scenario where emergency stop is activated, workers die, and their tasks remain in `EXECUTING` forever because the watchdog was also paused.
+
+---
+
+#### 6.6.7 Worker Control Plane API & RBAC Matrix
+
+The worker dispatch system exposes two API endpoints for task lifecycle management. Both endpoints enforce role-based access control.
+
+**API Endpoints:**
+
+| Endpoint | Method | Purpose | Request Body |
+|---|---|---|---|
+| `/api/triage/tasks/lease` | `POST` | Acquire a lease on the next available `APPROVED` task | `{ "worker_id": str, "capabilities": list[str] }` |
+| `/api/triage/tasks/{task_id}/result` | `PUT` | Submit execution result (complete, failed, rejected) | `PRProposal.to_result_payload()` or failure payload |
+
+**Lease Acquisition Response:**
+
+```json
+{
+  "task_id": "t-2026-09-03-a1b2c3",
+  "status": "EXECUTING",
+  "leased_at": "2026-09-03T10:06:00Z",
+  "lease_expires_at": "2026-09-03T10:21:00Z",
+  "content_hash": "sha256:e3b0c44298fc...",
+  "title": "Add rate limiting to /api/chat endpoint",
+  "project_id": "alphabrain-core",
+  "allowed_paths": ["src/api/middleware/**", "src/api/routes/chat.py", "tests/api/**"],
+  "acceptance_commands": ["python -m pytest tests/api/ -x", "python -m mypy src/api/"]
+}
+```
+
+**RBAC Matrix:**
+
+| Operation | `FOUNDER` | `ADMIN` | `WORKER` | `VIEWER` |
+|---|---|---|---|---|
+| `POST /api/triage/tasks/lease` | ✅ | ✅ | ✅ | ❌ |
+| `PUT /api/triage/tasks/{task_id}/result` | ✅ | ✅ | ✅ (own tasks only) | ❌ |
+| View task status | ✅ | ✅ | ✅ (own tasks only) | ✅ |
+| Trigger emergency stop | ✅ | ✅ | ❌ | ❌ |
+| Clear emergency stop | ✅ | ❌ | ❌ | ❌ |
+| Force-reap stale tasks | ✅ | ✅ | ❌ | ❌ |
+| Modify `STALE_THRESHOLD_SECONDS` | ✅ | ❌ | ❌ | ❌ |
+
+> [!CAUTION]
+> **WORKER role is scoped to own tasks only.** A worker can only submit results for tasks it has leased. Attempting to submit a result for a task leased by another worker returns `403 Forbidden`. This prevents a compromised worker from poisoning another worker's task results. The ownership check compares `request.worker_id` against `task.assigned_to` and is enforced **server-side** — client-provided worker IDs are validated against the authenticated session.
+
+**Rate Limiting & Lease Fairness:**
+
+- Each worker may hold at most **1 active lease** at a time
+- Lease requests are served **FIFO** by task priority, then by `created_at`
+- A worker must submit a result (or be reaped by the watchdog) before acquiring a new lease
+- Lease endpoint returns `429 Too Many Requests` if the worker already holds an active lease
+
+---
+
+#### 6.6.8 P9.4 Invariant Table
+
+The following invariants are established by Milestone P9.4 and are **binding on all implementations**. Violation of any invariant is a **blocking defect** that must be resolved before merge.
+
+| ID | Invariant | Enforcement Point | Failure Mode |
+|---|---|---|---|
+| **I-21** | Worker lifecycle is strictly linear: `LEASE_ACQUIRED → HASH_VERIFIED → WORKTREE_CREATED → EXECUTING → ACCEPTANCE_GATE → BLAST_RADIUS_CHECK → PR_PROPOSAL → RESULT_SUBMITTED`. No backward transitions. | `WorkerLifecycleStateMachine` | `InvalidStateTransitionError` — task marked `FAILED` |
+| **I-22** | SHA-256 `content_hash` verification uses `hmac.compare_digest()`. Mismatch = `REJECTED` with reason `CONTENT_TAMPERED`. Zero retries. No fallback. | `verify_content_hash()` | `TamperDetectedError` — task immediately `REJECTED`, security alert emitted |
+| **I-23** | Empty `allowed_paths` means **zero modifications permitted**. It is NOT a wildcard. | `find_disallowed_changes()` | All `changed_files` returned as disallowed → task `REJECTED` |
+| **I-24** | If `find_disallowed_changes()` returns a non-empty list, the task is `REJECTED`. No partial acceptance of "within-bounds" files. | Blast radius gate | `BlastRadiusViolationError` — task `REJECTED` with disallowed file list |
+| **I-25** | `shell=True` is **never** passed to `subprocess`. All acceptance commands use `subprocess_exec` with `shlex.split()` argument lists. | `run_acceptance_commands()` | Code review gate — any `shell=True` usage is a blocking review finding |
+| **I-26** | Every acceptance command has a hard timeout of 120 seconds. Timeout = command failure = task `FAILED`. | `asyncio.wait_for(timeout=120.0)` | `asyncio.TimeoutError` caught → `AcceptanceResult(passed=False)` |
+| **I-27** | Terminal state transitions (`complete`, `failed`, `rejected`) are permitted during emergency stop via `allow_during_emergency=True`. | Emergency stop gate | Terminal transitions bypass the emergency check; only new work is blocked |
+| **I-28** | Tasks in `EXECUTING` state for longer than `STALE_THRESHOLD_SECONDS` (default 900s) are force-transitioned to `FAILED` by the watchdog with reason `WATCHDOG_REAPED`. | `reap_stale_executing_tasks()` | Automatic — watchdog runs on independent 60s scheduling loop |
+| **I-29** | During emergency stop, the watchdog continues operating. Emergency stop blocks new leases/worktrees/executions but never blocks reaping or terminal transitions. | Watchdog scheduling loop | Watchdog is unconditionally scheduled; not gated by emergency flag |
+| **I-30** | A `WORKER` role can only submit results for tasks where `task.assigned_to == request.worker_id`. Cross-worker result submission returns `403`. Ownership is validated server-side against the authenticated session. | RBAC middleware on `PUT /api/triage/tasks/{task_id}/result` | `403 Forbidden` — request rejected, security audit log emitted |
+
+> [!TIP]
+> **Testing Invariants:** Each invariant in I-21 through I-30 must have a corresponding test case in `tests/unit/test_worker_dispatch.py` and `tests/integration/test_worker_pipeline.py`. The invariant ID should appear in the test name (e.g., `test_I22_content_hash_tamper_detection`). CI must gate on 100% invariant test coverage before any worker dispatch code merges to `main`.
+
+---
+
+**P9.4 Approval Signature:**
+
+```
+Milestone:  P9.4 — Worker Dispatch, Blast Radius Containment & PR Generation
+Status:     APPROVED
+Approved:   2026-09-03T15:36:04+05:30
+Authority:  Senior Architect (Opus)
+Invariants: I-21 through I-30 (10 invariants, all binding)
+Next:       P9.5 — End-to-End Pipeline Integration & Chaos Testing
+```
