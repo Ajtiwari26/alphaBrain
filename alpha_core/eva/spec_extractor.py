@@ -129,19 +129,36 @@ JSON SCHEMA:
 
         parsed: dict[str, Any] | None = None
 
-        # 1. Primary: Use AGY CLI via active Google Cloud Code account (free Pro quota)
-        raw_text = self._call_agy(prompt)
-        if raw_text:
+        # 1. Injected client (e.g. unit tests or explicit client configuration)
+        if self.client is not None:
             try:
-                parsed = self._parse_json_payload(raw_text)
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        "temperature": 0.1,
+                    },
+                )
+                text = response.text or ""
+                parsed = json.loads(text)
             except Exception as e:
-                logger.warning("Failed to parse AGY JSON response: %s", e)
+                logger.error("Failed to extract specification via injected client: %s", e)
+                return None
 
-        # 2. Secondary fallback: Use GenAI client only if AGY failed or is unavailable
+        # 2. Primary: Use AGY CLI via active Google Cloud Code account (free Pro quota)
+        if parsed is None:
+            raw_text = self._call_agy(prompt)
+            if raw_text:
+                try:
+                    parsed = self._parse_json_payload(raw_text)
+                except Exception as e:
+                    logger.warning("Failed to parse AGY JSON response: %s", e)
+
+        # 3. Secondary fallback: Use GenAI client only if AGY failed or is unavailable
         if parsed is None and self.api_key:
             try:
-                if self.client is None:
-                    self.client = genai.Client(api_key=self.api_key)
+                self.client = genai.Client(api_key=self.api_key)
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=prompt,

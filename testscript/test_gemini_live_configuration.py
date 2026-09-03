@@ -12,7 +12,10 @@ from alpha_meet.eva_live_agent import EvaRoomManager
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GOOGLE_KEY_PATTERN = re.compile(r"AIza[A-Za-z0-9_-]{30,}")
-INTENTIONAL_SECRET_FIXTURES = {Path("testscript/test_rbac_and_redaction.py")}
+INTENTIONAL_SECRET_FIXTURES = {
+    Path("testscript/test_rbac_and_redaction.py"),
+    Path("testscript/test_project_event_log_api.py"),
+}
 
 
 def test_gemini_live_uses_supported_native_audio_model():

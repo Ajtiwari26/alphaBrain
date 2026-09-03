@@ -307,13 +307,13 @@ async def test_fake_passed_embedded_evidence_routes_to_waiting_approval(
     submitted = await TaskEngine.submit_result(
         async_db, result, task_rec.lease_token, "worker-fake"
     )
-    # Under P4.1-R1, executor-supplied independent review evidence is rejected at submit_result
-    assert submitted is False
+    # Embedded evidence does not bypass review, task routes to waiting_approval
+    assert submitted is True
 
-    # Task is not completed
+    # Task is not completed, routes to waiting_approval
     t = await async_db.get(TaskRecord, task_id)
     assert t is not None
-    assert t.status != TaskStatus.COMPLETED.value
+    assert t.status == TaskStatus.WAITING_APPROVAL.value
 
 
 # ---------------------------------------------------------------------------
