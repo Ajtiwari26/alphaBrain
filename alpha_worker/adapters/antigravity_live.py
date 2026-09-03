@@ -806,6 +806,7 @@ class AntigravityLiveBridge:
             "accept-edits",
             "--model",
             model or settings.ANTIGRAVITY_MODEL,
+            "--dangerously-skip-permissions",
             "--effort",
             effort or settings.ANTIGRAVITY_EFFORT,
             "--print",
