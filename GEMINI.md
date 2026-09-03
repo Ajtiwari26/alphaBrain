@@ -2,11 +2,14 @@
 
 1. **Mandatory Senior Review After Completion**:
    Always review completed tasks from senior engineering review after completion via Pro or Opus depending on limit remaining calculated via `agy-switch list` and `agy-switch check <email>`.
-   - **Mathematical Baseline (Opportunity-Cost / Earliest-Deadline Scheduling):** Calculate the Utility Score ($U$) for each account:
-     $$U_i = \begin{cases} -\infty, & \text{if } W_i \le 0.0 \\ \left[ \frac{\ln(1 + W_i)}{T_{w,i} + 1.0} \right] \cdot \left( \sqrt{\max(0, F_i)} + \frac{2.0}{T_{f,i} + 1.0} \right), & \text{if } W_i > 0.0 \end{cases}$$
-     where $W_i$ and $F_i$ are weekly and 5-hour limits (%), $T_{w,i}$ is days/hours to weekly reset, and $T_{f,i}$ is hours to 5-hour reset.
-   - **Smooth Non-Disqualifying 5-Hour Scaling:** An account is disqualified ($-\infty$) ONLY when weekly quota is completely zero ($W_i \le 0$). Low 5-hour limits never disqualify an account; the $\frac{2.0}{T_{f,i} + 1.0}$ term smoothly rewards accounts whose 5-hour limit refreshes sooner.
-   - You MUST `agy-switch` to the account with $\arg\max U_i$ and invoke `claude-opus-4-6-thinking`.
+   - **Mathematical Baseline (Tiered Opportunity-Cost / Earliest-Deadline Scheduling):** Calculate the Utility Score ($U$) for each account across 3 strict priority tiers:
+     - **Tier 1 (Idle First):** If an account is untouched ($W_i \ge 99.0\%$ with weekly countdown timer unstarted), $U_i = 1000.0 + F_i$. These accounts MUST be routed to first for productive tasks to "break the seal" and trigger their 7-day weekly refresh countdown clock.
+     - **Tier 2 (Expiring $\le 2$ Days):** If $0 < T_{w,i} \le 2.0\text{ days}$ and $W_i > 0.0$, $U_i = 100.0 + \left[ \frac{100.0}{T_{w,i} + 0.1} \right] \cdot \left[ \frac{\sqrt{\max(0.1, W_i)}}{10.0} \right]$. Prioritizes consuming expiring quota before the weekly window refreshes.
+     - **Tier 3 (Normal OC-EDS Rotation):** For all other active accounts ($T_{w,i} > 2.0\text{ days}$ and $W_i > 0.0$):
+       $$U_i = \left[ \frac{\ln(1 + W_i)}{T_{w,i} + 1.0} \right] \cdot \left( \sqrt{\max(0, F_i)} + \frac{2.0}{T_{f,i} + 1.0} \right)$$
+     - **Tier 4 (Disqualified):** If $W_i \le 0.0\%$, $U_i = -\infty$.
+   - **Smooth Non-Disqualifying 5-Hour Scaling:** An account is disqualified ($-\infty$) ONLY when weekly quota is completely zero ($W_i \le 0$). Low 5-hour limits never disqualify an account.
+   - You MUST `agy-switch` to the account with $\arg\max U_i$ (or run `agy-switch plan`) and invoke `claude-opus-4-6-thinking`.
    - **Mid-Level Fallback:** If and ONLY IF all accounts have $W_i \le 0.0\%$ (all $U_i = -\infty$), fallback to Gemini Pro (`gemini-3.1-pro-high`) as a mid-level engineer for the review.
 
 2. **Canonical Architecture & Conflict Resolution Authority (Opus Exclusive Authoring)**:
