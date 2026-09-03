@@ -191,14 +191,14 @@ class WorktreeManager:
 
     def get_uncommitted_files(self, worktree_path: Path) -> list[str]:
         """Returns list of modified or untracked files currently uncommitted in the worktree."""
-        output = self._git(worktree_path, ["status", "--porcelain"])
+        output = self._git(worktree_path, ["status", "--porcelain", "-uall"])
         files = []
         for line in output.splitlines():
             line = line.strip()
             if line:
                 parts = line.split(maxsplit=1)
                 if len(parts) == 2:
-                    files.append(parts[1])
+                    files.append(parts[1].strip('"'))
         return files
 
     def get_changed_files(self, worktree_path: Path, base_commit: str = "HEAD") -> list[str]:

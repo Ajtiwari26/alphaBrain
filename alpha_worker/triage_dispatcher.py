@@ -92,8 +92,13 @@ class TriageTaskDispatcher:
         Executes a shell command safely inside the worktree directory without shell=True.
         """
         exec_cmd = list(cmd)
-        if exec_cmd and exec_cmd[0] == "python" and not shutil.which("python"):
-            exec_cmd[0] = sys.executable
+        if exec_cmd:
+            if exec_cmd[0] == "python" and not shutil.which("python"):
+                exec_cmd[0] = sys.executable
+            elif not shutil.which(exec_cmd[0]):
+                venv_bin = Path(sys.executable).parent / exec_cmd[0]
+                if venv_bin.exists():
+                    exec_cmd[0] = str(venv_bin)
 
         try:
             res = subprocess.run(
@@ -162,13 +167,15 @@ class TriageTaskDispatcher:
     def get_git_diff_and_changed_files(self, worktree_path: Path) -> tuple[list[str], str]:
         """Inspects git status and diff inside the worktree."""
         # 1. Changed files
-        ret, out, _ = self.run_command_in_worktree(worktree_path, ["git", "status", "--porcelain"])
+        ret, out, _ = self.run_command_in_worktree(
+            worktree_path, ["git", "status", "--porcelain", "-uall"]
+        )
         changed_files: list[str] = []
         if ret == 0 and out.strip():
             for line in out.strip().splitlines():
                 parts = line.strip().split(maxsplit=1)
                 if len(parts) == 2:
-                    changed_files.append(parts[1])
+                    changed_files.append(parts[1].strip('"'))
 
         # 2. Diff stat
         _, stat_out, _ = self.run_command_in_worktree(worktree_path, ["git", "diff", "--stat"])
