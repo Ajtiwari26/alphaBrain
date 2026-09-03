@@ -1,10 +1,12 @@
 import asyncio
+import base64
 import json
 import logging
 import re
 import time
 import uuid
 from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 from urllib.parse import parse_qsl, quote, urlsplit, urlunsplit
@@ -15,6 +17,7 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
+    Query,
     Request,
     Response,
     WebSocket,
@@ -25,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alpha_core.config import settings
@@ -47,6 +50,7 @@ from alpha_core.security import (
     create_scoped_stream_token,
     create_worker_identity_token,
     plivo_nonce_cache,
+    redact_dict,
     redact_secrets,
     require_api_principal,
     require_permission,
@@ -1058,6 +1062,307 @@ async def get_project_progress(
 
 
 # ==========================================
+# Durable Project Event Log Endpoints
+# ==========================================
+
+EVENT_CATEGORY_MAP: dict[str, str] = {
+    # project
+    "project_created": "project",
+    "project_updated": "project",
+    "project_deleted": "project",
+    "spec_submitted": "project",
+    "spec_approved": "project",
+    "spec_rejected": "project",
+    "spec_extracted": "project",
+    "decision_logged": "project",
+    "open_question_logged": "project",
+    "open_question_resolved": "project",
+    "task_graph_generated": "project",
+    "task_graph_draft_saved": "project",
+    "task_graph_submitted": "project",
+    "approval_decided": "project",
+    # task
+    "task_created": "task",
+    "task_queued": "task",
+    "task_leased": "task",
+    "task_completed": "task",
+    "task_failed": "task",
+    "task_cancelled": "task",
+    "task_canceled": "task",
+    "task_retry": "task",
+    "task_promoted": "task",
+    "task_blocked": "task",
+    "task_reset": "task",
+    "task_attempt_started": "task",
+    "task_attempt_completed": "task",
+    # work
+    "task_heartbeat": "work",
+    "task_checkpoint": "work",
+    "checkpoint_recorded": "work",
+    "worktree_created": "work",
+    "worker_registered": "work",
+    "worker_heartbeat": "work",
+    "worker_assigned": "work",
+    # qa
+    "gate_evidence_submitted": "qa",
+    "qa_review_passed": "qa",
+    "qa_review_failed": "qa",
+    "lint_passed": "qa",
+    "lint_failed": "qa",
+    "test_passed": "qa",
+    "test_failed": "qa",
+    "gate_passed": "qa",
+    "gate_failed": "qa",
+    "review_submitted": "qa",
+    # preview
+    "preview_ready": "preview",
+    "preview_deployed": "preview",
+    "preview_stopped": "preview",
+    "preview_url_generated": "preview",
+    "deployment_started": "preview",
+    "deployment_completed": "preview",
+    # incident
+    "watchdog_stalled": "incident",
+    "worker_failed": "incident",
+    "task_stalled": "incident",
+    "circuit_breaker_tripped": "incident",
+    "worker_crash": "incident",
+    "security_violation": "incident",
+    "lease_expired": "incident",
+    "lease_revoked": "incident",
+    "watchdog_alert": "incident",
+}
+
+VALID_EVENT_CATEGORIES = frozenset({"project", "task", "work", "qa", "preview", "incident"})
+
+
+def classify_event_category(event_type: str) -> str:
+    if event_type in EVENT_CATEGORY_MAP:
+        return EVENT_CATEGORY_MAP[event_type]
+    if (
+        event_type.startswith("project_")
+        or event_type.startswith("spec_")
+        or event_type.startswith("decision_")
+        or event_type.startswith("approval_")
+    ):
+        return "project"
+    if (
+        event_type.startswith("task_")
+        and not event_type.startswith("task_heartbeat")
+        and not event_type.startswith("task_checkpoint")
+    ):
+        return "task"
+    if (
+        event_type.startswith("gate_")
+        or event_type.startswith("qa_")
+        or event_type.startswith("test_")
+        or event_type.startswith("lint_")
+    ):
+        return "qa"
+    if event_type.startswith("preview_") or event_type.startswith("deployment_"):
+        return "preview"
+    if (
+        event_type.startswith("watchdog_")
+        or "incident" in event_type
+        or "stall" in event_type
+        or "breaker" in event_type
+        or "crash" in event_type
+        or "violation" in event_type
+    ):
+        return "incident"
+    return "work"
+
+
+def encode_event_cursor(timestamp: datetime, event_id: str) -> str:
+    payload = {"timestamp": timestamp.isoformat(), "id": event_id}
+    return base64.b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8")
+
+
+def decode_event_cursor(cursor_str: str) -> tuple[datetime, str]:
+    try:
+        raw_bytes = base64.b64decode(cursor_str.encode("ascii"), validate=True)
+        payload = json.loads(raw_bytes.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("Payload must be a JSON dictionary")
+        if "id" not in payload or "timestamp" not in payload:
+            raise ValueError("Missing 'id' or 'timestamp'")
+        event_id = str(payload["id"])
+        if not event_id:
+            raise ValueError("Event id cannot be empty")
+        ts_str = str(payload["timestamp"])
+        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt, event_id
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid pagination cursor: {exc}",
+        ) from exc
+
+
+def sanitize_client_event_details(details: dict[str, Any], depth: int = 0) -> dict[str, Any]:
+    if depth > 10:
+        return {}
+    cleaned = redact_dict(details)
+    excluded_terms = (
+        "secret",
+        "token",
+        "password",
+        "key",
+        "auth",
+        "telemetry",
+        "prompt",
+        "path",
+        "worktree",
+        "repo",
+        "storage",
+        "lease",
+        "worker",
+        "cost",
+        "sha256",
+        "internal",
+    )
+    result: dict[str, Any] = {}
+    for k, v in cleaned.items():
+        k_lower = k.lower().replace("-", "_")
+        if any(term in k_lower for term in excluded_terms):
+            continue
+        if isinstance(v, dict):
+            sub = sanitize_client_event_details(v, depth + 1)
+            if sub:
+                result[k] = sub
+        elif isinstance(v, str):
+            if "/" in v and ("Users" in v or "repos" in v or "alphaBrain" in v):
+                continue
+            result[k] = redact_secrets(v)
+        elif isinstance(v, list):
+            sanitized_list = []
+            for item in v:
+                if isinstance(item, dict):
+                    sub = sanitize_client_event_details(item, depth + 1)
+                    if sub:
+                        sanitized_list.append(sub)
+                elif isinstance(item, str):
+                    if not ("/" in item and ("Users" in item or "repos" in item)):
+                        sanitized_list.append(redact_secrets(item))
+                else:
+                    sanitized_list.append(item)
+            result[k] = sanitized_list
+        else:
+            result[k] = v
+    return result
+
+
+@app.get("/api/projects/{project_id}/events")
+async def get_project_events(
+    project_id: str,
+    limit: int = Query(default=25, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    _principal: AuthPrincipal = Depends(require_api_principal),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    require_permission(_principal, "audit:read")
+    require_project_access(_principal, project_id)
+
+    # 1. Verify project exists
+    project = await session.get(ProjectRecord, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project '{project_id}' not found",
+        )
+
+    # 2. Validate category if provided
+    if category is not None and category not in VALID_EVENT_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid event category: '{category}'. Valid categories are: {sorted(VALID_EVENT_CATEGORIES)}",
+        )
+
+    # 3. Build query
+    query = select(AuditEventRecord).where(AuditEventRecord.project_id == project_id)
+
+    if category:
+        if category == "work":
+            other_types = [k for k, v in EVENT_CATEGORY_MAP.items() if v != "work"]
+            work_types = [k for k, v in EVENT_CATEGORY_MAP.items() if v == "work"]
+            query = query.where(
+                or_(
+                    AuditEventRecord.event_type.in_(work_types),
+                    ~AuditEventRecord.event_type.in_(other_types),
+                )
+            )
+        else:
+            cat_types = [k for k, v in EVENT_CATEGORY_MAP.items() if v == category]
+            query = query.where(AuditEventRecord.event_type.in_(cat_types))
+
+    if cursor:
+        cursor_dt, cursor_id = decode_event_cursor(cursor)
+        query = query.where(
+            or_(
+                AuditEventRecord.timestamp < cursor_dt,
+                and_(
+                    AuditEventRecord.timestamp == cursor_dt,
+                    AuditEventRecord.id < cursor_id,
+                ),
+            )
+        )
+
+    query = query.order_by(AuditEventRecord.timestamp.desc(), AuditEventRecord.id.desc()).limit(
+        limit + 1
+    )
+
+    result = await session.execute(query)
+    records = result.scalars().all()
+
+    has_more = len(records) > limit
+    page_records = records[:limit]
+
+    next_cursor = None
+    if has_more and page_records:
+        last_rec = page_records[-1]
+        if last_rec.timestamp:
+            next_cursor = encode_event_cursor(last_rec.timestamp, last_rec.id)
+
+    # Format events according to viewer principal role
+    formatted_events = []
+    for rec in page_records:
+        rec_cat = classify_event_category(rec.event_type)
+        raw_details = rec.details_json if isinstance(rec.details_json, dict) else {}
+
+        if _principal.role == PrincipalRole.CLIENT:
+            actor = "system"
+            actor_role = "system"
+            details = sanitize_client_event_details(raw_details)
+        else:
+            actor = rec.actor
+            actor_role = rec.actor_role
+            details = redact_dict(raw_details)
+
+        formatted_events.append(
+            {
+                "id": rec.id,
+                "project_id": rec.project_id,
+                "task_id": rec.task_id,
+                "event_type": rec.event_type,
+                "category": rec_cat,
+                "actor": actor,
+                "actor_role": actor_role,
+                "details": details,
+                "timestamp": rec.timestamp.isoformat() if rec.timestamp else None,
+            }
+        )
+
+    return {
+        "events": formatted_events,
+        "returned_count": len(formatted_events),
+        "next_cursor": next_cursor,
+    }
+
+
+# ==========================================
 # Specification Intelligence Endpoints
 # ==========================================
 
@@ -1190,7 +1495,6 @@ async def plivo_media_websocket(websocket: WebSocket):
 
 
 import hashlib  # noqa: E402
-from datetime import UTC, datetime  # noqa: E402
 
 from alpha_core.db.models import TaskCheckpointRecord  # noqa: E402
 from alpha_protocol.task import (  # noqa: E402

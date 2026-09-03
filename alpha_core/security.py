@@ -576,16 +576,16 @@ plivo_nonce_cache = NonceReplayCache()
 
 # Patterns that look like secrets: API keys, tokens, passwords, signing secrets
 _SECRET_PATTERNS = [
-    re.compile(r"(AIza[A-Za-z0-9_-]{35})", re.ASCII),  # Google API key
-    re.compile(r"(sk-[A-Za-z0-9]{20,})", re.ASCII),  # OpenAI/generic
+    re.compile(r"(AIza[A-Za-z0-9_-]{20,})", re.ASCII),  # Google API key
+    re.compile(r"(sk-[A-Za-z0-9_-]{15,})", re.ASCII),  # OpenAI/generic
     re.compile(r"(AQ\.[A-Za-z0-9_-]{10,})", re.ASCII),  # Stitch API key
-    re.compile(r"(ghp_[A-Za-z0-9]{36,})", re.ASCII),  # GitHub PAT
+    re.compile(r"(ghp_[A-Za-z0-9_-]{20,})", re.ASCII),  # GitHub PAT
     re.compile(r"(Bearer\s+[A-Za-z0-9._-]{20,})", re.ASCII),  # Bearer tokens
     re.compile(r"(-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----)", re.ASCII),  # Private keys
 ]
 
 _KV_SECRET_PATTERN = re.compile(
-    r"(?i)\b([A-Za-z0-9_-]*(?:token|secret|api[_-]?key|password|auth|access|signing)[A-Za-z0-9_-]*)(\s*[=:]\s*)([^\s,;\"'}{]+)",
+    r"(?i)\b([A-Za-z0-9_-]*(?:token|secret|api[_-]?key|password|auth|access|signing|pat)[A-Za-z0-9_-]*)(\s*[=:]\s*)([^\s,;\"'}{]+)",
     re.ASCII,
 )
 
@@ -607,6 +607,10 @@ _SECRET_FIELD_NAMES = frozenset(
         "alpha_signing_secret",
         "gemini_api_key",
         "plivo_auth_token",
+        "google_key",
+        "stitch_key",
+        "openai_key",
+        "github_pat",
     }
 )
 
@@ -629,7 +633,15 @@ def redact_dict(data: dict[str, Any], depth: int = 0) -> dict[str, Any]:
     cleaned: dict[str, Any] = {}
     for key, value in data.items():
         key_lower = key.lower().replace("-", "_")
-        if key_lower in _SECRET_FIELD_NAMES or "secret" in key_lower or "password" in key_lower:
+        if (
+            key_lower in _SECRET_FIELD_NAMES
+            or "secret" in key_lower
+            or "password" in key_lower
+            or "token" in key_lower
+            or "api_key" in key_lower
+            or "pat" in key_lower
+            or "bearer" in key_lower
+        ):
             cleaned[key] = REDACTED
         elif isinstance(value, dict):
             cleaned[key] = redact_dict(value, depth + 1)

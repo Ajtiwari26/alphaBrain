@@ -1,3 +1,4 @@
+import sys
 """Official AGY CLI bridge for one isolated Alpha Brain project conversation."""
 
 import asyncio
@@ -439,6 +440,16 @@ def evaluate_agy_execution_outcome(
 
 
 class AntigravityLiveBridge:
+    @staticmethod
+    def _resolve_executable(exe: str) -> str:
+        import sys
+        from pathlib import Path
+        bin_dir = Path(sys.executable).parent
+        resolved = bin_dir / exe
+        if resolved.exists():
+            return str(resolved)
+        return exe
+
     """Runs project-scoped tasks through AGY CLI; never IDE/private database scraping."""
 
     def __init__(self) -> None:
@@ -815,6 +826,7 @@ class AntigravityLiveBridge:
             stdout_path = Path(log_dir) / "stdout.ndjson"
             stderr_path = Path(log_dir) / "stderr.log"
             with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
+                print("DEBUG AGY ARGS:", args, file=sys.stderr)
                 process = subprocess.Popen(
                     args,
                     cwd=str(worktree_path),
@@ -1001,7 +1013,7 @@ class AntigravityLiveBridge:
         )
         declared_commands = (
             "\n".join(
-                f"- {command.gate_type.value}: {' '.join([command.executable, *command.args])}"
+                f"- {command.gate_type.value}: {' '.join([self._resolve_executable(command.executable), *command.args])}"
                 for command in task.acceptance_plan.commands
             )
             or "- No executable gates declared"
@@ -1074,7 +1086,7 @@ The supervisor controls retries. The junior never reruns uncontrolled loops inte
         )
         declared_commands = (
             "\n".join(
-                f"- {command.gate_type.value}: {' '.join([command.executable, *command.args])}"
+                f"- {command.gate_type.value}: {' '.join([self._resolve_executable(command.executable), *command.args])}"
                 for command in task.acceptance_plan.commands
             )
             or "- No executable gates declared"
