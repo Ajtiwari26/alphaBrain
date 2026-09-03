@@ -110,12 +110,11 @@ class TriageTaskDispatcher:
         """
         exec_cmd = list(cmd)
         if exec_cmd:
-            if exec_cmd[0] == "python" and not shutil.which("python"):
+            venv_bin = Path(sys.executable).parent / exec_cmd[0]
+            if venv_bin.exists():
+                exec_cmd[0] = str(venv_bin)
+            elif exec_cmd[0] == "python":
                 exec_cmd[0] = sys.executable
-            elif not shutil.which(exec_cmd[0]):
-                venv_bin = Path(sys.executable).parent / exec_cmd[0]
-                if venv_bin.exists():
-                    exec_cmd[0] = str(venv_bin)
 
         try:
             res = subprocess.run(
