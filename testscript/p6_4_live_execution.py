@@ -88,7 +88,7 @@ async def main():
                 task = r.json()
                 status = task.get("status")
                 print(f"Status: {status}", flush=True)
-                if status in ("completed", "failed", "blocked"):
+                if status in ("completed", "failed", "blocked", "verified"):
                     print(f"Final status: {status}", flush=True)
                     
                     # Get execution events
@@ -98,7 +98,7 @@ async def main():
                             json.dump(r_events.json(), f, indent=2)
                         print("Trace saved to testscript/evidence/p6_4_trace.json", flush=True)
                     
-                    if status == "completed":
+                    if status in ("completed", "verified"):
                         print("P6.4 PROOF SUCCESSFUL", flush=True)
                         return
                     else:
