@@ -16,6 +16,8 @@ docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 6.5)
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import dataclasses
 import hashlib
 import json
@@ -24,11 +26,15 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any, cast
 
+from alpha_core.config import settings
 from alpha_core.queue.triage_queue import TaskTriageQueue
-from alpha_protocol import GateType
+from alpha_protocol import AgentType, GateType, RiskClass, TaskEnvelope
+from alpha_worker.adapters.antigravity import AntigravityAdapter
+from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
 from alpha_worker.worktree import WorktreeManager
 
 logger = logging.getLogger("alpha_worker.triage_dispatcher")
@@ -65,10 +71,21 @@ class TriageTaskDispatcher:
         queue: TaskTriageQueue,
         worktree_mgr: WorktreeManager | None = None,
         default_base_commit: str = "HEAD",
+        live_bridge: AntigravityLiveBridge | None = None,
+        adapter: AntigravityAdapter | None = None,
+        enable_agent_execution: bool | None = None,
     ) -> None:
         self.queue = queue
         self.worktree_mgr = worktree_mgr or WorktreeManager()
         self.default_base_commit = default_base_commit
+        self.live_bridge = live_bridge or AntigravityLiveBridge()
+        self.adapter = adapter or AntigravityAdapter()
+        if enable_agent_execution is not None:
+            self.enable_agent_execution = enable_agent_execution
+        else:
+            self.enable_agent_execution = (
+                settings.ENV != "test"
+            ) and settings.ANTIGRAVITY_EXECUTION_ENABLED
 
     def lease_task(self) -> dict[str, Any] | None:
         """
@@ -245,10 +262,18 @@ class TriageTaskDispatcher:
         computed_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
         stored_hash = leased_task.get("content_hash")
         if stored_hash and computed_hash != stored_hash:
-            err_msg = f"Security Violation: Content hash mismatch on task {task_id}! (stored: {stored_hash}, computed: {computed_hash})"
-            logger.critical(err_msg)
-            self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
-            return None
+            from alpha_core.eva.queue_producer import EvaQueueProducer
+
+            eva_hash = EvaQueueProducer.compute_content_hash(
+                title=envelope.get("title") or envelope.get("objective") or "",
+                acceptance_criteria=envelope.get("acceptance_criteria") or [],
+                allowed_paths=envelope.get("allowed_paths") or [],
+            )
+            if eva_hash != stored_hash:
+                err_msg = f"Security Violation: Content hash mismatch on task {task_id}! (stored: {stored_hash}, computed: {computed_hash})"
+                logger.critical(err_msg)
+                self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                return None
 
         # 2. Provision isolated worktree
         branch_name = f"alpha/{task_id}"
@@ -268,6 +293,33 @@ class TriageTaskDispatcher:
         worktree_path = worktree_path_obj
 
         try:
+            # 2.5. Launch the local AGY coding agent inside the worktree if enabled
+            if self.enable_agent_execution:
+                ready, reason = self.live_bridge.check_readiness()
+                if ready:
+                    logger.info(
+                        "Launching local AGY coding agent inside worktree: %s", worktree_path
+                    )
+                    try:
+                        task_env = self._build_task_envelope(leased_task, worktree_path)
+                        attempt_id = f"att_{task_id}_{uuid.uuid4().hex[:6]}"
+                        session_dir = self.adapter.setup_session_in_memory_graph(
+                            task_env, worktree_path
+                        )
+                        dispatch_res = self._run_async_dispatch(
+                            task_env, worktree_path, attempt_id, session_dir
+                        )
+                        logger.info(
+                            "AGY agent completed turn for %s. Completed: %s, changed files: %s",
+                            task_id,
+                            dispatch_res.completed,
+                            dispatch_res.changed_files,
+                        )
+                    except Exception as agy_err:
+                        logger.error("AGY coding agent error on task %s: %s", task_id, agy_err)
+                else:
+                    logger.warning("AGY execution enabled but bridge not ready: %s", reason)
+
             # 3. Check for worktree modifications and diff
             changed_files, diff_stat = self.get_git_diff_and_changed_files(worktree_path)
             allowed_paths = envelope.get("allowed_paths", [])
@@ -345,3 +397,64 @@ class TriageTaskDispatcher:
         if not leased:
             return None
         return self.execute_task(leased)
+
+    def _build_task_envelope(
+        self, leased_task: dict[str, Any], worktree_path: Path
+    ) -> TaskEnvelope:
+        env_dict = dict(leased_task["envelope"])
+        task_id = leased_task["id"]
+        env_dict.setdefault("task_id", task_id)
+        env_dict.setdefault("project_id", "alphabrain_triage")
+        env_dict.setdefault("repo", str(worktree_path))
+        env_dict.setdefault("base_commit", self.default_base_commit)
+        env_dict.setdefault("preferred_agent", AgentType.ANTIGRAVITY)
+        env_dict.setdefault("risk_class", RiskClass.LOW)
+
+        acc_plan = env_dict.get("acceptance_plan")
+        if isinstance(acc_plan, dict):
+            cmds = acc_plan.get("commands", [])
+            formatted_cmds = []
+            for cmd in cmds:
+                if isinstance(cmd, dict):
+                    c = dict(cmd)
+                    c.setdefault("gate_type", GateType.UNIT_TEST.value)
+                    formatted_cmds.append(c)
+                elif isinstance(cmd, str):
+                    parts = cmd.split()
+                    formatted_cmds.append(
+                        {
+                            "gate_type": GateType.UNIT_TEST.value,
+                            "executable": parts[0] if parts else "pytest",
+                            "args": parts[1:] if len(parts) > 1 else [],
+                        }
+                    )
+            acc_plan["commands"] = formatted_cmds
+        else:
+            env_dict["acceptance_plan"] = {
+                "commands": [{"gate_type": "unit_test", "executable": "pytest", "args": ["-q"]}],
+                "required_gates": ["unit_test"],
+            }
+        return TaskEnvelope.model_validate(env_dict)
+
+    def _run_async_dispatch(
+        self,
+        task: TaskEnvelope,
+        worktree_path: Path,
+        attempt_id: str,
+        session_dir: Path | None = None,
+    ) -> Any:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(
+                    asyncio.run,
+                    self.live_bridge.dispatch(task, worktree_path, attempt_id, session_dir),
+                ).result()
+        else:
+            return asyncio.run(
+                self.live_bridge.dispatch(task, worktree_path, attempt_id, session_dir)
+            )

@@ -37,8 +37,8 @@ class EvaQueueProducer:
         self.queue = queue
         self.task_proposer = task_proposer or EvaTaskProposer()
 
+    @staticmethod
     def compute_content_hash(
-        self,
         title: str,
         acceptance_criteria: list[str],
         allowed_paths: list[str],
