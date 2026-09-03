@@ -101,19 +101,25 @@ All Eva code must live cleanly outside `alpha_meet` in:
   - **Pro Mode**: If Claude quota is exhausted, invoke `gemini-3.1-pro-high` via `agy` CLI on high mode.
 - All review outputs must be preserved as artifacts and incorporated into this reference file.
 
-## 6. P9: The Self-Development Closed Loop Architecture
+## 6. P9: The Self-Development Closed Loop Architecture (The P9 Constitution)
 
-**Objective:** Bridge the gap between Eva's semantic task generation (P8) and the headless worker's execution (P6.4) via a secure, Human-in-the-Loop (HITL) triage pipeline.
+**Objective:** Safely bridge Eva's semantic task generation (P8) and the headless worker's execution (P6.4) via a strictly gated triage pipeline, as finalized by the Opus/Gemini Red Team debate.
 
-### 6.1 Architectural Steps
-1. **Ingestion & Triage Queue:** Eva pushes `TaskEnvelopes` to a centralized `task_triage_queue` (database table) in a `PENDING_REVIEW` state.
-2. **The HITL Approval Gate:** A lightweight UI or CLI command (e.g., `agy triage`) where the Founder can view, modify, reject, or approve (`STATUS = APPROVED`) the task.
-3. **Daemon Dispatch:** The P5 `launchd` background daemon periodically polls the `task_triage_queue` for `APPROVED` tasks.
-4. **Isolated Execution:** The daemon triggers the P6.4 worker in an isolated git worktree branch named `feature/alpha-gen-<task_id>`.
-5. **Delivery & Verification (No-Merge Policy):** The worker pushes the branch to the remote and generates a Pull Request (`STATUS = PR_SUBMITTED`). **The system does not merge its own code.**
+### 6.1 The Five Laws of P9
+1. **NO DIRECT PATH:** Eva's output shall NEVER connect directly to the Worker's input. The Safety Gate is a mandatory intermediary.
+2. **BLAST RADIUS CONTAINMENT:** No task shall modify >10 files or >500 lines. 
+3. **PROTECTED PATHS:** Automated tasks cannot modify `.git/`, `alpha_core/eva/`, `config/secrets/`, launchd plists, or this architecture doc.
+4. **FINITE EXECUTION:** 15 min hard timeout. Max 2 retries. Queue depth max 20. Exceeding limits halts the pipeline.
+5. **REVERSIBILITY:** Tasks execute in ephemeral Git worktrees on dedicated branches. No force-pushes or merging to main.
 
-### 6.2 Non-Negotiable Safety Boundaries
-* **Strict "No-Merge" Policy:** The P9 worker has NO permissions to push to `main` or `master`. Human approval is the final merge gate.
-* **Worktree Sandboxing:** Tasks execute strictly in ephemeral Git worktrees, isolated from the primary IDE workspace.
-* **Token & Time Budgeting:** Every task must carry a hard `max_tokens` and `max_execution_time_minutes` limit. The daemon must aggressively kill timed-out processes.
-* **Read-Only System Secrets:** The worker must use a scoped API key and IAM profile.
+### 6.2 The Three-Phase Queue (Safety Gate)
+To prevent race conditions, tasks strictly move through three queue states:
+1. `PENDING_REVIEW`: Inserted by Eva. Invisible to workers.
+2. **Async LLM Safety Check:** A separate thread verifies the 5 Laws without blocking Eva.
+3. `APPROVED` (or `REJECTED`): Workers **ONLY** poll for `APPROVED` tasks.
+
+### 6.3 Operational Hardening (Debate Resolutions)
+*   **Database Concurrency:** SQLite `PRAGMA busy_timeout = 5000` combined with `BEGIN IMMEDIATE` transactions. Lock timeouts are caught with a 3-try exponential backoff before transitioning a task to `FAILED_LOCK`.
+*   **The Tombstone Pattern:** On `emergency-stop`, the daemon drains active tasks for 30s, reaps children, closes DB connections, and writes an `.emergency_stop.lock` tombstone. It idles safely without crashing `launchd`. Removing the file triggers a clean re-exec restart.
+*   **Worktree Garbage Collection:** Strict `git worktree remove --force` upon task completion/rejection. Added a startup orphan sweep (to catch worktrees left by hard crashes) and a periodic `git gc --auto` every 20 tasks or 24h.
+*   **Anti-Infinite-Loop Guarantees:** Semantic cosine-similarity deduplication rejects tasks >0.92 similar to recent tasks. Hard budgets: Eva generates max 30 tasks/day, Worker executes max 10 tasks/day.
