@@ -45,7 +45,8 @@ CRITICAL RULES:
 1. If the dialogue is merely small talk, greetings, administrative scheduling, or vague chatter, set "is_actionable" to false and return empty requirements.
 2. Only set "is_actionable" to true if there is a concrete, implementable engineering request.
 3. Extract precise acceptance criteria and identify likely files or directories to touch (allowed_paths).
-4. Output MUST be valid JSON adhering strictly to the schema below.
+4. REPOSITORY CONTEXT: The codebase consists of `alpha_core/`, `alpha_worker/`, `alpha_protocol/`, and `testscript/`. All `allowed_paths` must strictly use these real paths (e.g. `alpha_core/`, `alpha_worker/`, `testscript/`), never invent imaginary directories.
+5. Output MUST be valid JSON adhering strictly to the schema below.
 
 JSON SCHEMA:
 {

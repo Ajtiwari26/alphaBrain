@@ -395,22 +395,43 @@ def cmd_worker_cycle(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
 def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     from alpha_core.eva.queue_producer import EvaQueueProducer
-    from alpha_core.eva.spec_extractor import ExtractedSpecification
+    from alpha_core.eva.spec_extractor import EvaSpecificationExtractor, ExtractedSpecification
 
-    allowed_paths = [p.strip() for p in args.allowed_paths.split(",") if p.strip()]
-    criteria = [c.strip() for c in args.criteria.split(",") if c.strip()] if args.criteria else []
-    requirements = [args.objective]
+    prompt_text = args.prompt.strip()
 
-    spec = ExtractedSpecification(
-        title=args.title,
-        summary=args.objective,
-        requirements=requirements,
-        acceptance_criteria=criteria,
-        allowed_paths=allowed_paths,
-        required_gates=["unit_test", "lint"],
-        confidence_score=0.99,
-        is_actionable=True,
-    )
+    # If full manual flags are provided, use them; otherwise, let Eva extract autonomously!
+    if getattr(args, "objective", None) and getattr(args, "allowed_paths", None):
+        allowed_paths = [p.strip() for p in args.allowed_paths.split(",") if p.strip()]
+        criteria = (
+            [c.strip() for c in args.criteria.split(",") if c.strip()]
+            if getattr(args, "criteria", None)
+            else []
+        )
+        spec = ExtractedSpecification(
+            title=prompt_text,
+            summary=args.objective,
+            requirements=[args.objective],
+            acceptance_criteria=criteria,
+            allowed_paths=allowed_paths,
+            required_gates=["unit_test", "lint"],
+            confidence_score=0.99,
+            is_actionable=True,
+        )
+    else:
+        print("🧠 Invoking Eva to autonomously extract engineering specification from prompt...")
+        extractor = EvaSpecificationExtractor()
+        extracted = extractor.extract_from_transcript(prompt_text)
+        if not extracted or not extracted.is_actionable:
+            print(
+                "❌ Eva marked the prompt as non-actionable or could not extract an engineering task.",
+                file=sys.stderr,
+            )
+            return 1
+        spec = extracted
+        if getattr(args, "allowed_paths", None):
+            spec.allowed_paths = [p.strip() for p in args.allowed_paths.split(",") if p.strip()]
+        elif not spec.allowed_paths:
+            spec.allowed_paths = ["alpha_core/triage_cli.py", "alpha_worker/", "testscript/"]
 
     producer = EvaQueueProducer(queue)
     repo = str(Path.cwd().resolve())
@@ -418,22 +439,24 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         spec=spec,
         project_id=args.project_id,
         meeting_id="cli_admit",
-        transcript_excerpt=args.objective,
+        transcript_excerpt=prompt_text,
         speaker_id="founder_cli",
         repo=repo,
         base_commit="HEAD",
     )
 
     if args.json:
-        print(json.dumps({"task_id": task_id, "status": "pending_review", "title": args.title}))
+        print(json.dumps({"task_id": task_id, "status": "pending_review", "title": spec.title}))
     else:
-        print("=" * 60)
+        print("=" * 65)
         print("📥 Task Admitted into AlphaBrain Triage Queue!")
         print(f"Task ID:        {task_id}")
-        print(f"Title:          {args.title}")
+        print(f"Title:          {spec.title}")
+        print(f"Summary:        {spec.summary}")
         print("Status:         pending_review")
-        print(f"Allowed paths:  {', '.join(allowed_paths)}")
-        print("=" * 60)
+        print(f"Allowed paths:  {', '.join(spec.allowed_paths)}")
+        print(f"Criteria:       {', '.join(spec.acceptance_criteria)}")
+        print("=" * 65)
         print("\nNext Autonomous Steps:")
         print(f"  1. Review Safety:  .venv/bin/python -m alpha_core.triage_cli review {task_id}")
         print(f"  2. Founder Approve:.venv/bin/python -m alpha_core.triage_cli approve {task_id}")
@@ -526,15 +549,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # admit
     p_admit = subparsers.add_parser("admit", help="Admit a new task into the triage queue")
-    p_admit.add_argument("title", help="Task title")
-    p_admit.add_argument("--objective", required=True, help="Detailed task objective")
-    p_admit.add_argument(
-        "--allowed-paths", required=True, help="Comma-separated allowed file paths"
-    )
+    p_admit.add_argument("prompt", help="Natural language request or task description")
+    p_admit.add_argument("--objective", help="Optional detailed objective")
+    p_admit.add_argument("--allowed-paths", help="Optional comma-separated allowed file paths")
     p_admit.add_argument(
         "--criteria",
-        default="Unit tests pass, Lint checks pass",
-        help="Comma-separated acceptance criteria",
+        help="Optional comma-separated acceptance criteria",
     )
     p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
     p_admit.add_argument("--json", action="store_true", help="Output JSON format")
