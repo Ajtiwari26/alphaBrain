@@ -46,7 +46,7 @@ async def main():
             "task_id": task_id,
             "project_id": project_id,
             "repo": os.getcwd(),
-            "commit_sha": head_sha,
+            "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip(),
             "objective": "Lint the codebase",
             "description": "Run a dry-run linter check on the codebase. Do NOT write any files. Output the linter results.",
             "status": "pending",
