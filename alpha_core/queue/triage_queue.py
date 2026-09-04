@@ -563,6 +563,44 @@ class TaskTriageQueue:
 
         return bool(self._execute_write_with_retry(_record, allow_during_emergency=True))
 
+    def queue_task_for_senior_repair(
+        self,
+        task_id: str,
+        repair_directives: str,
+    ) -> bool:
+        """
+        Transitions a COMPLETED task that failed Senior Review back to APPROVED,
+        appending the senior repair directives to its instructions so the worker agent
+        can resume the worktree and execute the repairs autonomously.
+        """
+        now = time.time()
+
+        def _reopen_repair(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute(
+                "SELECT envelope_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                (task_id, TriageStatus.COMPLETED.value),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            env = json.loads(row[0]) if row[0] else {}
+            old_inst = env.get("detailed_instructions", "")
+            env["detailed_instructions"] = (
+                f"{old_inst}\n\n## 🚨 Senior Engineering Review Repair Directives\n{repair_directives}"
+            )
+
+            cursor.execute(
+                """
+                UPDATE task_triage_queue
+                SET status = ?, envelope_json = ?, updated_at = ?
+                WHERE id = ?;
+                """,
+                (TriageStatus.APPROVED.value, json.dumps(env), now, task_id),
+            )
+            return cursor.rowcount > 0
+
+        return bool(self._execute_write_with_retry(_reopen_repair, allow_during_emergency=True))
+
     def fail_task(
         self,
         task_id: str,

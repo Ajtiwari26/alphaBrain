@@ -209,4 +209,13 @@ Instructions:
             review_details=verdict.to_dict(),
         )
 
+        # If repairs required, automatically transition back to APPROVED with senior directives
+        if not unanimous:
+            repair_packet = (
+                f"### Gemini 3.1 Pro High Findings:\n{pro_out}\n\n"
+                f"### Claude Opus 4.6 Thinking Architectural Ruling:\n{opus_out}"
+            )
+            self.queue.queue_task_for_senior_repair(task_id, repair_packet)
+            logger.info("Task %s queued for autonomous senior repair turn in worktree.", task_id)
+
         return verdict
