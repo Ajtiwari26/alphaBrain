@@ -591,13 +591,18 @@ class TaskTriageQueue:
                 f"{old_inst}\n\n## 🚨 Senior Engineering Review Repair Directives\n{repair_directives}"
             )
 
+            new_envelope_json = json.dumps(
+                env, sort_keys=True, separators=(",", ":"), default=str
+            )
+            new_content_hash = hashlib.sha256(new_envelope_json.encode("utf-8")).hexdigest()
+
             cursor.execute(
                 """
                 UPDATE task_triage_queue
-                SET status = ?, envelope_json = ?, updated_at = ?
+                SET status = ?, envelope_json = ?, content_hash = ?, updated_at = ?
                 WHERE id = ?;
                 """,
-                (TriageStatus.APPROVED.value, json.dumps(env), now, task_id),
+                (TriageStatus.APPROVED.value, new_envelope_json, new_content_hash, now, task_id),
             )
             return cursor.rowcount > 0
 
@@ -683,12 +688,17 @@ class TaskTriageQueue:
 
         def _retry(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
-                "SELECT provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                "SELECT envelope_json, provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
                 (task_id, TriageStatus.FAILED.value),
             )
             row = cursor.fetchone()
             if not row:
                 return False
+
+            env_json = row["envelope_json"]
+            env = json.loads(env_json) if env_json else {}
+            canonical_env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
+            computed_hash = hashlib.sha256(canonical_env_json.encode("utf-8")).hexdigest()
 
             provenance_dict = json.loads(row["provenance_json"]) if row["provenance_json"] else {}
             if "audit_history" not in provenance_dict:
@@ -700,12 +710,15 @@ class TaskTriageQueue:
                     "notes": operator_notes or "Operator manually triggered task retry",
                 }
             )
+            provenance_dict["content_hash"] = computed_hash
 
             conn.execute(
                 """
                 UPDATE task_triage_queue
                 SET status = ?,
                     retry_count = 0,
+                    envelope_json = ?,
+                    content_hash = ?,
                     provenance_json = ?,
                     completed_at = NULL,
                     updated_at = ?
@@ -713,6 +726,8 @@ class TaskTriageQueue:
                 """,
                 (
                     TriageStatus.APPROVED.value,
+                    canonical_env_json,
+                    computed_hash,
                     json.dumps(provenance_dict, default=str),
                     now,
                     task_id,
