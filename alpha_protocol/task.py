@@ -160,7 +160,6 @@ class TaskEnvelope(BaseModel):
         default_factory=list,
         description="Tasks that must complete before this task can be leased",
     )
-    depends_on: list[str] = Field(default_factory=list, description="List of task IDs this task depends on")
     retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
     concurrency_policy: ConcurrencyPolicy = Field(default_factory=ConcurrencyPolicy)
     requires_approval: bool = Field(

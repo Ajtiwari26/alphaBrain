@@ -9,7 +9,7 @@ from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue
 
 
 def make_dummy_envelope(task_id: str, depends_on: list[str] | None = None):
-    deps = depends_on or []
+    deps = [{"task_id": d, "required_status": "completed"} for d in (depends_on or [])]
     return {
         "protocol_version": "1",
         "task_id": task_id,
@@ -18,7 +18,7 @@ def make_dummy_envelope(task_id: str, depends_on: list[str] | None = None):
         "base_commit": "HEAD",
         "objective": "Test",
         "allowed_paths": ["."],
-        "depends_on": deps
+        "dependencies": deps
     }
 
 def make_dummy_provenance(task_id: str, depends_on: list[str] | None = None):

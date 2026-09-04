@@ -223,16 +223,16 @@ class TaskTriageQueue:
 
         raise TaskLockExhaustedError("Failed to acquire write lock after maximum retries.")
 
-    def _check_cycles(self, conn: sqlite3.Connection, task_id: str, depends_on: list[str]) -> None:
-        """Detects circular dependencies with a depth bound of 100."""
-        if not depends_on:
+    def _check_cycles(self, conn: sqlite3.Connection, task_id: str, dependencies: list[dict[str, Any]]) -> None:
+        """Detects circular dependencies with a depth bound of 20."""
+        if not dependencies:
             return
         visited = set()
-        stack = [(dep, 1) for dep in depends_on]
+        stack = [(dep.get("task_id"), 1) for dep in dependencies if dep.get("task_id")]
         while stack:
             curr, depth = stack.pop()
-            if depth > 100:
-                raise ValueError(f"Dependency graph depth exceeded limit (100) for {task_id}")
+            if depth > 20:
+                raise ValueError(f"Dependency graph depth exceeded limit (20) for {task_id}")
             if curr == task_id:
                 raise ValueError(f"Circular dependency detected involving {task_id}")
             if curr in visited:
@@ -242,8 +242,9 @@ class TaskTriageQueue:
             r = c.fetchone()
             if r:
                 curr_env = json.loads(r["envelope_json"])
-                for child_dep in curr_env.get("depends_on", []):
-                    stack.append((child_dep, depth + 1))
+                for child_dep in curr_env.get("dependencies", []):
+                    if child_dep.get("task_id"):
+                        stack.append((child_dep["task_id"], depth + 1))
 
     def enqueue_task(
         self,
@@ -282,7 +283,7 @@ class TaskTriageQueue:
                 logger.info("Task deduplicated against existing entry %s", existing["id"])
                 return str(existing["id"])
 
-            self._check_cycles(conn, task_id, envelope.get("depends_on", []))
+            self._check_cycles(conn, task_id, envelope.get("dependencies", []))
 
             conn.execute(
                 """
@@ -416,7 +417,7 @@ class TaskTriageQueue:
                     env_dict["description"] = str(description)
 
             # Cycle detection for modify
-            self._check_cycles(conn, task_id, env_dict.get("depends_on", []))
+            self._check_cycles(conn, task_id, env_dict.get("dependencies", []))
 
             new_envelope_json = json.dumps(
                 env_dict, sort_keys=True, separators=(",", ":"), default=str
@@ -477,36 +478,24 @@ class TaskTriageQueue:
         now = time.time()
 
         def _lease(conn: sqlite3.Connection) -> dict[str, Any] | None:
-            # Find the oldest approved task whose dependencies are ALL completed
+            # Find the oldest approved task whose dependencies are ALL satisfied
             cursor = conn.execute(
                 """
-                SELECT * FROM task_triage_queue
-                WHERE status = ?
-                ORDER BY created_at ASC;
+                SELECT t1.*
+                FROM task_triage_queue t1
+                WHERE t1.status = ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM json_each(t1.envelope_json, '$.dependencies') AS dep
+                      LEFT JOIN task_triage_queue t2 ON t2.id = json_extract(dep.value, '$.task_id')
+                      WHERE t2.status IS NULL OR t2.status != COALESCE(json_extract(dep.value, '$.required_status'), ?)
+                  )
+                ORDER BY t1.created_at ASC
+                LIMIT 1;
                 """,
-                (TriageStatus.APPROVED.value,),
+                (TriageStatus.APPROVED.value, TriageStatus.COMPLETED.value),
             )
-            rows = cursor.fetchall()
-
-            selected_row = None
-            for row in rows:
-                env = json.loads(row["envelope_json"])
-                depends_on = env.get("depends_on", [])
-
-                can_lease = True
-                if depends_on:
-                    placeholders = ",".join(["?"] * len(depends_on))
-                    c2 = conn.execute(
-                        f"SELECT status FROM task_triage_queue WHERE id IN ({placeholders})",
-                        tuple(depends_on)
-                    )
-                    statuses = [r["status"] for r in c2.fetchall()]
-                    if len(statuses) < len(depends_on) or any(s != TriageStatus.COMPLETED.value for s in statuses):
-                        can_lease = False
-
-                if can_lease:
-                    selected_row = row
-                    break
+            selected_row = cursor.fetchone()
 
             if not selected_row:
                 return None

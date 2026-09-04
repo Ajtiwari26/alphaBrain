@@ -455,7 +455,6 @@ def cmd_worker_cycle(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
 
 def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
-    from alpha_core.eva.queue_producer import EvaQueueProducer
     from alpha_core.eva.spec_extractor import EvaSpecificationExtractor, ExtractedSpecification
 
     prompt_text = args.prompt.strip()
@@ -494,24 +493,53 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         elif not spec.allowed_paths:
             spec.allowed_paths = ["alpha_core/triage_cli.py", "alpha_worker/", "testscript/"]
 
-    producer = EvaQueueProducer(queue)
+    import hashlib
+    import time
+
+    from alpha_core.eva.task_proposer import EvaTaskProposer
+    from alpha_core.queue.triage_queue import TaskProvenance, TriageStatus
+
     repo = str(Path.cwd().resolve())
-    task_id, _envelope, _provenance = producer.enqueue_specification(
+    proposer = EvaTaskProposer()
+    envelope = proposer.build_task_envelope(
         spec=spec,
         project_id=args.project_id,
-        meeting_id="cli_admit",
-        transcript_excerpt=prompt_text,
-        speaker_id="founder_cli",
         repo=repo,
         base_commit="HEAD",
     )
 
     if getattr(args, "depends_on", None):
+        from alpha_protocol.task import TaskDependency, TaskStatus
         depends_on = [d.strip() for d in args.depends_on.split(",") if d.strip()]
-        if depends_on:
-            env_dict = _envelope.model_dump(mode="json")
-            env_dict["depends_on"] = depends_on
-            queue.modify_task(task_id, new_envelope=env_dict, reviewer_notes="Added dependencies via CLI")
+        for d in depends_on:
+            envelope.dependencies.append(TaskDependency(task_id=d, required_status=TaskStatus.COMPLETED))
+
+    envelope_dict = envelope.model_dump(mode="json")
+    envelope_dict["acceptance_criteria"] = spec.acceptance_criteria
+    envelope_dict["title"] = spec.title
+
+    content_hash = hashlib.sha256(
+        json.dumps(envelope_dict, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+
+    provenance = TaskProvenance(
+        meeting_id="cli_admit",
+        speaker_id="founder_cli",
+        utterance_timestamp=time.time(),
+        transcript_excerpt=prompt_text,
+        extraction_model="gemini-3.1-pro-high",
+        extraction_confidence=1.0,
+        eva_session_id="eva_livekit_consumer",
+        created_at=time.time(),
+        content_hash=content_hash,
+    )
+
+    task_id = queue.enqueue_task(
+        task_id=envelope.task_id,
+        envelope=envelope_dict,
+        provenance=provenance,
+        initial_status=TriageStatus.PENDING_REVIEW,
+    )
 
     if args.json:
         print(json.dumps({"task_id": task_id, "status": "pending_review", "title": spec.title}))
@@ -667,15 +695,17 @@ def cmd_dag(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     # Find roots (tasks with no dependencies)
     roots = []
     for t in tasks:
-        deps = t.get("envelope", {}).get("depends_on", [])
+        deps = t.get("envelope", {}).get("dependencies", [])
         if not deps:
             roots.append(t["id"])
         for d in deps:
-            if d in children:
-                children[d].append(t["id"])
-            else:
-                # Dependency doesn't exist in the current subset (or at all), we might consider this a root visually
-                pass
+            dep_id = d.get("task_id")
+            if dep_id:
+                if dep_id in children:
+                    children[dep_id].append(t["id"])
+                else:
+                    # Dependency doesn't exist in the current subset
+                    pass
 
     if args.json:
         # Just return the graph structure
@@ -687,7 +717,7 @@ def cmd_dag(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
     def print_tree(node_id: str, prefix: str = ""):
         if node_id in visited:
-            print(f"{prefix}└── {node_id} (cycle/re-visited)")
+            print(f"{prefix}└── {node_id} (shared — already displayed)")
             return
         visited.add(node_id)
 
