@@ -167,22 +167,26 @@ def cmd_export_audit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print(f"Error: Task '{args.task_id}' not found.", file=sys.stderr)
         return 1
 
+    from alpha_core.security import redact_dict
+
     prov = task.get("provenance", {})
     res = task.get("result", {})
 
     audit_data = {
+        "schema_version": "1.0",
+        "exported_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "task_id": task["id"],
         "status": task["status"],
         "created_at": task.get("created_at"),
         "updated_at": task.get("updated_at"),
-        "provenance": prov,
-        "execution_history": res
+        "provenance": redact_dict(prov) if isinstance(prov, dict) else prov,
+        "execution_history": redact_dict(res) if isinstance(res, dict) else res,
     }
 
     output_path = getattr(args, "output", None) or f"audit_export_{task['id']}.json"
     try:
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(audit_data, f, indent=2, default=str)
+            json.dump(audit_data, f, indent=2, default=str, sort_keys=True)
         print(f"Audit exported successfully to {output_path}")
     except OSError as e:
         print(f"Error: Could not write to {output_path} - {e}", file=sys.stderr)
@@ -690,7 +694,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_export_audit.add_argument("task_id", help="ID of the task to export")
     p_export_audit.add_argument("--output", help="Output JSON file path")
-    p_export_audit.add_argument("--json", action="store_true", help="Output JSON format (ignored)")
 
     return parser
 
