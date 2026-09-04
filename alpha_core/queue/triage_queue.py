@@ -223,7 +223,9 @@ class TaskTriageQueue:
 
         raise TaskLockExhaustedError("Failed to acquire write lock after maximum retries.")
 
-    def _check_cycles(self, conn: sqlite3.Connection, task_id: str, dependencies: list[dict[str, Any]]) -> None:
+    def _check_cycles(
+        self, conn: sqlite3.Connection, task_id: str, dependencies: list[dict[str, Any]]
+    ) -> None:
         """Detects circular dependencies with a depth bound of 20."""
         if not dependencies:
             return
@@ -465,7 +467,7 @@ class TaskTriageQueue:
 
         return bool(self._execute_write_with_retry(_modify))
 
-    def lease_next_approved_task(self) -> dict[str, Any] | None:
+    def lease_next_approved_task(self, worker_id: str | None = None) -> dict[str, Any] | None:
         """
         Atomically leases the oldest APPROVED task and sets it to EXECUTING.
         CRITICAL SAFETY CONSTITUTION LAW 1: Workers STRICTLY poll status = 'approved'.
@@ -501,16 +503,35 @@ class TaskTriageQueue:
                 return None
 
             task_id = selected_row["id"]
+            created_at = selected_row["created_at"]
+
+            provenance_dict = json.loads(selected_row["provenance_json"])
+            if "audit_history" not in provenance_dict:
+                provenance_dict["audit_history"] = []
+
+            queue_wait_seconds = max(0.0, now - created_at)
+            provenance_dict["audit_history"].append(
+                {
+                    "action": "task_leased",
+                    "timestamp": now,
+                    "queue_wait_seconds": queue_wait_seconds,
+                    "worker_id": worker_id,
+                }
+            )
+
+            new_provenance_json = json.dumps(provenance_dict, default=str)
+
             # Atomically claim it
             conn.execute(
                 """
                 UPDATE task_triage_queue
-                SET status = ?, started_at = ?, updated_at = ?
+                SET status = ?, started_at = ?, provenance_json = ?, updated_at = ?
                 WHERE id = ? AND status = ?;
                 """,
                 (
                     TriageStatus.EXECUTING.value,
                     now,
+                    new_provenance_json,
                     now,
                     task_id,
                     TriageStatus.APPROVED.value,
@@ -539,9 +560,38 @@ class TaskTriageQueue:
 
         def _complete(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
+                "SELECT created_at, started_at, provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                (task_id, TriageStatus.EXECUTING.value),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            created_at = row["created_at"]
+            started_at = row["started_at"] or created_at
+
+            provenance_dict = json.loads(row["provenance_json"])
+            if "audit_history" not in provenance_dict:
+                provenance_dict["audit_history"] = []
+
+            execution_duration_seconds = max(0.0, now - started_at)
+            total_lifecycle_seconds = max(0.0, now - created_at)
+
+            provenance_dict["audit_history"].append(
+                {
+                    "action": "task_completed",
+                    "timestamp": now,
+                    "execution_duration_seconds": execution_duration_seconds,
+                    "total_lifecycle_seconds": total_lifecycle_seconds,
+                }
+            )
+
+            new_provenance_json = json.dumps(provenance_dict, default=str)
+
+            update_cursor = conn.execute(
                 """
                 UPDATE task_triage_queue
-                SET status = ?, result_json = ?, worktree_path = ?, branch_name = ?, completed_at = ?, updated_at = ?
+                SET status = ?, result_json = ?, worktree_path = ?, branch_name = ?, completed_at = ?, provenance_json = ?, updated_at = ?
                 WHERE id = ? AND status = ?;
                 """,
                 (
@@ -550,12 +600,13 @@ class TaskTriageQueue:
                     worktree_path,
                     branch_name,
                     now,
+                    new_provenance_json,
                     now,
                     task_id,
                     TriageStatus.EXECUTING.value,
                 ),
             )
-            return cursor.rowcount > 0
+            return update_cursor.rowcount > 0
 
         return bool(self._execute_write_with_retry(_complete, allow_during_emergency=True))
 
@@ -627,9 +678,7 @@ class TaskTriageQueue:
                 f"{old_inst}\n\n## 🚨 Senior Engineering Review Repair Directives\n{repair_directives}"
             )
 
-            new_envelope_json = json.dumps(
-                env, sort_keys=True, separators=(",", ":"), default=str
-            )
+            new_envelope_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
             new_content_hash = hashlib.sha256(new_envelope_json.encode("utf-8")).hexdigest()
 
             cursor.execute(
@@ -660,7 +709,7 @@ class TaskTriageQueue:
 
         def _fail(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
-                "SELECT retry_count FROM task_triage_queue WHERE id = ? AND status = ?;",
+                "SELECT retry_count, created_at, started_at, provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
                 (task_id, TriageStatus.EXECUTING.value),
             )
             row = cursor.fetchone()
@@ -668,19 +717,42 @@ class TaskTriageQueue:
                 return False
 
             current_retries = int(row["retry_count"] or 0)
+            created_at = row["created_at"]
+            started_at = row["started_at"] or created_at
+
+            provenance_dict = json.loads(row["provenance_json"])
+            if "audit_history" not in provenance_dict:
+                provenance_dict["audit_history"] = []
+
+            execution_duration_seconds = max(0.0, now - started_at)
+            total_lifecycle_seconds = max(0.0, now - created_at)
+
+            provenance_dict["audit_history"].append(
+                {
+                    "action": "task_failed",
+                    "timestamp": now,
+                    "execution_duration_seconds": execution_duration_seconds,
+                    "total_lifecycle_seconds": total_lifecycle_seconds,
+                    "retry_count": current_retries,
+                }
+            )
+
+            new_provenance_json = json.dumps(provenance_dict, default=str)
+
             if allow_retry and current_retries < max_retries:
                 # Re-queue for execution
                 next_retries = current_retries + 1
                 conn.execute(
                     """
                     UPDATE task_triage_queue
-                    SET status = ?, retry_count = ?, result_json = ?, updated_at = ?
+                    SET status = ?, retry_count = ?, result_json = ?, provenance_json = ?, updated_at = ?
                     WHERE id = ?;
                     """,
                     (
                         TriageStatus.APPROVED.value,
                         next_retries,
                         json.dumps(payload),
+                        new_provenance_json,
                         now,
                         task_id,
                     ),
@@ -692,13 +764,14 @@ class TaskTriageQueue:
                 conn.execute(
                     """
                     UPDATE task_triage_queue
-                    SET status = ?, result_json = ?, completed_at = ?, updated_at = ?
+                    SET status = ?, result_json = ?, completed_at = ?, provenance_json = ?, updated_at = ?
                     WHERE id = ?;
                     """,
                     (
                         TriageStatus.FAILED.value,
                         json.dumps(payload),
                         now,
+                        new_provenance_json,
                         now,
                         task_id,
                     ),
@@ -868,3 +941,29 @@ class TaskTriageQueue:
                     d["result"] = json.loads(d["result_json"])
                 results.append(d)
             return results
+
+    def get_task_telemetry(self, task_id: str) -> dict[str, Any]:
+        """Extracts telemetry and timing metrics from a task's audit history."""
+        task = self.get_task(task_id)
+        if not task:
+            return {}
+
+        audit_history = task.get("provenance", {}).get("audit_history", [])
+
+        telemetry = {
+            "queue_wait_seconds": None,
+            "execution_duration_seconds": None,
+            "total_lifecycle_seconds": None,
+            "transition_count": len(audit_history),
+        }
+
+        for entry in audit_history:
+            if entry.get("action") == "task_leased" and "queue_wait_seconds" in entry:
+                telemetry["queue_wait_seconds"] = entry["queue_wait_seconds"]
+            elif entry.get("action") in ("task_completed", "task_failed"):
+                if "execution_duration_seconds" in entry:
+                    telemetry["execution_duration_seconds"] = entry["execution_duration_seconds"]
+                if "total_lifecycle_seconds" in entry:
+                    telemetry["total_lifecycle_seconds"] = entry["total_lifecycle_seconds"]
+
+        return telemetry
