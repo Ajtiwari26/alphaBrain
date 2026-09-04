@@ -499,6 +499,33 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_senior_review(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    from alpha_worker.senior_review_engine import SeniorReviewEngine
+
+    engine = SeniorReviewEngine(queue=queue)
+    try:
+        verdict = engine.execute_senior_review(args.task_id)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(verdict.to_dict(), indent=2))
+        return 0 if verdict.approved else 1
+
+    print("=" * 70)
+    print(f"🏛️  2-Round Senior Engineering Review for Task: {verdict.task_id}")
+    print(f"Round 1 (Gemini 3.1 Pro High):      {verdict.pro_verdict}")
+    print(f"Round 2 (Claude Opus 4.6 Thinking): {verdict.opus_verdict}")
+    print("-" * 70)
+    if verdict.approved:
+        print("🟢 VERDICT: APPROVED (Certified for Autonomous Merge)")
+    else:
+        print("🔴 VERDICT: REPAIR_REQUIRED (Merge Blocked)")
+    print("=" * 70)
+    return 0 if verdict.approved else 1
+
+
 def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     task = queue.get_task(args.task_id)
     if not task:
@@ -520,6 +547,17 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         )
         return 1
 
+    senior_review = result.get("senior_review") or {}
+    skip_sr = getattr(args, "skip_senior_review", False)
+    if not senior_review.get("approved", False) and not skip_sr:
+        print(
+            f"Error: Task '{args.task_id}' has not passed 2-Round Senior Engineering Review (Pro + Opus).\n"
+            f"Run '.venv/bin/python -m alpha_core.triage_cli senior-review {args.task_id}' before merging,\n"
+            f"or supply --skip-senior-review for emergency operator override.",
+            file=sys.stderr,
+        )
+        return 1
+
     worktree_path = task.get("worktree_path")
     branch_name = task.get("branch_name")
     repo_path = task.get("envelope", {}).get("repo", ".")
@@ -528,7 +566,7 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print(f"Error: Missing branch name in task record '{args.task_id}'.", file=sys.stderr)
         return 1
 
-    print(f"Verifying gates passed for '{args.task_id}'... OK")
+    print(f"Verifying gates passed and senior review for '{args.task_id}'... OK")
     print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")
     try:
         subprocess.run(
@@ -681,11 +719,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
     p_admit.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # senior-review
+    p_senior = subparsers.add_parser(
+        "senior-review", help="Execute 2-round senior engineering review (Pro + Opus)"
+    )
+    p_senior.add_argument("task_id", help="ID of the completed task to review")
+    p_senior.add_argument("--json", action="store_true", help="Output JSON format")
+
     # merge
     p_merge = subparsers.add_parser(
         "merge", help="Fast-forward merge a completed task branch and prune worktree"
     )
     p_merge.add_argument("task_id", help="ID of the task to merge")
+    p_merge.add_argument("--skip-senior-review", action="store_true", help="Bypass mandatory 2-round senior review")
     p_merge.add_argument("--json", action="store_true", help="Output JSON format")
 
     # export-audit
@@ -719,6 +765,7 @@ def main(argv: list[str] | None = None) -> int:
         "emergency-resume": cmd_emergency_resume,
         "emergency-status": cmd_emergency_status,
         "worker-cycle": cmd_worker_cycle,
+        "senior-review": cmd_senior_review,
         "merge": cmd_merge,
         "export-audit": cmd_export_audit,
     }

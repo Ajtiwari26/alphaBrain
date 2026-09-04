@@ -521,6 +521,48 @@ class TaskTriageQueue:
 
         return bool(self._execute_write_with_retry(_complete, allow_during_emergency=True))
 
+    def record_senior_review(
+        self,
+        task_id: str,
+        pro_verdict: str,
+        opus_verdict: str,
+        approved: bool,
+        review_details: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Records the outcome of the 2-Round Senior Review (Pro + Opus) for a completed task.
+        Appends the senior_review object into result_json.
+        """
+        now = time.time()
+
+        def _record(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute(
+                "SELECT result_json FROM task_triage_queue WHERE id = ?;",
+                (task_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            result_data = json.loads(row[0]) if row[0] else {}
+            result_data["senior_review"] = {
+                "pro_verdict": pro_verdict,
+                "opus_verdict": opus_verdict,
+                "approved": approved,
+                "reviewed_at": now,
+                "details": review_details or {},
+            }
+            cursor = conn.execute(
+                """
+                UPDATE task_triage_queue
+                SET result_json = ?, updated_at = ?
+                WHERE id = ?;
+                """,
+                (json.dumps(result_data), now, task_id),
+            )
+            return cursor.rowcount > 0
+
+        return bool(self._execute_write_with_retry(_record, allow_during_emergency=True))
+
     def fail_task(
         self,
         task_id: str,
