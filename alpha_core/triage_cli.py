@@ -510,16 +510,21 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
     if getattr(args, "depends_on", None):
         from alpha_protocol.task import TaskDependency, TaskStatus
+
         depends_on = [d.strip() for d in args.depends_on.split(",") if d.strip()]
         for d in depends_on:
-            envelope.dependencies.append(TaskDependency(task_id=d, required_status=TaskStatus.COMPLETED))
+            envelope.dependencies.append(
+                TaskDependency(task_id=d, required_status=TaskStatus.COMPLETED)
+            )
 
     envelope_dict = envelope.model_dump(mode="json")
     envelope_dict["acceptance_criteria"] = spec.acceptance_criteria
     envelope_dict["title"] = spec.title
 
     content_hash = hashlib.sha256(
-        json.dumps(envelope_dict, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        json.dumps(envelope_dict, sort_keys=True, separators=(",", ":"), default=str).encode(
+            "utf-8"
+        )
     ).hexdigest()
 
     provenance = TaskProvenance(
@@ -731,12 +736,74 @@ def cmd_dag(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
         child_nodes = children.get(node_id, [])
         for i, child_id in enumerate(child_nodes):
-            is_last = (i == len(child_nodes) - 1)
+            is_last = i == len(child_nodes) - 1
             new_prefix = prefix + ("    " if is_last else "│   ")
             print_tree(child_id, new_prefix)
 
     for root in roots:
         print_tree(root, "")
+
+    return 0
+
+
+def cmd_stats(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    import statistics
+
+    tasks = queue.list_tasks(limit=100000)
+    total_count = len(tasks)
+    status_counts = {s.value: 0 for s in TriageStatus}
+
+    queue_waits = []
+    exec_durations = []
+
+    for t in tasks:
+        status = t.get("status")
+        if status in status_counts:
+            status_counts[status] += 1
+
+        telemetry = queue.get_task_telemetry(t["id"])
+
+        qw = telemetry.get("queue_wait_seconds")
+        if qw is not None:
+            queue_waits.append(qw)
+
+        ed = telemetry.get("execution_duration_seconds")
+        if ed is not None:
+            exec_durations.append(ed)
+
+    stats = {
+        "total_tasks": total_count,
+        "by_status": status_counts,
+        "queue_wait_seconds": {
+            "average": float(statistics.mean(queue_waits)) if queue_waits else 0.0,
+            "median": float(statistics.median(queue_waits)) if queue_waits else 0.0,
+        },
+        "execution_duration_seconds": {
+            "average": float(statistics.mean(exec_durations)) if exec_durations else 0.0,
+            "median": float(statistics.median(exec_durations)) if exec_durations else 0.0,
+        },
+    }
+
+    if getattr(args, "json", False):
+        print(json.dumps(stats, indent=2))
+        return 0
+
+    print("=" * 50)
+    print("Pipeline Metrics Summary")
+    print("=" * 50)
+    print(f"Total Tasks: {stats['total_tasks']}")
+    print("-" * 50)
+    print("Counts by Status:")
+    for st, count in stats["by_status"].items():
+        print(f"  {st.ljust(15)}: {count}")
+    print("-" * 50)
+    print("Queue Wait (seconds):")
+    print(f"  Average: {stats['queue_wait_seconds']['average']:.2f}")
+    print(f"  Median:  {stats['queue_wait_seconds']['median']:.2f}")
+    print("Execution Duration (seconds):")
+    print(f"  Average: {stats['execution_duration_seconds']['average']:.2f}")
+    print(f"  Median:  {stats['execution_duration_seconds']['median']:.2f}")
+    print("=" * 50)
 
     return 0
 
@@ -795,7 +862,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_reject.add_argument("--json", action="store_true", help="Output JSON format")
 
     # retry
-    p_retry = subparsers.add_parser("retry", help="Reset a FAILED task back to APPROVED for worker retry")
+    p_retry = subparsers.add_parser(
+        "retry", help="Reset a FAILED task back to APPROVED for worker retry"
+    )
     p_retry.add_argument("task_id", help="ID of the failed task to retry")
     p_retry.add_argument("--notes", help="Optional operator retry notes")
     p_retry.add_argument("--json", action="store_true", help="Output JSON format")
@@ -855,7 +924,9 @@ def build_parser() -> argparse.ArgumentParser:
         "merge", help="Fast-forward merge a completed task branch and prune worktree"
     )
     p_merge.add_argument("task_id", help="ID of the task to merge")
-    p_merge.add_argument("--skip-senior-review", action="store_true", help="Bypass mandatory 2-round senior review")
+    p_merge.add_argument(
+        "--skip-senior-review", action="store_true", help="Bypass mandatory 2-round senior review"
+    )
     p_merge.add_argument("--json", action="store_true", help="Output JSON format")
 
     # export-audit
@@ -868,6 +939,12 @@ def build_parser() -> argparse.ArgumentParser:
     # dag
     p_dag = subparsers.add_parser("dag", help="Display the task dependency DAG")
     p_dag.add_argument("--json", action="store_true", help="Output JSON format")
+
+    # stats
+    p_stats = subparsers.add_parser(
+        "stats", help="Compute aggregate pipeline metrics and telemetry"
+    )
+    p_stats.add_argument("--json", action="store_true", help="Output JSON format")
 
     return parser
 
@@ -898,6 +975,7 @@ def main(argv: list[str] | None = None) -> int:
         "merge": cmd_merge,
         "export-audit": cmd_export_audit,
         "dag": cmd_dag,
+        "stats": cmd_stats,
     }
 
     handler = handlers.get(args.subcommand)
