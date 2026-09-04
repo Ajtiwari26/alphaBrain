@@ -260,6 +260,24 @@ class TaskTriageQueue:
                 logger.info("Task deduplicated against existing entry %s", existing["id"])
                 return str(existing["id"])
 
+            # Cycle detection
+            depends_on = envelope.get("depends_on", [])
+            if depends_on:
+                visited = set()
+                stack = list(depends_on)
+                while stack:
+                    curr = stack.pop()
+                    if curr == task_id:
+                        raise ValueError(f"Circular dependency detected involving {task_id}")
+                    if curr in visited:
+                        continue
+                    visited.add(curr)
+                    c = conn.execute("SELECT envelope_json FROM task_triage_queue WHERE id = ?", (curr,))
+                    r = c.fetchone()
+                    if r:
+                        curr_env = json.loads(r["envelope_json"])
+                        stack.extend(curr_env.get("depends_on", []))
+
             conn.execute(
                 """
                 INSERT INTO task_triage_queue (
@@ -391,6 +409,24 @@ class TaskTriageQueue:
                 if "description" in env_dict:
                     env_dict["description"] = str(description)
 
+            # Cycle detection for modify
+            depends_on = env_dict.get("depends_on", [])
+            if depends_on:
+                visited = set()
+                stack = list(depends_on)
+                while stack:
+                    curr = stack.pop()
+                    if curr == task_id:
+                        raise ValueError(f"Circular dependency detected involving {task_id}")
+                    if curr in visited:
+                        continue
+                    visited.add(curr)
+                    c = conn.execute("SELECT envelope_json FROM task_triage_queue WHERE id = ?", (curr,))
+                    r = c.fetchone()
+                    if r:
+                        curr_env = json.loads(r["envelope_json"])
+                        stack.extend(curr_env.get("depends_on", []))
+
             new_envelope_json = json.dumps(
                 env_dict, sort_keys=True, separators=(",", ":"), default=str
             )
@@ -450,21 +486,39 @@ class TaskTriageQueue:
         now = time.time()
 
         def _lease(conn: sqlite3.Connection) -> dict[str, Any] | None:
-            # Find the oldest approved task
+            # Find the oldest approved task whose dependencies are ALL completed
             cursor = conn.execute(
                 """
                 SELECT * FROM task_triage_queue
                 WHERE status = ?
-                ORDER BY created_at ASC
-                LIMIT 1;
+                ORDER BY created_at ASC;
                 """,
                 (TriageStatus.APPROVED.value,),
             )
-            row = cursor.fetchone()
-            if not row:
+            rows = cursor.fetchall()
+
+            selected_row = None
+            for row in rows:
+                env = json.loads(row["envelope_json"])
+                depends_on = env.get("depends_on", [])
+
+                can_lease = True
+                for dep_id in depends_on:
+                    c2 = conn.execute("SELECT status FROM task_triage_queue WHERE id = ?", (dep_id,))
+                    dep_row = c2.fetchone()
+                    # If dependency doesn't exist or isn't completed, we cannot lease this task yet
+                    if not dep_row or dep_row["status"] != TriageStatus.COMPLETED.value:
+                        can_lease = False
+                        break
+
+                if can_lease:
+                    selected_row = row
+                    break
+
+            if not selected_row:
                 return None
 
-            task_id = row["id"]
+            task_id = selected_row["id"]
             # Atomically claim it
             conn.execute(
                 """
@@ -480,7 +534,7 @@ class TaskTriageQueue:
                     TriageStatus.APPROVED.value,
                 ),
             )
-            data = dict(row)
+            data = dict(selected_row)
             data["status"] = TriageStatus.EXECUTING.value
             data["started_at"] = now
             data["envelope"] = json.loads(data["envelope_json"])

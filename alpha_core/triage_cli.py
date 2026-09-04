@@ -506,6 +506,13 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         base_commit="HEAD",
     )
 
+    if getattr(args, "depends_on", None):
+        depends_on = [d.strip() for d in args.depends_on.split(",") if d.strip()]
+        if depends_on:
+            env_dict = _envelope.model_dump(mode="json")
+            env_dict["depends_on"] = depends_on
+            queue.modify_task(task_id, new_envelope=env_dict, reviewer_notes="Added dependencies via CLI")
+
     if args.json:
         print(json.dumps({"task_id": task_id, "status": "pending_review", "title": spec.title}))
     else:
@@ -650,6 +657,60 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_dag(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    tasks = queue.list_tasks(limit=1000)
+
+    # Build a lookup and graph
+    task_map = {t["id"]: t for t in tasks}
+    children = {t["id"]: [] for t in tasks}
+
+    # Find roots (tasks with no dependencies)
+    roots = []
+    for t in tasks:
+        deps = t.get("envelope", {}).get("depends_on", [])
+        if not deps:
+            roots.append(t["id"])
+        for d in deps:
+            if d in children:
+                children[d].append(t["id"])
+            else:
+                # Dependency doesn't exist in the current subset (or at all), we might consider this a root visually
+                pass
+
+    if args.json:
+        # Just return the graph structure
+        print(json.dumps({"tasks": task_map, "graph": children}, indent=2, default=str))
+        return 0
+
+    print("Task Dependency DAG:")
+    visited = set()
+
+    def print_tree(node_id: str, prefix: str = ""):
+        if node_id in visited:
+            print(f"{prefix}└── {node_id} (cycle/re-visited)")
+            return
+        visited.add(node_id)
+
+        t = task_map.get(node_id)
+        if not t:
+            print(f"{prefix}└── {node_id} [NOT FOUND]")
+            return
+
+        status = t.get("status", "unknown")
+        print(f"{prefix}└── {node_id} [{status.upper()}]")
+
+        child_nodes = children.get(node_id, [])
+        for i, child_id in enumerate(child_nodes):
+            is_last = (i == len(child_nodes) - 1)
+            new_prefix = prefix + ("    " if is_last else "│   ")
+            print_tree(child_id, new_prefix)
+
+    for root in roots:
+        print_tree(root, "")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="alphabrain triage",
@@ -748,6 +809,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--criteria",
         help="Optional comma-separated acceptance criteria",
     )
+    p_admit.add_argument("--depends-on", help="Optional comma-separated list of dependent task IDs")
     p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
     p_admit.add_argument("--json", action="store_true", help="Output JSON format")
 
@@ -772,6 +834,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_export_audit.add_argument("task_id", help="ID of the task to export")
     p_export_audit.add_argument("--output", help="Output JSON file path")
+
+    # dag
+    p_dag = subparsers.add_parser("dag", help="Display the task dependency DAG")
+    p_dag.add_argument("--json", action="store_true", help="Output JSON format")
 
     return parser
 
@@ -801,6 +867,7 @@ def main(argv: list[str] | None = None) -> int:
         "senior-review": cmd_senior_review,
         "merge": cmd_merge,
         "export-audit": cmd_export_audit,
+        "dag": cmd_dag,
     }
 
     handler = handlers.get(args.subcommand)
