@@ -669,6 +669,61 @@ class TaskTriageQueue:
 
         return bool(self._execute_write_with_retry(_fail, allow_during_emergency=True))
 
+    def retry_task(
+        self,
+        task_id: str,
+        operator_notes: str | None = None,
+    ) -> bool:
+        """
+        Reopens a FAILED task back to APPROVED, resetting retry_count to 0.
+        Preserves result_json so prior attempt gate failure evidence remains accessible
+        for worker self-repair directives.
+        """
+        now = time.time()
+
+        def _retry(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute(
+                "SELECT provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                (task_id, TriageStatus.FAILED.value),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            provenance_dict = json.loads(row["provenance_json"]) if row["provenance_json"] else {}
+            if "audit_history" not in provenance_dict:
+                provenance_dict["audit_history"] = []
+            provenance_dict["audit_history"].append(
+                {
+                    "action": "task_retried",
+                    "timestamp": now,
+                    "notes": operator_notes or "Operator manually triggered task retry",
+                }
+            )
+
+            conn.execute(
+                """
+                UPDATE task_triage_queue
+                SET status = ?,
+                    retry_count = 0,
+                    provenance_json = ?,
+                    completed_at = NULL,
+                    updated_at = ?
+                WHERE id = ? AND status = ?;
+                """,
+                (
+                    TriageStatus.APPROVED.value,
+                    json.dumps(provenance_dict, default=str),
+                    now,
+                    task_id,
+                    TriageStatus.FAILED.value,
+                ),
+            )
+            logger.info("Task %s reset from FAILED to APPROVED for retry", task_id)
+            return True
+
+        return bool(self._execute_write_with_retry(_retry))
+
     def reap_stale_executing_tasks(self, timeout_seconds: float = 3600.0) -> int:
         """
         Scans for EXECUTING tasks that have stalled beyond timeout_seconds,

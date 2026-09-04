@@ -270,6 +270,32 @@ def cmd_approve(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_retry(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    task = queue.get_task(args.task_id)
+    if not task:
+        print(f"Error: Task '{args.task_id}' not found.", file=sys.stderr)
+        return 1
+
+    if queue.is_emergency_stopped():
+        print("Error: Emergency stop is active. Cannot retry tasks.", file=sys.stderr)
+        return 1
+
+    notes = getattr(args, "notes", None) or "Operator triggered retry via CLI"
+    success = queue.retry_task(args.task_id, operator_notes=notes)
+    if not success:
+        print(
+            f"Error: Failed to retry task '{args.task_id}'. Ensure status is 'failed'.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if getattr(args, "json", False):
+        print(json.dumps({"task_id": args.task_id, "status": "approved", "notes": notes}))
+    else:
+        print(f"Task '{args.task_id}' successfully reset from FAILED to APPROVED for retry.")
+    return 0
+
+
 def cmd_reject(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     task = queue.get_task(args.task_id)
     if not task:
@@ -677,6 +703,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_reject.add_argument("--reason", required=True, help="Reason for rejection")
     p_reject.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # retry
+    p_retry = subparsers.add_parser("retry", help="Reset a FAILED task back to APPROVED for worker retry")
+    p_retry.add_argument("task_id", help="ID of the failed task to retry")
+    p_retry.add_argument("--notes", help="Optional operator retry notes")
+    p_retry.add_argument("--json", action="store_true", help="Output JSON format")
+
     # modify
     p_modify = subparsers.add_parser(
         "modify", help="Safely modify task envelope and re-run SafetyGate"
@@ -760,6 +792,7 @@ def main(argv: list[str] | None = None) -> int:
         "review": cmd_review,
         "approve": cmd_approve,
         "reject": cmd_reject,
+        "retry": cmd_retry,
         "modify": cmd_modify,
         "emergency-stop": cmd_emergency_stop,
         "emergency-resume": cmd_emergency_resume,

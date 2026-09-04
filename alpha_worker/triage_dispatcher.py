@@ -171,8 +171,8 @@ class TriageTaskDispatcher:
                     "command": " ".join(full_cmd),
                     "passed": passed,
                     "returncode": returncode,
-                    "stdout_snippet": stdout[:1000],
-                    "stderr_snippet": stderr[:1000],
+                    "stdout_snippet": stdout[:5000],
+                    "stderr_snippet": stderr[:5000],
                     "timestamp": time.time(),
                 }
             )
