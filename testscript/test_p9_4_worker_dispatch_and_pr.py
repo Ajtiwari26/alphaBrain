@@ -574,3 +574,58 @@ def test_zero_diff_worktree_fails_closed(
     assert task["status"] in (TriageStatus.APPROVED.value, TriageStatus.FAILED.value)
     assert "Fail-Closed Violation" in str(task["result_json"])
 
+def test_failure_evidence_injected_on_retry(
+    isolated_queue: TaskTriageQueue, fixture_repo: Path, tmp_path: Path
+) -> None:
+    """Verifies that gate failures from a previous attempt are injected into detailed_instructions."""
+    wt_mgr = WorktreeManager(base_worktree_dir=tmp_path / "worktrees")
+    dispatcher = TriageTaskDispatcher(queue=isolated_queue, worktree_mgr=wt_mgr)
+
+    env = {
+        "task_id": "task_retry_loop",
+        "objective": "Retry loop test",
+        "repo": str(fixture_repo),
+        "allowed_paths": ["failing.txt"],
+        "detailed_instructions": "Initial instructions.",
+        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(1)"]}]},
+    }
+    import hashlib
+
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("task_retry_loop", content_hash)
+
+    isolated_queue.enqueue_task("task_retry_loop", env, prov)
+    isolated_queue.approve_task("task_retry_loop")
+
+    # Cycle 1: Modifies file but gate fails (exit 1)
+    wt_path = wt_mgr.create_or_resume_worktree(
+        repo_path=str(fixture_repo),
+        task_id="task_retry_loop",
+        base_commit="HEAD",
+    )
+    (wt_path / "failing.txt").write_text("modified\n")
+
+    proposal = dispatcher.execute_next_cycle()
+    assert proposal is None
+
+    # The task should have failed and been requeued for retry (status=approved, retry_count=1)
+    task = isolated_queue.get_task("task_retry_loop")
+    assert task is not None
+    assert task["status"] == TriageStatus.APPROVED.value
+    assert int(task["retry_count"]) == 1
+    assert "result" in task
+    assert "evidence" in task["result"]
+
+    # Cycle 2: We intercept `_build_task_envelope` via a mock to check the injected instructions
+    leased = isolated_queue.lease_next_approved_task()
+    assert leased is not None
+
+    # We directly invoke _build_task_envelope to verify the injection
+    task_env = dispatcher._build_task_envelope(leased, wt_path)
+
+    # Assert instructions contain the failure directives
+    assert "PREVIOUS ATTEMPT GATE FAILURES" in task_env.detailed_instructions
+    assert "Failed Gate: python -c exit(1) (Exit 1)" in task_env.detailed_instructions
+    assert task_env.detailed_instructions.startswith("Initial instructions.")
+

@@ -485,6 +485,8 @@ class TaskTriageQueue:
             data["started_at"] = now
             data["envelope"] = json.loads(data["envelope_json"])
             data["provenance"] = json.loads(data["provenance_json"])
+            if data.get("result_json"):
+                data["result"] = json.loads(data["result_json"])
             return data
 
         return self._execute_write_with_retry(_lease)

@@ -424,6 +424,24 @@ class TriageTaskDispatcher:
         env_dict.setdefault("preferred_agent", AgentType.ANTIGRAVITY)
         env_dict.setdefault("risk_class", RiskClass.LOW)
 
+        evidence_list = leased_task.get("result", {}).get("evidence", [])
+        failed_gates = [e for e in evidence_list if not e.get("passed", True)]
+        if failed_gates:
+            repair_block = "\n\n## 🚨 PREVIOUS ATTEMPT GATE FAILURES (REPAIR DIRECTIVES)\n"
+            for fg in failed_gates:
+                cmd = fg.get("command", "Unknown")
+                ret = fg.get("returncode", 1)
+                stdout = fg.get("stdout_snippet", "").strip()
+                stderr = fg.get("stderr_snippet", "").strip()
+                repair_block += f"### Failed Gate: {cmd} (Exit {ret})\n"
+                if stdout:
+                    repair_block += f"**Stdout:**\n```\n{stdout}\n```\n"
+                if stderr:
+                    repair_block += f"**Stderr:**\n```\n{stderr}\n```\n"
+
+            old_inst = env_dict.get("detailed_instructions") or ""
+            env_dict["detailed_instructions"] = old_inst + repair_block
+
         acc_plan = env_dict.get("acceptance_plan")
         if isinstance(acc_plan, dict):
             cmds = acc_plan.get("commands", [])
