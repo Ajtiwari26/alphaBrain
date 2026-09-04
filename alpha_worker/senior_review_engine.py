@@ -74,6 +74,19 @@ class SeniorReviewEngine:
         repo_path = task.get("envelope", {}).get("repo", ".")
         if branch_name:
             try:
+                # Ensure branch is up-to-date with main before diffing
+                subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", "main", branch_name],
+                    cwd=repo_path,
+                    capture_output=True,
+                )
+                stat_res = subprocess.run(
+                    ["git", "diff", "--stat", f"main..{branch_name}"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
                 res = subprocess.run(
                     ["git", "diff", f"main..{branch_name}"],
                     cwd=repo_path,
@@ -82,7 +95,8 @@ class SeniorReviewEngine:
                     timeout=30,
                 )
                 if res.returncode == 0 and res.stdout.strip():
-                    return res.stdout.strip()
+                    stat_str = stat_res.stdout.strip() if stat_res.returncode == 0 else ""
+                    return f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{res.stdout.strip()}"
             except Exception:
                 pass
         result = task.get("result") or {}
@@ -153,7 +167,7 @@ Description: {description}
 
 Git Diff:
 ```diff
-{diff_content[:6000]}
+{diff_content[:25000]}
 ```
 
 Review Instructions:
@@ -174,11 +188,11 @@ Title: {title}
 
 Git Diff:
 ```diff
-{diff_content[:6000]}
+{diff_content[:25000]}
 ```
 
 Gemini 3.1 Pro High Round 1 Finding:
-{pro_out[:3000]}
+{pro_out[:10000]}
 
 Instructions:
 1. Debate Gemini Pro's findings.
