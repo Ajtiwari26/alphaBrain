@@ -25,3 +25,15 @@
    - Maintain workspace clean: every test script must be under `testscript/` directory.
    - Code review graph MCP must be consulted for context to prevent token waste and preserve architectural integrity.
    - Every terminal command or curl command must have a clear commented explanation string describing what it achieves.
+
+5. **Strict Autonomous Self-Development Invariant (Zero Direct Manual Edits)**:
+   - **NO DIRECT MANUAL CODE MODIFICATIONS**: Assistants (Antigravity, Gemini, Claude, etc.) must NEVER manually edit task implementation code, tests, or features directly in the workspace working tree.
+   - **STRICT SELF-DEVELOPMENT DISPATCH**: All features, modifications, bug fixes, and review repairs MUST be executed exclusively by AlphaBrain's autonomous self-development pipeline:
+     1. **Admit**: Task or repair admitted into triage queue (`.venv/bin/python -m alpha_core.triage_cli admit`).
+     2. **Safety Review**: Deterministic SafetyGate evaluation (`.venv/bin/python -m alpha_core.triage_cli review <task_id>`).
+     3. **Founder Approval**: Operator sign-off (`.venv/bin/python -m alpha_core.triage_cli approve <task_id>`).
+     4. **Autonomous Worker Dispatch**: AGY coding agent dispatched inside an isolated Git worktree (`.venv/bin/python -m alpha_core.triage_cli worker-cycle`). All code edits, test additions, and gate executions occur inside this isolated worktree by the AGY worker.
+     5. **Senior Engineering Review**: Mandatory 2-Round debate between Gemini 3.1 Pro High and Claude Opus 4.6 Thinking (`.venv/bin/python -m alpha_core.triage_cli senior-review <task_id>`). If repairs are required, the repair instructions are fed back into AlphaBrain's autonomous retry cycle—NEVER manually patched by the supervisor.
+     6. **Autonomous Merge**: Atomic fast-forward merge into main (`.venv/bin/python -m alpha_core.triage_cli merge <task_id>`) only after unanimous senior approval.
+   - The supervisor's role is strictly orchestration, monitoring, and operator feedback—never direct coding or bypass.
+
