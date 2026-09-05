@@ -274,6 +274,38 @@ class TriageTaskDispatcher:
         ret, out, _ = self.run_command_in_worktree(worktree_path, ["git", "rev-parse", "HEAD"])
         return out.strip() if ret == 0 else None
 
+    def validate_acceptance_plan(self, plan: dict[str, Any]) -> str | None:
+        """
+        Validates the acceptance plan prior to execution.
+        Returns an error string if validation fails, or None if valid.
+        """
+        if not plan:
+            return None
+
+        commands = plan.get("commands", [])
+        required_gates = plan.get("required_gates", [])
+
+        if required_gates and not commands:
+            return "Ambiguous empty plan: required_gates present but commands is empty."
+
+        gate_types_seen = set()
+        recognized_gates = {g.value for g in GateType}
+
+        for c in commands:
+            gate_type = c.get("gate_type")
+            if not gate_type or gate_type not in recognized_gates:
+                return f"Unknown or missing gate type: {gate_type}"
+
+            if gate_type in gate_types_seen:
+                return f"Duplicate command definition for gate_type: {gate_type}"
+            gate_types_seen.add(gate_type)
+
+            exe = c.get("executable")
+            if not exe or not str(exe).strip():
+                return f"Command missing executable for gate_type: {gate_type}"
+
+        return None
+
     def execute_task(self, leased_task: dict[str, Any]) -> PRProposal | None:
         """
         Executes a single leased task through the full isolation and PR generation lifecycle.
@@ -286,6 +318,13 @@ class TriageTaskDispatcher:
         base_commit = envelope.get("base_commit", self.default_base_commit)
         if not base_commit or base_commit == "HEAD":
             raise ValueError(f"Task '{task_id}' rejected: mutable HEAD or missing base_commit. Must provide a resolved SHA.")
+
+        # 1.5 Validate acceptance plan (Pre-Execution Typed Gate Validation)
+        validation_error = self.validate_acceptance_plan(envelope.get("acceptance_plan", {}))
+        if validation_error:
+            logger.error(f"Task {task_id} validation failed: {validation_error}")
+            self.queue.fail_task(task_id, error_details={"error": validation_error}, allow_retry=False)
+            return None
 
         # 1. Verify content_hash integrity
         env_json = json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str)
@@ -417,6 +456,62 @@ class TriageTaskDispatcher:
                 self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
                 return None
 
+            # 5.5 Post-Commit Final Diff Audit & Budget Enforcement
+            _ret, out, _ = self.run_command_in_worktree(
+                worktree_path, ["git", "diff", "--name-only", f"{base_commit}..{head_commit}"]
+            )
+            final_changed_files = [line.strip('"') for line in out.strip().splitlines() if line.strip()]
+
+            if final_changed_files:
+                violations = WorktreeManager.find_disallowed_changes(final_changed_files, allowed_paths)
+                if violations:
+                    err_msg = f"Security Violation: Post-commit diff contains files outside allowed_paths: {violations}"
+                    logger.error(err_msg)
+                    self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                    return None
+
+            _ret, ls_out, _ = self.run_command_in_worktree(worktree_path, ["git", "ls-tree", "-r", "HEAD"])
+            for line in ls_out.strip().splitlines():
+                if line.startswith("120000 ") or line.startswith("160000 "):
+                    err_msg = "Security Violation: Symlink or submodule detected in final commit."
+                    logger.error(err_msg)
+                    self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                    return None
+
+            _ret, status_out, _ = self.run_command_in_worktree(worktree_path, ["git", "status", "--porcelain"])
+            if status_out.strip():
+                err_msg = "Dirty uncommitted residue left behind after commit."
+                logger.error(err_msg)
+                self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                return None
+
+            max_changed_files = envelope.get("max_changed_files")
+            if isinstance(max_changed_files, int) and len(final_changed_files) > max_changed_files:
+                err_msg = f"Budget Error: Changed files count ({len(final_changed_files)}) exceeds max_changed_files ({max_changed_files})."
+                logger.error(err_msg)
+                self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                return None
+
+            max_diff_lines = envelope.get("max_diff_lines")
+            if isinstance(max_diff_lines, int):
+                import re
+                _ret, diff_stat_out, _ = self.run_command_in_worktree(
+                    worktree_path, ["git", "diff", "--shortstat", f"{base_commit}..{head_commit}"]
+                )
+                lines_changed = 0
+                match_ins = re.search(r'(\d+)\s+insertion', diff_stat_out)
+                match_del = re.search(r'(\d+)\s+deletion', diff_stat_out)
+                if match_ins:
+                    lines_changed += int(match_ins.group(1))
+                if match_del:
+                    lines_changed += int(match_del.group(1))
+
+                if lines_changed > max_diff_lines:
+                    err_msg = f"Budget Error: Diff lines count ({lines_changed}) exceeds max_diff_lines ({max_diff_lines})."
+                    logger.error(err_msg)
+                    self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                    return None
+
             # 6. Generate PR Proposal Artifact
             pr_proposal = PRProposal(
                 task_id=task_id,
@@ -428,7 +523,7 @@ class TriageTaskDispatcher:
                 description=envelope.get("detailed_instructions")
                 or envelope.get("description")
                 or title,
-                files_changed=changed_files,
+                files_changed=final_changed_files,
                 diff_stat=diff_stat,
                 gates_passed=gates_passed,
                 evidence=evidence,
