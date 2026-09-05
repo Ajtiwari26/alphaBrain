@@ -502,11 +502,22 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
     repo = str(Path.cwd().resolve())
     proposer = EvaTaskProposer()
+    import subprocess
+
+    # Resolve HEAD to strict 40-char SHA
+    base_commit_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True
+    ).stdout.strip()
+
     envelope = proposer.build_task_envelope(
         spec=spec,
         project_id=args.project_id,
         repo=repo,
-        base_commit="HEAD",
+        base_commit=base_commit_sha,
     )
 
     if getattr(args, "depends_on", None):

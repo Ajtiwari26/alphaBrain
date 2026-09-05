@@ -127,9 +127,8 @@ class TaskEnvelope(BaseModel):
     )
     repo: str = Field(min_length=1, max_length=512, description="Repository path or identifier")
     base_commit: str = Field(
-        default="HEAD",
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/@{}~^+-]{0,127}$",
-        description="Git base commit/branch",
+        pattern=r"^[a-f0-9]{40}$",
+        description="Git base commit SHA (strict 40-chars)",
     )
     objective: str = Field(description="Clear, actionable task objective")
     detailed_instructions: str | None = Field(
@@ -173,6 +172,13 @@ class TaskEnvelope(BaseModel):
 
     # Timestamps
     created_at: datetime = Field(default_factory=utc_now)
+
+    @field_validator("base_commit", mode="before")
+    @classmethod
+    def validate_base_commit(cls, v: Any) -> str:
+        if not v or str(v) == "HEAD":
+            raise ValueError("base_commit must be a resolved 40-char SHA, not HEAD or empty")
+        return str(v)
 
     @field_validator("allowed_paths")
     @classmethod
