@@ -18,7 +18,6 @@ Review Workflow:
 from __future__ import annotations
 
 import logging
-import re
 import subprocess
 import tempfile
 import time
@@ -98,7 +97,7 @@ class SeniorReviewEngine:
                     stat_str = stat_res.stdout.strip() if stat_res.returncode == 0 else ""
                     diff_str = res.stdout.strip()
                     full_content_str = ""
-                    
+
                     # Also append full file contents of modified files
                     files_res = subprocess.run(
                         ["git", "diff", "--name-only", f"main..{branch_name}"],
@@ -124,7 +123,7 @@ class SeniorReviewEngine:
                                         full_content_str += f"\n\n=== FULL FILE CONTENT: {f} ===\n```\n{content_res.stdout}\n```\n"
                                 except Exception:
                                     pass
-                                    
+
                     return (
                         f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{diff_str}\n{full_content_str}"
                     )
@@ -179,13 +178,13 @@ class SeniorReviewEngine:
         """
         if not output:
             return default_verdict
-        
+
         lines = [line.strip() for line in output.splitlines() if line.strip()]
         if not lines:
             return default_verdict
-            
+
         last_line = lines[-1]
-        
+
         try:
             import json
             def reject_duplicates(ordered_pairs):
@@ -195,19 +194,19 @@ class SeniorReviewEngine:
                         raise ValueError(f"Duplicate key: {k}")
                     d[k] = v
                 return d
-                
+
             parsed = json.loads(last_line, object_pairs_hook=reject_duplicates)
-            
+
             if not isinstance(parsed, dict):
                 return default_verdict
-                
+
             if len(parsed) != 1 or "verdict" not in parsed:
                 return default_verdict
-                
+
             val = parsed["verdict"]
             if not isinstance(val, str) or val not in valid_enums:
                 return default_verdict
-                
+
             return val
         except Exception:
             return default_verdict

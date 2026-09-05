@@ -219,7 +219,7 @@ class TriageTaskDispatcher:
         _, uncommitted_stat, _ = self.run_command_in_worktree(
             worktree_path, ["git", "diff", "--stat"]
         )
-        
+
         full_stat = stat_out.strip()
         if uncommitted_stat.strip():
             full_stat += "\n" + uncommitted_stat.strip()

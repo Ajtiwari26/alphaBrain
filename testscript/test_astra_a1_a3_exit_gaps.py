@@ -92,30 +92,30 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
 
 def test_senior_review_parser_strict_json():
     engine = SeniorReviewEngine(None)  # Queue not needed for parser tests
-    
+
     # 1. Valid Pro output
     valid_pro = 'Great work.\n{"verdict": "APPROVE"}'
     assert engine.parse_verdict_line(valid_pro, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "APPROVE"
-    
+
     # 2. Valid Opus output
     valid_opus = 'Looks good.\n{"verdict": "FINAL_APPROVAL"}'
     assert engine.parse_verdict_line(valid_opus, ["FINAL_APPROVAL", "REJECT"], "REJECT") == "FINAL_APPROVAL"
-    
+
     # 3. Wrong enum (Opus evaluating Pro output)
     assert engine.parse_verdict_line(valid_pro, ["FINAL_APPROVAL", "REJECT"], "REJECT") == "REJECT"
-    
+
     # 4. JSON embedded but not on the last line
     embedded = 'Here is the verdict: {"verdict": "APPROVE"}\nBut wait, final decision: REJECT'
     assert engine.parse_verdict_line(embedded, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"
-    
+
     # 5. Extra keys in JSON
     extra_keys = '{"verdict": "APPROVE", "reason": "good"}'
     assert engine.parse_verdict_line(extra_keys, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"
-    
+
     # 6. Duplicate keys in JSON
     duplicate = '{"verdict": "REPAIR_REQUIRED", "verdict": "APPROVE"}'
     assert engine.parse_verdict_line(duplicate, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"
-    
+
     # 7. Quoted or fenced JSON
     fenced = '```json\n{"verdict": "APPROVE"}\n```'
     assert engine.parse_verdict_line(fenced, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"
