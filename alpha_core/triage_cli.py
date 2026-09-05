@@ -651,6 +651,35 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print("Error: Missing result_sha. Immutable result binding is required for promotion.", file=sys.stderr)
         return 1
 
+    attestation_dict = senior_review.get("attestation")
+    if attestation_dict:
+        import os
+
+        from alpha_protocol.task import ReviewAttestation
+        try:
+            att = ReviewAttestation(**attestation_dict)
+        except Exception as e:
+            print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
+            return 1
+
+        signing_secret = os.environ.get("ALPHA_SIGNING_SECRET", "alphabrain_senior_review_key")
+        if not att.verify(signing_secret):
+            print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
+            return 1
+
+        if att.result_sha != result_sha:
+            print("Error: Attestation result_sha does not match expected result_sha.", file=sys.stderr)
+            return 1
+
+        expected_base_commit = task.get("envelope", {}).get("base_commit")
+        if att.base_commit != expected_base_commit:
+            print("Error: Attestation base_commit does not match task base_commit.", file=sys.stderr)
+            return 1
+
+        if not att.approved:
+            print("Error: Attestation indicates senior review was not approved.", file=sys.stderr)
+            return 1
+
     try:
         tip_res = subprocess.run(
             ["git", "rev-parse", branch_name],
@@ -669,54 +698,66 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
     print(f"Verifying gates passed and senior review for '{args.task_id}'... OK")
     print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")
-    try:
-        subprocess.run(
-            ["git", "checkout", "main"],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        res = subprocess.run(
-            ["git", "merge", "--ff-only", branch_name],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        if res.stdout.strip():
-            print(res.stdout.strip())
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Fast-forward merge failed.\n{e.stderr}", file=sys.stderr)
-        return 1
 
-    if worktree_path and Path(worktree_path).exists():
-        print(f"Pruning git worktree '{worktree_path}'...")
+    import fcntl
+    lock_file_path = Path(repo_path) / ".alphabrain" / "promotion.lock"
+    lock_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(lock_file_path, "w") as lock_file:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("Error: Another promotion is currently in progress. Lock acquisition failed.", file=sys.stderr)
+            return 1
+
         try:
             subprocess.run(
-                ["git", "worktree", "remove", "--force", worktree_path],
+                ["git", "checkout", "main"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            res = subprocess.run(
+                ["git", "merge", "--ff-only", result_sha],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            if res.stdout.strip():
+                print(res.stdout.strip())
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Fast-forward merge failed.\n{e.stderr}", file=sys.stderr)
+            return 1
+
+        if worktree_path and Path(worktree_path).exists():
+            print(f"Pruning git worktree '{worktree_path}'...")
+            try:
+                subprocess.run(
+                    ["git", "worktree", "remove", "--force", worktree_path],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as e:
+                print(
+                    f"Warning: Failed to prune worktree '{worktree_path}'.\n{e.stderr}",
+                    file=sys.stderr,
+                )
+
+        print(f"Deleting task branch '{branch_name}'...")
+        try:
+            subprocess.run(
+                ["git", "branch", "-d", branch_name],
                 cwd=repo_path,
                 check=True,
                 capture_output=True,
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            print(
-                f"Warning: Failed to prune worktree '{worktree_path}'.\n{e.stderr}",
-                file=sys.stderr,
-            )
-
-    print(f"Deleting task branch '{branch_name}'...")
-    try:
-        subprocess.run(
-            ["git", "branch", "-d", branch_name],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as e:
-        print(f"Warning: Failed to delete branch '{branch_name}'.\n{e.stderr}", file=sys.stderr)
+            print(f"Warning: Failed to delete branch '{branch_name}'.\n{e.stderr}", file=sys.stderr)
 
     if getattr(args, "json", False):
         print(json.dumps({"task_id": args.task_id, "status": "merged"}))
