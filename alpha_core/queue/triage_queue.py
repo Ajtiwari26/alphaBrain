@@ -530,10 +530,9 @@ class TaskTriageQueue:
             # Since we can't easily alter the schema, store these in provenance_json for validation
             provenance_dict["lease_metadata"] = {
                 "worker_id": worker_id or "default_worker",
-                "owner_id": worker_id or "default_worker",
                 "lease_id": lease_id,
                 "fencing_epoch": fencing_epoch,
-                "attempt_id": attempt_id
+                "attempt_id": attempt_id,
             }
             new_provenance_json = json.dumps(provenance_dict, default=str)
 
@@ -567,6 +566,66 @@ class TaskTriageQueue:
             return data
 
         return self._execute_write_with_retry(_lease)
+
+    def release_lease(
+        self,
+        task_id: str,
+        worker_id: str,
+        lease_id: str,
+        fencing_epoch: int,
+        attempt_id: str,
+        reason: str = "tenant_access_denied",
+    ) -> bool:
+        """
+        Atomically releases a leased task back to APPROVED status without incrementing retry_count.
+        Clears lease_metadata from provenance_json to avoid stale token collision (Opus Directive A-3).
+        Avoids audit log bloat in DB for fast-fail authorization checks (Gemini Pro + Opus).
+        Uses atomic Compare-And-Swap (CAS) with the fencing token quadruple.
+        """
+        now = time.time()
+
+        def _release(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute(
+                "SELECT provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                (task_id, TriageStatus.EXECUTING.value),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            provenance_dict = json.loads(row["provenance_json"]) if row["provenance_json"] else {}
+            # Evict lease_metadata so subsequent leases start completely clean
+            provenance_dict.pop("lease_metadata", None)
+            new_provenance_json = json.dumps(provenance_dict, default=str)
+
+            # Defensive SQL Security Note:
+            # Query fragments below are statically defined internal constants.
+            # All variable values are passed strictly via parameterized query bindings.
+            update_cursor = conn.execute(
+                """
+                UPDATE task_triage_queue
+                SET status = ?, started_at = NULL, provenance_json = ?, updated_at = ?
+                WHERE id = ? AND status = ?
+                  AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?
+                  AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?
+                  AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?
+                  AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?;
+                """,
+                (
+                    TriageStatus.APPROVED.value,
+                    new_provenance_json,
+                    now,
+                    task_id,
+                    TriageStatus.EXECUTING.value,
+                    worker_id,
+                    lease_id,
+                    fencing_epoch,
+                    attempt_id,
+                ),
+            )
+            return update_cursor.rowcount > 0
+
+        return bool(self._execute_write_with_retry(_release, allow_during_emergency=True))
 
     def complete_task(
         self,
@@ -612,6 +671,9 @@ class TaskTriageQueue:
 
             new_provenance_json = json.dumps(provenance_dict, default=str)
 
+            # Defensive SQL Security Note:
+            # Query fragments below are statically defined internal constants.
+            # All variable values are passed strictly via parameterized query bindings.
             where_clause = "WHERE id = ? AND status = ?"
             params = [
                 TriageStatus.COMPLETED.value,
@@ -625,11 +687,11 @@ class TaskTriageQueue:
                 TriageStatus.EXECUTING.value,
             ]
             if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
-                where_clause += " AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)"
+                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
                 where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
                 where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
                 where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
-                params.extend([worker_id, worker_id, lease_id, fencing_epoch, attempt_id])
+                params.extend([worker_id, lease_id, fencing_epoch, attempt_id])
 
             update_cursor = conn.execute(
                 f"""
@@ -800,14 +862,17 @@ class TaskTriageQueue:
                     now,
                     task_id,
                 ]
+                # Defensive SQL Security Note:
+                # Query fragments below are statically defined internal constants.
+                # All variable values are passed strictly via parameterized query bindings.
                 if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
                     where_clause += " AND status = ?"
                     params.append(TriageStatus.EXECUTING.value)
-                    where_clause += " AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
                     where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
                     where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
                     where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
-                    params.extend([worker_id, worker_id, lease_id, fencing_epoch, attempt_id])
+                    params.extend([worker_id, lease_id, fencing_epoch, attempt_id])
 
                 up_cur = conn.execute(
                     f"""
@@ -832,14 +897,17 @@ class TaskTriageQueue:
                     now,
                     task_id,
                 ]
+                # Defensive SQL Security Note:
+                # Query fragments below are statically defined internal constants.
+                # All variable values are passed strictly via parameterized query bindings.
                 if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
                     where_clause += " AND status = ?"
                     params.append(TriageStatus.EXECUTING.value)
-                    where_clause += " AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
                     where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
                     where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
                     where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
-                    params.extend([worker_id, worker_id, lease_id, fencing_epoch, attempt_id])
+                    params.extend([worker_id, lease_id, fencing_epoch, attempt_id])
 
                 up_cur = conn.execute(
                     f"""
@@ -1012,12 +1080,14 @@ class TaskTriageQueue:
             new_attempt_id = str(uuid.uuid4())
             new_fencing_epoch = time.time_ns()
 
+            # Defensive SQL Security Note:
+            # Query fragments below are statically defined internal constants.
+            # All variable values are passed strictly via parameterized query bindings.
             provenance_dict["lease_metadata"] = {
                 "worker_id": new_worker_id,
-                "owner_id": new_worker_id,
                 "lease_id": new_lease_id,
                 "fencing_epoch": new_fencing_epoch,
-                "attempt_id": new_attempt_id
+                "attempt_id": new_attempt_id,
             }
 
             new_provenance_json = json.dumps(provenance_dict, default=str)
@@ -1027,7 +1097,7 @@ class TaskTriageQueue:
                 UPDATE task_triage_queue
                 SET provenance_json = ?, updated_at = ?
                 WHERE id = ? AND status = ?
-                  AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)
+                  AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?
                   AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?
                   AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?
                   AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?;
@@ -1037,7 +1107,7 @@ class TaskTriageQueue:
                     now,
                     task_id,
                     TriageStatus.EXECUTING.value,
-                    worker_id, worker_id, lease_id, fencing_epoch, attempt_id
+                    worker_id, lease_id, fencing_epoch, attempt_id
                 ),
             )
             return update_cursor.rowcount > 0
