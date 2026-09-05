@@ -186,16 +186,6 @@ class SeniorReviewEngine:
             
         last_line = lines[-1]
         
-        # If the last line is a markdown code block closer, look at the second to last line
-        if last_line.startswith('```') and len(lines) >= 2:
-            last_line = lines[-2]
-            # It might also have ````json` before it, so let's strip those too if they exist
-            if last_line.startswith('```'):
-                pass # not likely, but just in case
-                
-        # Also strip any inline backticks
-        last_line = last_line.strip('`')
-        
         try:
             import json
             def reject_duplicates(ordered_pairs):
