@@ -69,7 +69,7 @@ class TriageTaskDispatcher:
         self,
         queue: TaskTriageQueue,
         worktree_mgr: WorktreeManager | None = None,
-        default_base_commit: str = "HEAD",
+        default_base_commit: str | None = None,
         live_bridge: AntigravityLiveBridge | None = None,
         adapter: AntigravityAdapter | None = None,
         enable_agent_execution: bool | None = None,
@@ -264,6 +264,8 @@ class TriageTaskDispatcher:
         project_id = envelope.get("project_id", "default_proj")
         repo_path = envelope.get("repo", ".")
         base_commit = envelope.get("base_commit", self.default_base_commit)
+        if not base_commit or base_commit == "HEAD":
+            raise ValueError(f"Task '{task_id}' rejected: mutable HEAD or missing base_commit. Must provide a resolved SHA.")
 
         # 1. Verify content_hash integrity
         env_json = json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str)
@@ -449,6 +451,8 @@ class TriageTaskDispatcher:
         env_dict.setdefault("project_id", "alphabrain_triage")
         env_dict.setdefault("repo", str(worktree_path))
         env_dict.setdefault("base_commit", self.default_base_commit)
+
+
         env_dict.setdefault("preferred_agent", AgentType.ANTIGRAVITY)
         env_dict.setdefault("risk_class", RiskClass.LOW)
 

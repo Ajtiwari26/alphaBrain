@@ -40,13 +40,13 @@ def test_worktree_lifecycle(temp_git_repo, monkeypatch, tmp_path):
     worktree_path = mgr.create_worktree(
         repo_path=str(temp_git_repo),
         task_id=task_id,
-        base_commit="HEAD",
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=temp_git_repo).decode("utf-8").strip(),
     )
     assert worktree_path.exists()
     assert (worktree_path / "README.md").exists()
     assert (
         mgr.create_or_resume_worktree(
-            repo_path=str(temp_git_repo), task_id=task_id, base_commit="HEAD"
+            repo_path=str(temp_git_repo), task_id=task_id, base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=temp_git_repo).decode("utf-8").strip()
         )
         == worktree_path
     )

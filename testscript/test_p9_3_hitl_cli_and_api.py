@@ -1,4 +1,5 @@
 """
+import subprocess
 testscript/test_p9_3_hitl_cli_and_api.py
 Comprehensive integration test suite for Milestone P9.3:
 Human-in-the-Loop (HITL) Review Interface, CLI, and REST API.

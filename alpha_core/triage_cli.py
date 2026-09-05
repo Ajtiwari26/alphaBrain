@@ -18,8 +18,8 @@ import datetime
 import json
 import subprocess
 import sys
-from typing import Any, cast
 from pathlib import Path
+from typing import cast
 
 from alpha_core.queue.triage_queue import (
     DEFAULT_DB_PATH,
@@ -634,31 +634,27 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     # A3: SLSA Provenance check - compare branch tip to result_sha
     result_sha = result.get("result_sha")
     if not result_sha:
-        # Fallback to senior_review payload if it was stored there
         result_sha = senior_review.get("result_sha")
 
-    if result_sha:
-        try:
-            tip_res = subprocess.run(
-                ["git", "rev-parse", branch_name],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            branch_tip = tip_res.stdout.strip()
-            if branch_tip != result_sha:
-                print(
-                    f"Error: Security Violation. Branch tip '{branch_tip}' does not match reviewed SHA '{result_sha}'.",
-                    file=sys.stderr,
-                )
-                return 1
-        except subprocess.CalledProcessError as e:
-            print(
-                f"Error: Could not resolve branch tip for '{branch_name}'.\n{e.stderr}",
-                file=sys.stderr,
-            )
+    if not result_sha:
+        print("Error: Missing result_sha. Immutable result binding is required for promotion.", file=sys.stderr)
+        return 1
+
+    try:
+        tip_res = subprocess.run(
+            ["git", "rev-parse", branch_name],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        branch_tip = tip_res.stdout.strip()
+        if branch_tip != result_sha:
+            print(f"Error: SLSA Provenance Failure. Branch tip {branch_tip} does not match approved result_sha {result_sha}.", file=sys.stderr)
             return 1
+    except subprocess.CalledProcessError:
+        print(f"Error: Could not resolve branch {branch_name}.", file=sys.stderr)
+        return 1
 
     print(f"Verifying gates passed and senior review for '{args.task_id}'... OK")
     print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")

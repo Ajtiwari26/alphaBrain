@@ -18,15 +18,14 @@ Review Workflow:
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 import tempfile
 import time
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from alpha_core.config import settings
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
 
 logger = logging.getLogger("alphabrain.worker.senior_review")
@@ -125,7 +124,6 @@ class SeniorReviewEngine:
                 str(self.agy_bin),
                 "--model",
                 model,
-                "--dangerously-skip-permissions",
                 "--disable-slash-commands",
                 "--print-timeout",
                 f"{timeout_seconds}s",
@@ -175,15 +173,22 @@ Review Instructions:
 1. Verify correct implementation of the objective.
 2. Check security, boundary validation, and zero secret leakage.
 3. Check test coverage and acceptance criteria.
-4. Render your verdict explicitly as either 'VERDICT: APPROVE' or 'VERDICT: REPAIR_REQUIRED'.
+4. Render your verdict explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "APPROVE"}} or {{"verdict": "REPAIR_REQUIRED"}}. Do not output any other JSON.
 """
+        import json
         pro_out = self._invoke_agy(
             "gemini-3.1-pro-high", pro_prompt, timeout_seconds=240, effort="high"
         )
-        pro_match = re.search(
-            r"VERDICT:\s*(APPROVE|REPAIR_REQUIRED|REJECT)", pro_out, flags=re.MULTILINE
-        )
-        pro_verdict = pro_match.group(1) if pro_match else "REPAIR_REQUIRED"
+        try:
+            verdicts = re.findall(r'\{"verdict":\s*"[^"]+"\}', pro_out)
+            if len(verdicts) != 1:
+                pro_verdict = "REPAIR_REQUIRED"
+            else:
+                parsed = json.loads(verdicts[0])
+                pro_verdict = parsed.get("verdict", "REPAIR_REQUIRED")
+        except Exception:
+            pro_verdict = "REPAIR_REQUIRED"
+
         pro_approved = pro_verdict == "APPROVE"
 
         # --- Round 1 Step 2: Claude Opus 4.6 Thinking ---
@@ -203,11 +208,19 @@ Gemini 3.1 Pro High Round 1 Finding:
 Instructions:
 1. Debate Gemini Pro's findings.
 2. Verify overall system design and AlphaBrain Invariant compliance.
-3. Render your authoritative final ruling explicitly as either 'VERDICT: FINAL_APPROVAL' or 'VERDICT: REJECT'.
+3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
         opus_out = self._invoke_agy("claude-opus-4-6-thinking", opus_prompt, timeout_seconds=360)
-        opus_match = re.search(r"VERDICT:\s*(FINAL_APPROVAL|REJECT)", opus_out, flags=re.MULTILINE)
-        opus_verdict = opus_match.group(1) if opus_match else "REJECT"
+        try:
+            verdicts = re.findall(r'\{"verdict":\s*"[^"]+"\}', opus_out)
+            if len(verdicts) != 1:
+                opus_verdict = "REJECT"
+            else:
+                parsed = json.loads(verdicts[0])
+                opus_verdict = parsed.get("verdict", "REJECT")
+        except Exception:
+            opus_verdict = "REJECT"
+
         opus_approved = opus_verdict == "FINAL_APPROVAL"
 
         unanimous = pro_approved and opus_approved

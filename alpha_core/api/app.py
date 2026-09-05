@@ -2361,6 +2361,10 @@ class TriageTaskResultRequest(BaseModel):
     worktree_path: str | None = None
     branch_name: str | None = None
     error: str | None = None
+    worker_id: str
+    lease_id: str
+    fencing_epoch: int
+    attempt_id: str
 
 
 def require_triage_worker_access(principal: AuthPrincipal) -> None:
@@ -2399,6 +2403,19 @@ async def post_triage_task_result(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid task ID"
         )
+
+    task_rec = queue.get_task(task_id)
+    if not task_rec:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    if task_rec.get("status") != "executing":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task not executing")
+
+    lease_meta = task_rec.get("provenance", {}).get("lease_metadata", {})
+    if (lease_meta.get("worker_id") != payload.worker_id or
+        lease_meta.get("lease_id") != payload.lease_id or
+        lease_meta.get("fencing_epoch") != payload.fencing_epoch or
+        lease_meta.get("attempt_id") != payload.attempt_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Lease fencing violation: Ownership proof failed")
 
     if payload.status == "completed":
         # A3 SLSA Provenance: Prevent executor from minting review/promotion evidence

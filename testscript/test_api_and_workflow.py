@@ -448,6 +448,7 @@ async def test_worker_control_plane_lease_heartbeat_result_vertical_slice(
     assert queued.json()["status"] == "queued"
     assert leased.json()["status"] == "leased"
     assert heartbeat.json()["status"] == "heartbeat_recorded"
+    print(completed.json())
     assert completed.json()["status"] == "result_recorded"
 
 

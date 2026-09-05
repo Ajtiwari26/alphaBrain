@@ -136,6 +136,10 @@ class AuthPrincipal:
     role: PrincipalRole
     project_ids: tuple[str, ...] = ()
 
+    def __post_init__(self):
+        if isinstance(self.role, str):
+            object.__setattr__(self, 'role', PrincipalRole(self.role))
+
     def has_permission(self, permission: str) -> bool:
         return permission in ROLE_PERMISSIONS.get(self.role, frozenset())
 
@@ -153,7 +157,7 @@ def require_permission(principal: AuthPrincipal, permission: str) -> None:
     if not principal.has_permission(permission):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Role '{principal.role.value}' lacks permission '{permission}'",
+            detail=f"Role '{getattr(principal.role, 'value', principal.role)}' lacks permission '{permission}'",
         )
 
 

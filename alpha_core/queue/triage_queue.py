@@ -15,6 +15,7 @@ import json
 import logging
 import sqlite3
 import time
+import uuid
 from collections.abc import Callable
 from contextlib import closing
 from enum import Enum
@@ -522,6 +523,19 @@ class TaskTriageQueue:
             new_provenance_json = json.dumps(provenance_dict, default=str)
 
             # Atomically claim it
+            lease_id = str(uuid.uuid4())
+            attempt_id = str(uuid.uuid4())
+            fencing_epoch = int(now)
+
+            # Since we can't easily alter the schema, store these in provenance_json for validation
+            provenance_dict["lease_metadata"] = {
+                "worker_id": worker_id or "default_worker",
+                "lease_id": lease_id,
+                "fencing_epoch": fencing_epoch,
+                "attempt_id": attempt_id
+            }
+            new_provenance_json = json.dumps(provenance_dict, default=str)
+
             conn.execute(
                 """
                 UPDATE task_triage_queue
@@ -538,6 +552,12 @@ class TaskTriageQueue:
                 ),
             )
             data = dict(selected_row)
+            data["provenance"] = provenance_dict
+            data["worker_id"] = provenance_dict["lease_metadata"]["worker_id"]
+            data["lease_id"] = lease_id
+            data["fencing_epoch"] = fencing_epoch
+            data["attempt_id"] = attempt_id
+
             data["status"] = TriageStatus.EXECUTING.value
             data["started_at"] = now
             data["envelope"] = json.loads(data["envelope_json"])
@@ -633,12 +653,24 @@ class TaskTriageQueue:
             if not row:
                 return False
             result_data = json.loads(row[0]) if row[0] else {}
+
+            import hashlib
+            result_sha = result_data.get("head_commit", "") or result_data.get("result_sha", "")
+            gate_manifest = json.dumps(result_data.get("acceptance_manifest", {}), sort_keys=True)
+            reviewer_identity = "SYSTEM_SENIOR_REVIEW_ENGINE"
+
+            payload = f"{task_id}:{result_sha}:{gate_manifest}:{reviewer_identity}:{approved}"
+            provenance_signature = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
             result_data["senior_review"] = {
                 "pro_verdict": pro_verdict,
                 "opus_verdict": opus_verdict,
                 "approved": approved,
                 "reviewed_at": now,
                 "details": review_details or {},
+                "provenance_signature": provenance_signature,
+                "reviewer_identity": reviewer_identity,
+                "result_sha": result_sha,
             }
             cursor = conn.execute(
                 """

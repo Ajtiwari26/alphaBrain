@@ -1,4 +1,5 @@
 """
+import subprocess
 testscript/test_p9_2_safety_pipeline.py
 End-to-end verification of Eva Queue Producer and Safety Gate Engine (Phase 9.2-R1).
 

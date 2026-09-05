@@ -132,6 +132,8 @@ def test_full_end_to_end_autonomous_lifecycle(
     assert task_data is not None
     env_dict = task_data["envelope"]
     env_dict["repo"] = str(fixture_repo)
+    import subprocess
+    env_dict["base_commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip()
     env_json = json.dumps(env_dict, default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     with isolated_queue._get_connection() as conn:
@@ -222,6 +224,7 @@ def test_chaos_worker_sudden_crash_and_watchdog_reclamation(
         "project_id": "proj_chaos",
         "objective": "Heavy compute job",
         "repo": str(fixture_repo),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
         "allowed_paths": ["compute.py"],
     }
     env_json = json.dumps(env, default=str)
@@ -402,6 +405,7 @@ def test_chaos_cryptographic_tamper_detection(
         "task_id": "tamper_task",
         "objective": "Benign task",
         "repo": str(fixture_repo),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
         "allowed_paths": ["safe.py"],
     }
     env_json = json.dumps(env, default=str)
@@ -457,6 +461,7 @@ def test_chaos_sandbox_escape_and_blast_radius_violations(
         "task_id": "escape_task",
         "objective": "Restricted task",
         "repo": str(fixture_repo),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
         "allowed_paths": ["docs/guide.md"],
     }
     env_json = json.dumps(env, default=str)

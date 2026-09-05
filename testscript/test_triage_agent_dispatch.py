@@ -67,7 +67,7 @@ def test_triage_dispatcher_invokes_agy_live_bridge(
         "task_id": "task_agy_1",
         "project_id": "test_proj",
         "repo": str(repo),
-        "base_commit": "HEAD",
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo).decode("utf-8").strip(),
         "objective": "Auto-code feature",
         "allowed_paths": ["agent_output.py"],
         "acceptance_plan": {
@@ -131,7 +131,7 @@ def test_triage_dispatcher_eva_hash_fallback(
         "task_id": "task_eva_hash_1",
         "project_id": "test_proj",
         "repo": str(repo),
-        "base_commit": "HEAD",
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo).decode("utf-8").strip(),
         "title": title,
         "acceptance_criteria": crit,
         "allowed_paths": paths,
