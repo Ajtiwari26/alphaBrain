@@ -2387,7 +2387,14 @@ async def post_triage_lease_task(
             status_code=status.HTTP_409_CONFLICT,
             detail="Emergency stop active. Worker leasing suspended.",
         )
-    task = queue.lease_next_approved_task()
+    task = queue.lease_next_approved_task(worker_id=principal.subject)
+    if task:
+        try:
+            require_project_access(principal, task["envelope"]["project_id"])
+        except HTTPException as e:
+            # rollback lease
+            queue.fail_task(task["id"], error_details={"error": "Lease aborted: Unauthorized tenant access"}, allow_retry=True, max_retries=999)
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized tenant access") from e
     return {"status": "ok", "task": task}
 
 
@@ -2431,15 +2438,31 @@ async def post_triage_task_result(
             result=payload.result,
             worktree_path=payload.worktree_path,
             branch_name=payload.branch_name,
+            worker_id=payload.worker_id,
+            lease_id=payload.lease_id,
+            fencing_epoch=payload.fencing_epoch,
+            attempt_id=payload.attempt_id,
         )
         if not success:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Task '{task_id}' not found or not in EXECUTING state",
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Task '{task_id}' concurrent modification or fencing violated",
             )
         return {"status": "ok", "task_id": task_id, "state": "completed"}
     elif payload.status == "failed":
-        queue.fail_task(task_id, error_details={"error": payload.error or "Unknown worker failure"})
+        success = queue.fail_task(
+            task_id,
+            error_details={"error": payload.error or "Unknown worker failure"},
+            worker_id=payload.worker_id,
+            lease_id=payload.lease_id,
+            fencing_epoch=payload.fencing_epoch,
+            attempt_id=payload.attempt_id,
+        )
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Task '{task_id}' concurrent modification or fencing violated",
+            )
         return {"status": "ok", "task_id": task_id, "state": "failed"}
     else:
         raise HTTPException(

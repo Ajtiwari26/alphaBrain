@@ -525,11 +525,12 @@ class TaskTriageQueue:
             # Atomically claim it
             lease_id = str(uuid.uuid4())
             attempt_id = str(uuid.uuid4())
-            fencing_epoch = int(now)
+            fencing_epoch = time.time_ns()
 
             # Since we can't easily alter the schema, store these in provenance_json for validation
             provenance_dict["lease_metadata"] = {
                 "worker_id": worker_id or "default_worker",
+                "owner_id": worker_id or "default_worker",
                 "lease_id": lease_id,
                 "fencing_epoch": fencing_epoch,
                 "attempt_id": attempt_id
@@ -561,7 +562,6 @@ class TaskTriageQueue:
             data["status"] = TriageStatus.EXECUTING.value
             data["started_at"] = now
             data["envelope"] = json.loads(data["envelope_json"])
-            data["provenance"] = json.loads(data["provenance_json"])
             if data.get("result_json"):
                 data["result"] = json.loads(data["result_json"])
             return data
@@ -574,6 +574,10 @@ class TaskTriageQueue:
         result: dict[str, Any],
         worktree_path: str | None = None,
         branch_name: str | None = None,
+        worker_id: str | None = None,
+        lease_id: str | None = None,
+        fencing_epoch: int | None = None,
+        attempt_id: str | None = None,
     ) -> bool:
         """Marks a task as COMPLETED with its execution output and worktree metadata."""
         now = time.time()
@@ -608,23 +612,32 @@ class TaskTriageQueue:
 
             new_provenance_json = json.dumps(provenance_dict, default=str)
 
+            where_clause = "WHERE id = ? AND status = ?"
+            params = [
+                TriageStatus.COMPLETED.value,
+                json.dumps(result),
+                worktree_path,
+                branch_name,
+                now,
+                new_provenance_json,
+                now,
+                task_id,
+                TriageStatus.EXECUTING.value,
+            ]
+            if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
+                where_clause += " AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)"
+                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
+                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
+                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                params.extend([worker_id, worker_id, lease_id, fencing_epoch, attempt_id])
+
             update_cursor = conn.execute(
-                """
+                f"""
                 UPDATE task_triage_queue
                 SET status = ?, result_json = ?, worktree_path = ?, branch_name = ?, completed_at = ?, provenance_json = ?, updated_at = ?
-                WHERE id = ? AND status = ?;
+                {where_clause};
                 """,
-                (
-                    TriageStatus.COMPLETED.value,
-                    json.dumps(result),
-                    worktree_path,
-                    branch_name,
-                    now,
-                    new_provenance_json,
-                    now,
-                    task_id,
-                    TriageStatus.EXECUTING.value,
-                ),
+                tuple(params),
             )
             return update_cursor.rowcount > 0
 
@@ -731,6 +744,10 @@ class TaskTriageQueue:
         error_details: dict[str, Any] | str,
         allow_retry: bool = True,
         max_retries: int = 2,
+        worker_id: str | None = None,
+        lease_id: str | None = None,
+        fencing_epoch: int | None = None,
+        attempt_id: str | None = None,
     ) -> bool:
         """
         Marks an in-flight task as failed. If retry_count < max_retries and allow_retry=True,
@@ -774,40 +791,66 @@ class TaskTriageQueue:
             if allow_retry and current_retries < max_retries:
                 # Re-queue for execution
                 next_retries = current_retries + 1
-                conn.execute(
-                    """
+                where_clause = "WHERE id = ?"
+                params = [
+                    TriageStatus.APPROVED.value,
+                    next_retries,
+                    json.dumps(payload),
+                    new_provenance_json,
+                    now,
+                    task_id,
+                ]
+                if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
+                    where_clause += " AND status = ?"
+                    params.append(TriageStatus.EXECUTING.value)
+                    where_clause += " AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                    params.extend([worker_id, worker_id, lease_id, fencing_epoch, attempt_id])
+
+                up_cur = conn.execute(
+                    f"""
                     UPDATE task_triage_queue
                     SET status = ?, retry_count = ?, result_json = ?, provenance_json = ?, updated_at = ?
-                    WHERE id = ?;
+                    {where_clause};
                     """,
-                    (
-                        TriageStatus.APPROVED.value,
-                        next_retries,
-                        json.dumps(payload),
-                        new_provenance_json,
-                        now,
-                        task_id,
-                    ),
+                    tuple(params),
                 )
+                if worker_id is not None and up_cur.rowcount == 0:
+                    return False
                 logger.warning(
                     "Task %s failed; retrying (%d/%d)", task_id, next_retries, max_retries
                 )
             else:
-                conn.execute(
-                    """
+                where_clause = "WHERE id = ?"
+                params = [
+                    TriageStatus.FAILED.value,
+                    json.dumps(payload),
+                    now,
+                    new_provenance_json,
+                    now,
+                    task_id,
+                ]
+                if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
+                    where_clause += " AND status = ?"
+                    params.append(TriageStatus.EXECUTING.value)
+                    where_clause += " AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
+                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                    params.extend([worker_id, worker_id, lease_id, fencing_epoch, attempt_id])
+
+                up_cur = conn.execute(
+                    f"""
                     UPDATE task_triage_queue
                     SET status = ?, result_json = ?, completed_at = ?, provenance_json = ?, updated_at = ?
-                    WHERE id = ?;
+                    {where_clause};
                     """,
-                    (
-                        TriageStatus.FAILED.value,
-                        json.dumps(payload),
-                        now,
-                        new_provenance_json,
-                        now,
-                        task_id,
-                    ),
+                    tuple(params),
                 )
+                if worker_id is not None and up_cur.rowcount == 0:
+                    return False
                 logger.error(
                     "Task %s permanently failed after %d retries", task_id, current_retries
                 )
@@ -891,7 +934,7 @@ class TaskTriageQueue:
         def _reap(conn: sqlite3.Connection) -> int:
             cursor = conn.execute(
                 """
-                SELECT id FROM task_triage_queue
+                SELECT id, provenance_json FROM task_triage_queue
                 WHERE status = ? AND started_at < ?;
                 """,
                 (TriageStatus.EXECUTING.value, cutoff),
@@ -900,10 +943,19 @@ class TaskTriageQueue:
             reaped = 0
             for row in rows:
                 task_id = row["id"]
+                provenance_dict = json.loads(row["provenance_json"]) if "provenance_json" in row.keys() else {}
+                if "audit_history" not in provenance_dict:
+                    provenance_dict["audit_history"] = []
+                provenance_dict["audit_history"].append({
+                    "action": "task_reaped_by_watchdog",
+                    "timestamp": now,
+                    "timeout_seconds": timeout_seconds,
+                })
+                new_provenance_json = json.dumps(provenance_dict, default=str)
                 conn.execute(
                     """
                     UPDATE task_triage_queue
-                    SET status = ?, result_json = ?, updated_at = ?
+                    SET status = ?, result_json = ?, provenance_json = ?, updated_at = ?
                     WHERE id = ? AND status = ?;
                     """,
                     (
@@ -913,6 +965,7 @@ class TaskTriageQueue:
                                 "error": f"Watchdog timeout: execution stalled for >{timeout_seconds}s"
                             }
                         ),
+                        new_provenance_json,
                         now,
                         task_id,
                         TriageStatus.EXECUTING.value,
@@ -922,6 +975,74 @@ class TaskTriageQueue:
             return reaped
 
         return int(self._execute_write_with_retry(_reap, allow_during_emergency=True))
+
+    def reassign(
+        self,
+        task_id: str,
+        worker_id: str,
+        lease_id: str,
+        fencing_epoch: int,
+        attempt_id: str,
+        new_worker_id: str,
+    ) -> bool:
+        """Atomically reassigns an executing task to a new worker with a fresh lease."""
+        now = time.time()
+
+        def _reassign(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute(
+                "SELECT provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                (task_id, TriageStatus.EXECUTING.value),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            provenance_dict = json.loads(row["provenance_json"])
+            if "audit_history" not in provenance_dict:
+                provenance_dict["audit_history"] = []
+
+            provenance_dict["audit_history"].append({
+                "action": "task_reassigned",
+                "timestamp": now,
+                "old_worker_id": worker_id,
+                "new_worker_id": new_worker_id,
+            })
+
+            new_lease_id = str(uuid.uuid4())
+            new_attempt_id = str(uuid.uuid4())
+            new_fencing_epoch = time.time_ns()
+
+            provenance_dict["lease_metadata"] = {
+                "worker_id": new_worker_id,
+                "owner_id": new_worker_id,
+                "lease_id": new_lease_id,
+                "fencing_epoch": new_fencing_epoch,
+                "attempt_id": new_attempt_id
+            }
+
+            new_provenance_json = json.dumps(provenance_dict, default=str)
+
+            update_cursor = conn.execute(
+                """
+                UPDATE task_triage_queue
+                SET provenance_json = ?, updated_at = ?
+                WHERE id = ? AND status = ?
+                  AND (json_extract(provenance_json, '$.lease_metadata.worker_id') = ? OR json_extract(provenance_json, '$.lease_metadata.owner_id') = ?)
+                  AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?
+                  AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?
+                  AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?;
+                """,
+                (
+                    new_provenance_json,
+                    now,
+                    task_id,
+                    TriageStatus.EXECUTING.value,
+                    worker_id, worker_id, lease_id, fencing_epoch, attempt_id
+                ),
+            )
+            return update_cursor.rowcount > 0
+
+        return bool(self._execute_write_with_retry(_reassign, allow_during_emergency=True))
 
     def get_task(self, task_id: str) -> dict[str, Any] | None:
         """Reads a single task by ID."""
