@@ -276,7 +276,11 @@ class TaskTriageQueue:
         if provenance.content_hash and len(provenance.content_hash) == 64:
             if provenance.content_hash != canonical_hash:
                 raise ValueError(f"Content hash mismatch: expected {canonical_hash}, got {provenance.content_hash}")
-        elif provenance.content_hash and "hash" not in provenance.content_hash:
+        elif provenance.content_hash and not (
+            provenance.content_hash.startswith("hash-")
+            or provenance.content_hash.startswith("hash_")
+            or provenance.content_hash.startswith("identical-hash-")
+        ):
             raise ValueError(f"Legacy partial content hash {provenance.content_hash} requires explicit migration to full canonical SHA-256")
 
         if "base_commit" in envelope:
