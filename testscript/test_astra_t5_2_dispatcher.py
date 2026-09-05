@@ -130,7 +130,7 @@ def test_post_commit_symlink_rejection(temp_repo):
 
     dispatcher.execute_task(build_task("t1", envelope))
     assert len(q.failed_tasks) > 0
-    assert "Symlink or submodule detected" in q.failed_tasks[0]["error"]
+    assert "Symlink or submodule added/modified" in q.failed_tasks[0]["error"]
 
 def test_post_commit_uncommitted_residue(temp_repo):
     q = MockQueue()
@@ -145,15 +145,25 @@ def test_post_commit_uncommitted_residue(temp_repo):
     os.system("git add allowed.txt")
     os.chdir(cwd)
 
+    original_create_git_commit = dispatcher.create_git_commit
+
+    def mock_create_git_commit(worktree_path, commit_message, author_name="AlphaBrain Autonomous Worker", author_email="worker@alphabrain.ai"):
+        head = original_create_git_commit(worktree_path, commit_message, author_name, author_email)
+        with open(worktree_path / "residue.txt", "w") as f:
+            f.write("dirt")
+        return head
+
+    dispatcher.create_git_commit = mock_create_git_commit
+
     envelope = {
         "repo": temp_repo,
         "base_commit": base_commit,
         "allowed_paths": ["allowed.txt"],
-        "acceptance_plan": {"commands": [{"gate_type": GateType.UNIT_TEST.value, "executable": "sh", "args": ["-c", "echo dirt > uncommitted.txt"]}]}
+        "acceptance_plan": {"commands": [{"gate_type": GateType.UNIT_TEST.value, "executable": "echo"}]}
     }
 
     dispatcher.execute_task(build_task("t2", envelope))
-    assert any(("Dirty uncommitted residue" in ft["error"] or "outside allowed_paths" in ft["error"]) for ft in q.failed_tasks)
+    assert any("Dirty uncommitted residue" in ft["error"] for ft in q.failed_tasks)
 
 def test_diff_budget_max_changed_files(temp_repo):
     q = MockQueue()

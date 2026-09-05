@@ -22,6 +22,7 @@ import dataclasses
 import hashlib
 import json
 import logging
+import re
 import subprocess
 import sys
 import time
@@ -282,6 +283,9 @@ class TriageTaskDispatcher:
         if not plan:
             return None
 
+        if not isinstance(plan, dict):
+            return "Invalid acceptance plan format: must be a dictionary."
+
         commands = plan.get("commands", [])
         required_gates = plan.get("required_gates", [])
 
@@ -291,7 +295,13 @@ class TriageTaskDispatcher:
         gate_types_seen = set()
         recognized_gates = {g.value for g in GateType}
 
+        if not isinstance(commands, list):
+            return "Invalid commands format: must be a list."
+
         for c in commands:
+            if not isinstance(c, dict):
+                return "Invalid command definition format: must be a dictionary."
+
             gate_type = c.get("gate_type")
             if not gate_type or gate_type not in recognized_gates:
                 return f"Unknown or missing gate type: {gate_type}"
@@ -470,10 +480,13 @@ class TriageTaskDispatcher:
                     self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
                     return None
 
-            _ret, ls_out, _ = self.run_command_in_worktree(worktree_path, ["git", "ls-tree", "-r", "HEAD"])
-            for line in ls_out.strip().splitlines():
-                if line.startswith("120000 ") or line.startswith("160000 "):
-                    err_msg = "Security Violation: Symlink or submodule detected in final commit."
+            _ret, diff_tree_out, _ = self.run_command_in_worktree(
+                worktree_path, ["git", "diff-tree", "-r", "--diff-filter=ACMR", base_commit, head_commit]
+            )
+            for line in diff_tree_out.strip().splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and (parts[1] == "120000" or parts[1] == "160000"):
+                    err_msg = "Security Violation: Symlink or submodule added/modified in final commit."
                     logger.error(err_msg)
                     self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
                     return None
@@ -494,7 +507,6 @@ class TriageTaskDispatcher:
 
             max_diff_lines = envelope.get("max_diff_lines")
             if isinstance(max_diff_lines, int):
-                import re
                 _ret, diff_stat_out, _ = self.run_command_in_worktree(
                     worktree_path, ["git", "diff", "--shortstat", f"{base_commit}..{head_commit}"]
                 )
