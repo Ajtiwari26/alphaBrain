@@ -137,6 +137,7 @@ class SeniorReviewEngine:
         self,
         model: str,
         prompt: str,
+        cwd: str | None = None,
         timeout_seconds: int = 300,
         effort: str | None = None,
     ) -> str:
@@ -162,7 +163,7 @@ class SeniorReviewEngine:
                 cmd.extend(["--effort", effort])
             cmd.extend(["--print", prompt])
 
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds + 30)
+            res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_seconds + 30)
             if res.returncode != 0:
                 logger.warning("AGY %s returned non-zero %d: %s", model, res.returncode, res.stderr)
                 raise RuntimeError(
@@ -245,7 +246,7 @@ Review Instructions:
 4. Render your verdict explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "APPROVE"}} or {{"verdict": "REPAIR_REQUIRED"}}. Do not output any other JSON.
 """
         pro_out = self._invoke_agy(
-            "gemini-3.1-pro-high", pro_prompt, timeout_seconds=240, effort="high"
+            "gemini-3.1-pro-high", pro_prompt, cwd=task.get("worktree_path"), timeout_seconds=240, effort="high"
         )
         pro_verdict = self.parse_verdict_line(pro_out, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
         pro_approved = pro_verdict == "APPROVE"
@@ -269,7 +270,7 @@ Instructions:
 2. Verify overall system design and AlphaBrain Invariant compliance.
 3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
-        opus_out = self._invoke_agy("claude-opus-4-6-thinking", opus_prompt, timeout_seconds=360)
+        opus_out = self._invoke_agy("claude-opus-4-6-thinking", opus_prompt, cwd=task.get("worktree_path"), timeout_seconds=360)
         opus_verdict = self.parse_verdict_line(opus_out, ["FINAL_APPROVAL", "REJECT"], "REJECT")
         opus_approved = opus_verdict == "FINAL_APPROVAL"
 
