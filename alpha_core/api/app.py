@@ -2392,8 +2392,16 @@ async def post_triage_lease_task(
         try:
             require_project_access(principal, task["envelope"]["project_id"])
         except HTTPException as e:
-            # rollback lease
-            queue.fail_task(task["id"], error_details={"error": "Lease aborted: Unauthorized tenant access"}, allow_retry=True, max_retries=999)
+            # rollback lease with full atomic fencing quadruple
+            queue.fail_task(
+                task["id"],
+                error_details={"error": "Lease aborted: Unauthorized tenant access"},
+                allow_retry=True,
+                worker_id=task["worker_id"],
+                lease_id=task["lease_id"],
+                fencing_epoch=task["fencing_epoch"],
+                attempt_id=task["attempt_id"],
+            )
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized tenant access") from e
     return {"status": "ok", "task": task}
 
