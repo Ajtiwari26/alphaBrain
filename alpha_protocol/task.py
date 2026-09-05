@@ -69,6 +69,84 @@ class ConcurrencyPolicy(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Review Attestation
+# ---------------------------------------------------------------------------
+
+
+class ReviewAttestation(BaseModel):
+    """Cryptographic attestation of senior review execution."""
+
+    task_id: str
+    result_sha: str = Field(pattern=r"^[a-f0-9]{40}$")
+    base_commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+    pro_verdict: str
+    opus_verdict: str
+    approved: bool
+    reviewed_at: float
+    evidence_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    signer_identity: str = "SYSTEM_SENIOR_REVIEW_ENGINE"
+    signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    def compute_digest(self) -> str:
+        import hashlib
+
+        data = self.model_dump(exclude={"signature"})
+        canonical_json = json.dumps(data, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def compute_evidence_digest(evidence: Any) -> str:
+        import hashlib
+
+        # Assuming evidence is JSON serializable
+        canonical_json = json.dumps(evidence, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+    def sign(self, secret: bytes | str) -> str:
+        import hashlib
+        import hmac
+
+        if isinstance(secret, str):
+            secret = secret.encode("utf-8")
+        digest = self.compute_digest().encode("utf-8")
+        return hmac.new(secret, digest, hashlib.sha256).hexdigest()
+
+    def verify(self, secret: bytes | str) -> bool:
+        import hmac
+
+        expected_signature = self.sign(secret)
+        return hmac.compare_digest(self.signature, expected_signature)
+
+    @classmethod
+    def create(
+        cls,
+        task_id: str,
+        result_sha: str,
+        base_commit: str,
+        pro_verdict: str,
+        opus_verdict: str,
+        approved: bool,
+        reviewed_at: float,
+        evidence: Any,
+        secret: bytes | str,
+    ) -> "ReviewAttestation":
+        evidence_digest = cls.compute_evidence_digest(evidence)
+        att = cls(
+            task_id=task_id,
+            result_sha=result_sha,
+            base_commit=base_commit,
+            pro_verdict=pro_verdict,
+            opus_verdict=opus_verdict,
+            approved=approved,
+            reviewed_at=reviewed_at,
+            evidence_digest=evidence_digest,
+            signature="0" * 64,  # Placeholder to satisfy validation
+        )
+        att.signature = att.sign(secret)
+        return att
+
+
+# ---------------------------------------------------------------------------
 # Approval Request/Result
 # ---------------------------------------------------------------------------
 

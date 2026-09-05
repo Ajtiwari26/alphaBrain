@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
+from alpha_protocol.task import ReviewAttestation
 
 logger = logging.getLogger("alphabrain.worker.senior_review")
 
@@ -39,6 +40,7 @@ class SeniorReviewVerdict:
     pro_review_text: str
     opus_review_text: str
     reviewed_at: float
+    attestation: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -49,6 +51,7 @@ class SeniorReviewVerdict:
             "pro_review_text": self.pro_review_text,
             "opus_review_text": self.opus_review_text,
             "reviewed_at": self.reviewed_at,
+            "attestation": self.attestation,
         }
 
 
@@ -57,9 +60,12 @@ class SeniorReviewEngine:
         self,
         queue: TaskTriageQueue,
         agy_bin: Path | None = None,
+        signing_secret: str | bytes | None = None,
     ) -> None:
+        import os
         self.queue = queue
         self.agy_bin = agy_bin or (Path.home() / ".local" / "bin" / "agy")
+        self.signing_secret = signing_secret or os.environ.get("ALPHA_SIGNING_SECRET", "alphabrain_senior_review_key")
 
     def run_command(self, cmd: list[str], timeout: int = 120) -> tuple[int, str, str]:
         try:
@@ -274,6 +280,24 @@ Instructions:
         opus_approved = opus_verdict == "FINAL_APPROVAL"
 
         unanimous = pro_approved and opus_approved
+
+        # Extract fields for attestation
+        base_commit = task.get("envelope", {}).get("base_commit") or ("0" * 40)
+        result_sha = task.get("result", {}).get("result_commit") or ("0" * 40)
+        evidence = task.get("result", {}).get("gate_result", {})
+
+        att = ReviewAttestation.create(
+            task_id=task_id,
+            result_sha=result_sha,
+            base_commit=base_commit,
+            pro_verdict=pro_verdict,
+            opus_verdict=opus_verdict,
+            approved=unanimous,
+            reviewed_at=time.time(),
+            evidence=evidence,
+            secret=self.signing_secret,
+        )
+
         verdict = SeniorReviewVerdict(
             task_id=task_id,
             approved=unanimous,
@@ -281,7 +305,8 @@ Instructions:
             opus_verdict=opus_verdict,
             pro_review_text=pro_out,
             opus_review_text=opus_out,
-            reviewed_at=time.time(),
+            reviewed_at=att.reviewed_at,
+            attestation=att.model_dump(),
         )
 
         # Record in queue
