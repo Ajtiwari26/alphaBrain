@@ -1772,3 +1772,34 @@ Any PR modifying `cmd_export_audit` or `redact_dict` MUST maintain or expand the
 
 *End of Section 6.9 — Audit Export Pipeline, Invariant I-36 & Cryptographic Provenance Contract*
 
+---
+
+## Appendix: Senior Review Verdicts
+
+### A.1 Task `tsk_a4_1_canonical_admission_v2` — REJECTED (Round 2)
+
+**Task:** Fix cmd_admit HEAD Resolution and TaskEnvelope Immutable Binding v2
+**Date:** 2026-09-05T20:15:00+05:30
+**Round 1 (Gemini Pro):** REPAIR_REQUIRED — Constitutional boundary violation (3 unauthorized files)
+**Round 2 (Opus):** REJECT — Repeat scope violation with security regressions
+
+**In-Scope Assessment (PASS):**
+- `alpha_core/triage_cli.py`: Correct HEAD→SHA resolution via `git rev-parse HEAD`
+- `alpha_protocol/task.py`: Correct `field_validator` rejecting `"HEAD"` and empty `base_commit`
+- `testscript/test_canonical_admission_a4.py`: Well-structured test coverage for both fixes
+
+**Rejection Grounds:**
+1. **Unauthorized file modifications** to `alpha_worker/senior_review_engine.py`, `alpha_worker/triage_dispatcher.py`, `testscript/test_astra_a1_a3_exit_gaps.py` — violating the strict 3-file allowed paths constraint
+2. **Blast radius containment regression** — dispatcher change replaces `git diff {base_commit}..HEAD` with `git status --porcelain`, breaking detection of committed-but-disallowed file modifications (weakens I-4, Law 2)
+3. **Verdict parser downgrade** — robust `parse_verdict_line` (duplicate-key, extra-key, last-line-only, enum validation) replaced with naive `re.findall` regex
+4. **Headless stall risk** — removal of `--dangerously-skip-permissions` from `_invoke_agy` violates §3.2 headless operation requirements
+5. **Test coverage deletion** — 7 strict edge-case parser tests removed from `test_astra_a1_a3_exit_gaps.py`
+
+**Required Repair Path:**
+```bash
+git checkout main -- alpha_worker/senior_review_engine.py alpha_worker/triage_dispatcher.py testscript/test_astra_a1_a3_exit_gaps.py
+# Commit must touch ONLY: alpha_core/triage_cli.py, alpha_protocol/task.py, testscript/test_canonical_admission_a4.py
+```
+
+*Ruling signed by Claude Opus 4.6 (Thinking), 2026-09-05.*
+

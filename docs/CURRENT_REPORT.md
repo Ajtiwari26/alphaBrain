@@ -1,5 +1,17 @@
 # AlphaBrain Current Report
 
+## Current status — 2026-09-05
+
+Snapshot: `main` at `a13a24d9e98ede77f624a9db6540baf8f7fea263` plus user-owned dirty reviewer permission flag. A1/A3 are **partially repaired, not accepted**. Reproduced false approval from embedded JSON followed by rejection. Review checksum is unsigned/unverified; promotion has a branch race; lease identity is not bound to principal and result mutation is not atomically fenced.
+
+Independent focused checks: 12 tests passed; lint passed on four boundary files; formatting failed on four. Full-repository Ruff check also passed during documentation update. Commit's full-suite claim not independently rerun here. No new live/staging claim.
+
+Current handoff: [compact context](implementation/ALPHABRAIN_COMPACT_CONTEXT.md) and [T1–T6 repair packets](implementation/ASTRA_EXIT_GAP_REPAIR_PACKETS_2026-09-05.md). Graph status now reports `main`, `a13a24d9e98e`, updated `2026-09-05T19:38:05`, 1,958 nodes and 24,288 edges. Graph HEAD does not identify dirty edits. Existing canonical architecture requires owner reconciliation.
+
+Everything below is archived August 31 evidence; do not use it as current completion status.
+
+---
+
 **Audit date:** 2026-08-31
 
 **Audited revision:** `f18557c` plus local approved-spec planning changes
