@@ -235,7 +235,7 @@ Description: {description}
 
 Git Diff:
 ```diff
-{diff_content[:25000]}
+{diff_content}
 ```
 
 Review Instructions:
@@ -258,7 +258,7 @@ Title: {title}
 
 Git Diff:
 ```diff
-{diff_content[:25000]}
+{diff_content}
 ```
 
 Gemini 3.1 Pro High Round 1 Finding:
