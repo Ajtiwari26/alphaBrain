@@ -18,6 +18,7 @@ from alpha_protocol import (
 from alpha_worker.adapters.antigravity import AntigravityAdapter
 from alpha_worker.daemon import AlphaWorkerDaemon
 
+FAKE_BASE_COMMIT = "a" * 40
 
 @pytest.fixture
 def fake_task() -> TaskEnvelope:
@@ -25,7 +26,7 @@ def fake_task() -> TaskEnvelope:
         task_id="task_123",
         project_id="proj_123",
         objective="Test objective",
-        base_commit="commit123",
+        base_commit=FAKE_BASE_COMMIT,
         repo="https://github.com/test/repo.git",
         allowed_paths=["src", "tests"],
         preferred_agent=AgentType.ANTIGRAVITY,
@@ -79,7 +80,7 @@ async def test_antigravity_normalized_success(fake_task: TaskEnvelope, fake_work
     assert result.status == TaskStatus.COMPLETED
     assert result.agent == AgentType.ANTIGRAVITY
     assert result.model == f"antigravity-{settings.ANTIGRAVITY_MODEL}"
-    assert result.base_commit == "commit123"
+    assert result.base_commit == FAKE_BASE_COMMIT
     assert result.result_commit == "commit456"
     assert result.files_changed == ["file1.py"]
     assert result.diff_summary == "Diff summary"

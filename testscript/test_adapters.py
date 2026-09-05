@@ -28,10 +28,12 @@ def test_antigravity_session_setup(tmp_path):
     adapter = AntigravityAdapter()
     adapter.memory_graph_path = tmp_path
 
+    FAKE_BASE_COMMIT = "a" * 40
     task = TaskEnvelope(
         task_id="tsk_adapter_01",
         project_id="prj_alpha",
         repo=str(tmp_path),
+        base_commit=FAKE_BASE_COMMIT,
         objective="Implement memory graph integration",
         allowed_paths=["."],
     )
