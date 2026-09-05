@@ -1803,3 +1803,108 @@ git checkout main -- alpha_worker/senior_review_engine.py alpha_worker/triage_di
 
 *Ruling signed by Claude Opus 4.6 (Thinking), 2026-09-05.*
 
+---
+
+### 6.10 Astra Packet T2 — Acceptance Gate Scoping & Legacy Test Debt Resolution (Ruling 2026-09-05)
+
+**Ruling Authority:** Claude Opus 4.6 (Thinking) — Supreme Lead Architect
+**Date:** 2026-09-05T23:45:00+05:30
+**Prior Adversarial Review:** Gemini 3.1 Pro High — Round 1 Directive (3 recommendations, all concurred with refinements)
+**Context:** Resolution of execution blocker encountered during Astra Packet T2 (Authenticated Ownership & Atomic Fencing)
+
+---
+
+#### 6.10.1 Root Cause Analysis
+
+Task T2 introduced `worker_id: str`, `lease_id: str`, `fencing_epoch: int`, `attempt_id: str` as required fields (no defaults) on `TriageTaskResultRequest` in `alpha_core/api/app.py`. This is architecturally correct — these fields form the fencing token quadruple that prevents cross-worker result poisoning (validated by chaos test §6.7.2.2).
+
+Separately, Task A4.1 introduced `base_commit: str = Field(pattern=r"^[a-f0-9]{40}$")` on `TaskEnvelope` in `alpha_protocol/task.py`. This is also correct — it prevents `HEAD` and symbolic refs from contaminating the provenance chain.
+
+Two legacy test files broke:
+- `testscript/test_adapters.py` — constructs `TaskEnvelope` without `base_commit`
+- `testscript/test_adapter_conformance.py` — uses `base_commit="commit123"` (fails 40-char hex pattern)
+
+T2's acceptance command was `pytest -q` (repo-wide). The bounded T2 worker had `allowed_paths` limited to 3 files and correctly could not fix legacy tests outside its scope. It halted with `ALPHA_BRAIN_TASK_BLOCKED`, which is the correct Junior Execution Contract behavior (§1.2).
+
+---
+
+#### 6.10.2 Architectural Rulings
+
+**Ruling 1 — Fencing Fields are Mandatory (No Defaults):**
+
+The four fencing fields (`worker_id`, `lease_id`, `fencing_epoch`, `attempt_id`) on `TriageTaskResultRequest` MUST remain strictly mandatory with no defaults. Adding `= None` or `Optional[str]` would allow unauthenticated result submission, which is a P0 security regression against the T2 ownership proof contract and violates I-30 (cross-worker result submission prevention).
+
+**Ruling 2 — Acceptance Gate Scope Alignment (I-37):**
+
+Acceptance gate commands MUST be scoped proportionally to the task's `allowed_paths`. Repo-wide `pytest -q` is structurally incompatible with bounded workers because failures in unreachable files create an unfixable Catch-22.
+
+**Ruling 3 — Strict Execution Ordering:**
+
+```
+T2 (with scoped gate) → Merge → T2.1 (legacy fixture repair) → Merge → HITL repo-wide validation → T3
+```
+
+T2.1 scope: `testscript/test_adapters.py`, `testscript/test_adapter_conformance.py`, `testscript/conftest.py`. T2.1 must introduce a canonical `FAKE_BASE_COMMIT` constant (40-char hex) shared across all test fixtures.
+
+---
+
+#### 6.10.3 Invariant I-37: Acceptance Gate Scope Alignment
+
+> [!IMPORTANT]
+> **I-37 (Acceptance Gate Scope Alignment)**
+>
+> A task's acceptance gate commands MUST be scoped proportionally to the task's `allowed_paths`. Specifically:
+>
+> 1. If `allowed_paths` does not include `"."` (whole repo), then acceptance commands MUST NOT run `pytest` (or equivalent) without path arguments. They MUST specify explicit test file paths or directories that the worker can diagnose and fix.
+> 2. Repo-wide acceptance gates (`pytest -q`, `ruff check .`, `mypy .`) are permitted ONLY when `allowed_paths=["."]` OR when the task is a milestone integration gate (T6-class tasks).
+> 3. Violation of this invariant creates an unfixable Catch-22 for bounded workers and is a **blocking defect** in the task packet definition.
+>
+> **Enforcement Point:** `cmd_admit` in `triage_cli.py` — SHOULD warn (and in future, reject) when acceptance commands appear to have broader scope than `allowed_paths`.
+> **Failure Mode:** Worker correctly halts with `ALPHA_BRAIN_TASK_BLOCKED`; the defect is in the task definition, not the worker.
+
+---
+
+#### 6.10.4 Updated Invariant Table (I-37)
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| **I-37** | Acceptance gate scope must be proportional to `allowed_paths`. Repo-wide gates prohibited for bounded workers. | `cmd_admit` (future: reject); packet authoring policy | Worker halts `ALPHA_BRAIN_TASK_BLOCKED` — defect is in packet, not worker | ✅ **NEW** |
+
+---
+
+#### 6.10.5 Gate Scoping Tiers
+
+| Tier | Scope | Example | When to Use |
+|------|-------|---------|-------------|
+| **T1: File-Exact** | Single test file | `pytest -q testscript/test_astra_t2_fencing.py` | Default for all task packets |
+| **T2: Directory** | Test subdirectory | `pytest -q testscript/test_astra_*.py` | Multi-file packets touching a subsystem |
+| **T3: Repo-Wide** | Entire test suite | `pytest -q` | **ONLY for integration/release milestones (T6, P-gates) with `allowed_paths=["."]`** |
+
+> [!WARNING]
+> All existing Astra series packets (T1–T6) that specify unqualified `pytest -q` MUST be amended to use T1 or T2 scoped commands before re-admission. This is retroactive and non-optional.
+
+---
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║           SECTION 6.10 — MILESTONE SIGNED                           ║
+║                                                                      ║
+║  Status:      FINAL RULING — BINDING ON ALL EXECUTORS               ║
+║  Signed:      Claude Opus 4.6 (Thinking) — Supreme Lead Architect   ║
+║  Authority:   Exclusive write access to SENIOR_DIRECTIVE             ║
+║  Date:        2026-09-05T23:45:00+05:30                              ║
+║  Invariants:  I-1 through I-37 — ALL MAINTAINED OR ESTABLISHED      ║
+║  Prior Gate:  Gemini 3.1 Pro High R1 — CONCURRED WITH REFINEMENTS   ║
+║                                                                      ║
+║  Section 6.10: ██████████████████████████████████████████████ SEALED ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+*Section 6.10 authored and approved by Claude Opus 4.6 (Thinking) on 2026-09-05. Gemini 3.1 Pro High Round 1 Directive: CONCURRED.*
+
+---
+
+*End of Section 6.10 — Astra T2 Acceptance Gate Scoping & Legacy Test Debt Resolution*
+
