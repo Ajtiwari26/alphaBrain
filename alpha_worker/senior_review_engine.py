@@ -96,8 +96,37 @@ class SeniorReviewEngine:
                 )
                 if res.returncode == 0 and res.stdout.strip():
                     stat_str = stat_res.stdout.strip() if stat_res.returncode == 0 else ""
+                    diff_str = res.stdout.strip()
+                    full_content_str = ""
+                    
+                    # Also append full file contents of modified files
+                    files_res = subprocess.run(
+                        ["git", "diff", "--name-only", f"main..{branch_name}"],
+                        cwd=repo_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if files_res.returncode == 0:
+                        for f in files_res.stdout.strip().splitlines():
+                            f = f.strip()
+                            if f:
+                                try:
+                                    # Use git show to get the file content at the branch_name
+                                    content_res = subprocess.run(
+                                        ["git", "show", f"{branch_name}:{f}"],
+                                        cwd=repo_path,
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=10,
+                                    )
+                                    if content_res.returncode == 0:
+                                        full_content_str += f"\n\n=== FULL FILE CONTENT: {f} ===\n```\n{content_res.stdout}\n```\n"
+                                except Exception:
+                                    pass
+                                    
                     return (
-                        f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{res.stdout.strip()}"
+                        f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{diff_str}\n{full_content_str}"
                     )
             except Exception:
                 pass
