@@ -13,6 +13,7 @@ import dataclasses
 import hashlib
 import json
 import logging
+import re
 import sqlite3
 import time
 import uuid
@@ -164,12 +165,17 @@ class TaskTriageQueue:
                     started_at      REAL,
                     completed_at    REAL,
                     retry_count     INTEGER DEFAULT 0,
+                    cumulative_retries INTEGER DEFAULT 0,
                     worktree_path   TEXT,
                     branch_name     TEXT,
                     result_json     TEXT
                 );
                 """
             )
+            try:
+                conn.execute("ALTER TABLE task_triage_queue ADD COLUMN cumulative_retries INTEGER DEFAULT 0;")
+            except sqlite3.OperationalError:
+                pass
             conn.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_triage_queue(status);")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_content_hash ON task_triage_queue(content_hash);"
@@ -266,6 +272,15 @@ class TaskTriageQueue:
         now = time.time()
         cutoff = now - dedup_window_seconds
 
+        canonical_hash = hashlib.sha256(json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")).hexdigest()
+        if provenance.content_hash != canonical_hash:
+            raise ValueError(f"Content hash mismatch: expected {canonical_hash}, got {provenance.content_hash}")
+
+        if "base_commit" in envelope:
+            base_commit = envelope["base_commit"]
+            if not base_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(base_commit))):
+                raise ValueError("Task base_commit must be a fully resolved 40-character hexadecimal SHA")
+
         def _insert(conn: sqlite3.Connection) -> str:
             # Deduplication check
             cursor = conn.execute(
@@ -323,6 +338,15 @@ class TaskTriageQueue:
         now = time.time()
 
         def _approve(conn: sqlite3.Connection) -> bool:
+            cursor = conn.execute("SELECT envelope_json FROM task_triage_queue WHERE id = ? AND status = ?;", (task_id, TriageStatus.PENDING_REVIEW.value))
+            row = cursor.fetchone()
+            if not row:
+                return False
+            env = json.loads(row["envelope_json"])
+            base_commit = env.get("base_commit")
+            if not base_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(base_commit))):
+                raise ValueError("Task base_commit must be a fully resolved 40-character hexadecimal SHA")
+
             cursor = conn.execute(
                 """
                 UPDATE task_triage_queue
@@ -491,12 +515,14 @@ class TaskTriageQueue:
                       SELECT 1
                       FROM json_each(t1.envelope_json, '$.dependencies') AS dep
                       LEFT JOIN task_triage_queue t2 ON t2.id = json_extract(dep.value, '$.task_id')
-                      WHERE t2.status IS NULL OR t2.status != COALESCE(json_extract(dep.value, '$.required_status'), ?)
+                      WHERE t2.status IS NULL
+                         OR t2.status != COALESCE(json_extract(dep.value, '$.required_status'), ?)
+                         OR (t2.status = ? AND COALESCE(json_extract(t2.result_json, '$.senior_review.approved'), 0) != 1)
                   )
                 ORDER BY t1.created_at ASC
                 LIMIT 1;
                 """,
-                (TriageStatus.APPROVED.value, TriageStatus.COMPLETED.value),
+                (TriageStatus.APPROVED.value, TriageStatus.COMPLETED.value, TriageStatus.COMPLETED.value),
             )
             selected_row = cursor.fetchone()
 
@@ -820,7 +846,7 @@ class TaskTriageQueue:
 
         def _fail(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
-                "SELECT retry_count, created_at, started_at, provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                "SELECT retry_count, cumulative_retries, created_at, started_at, provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
                 (task_id, TriageStatus.EXECUTING.value),
             )
             row = cursor.fetchone()
@@ -828,6 +854,7 @@ class TaskTriageQueue:
                 return False
 
             current_retries = int(row["retry_count"] or 0)
+            current_cumulative = int(row["cumulative_retries"] or 0)
             created_at = row["created_at"]
             started_at = row["started_at"] or created_at
 
@@ -853,10 +880,12 @@ class TaskTriageQueue:
             if allow_retry and current_retries < max_retries:
                 # Re-queue for execution
                 next_retries = current_retries + 1
+                next_cumulative = current_cumulative + 1
                 where_clause = "WHERE id = ?"
                 params = [
                     TriageStatus.APPROVED.value,
                     next_retries,
+                    next_cumulative,
                     json.dumps(payload),
                     new_provenance_json,
                     now,
@@ -877,7 +906,7 @@ class TaskTriageQueue:
                 up_cur = conn.execute(
                     f"""
                     UPDATE task_triage_queue
-                    SET status = ?, retry_count = ?, result_json = ?, provenance_json = ?, updated_at = ?
+                    SET status = ?, retry_count = ?, cumulative_retries = ?, result_json = ?, provenance_json = ?, updated_at = ?
                     {where_clause};
                     """,
                     tuple(params),
@@ -888,9 +917,11 @@ class TaskTriageQueue:
                     "Task %s failed; retrying (%d/%d)", task_id, next_retries, max_retries
                 )
             else:
+                next_cumulative = current_cumulative + 1
                 where_clause = "WHERE id = ?"
                 params = [
                     TriageStatus.FAILED.value,
+                    next_cumulative,
                     json.dumps(payload),
                     now,
                     new_provenance_json,
@@ -912,7 +943,7 @@ class TaskTriageQueue:
                 up_cur = conn.execute(
                     f"""
                     UPDATE task_triage_queue
-                    SET status = ?, result_json = ?, completed_at = ?, provenance_json = ?, updated_at = ?
+                    SET status = ?, cumulative_retries = ?, result_json = ?, completed_at = ?, provenance_json = ?, updated_at = ?
                     {where_clause};
                     """,
                     tuple(params),
@@ -940,7 +971,7 @@ class TaskTriageQueue:
 
         def _retry(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
-                "SELECT envelope_json, provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                "SELECT envelope_json, provenance_json, cumulative_retries FROM task_triage_queue WHERE id = ? AND status = ?;",
                 (task_id, TriageStatus.FAILED.value),
             )
             row = cursor.fetchone()
@@ -949,6 +980,24 @@ class TaskTriageQueue:
 
             env_json = row["envelope_json"]
             env = json.loads(env_json) if env_json else {}
+
+            cumulative_retries = int(row["cumulative_retries"] or 0)
+            max_cumulative = env.get("max_cumulative_retries", 5)
+
+            if cumulative_retries >= max_cumulative:
+                payload = {"error": "Cumulative lifetime repair budget exhausted", "cumulative_retries": cumulative_retries}
+                conn.execute(
+                    """
+                    UPDATE task_triage_queue
+                    SET result_json = ?,
+                        updated_at = ?
+                    WHERE id = ? AND status = ?;
+                    """,
+                    (json.dumps(payload), now, task_id, TriageStatus.FAILED.value)
+                )
+                logger.error("Task %s repair budget exhausted (%d). Terminally failed.", task_id, cumulative_retries)
+                return False
+
             canonical_env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
             computed_hash = hashlib.sha256(canonical_env_json.encode("utf-8")).hexdigest()
 
