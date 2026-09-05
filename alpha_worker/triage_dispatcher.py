@@ -189,22 +189,42 @@ class TriageTaskDispatcher:
 
         return all_passed, evidence
 
-    def get_git_diff_and_changed_files(self, worktree_path: Path) -> tuple[list[str], str]:
-        """Inspects git status and diff inside the worktree."""
-        # 1. Changed files
+    def get_git_diff_and_changed_files(self, worktree_path: Path, base_commit: str) -> tuple[list[str], str]:
+        """Inspects git diff relative to base_commit inside the worktree, including uncommitted changes."""
+        # 1. Changed files (committed on branch relative to base)
         ret, out, _ = self.run_command_in_worktree(
-            worktree_path, ["git", "status", "--porcelain", "-uall"]
+            worktree_path, ["git", "diff", "--name-only", f"{base_commit}..HEAD"]
         )
         changed_files: list[str] = []
         if ret == 0 and out.strip():
             for line in out.strip().splitlines():
+                changed_files.append(line.strip('"'))
+
+        # Also include uncommitted changes in the worktree
+        ret2, out2, _ = self.run_command_in_worktree(
+            worktree_path, ["git", "status", "--porcelain", "-uall"]
+        )
+        if ret2 == 0 and out2.strip():
+            for line in out2.strip().splitlines():
                 parts = line.strip().split(maxsplit=1)
                 if len(parts) == 2:
-                    changed_files.append(parts[1].strip('"'))
+                    f = parts[1].strip('"')
+                    if f not in changed_files:
+                        changed_files.append(f)
 
         # 2. Diff stat
-        _, stat_out, _ = self.run_command_in_worktree(worktree_path, ["git", "diff", "--stat"])
-        return changed_files, stat_out.strip()
+        _, stat_out, _ = self.run_command_in_worktree(
+            worktree_path, ["git", "diff", "--stat", f"{base_commit}..HEAD"]
+        )
+        _, uncommitted_stat, _ = self.run_command_in_worktree(
+            worktree_path, ["git", "diff", "--stat"]
+        )
+        
+        full_stat = stat_out.strip()
+        if uncommitted_stat.strip():
+            full_stat += "\n" + uncommitted_stat.strip()
+
+        return changed_files, full_stat
 
     def create_git_commit(
         self,
@@ -347,7 +367,7 @@ class TriageTaskDispatcher:
                     return None
 
             # 3. Check for worktree modifications and diff
-            changed_files, diff_stat = self.get_git_diff_and_changed_files(worktree_path)
+            changed_files, diff_stat = self.get_git_diff_and_changed_files(worktree_path, base_commit)
 
             allowed_paths = envelope.get("allowed_paths", [])
             if changed_files:

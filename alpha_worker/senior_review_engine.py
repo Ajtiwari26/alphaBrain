@@ -125,6 +125,7 @@ class SeniorReviewEngine:
                 "--model",
                 model,
                 "--disable-slash-commands",
+                "--dangerously-skip-permissions",
                 "--print-timeout",
                 f"{timeout_seconds}s",
             ]
