@@ -20,6 +20,7 @@ from alpha_worker.daemon import AlphaWorkerDaemon
 
 FAKE_BASE_COMMIT = "a" * 40
 
+
 @pytest.fixture
 def fake_task() -> TaskEnvelope:
     return TaskEnvelope(
