@@ -90,18 +90,32 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
     ret = cmd_merge(args, isolated_queue)
     assert ret == 1  # Fails due to missing result_sha binding
 
-def test_senior_review_parser_strict_json(isolated_queue: TaskTriageQueue, monkeypatch):
-    isolated_queue.enqueue_task("tsk_review", {"base_commit": "HEAD"}, TaskProvenance(meeting_id="m1", speaker_id="s1", utterance_timestamp=1.0, transcript_excerpt="", extraction_model="", extraction_confidence=1.0, eva_session_id="", created_at=1.0, content_hash="hash"))
-    isolated_queue.approve_task("tsk_review")
-    isolated_queue.lease_next_approved_task()
-    isolated_queue.complete_task("tsk_review", {"gates_passed": True})
-
-    engine = SeniorReviewEngine(isolated_queue)
-
-    # Simulate an embedded verdict that shouldn't parse correctly as a strict JSON block on the last line
-    def mock_invoke(*args, **kwargs):
-        return 'I think we should do this. VERDICT: APPROVE and {"verdict": "APPROVE"} wait no'
-
-    monkeypatch.setattr(engine, "_invoke_agy", mock_invoke)
-    verdict = engine.execute_senior_review("tsk_review")
-    assert not verdict.approved  # Should fail closed because it wasn't the only strict JSON line
+def test_senior_review_parser_strict_json():
+    engine = SeniorReviewEngine(None)  # Queue not needed for parser tests
+    
+    # 1. Valid Pro output
+    valid_pro = 'Great work.\n{"verdict": "APPROVE"}'
+    assert engine.parse_verdict_line(valid_pro, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "APPROVE"
+    
+    # 2. Valid Opus output
+    valid_opus = 'Looks good.\n{"verdict": "FINAL_APPROVAL"}'
+    assert engine.parse_verdict_line(valid_opus, ["FINAL_APPROVAL", "REJECT"], "REJECT") == "FINAL_APPROVAL"
+    
+    # 3. Wrong enum (Opus evaluating Pro output)
+    assert engine.parse_verdict_line(valid_pro, ["FINAL_APPROVAL", "REJECT"], "REJECT") == "REJECT"
+    
+    # 4. JSON embedded but not on the last line
+    embedded = 'Here is the verdict: {"verdict": "APPROVE"}\nBut wait, final decision: REJECT'
+    assert engine.parse_verdict_line(embedded, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"
+    
+    # 5. Extra keys in JSON
+    extra_keys = '{"verdict": "APPROVE", "reason": "good"}'
+    assert engine.parse_verdict_line(extra_keys, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"
+    
+    # 6. Duplicate keys in JSON
+    duplicate = '{"verdict": "REPAIR_REQUIRED", "verdict": "APPROVE"}'
+    assert engine.parse_verdict_line(duplicate, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"
+    
+    # 7. Quoted or fenced JSON
+    fenced = '```json\n{"verdict": "APPROVE"}\n```'
+    assert engine.parse_verdict_line(fenced, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED") == "REPAIR_REQUIRED"

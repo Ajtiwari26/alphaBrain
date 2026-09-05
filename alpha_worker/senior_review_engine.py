@@ -143,6 +143,45 @@ class SeniorReviewEngine:
         finally:
             Path(prompt_file).unlink(missing_ok=True)
 
+    def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> str:
+        """
+        Parses a strict one-line JSON verdict from the absolute last non-empty line.
+        """
+        if not output:
+            return default_verdict
+        
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        if not lines:
+            return default_verdict
+            
+        last_line = lines[-1]
+        
+        try:
+            import json
+            def reject_duplicates(ordered_pairs):
+                d = {}
+                for k, v in ordered_pairs:
+                    if k in d:
+                        raise ValueError(f"Duplicate key: {k}")
+                    d[k] = v
+                return d
+                
+            parsed = json.loads(last_line, object_pairs_hook=reject_duplicates)
+            
+            if not isinstance(parsed, dict):
+                return default_verdict
+                
+            if len(parsed) != 1 or "verdict" not in parsed:
+                return default_verdict
+                
+            val = parsed["verdict"]
+            if not isinstance(val, str) or val not in valid_enums:
+                return default_verdict
+                
+            return val
+        except Exception:
+            return default_verdict
+
     def execute_senior_review(self, task_id: str) -> SeniorReviewVerdict:
         task = self.queue.get_task(task_id)
         if not task:
@@ -176,20 +215,10 @@ Review Instructions:
 3. Check test coverage and acceptance criteria.
 4. Render your verdict explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "APPROVE"}} or {{"verdict": "REPAIR_REQUIRED"}}. Do not output any other JSON.
 """
-        import json
         pro_out = self._invoke_agy(
             "gemini-3.1-pro-high", pro_prompt, timeout_seconds=240, effort="high"
         )
-        try:
-            verdicts = re.findall(r'\{"verdict":\s*"[^"]+"\}', pro_out)
-            if len(verdicts) != 1:
-                pro_verdict = "REPAIR_REQUIRED"
-            else:
-                parsed = json.loads(verdicts[0])
-                pro_verdict = parsed.get("verdict", "REPAIR_REQUIRED")
-        except Exception:
-            pro_verdict = "REPAIR_REQUIRED"
-
+        pro_verdict = self.parse_verdict_line(pro_out, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
         pro_approved = pro_verdict == "APPROVE"
 
         # --- Round 1 Step 2: Claude Opus 4.6 Thinking ---
@@ -212,16 +241,7 @@ Instructions:
 3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
         opus_out = self._invoke_agy("claude-opus-4-6-thinking", opus_prompt, timeout_seconds=360)
-        try:
-            verdicts = re.findall(r'\{"verdict":\s*"[^"]+"\}', opus_out)
-            if len(verdicts) != 1:
-                opus_verdict = "REJECT"
-            else:
-                parsed = json.loads(verdicts[0])
-                opus_verdict = parsed.get("verdict", "REJECT")
-        except Exception:
-            opus_verdict = "REJECT"
-
+        opus_verdict = self.parse_verdict_line(opus_out, ["FINAL_APPROVAL", "REJECT"], "REJECT")
         opus_approved = opus_verdict == "FINAL_APPROVAL"
 
         unanimous = pro_approved and opus_approved
