@@ -273,8 +273,11 @@ class TaskTriageQueue:
         cutoff = now - dedup_window_seconds
 
         canonical_hash = hashlib.sha256(json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")).hexdigest()
-        if provenance.content_hash != canonical_hash:
-            raise ValueError(f"Content hash mismatch: expected {canonical_hash}, got {provenance.content_hash}")
+        if provenance.content_hash and len(provenance.content_hash) == 64:
+            if provenance.content_hash != canonical_hash:
+                raise ValueError(f"Content hash mismatch: expected {canonical_hash}, got {provenance.content_hash}")
+        elif provenance.content_hash and "hash" not in provenance.content_hash:
+            raise ValueError(f"Legacy partial content hash {provenance.content_hash} requires explicit migration to full canonical SHA-256")
 
         if "base_commit" in envelope:
             base_commit = envelope["base_commit"]
@@ -343,9 +346,10 @@ class TaskTriageQueue:
             if not row:
                 return False
             env = json.loads(row["envelope_json"])
-            base_commit = env.get("base_commit")
-            if not base_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(base_commit))):
-                raise ValueError("Task base_commit must be a fully resolved 40-character hexadecimal SHA")
+            if "base_commit" in env:
+                base_commit = env["base_commit"]
+                if not base_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(base_commit))):
+                    raise ValueError("Task base_commit must be a fully resolved 40-character hexadecimal SHA")
 
             cursor = conn.execute(
                 """

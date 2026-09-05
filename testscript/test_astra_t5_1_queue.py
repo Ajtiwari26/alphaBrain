@@ -58,7 +58,7 @@ def test_content_hash_mismatch(queue):
         meeting_id="m1", speaker_id=None, utterance_timestamp=time.time(),
         transcript_excerpt="test", extraction_model="test", extraction_confidence=1.0,
         eva_session_id="e1", created_at=time.time(),
-        content_hash="badhash"
+        content_hash="b" * 64
     )
     with pytest.raises(ValueError, match="Content hash mismatch"):
         queue.enqueue_task("task4", envelope, corrupt_prov)
