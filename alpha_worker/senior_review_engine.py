@@ -180,7 +180,8 @@ class SeniorReviewEngine:
 
     def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> str:
         """
-        Parses a strict one-line JSON verdict from the absolute last non-empty line.
+        Parses a strict one-line JSON verdict from the response lines.
+        Inspects lines from the bottom up, skipping markdown fences.
         """
         if not output:
             return default_verdict
@@ -189,10 +190,9 @@ class SeniorReviewEngine:
         if not lines:
             return default_verdict
 
-        last_line = lines[-1]
-
         try:
             import json
+
             def reject_duplicates(ordered_pairs):
                 d = {}
                 for k, v in ordered_pairs:
@@ -201,19 +201,21 @@ class SeniorReviewEngine:
                     d[k] = v
                 return d
 
-            parsed = json.loads(last_line, object_pairs_hook=reject_duplicates)
+            for candidate_line in reversed(lines):
+                candidate_line = candidate_line.strip()
+                if not candidate_line or candidate_line.startswith("```"):
+                    continue
+                try:
+                    parsed = json.loads(candidate_line, object_pairs_hook=reject_duplicates)
+                    if not isinstance(parsed, dict) or len(parsed) != 1 or "verdict" not in parsed:
+                        continue
+                    val = parsed["verdict"]
+                    if isinstance(val, str) and val in valid_enums:
+                        return val
+                except Exception:
+                    continue
 
-            if not isinstance(parsed, dict):
-                return default_verdict
-
-            if len(parsed) != 1 or "verdict" not in parsed:
-                return default_verdict
-
-            val = parsed["verdict"]
-            if not isinstance(val, str) or val not in valid_enums:
-                return default_verdict
-
-            return val
+            return default_verdict
         except Exception:
             return default_verdict
 
@@ -273,9 +275,10 @@ Gemini 3.1 Pro High Round 1 Finding:
 Instructions:
 1. Debate Gemini Pro's findings.
 2. Verify overall system design and AlphaBrain Invariant compliance.
-3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
+3. CRITICAL: Do NOT invoke external tools or inspect files on disk. The repository on disk is at base_commit; all pending changes are provided in the 'Git Diff' above. Base your architectural evaluation strictly on the provided Git Diff and Round 1 debate context.
+4. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
-        opus_out = self._invoke_agy("claude-opus-4-6-thinking", opus_prompt, cwd=task.get("worktree_path"), timeout_seconds=360)
+        opus_out = self._invoke_agy("claude-opus-4-6-thinking", opus_prompt, cwd=task.get("worktree_path"), timeout_seconds=500)
         opus_verdict = self.parse_verdict_line(opus_out, ["FINAL_APPROVAL", "REJECT"], "REJECT")
         opus_approved = opus_verdict == "FINAL_APPROVAL"
 
@@ -283,7 +286,12 @@ Instructions:
 
         # Extract fields for attestation
         base_commit = task.get("envelope", {}).get("base_commit") or ("0" * 40)
-        result_sha = task.get("result", {}).get("result_commit") or ("0" * 40)
+        result_sha = (
+            task.get("result", {}).get("result_sha")
+            or task.get("result", {}).get("head_commit")
+            or task.get("result", {}).get("result_commit")
+            or ("0" * 40)
+        )
         evidence = task.get("result", {}).get("gate_result", {})
 
         att = ReviewAttestation.create(

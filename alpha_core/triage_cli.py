@@ -651,7 +651,7 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print("Error: Missing result_sha. Immutable result binding is required for promotion.", file=sys.stderr)
         return 1
 
-    attestation_dict = senior_review.get("attestation")
+    attestation_dict = senior_review.get("attestation") or (senior_review.get("details") or {}).get("attestation")
     if attestation_dict:
         import os
 
