@@ -144,7 +144,13 @@ def test_telemetry_snippet_retention(temp_queue: TaskTriageQueue):
         dispatcher.run_command_in_worktree = lambda path, cmd: (1, long_output, "")
         passed, evidence = dispatcher.run_acceptance_gates(
             Path(workdir),
-            {"acceptance_plan": {"commands": [{"executable": "ruff", "args": ["check", "."]}]}},
+            {
+                "acceptance_plan": {
+                    "commands": [
+                        {"executable": "ruff", "args": ["check", "."], "gate_type": "lint"}
+                    ]
+                }
+            },
         )
         assert passed is False
         assert len(evidence) == 1

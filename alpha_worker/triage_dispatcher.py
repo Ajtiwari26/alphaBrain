@@ -141,24 +141,29 @@ class TriageTaskDispatcher:
         """
         plan = envelope.get("acceptance_plan", {})
         commands = plan.get("commands", [])
-        if not commands:
-            # If no custom commands, default to basic pytest verification
-            commands = [{"executable": "pytest", "args": ["-q"]}]
+        required_gates = plan.get("required_gates", [])
+
+        if not commands and required_gates:
+            logger.error("No commands provided but required_gates exist.")
+            return False, []
 
         all_passed = True
         evidence: list[dict[str, Any]] = []
+        executed_gates = set()
 
         for c in commands:
-            exe = c.get("executable", "pytest")
+            exe = c.get("executable")
+            if not exe:
+                continue
             args = c.get("args", [])
             full_cmd = [exe, *args]
 
-            # Determine gate type
-            gate_type = GateType.UNIT_TEST.value
-            if "ruff" in exe or "lint" in exe or "flake8" in exe:
-                gate_type = GateType.LINT.value
-            elif "mypy" in exe or "type" in exe:
-                gate_type = GateType.TYPE_CHECK.value
+            gate_type = c.get("gate_type")
+            if not gate_type:
+                logger.error("Gate missing explicit gate_type in command definition: %s", c)
+                return False, evidence
+
+            executed_gates.add(gate_type)
 
             returncode, stdout, stderr = self.run_command_in_worktree(worktree_path, full_cmd)
             passed = returncode == 0
@@ -176,6 +181,11 @@ class TriageTaskDispatcher:
                     "timestamp": time.time(),
                 }
             )
+
+        for rg in required_gates:
+            if rg not in executed_gates:
+                logger.error("Required gate %s was not executed.", rg)
+                return False, evidence
 
         return all_passed, evidence
 
@@ -295,29 +305,44 @@ class TriageTaskDispatcher:
             # 2.5. Launch the local AGY coding agent inside the worktree if enabled
             if self.enable_agent_execution:
                 ready, reason = self.live_bridge.check_readiness()
-                if ready:
-                    logger.info(
-                        "Launching local AGY coding agent inside worktree: %s", worktree_path
+                if not ready:
+                    err_msg = f"AGY execution enabled but bridge not ready: {reason}"
+                    logger.warning(err_msg)
+                    self.queue.fail_task(
+                        task_id, error_details={"error": err_msg}, allow_retry=True
                     )
-                    try:
-                        task_env = self._build_task_envelope(leased_task, worktree_path)
-                        attempt_id = f"att_{task_id}_{uuid.uuid4().hex[:6]}"
-                        session_dir = self.adapter.setup_session_in_memory_graph(
-                            task_env, worktree_path
+                    return None
+
+                logger.info("Launching local AGY coding agent inside worktree: %s", worktree_path)
+                try:
+                    task_env = self._build_task_envelope(leased_task, worktree_path)
+                    attempt_id = f"att_{task_id}_{uuid.uuid4().hex[:6]}"
+                    session_dir = self.adapter.setup_session_in_memory_graph(
+                        task_env, worktree_path
+                    )
+                    dispatch_res = self._run_async_dispatch(
+                        task_env, worktree_path, attempt_id, session_dir
+                    )
+                    logger.info(
+                        "AGY agent completed turn for %s. Completed: %s, changed files: %s",
+                        task_id,
+                        getattr(dispatch_res, "completed", False),
+                        getattr(dispatch_res, "changed_files", []),
+                    )
+                    if not getattr(dispatch_res, "completed", False):
+                        err_msg = f"AGY dispatcher returned completed=False for task {task_id}"
+                        self.queue.fail_task(
+                            task_id, error_details={"error": err_msg}, allow_retry=True
                         )
-                        dispatch_res = self._run_async_dispatch(
-                            task_env, worktree_path, attempt_id, session_dir
-                        )
-                        logger.info(
-                            "AGY agent completed turn for %s. Completed: %s, changed files: %s",
-                            task_id,
-                            dispatch_res.completed,
-                            dispatch_res.changed_files,
-                        )
-                    except Exception as agy_err:
-                        logger.error("AGY coding agent error on task %s: %s", task_id, agy_err)
-                else:
-                    logger.warning("AGY execution enabled but bridge not ready: %s", reason)
+                        return None
+                except Exception as agy_err:
+                    logger.error("AGY coding agent error on task %s: %s", task_id, agy_err)
+                    self.queue.fail_task(
+                        task_id,
+                        error_details={"error": f"Agent error: {agy_err}"},
+                        allow_retry=True,
+                    )
+                    return None
 
             # 3. Check for worktree modifications and diff
             changed_files, diff_stat = self.get_git_diff_and_changed_files(worktree_path)
@@ -365,7 +390,10 @@ class TriageTaskDispatcher:
             commit_msg = f"feat({project_id}): {title}\n\nTask-ID: {task_id}\nProvenance: {provenance.get('meeting_id', 'eva')}"
             head_commit = self.create_git_commit(worktree_path, commit_msg)
             if not head_commit:
-                head_commit = base_commit
+                err_msg = "Failed to create commit in worktree."
+                logger.error(err_msg)
+                self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                return None
 
             # 6. Generate PR Proposal Artifact
             pr_proposal = PRProposal(
@@ -449,7 +477,8 @@ class TriageTaskDispatcher:
             for cmd in cmds:
                 if isinstance(cmd, dict):
                     c = dict(cmd)
-                    c.setdefault("gate_type", GateType.UNIT_TEST.value)
+                    # Removed auto unit_test default to enforce explicit gate types
+                    pass
                     formatted_cmds.append(c)
                 elif isinstance(cmd, str):
                     parts = cmd.split()
@@ -466,9 +495,9 @@ class TriageTaskDispatcher:
                 "commands": [{"gate_type": "unit_test", "executable": "pytest", "args": ["-q"]}],
                 "required_gates": ["unit_test"],
             }
-        return TaskEnvelope.model_validate(env_dict)
+        return TaskEnvelope.model_validate(env_dict)  # type: ignore
 
-    def _run_async_dispatch(
+    def _run_async_dispatch(  # type: ignore
         self,
         task: TaskEnvelope,
         worktree_path: Path,

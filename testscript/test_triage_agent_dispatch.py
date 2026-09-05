@@ -70,7 +70,11 @@ def test_triage_dispatcher_invokes_agy_live_bridge(
         "base_commit": "HEAD",
         "objective": "Auto-code feature",
         "allowed_paths": ["agent_output.py"],
-        "acceptance_plan": {"commands": [{"executable": "python3", "args": ["-c", "exit(0)"]}]},
+        "acceptance_plan": {
+            "commands": [
+                {"executable": "python3", "args": ["-c", "exit(0)"], "gate_type": "unit_test"}
+            ]
+        },
     }
     env_json = json.dumps(env, default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
@@ -131,7 +135,11 @@ def test_triage_dispatcher_eva_hash_fallback(
         "title": title,
         "acceptance_criteria": crit,
         "allowed_paths": paths,
-        "acceptance_plan": {"commands": [{"executable": "python3", "args": ["-c", "exit(0)"]}]},
+        "acceptance_plan": {
+            "commands": [
+                {"executable": "python3", "args": ["-c", "exit(0)"], "gate_type": "unit_test"}
+            ]
+        },
     }
     prov = TaskProvenance(
         meeting_id="meet_1",

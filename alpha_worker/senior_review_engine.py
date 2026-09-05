@@ -21,6 +21,7 @@ import logging
 import subprocess
 import tempfile
 import time
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -96,11 +97,13 @@ class SeniorReviewEngine:
                 )
                 if res.returncode == 0 and res.stdout.strip():
                     stat_str = stat_res.stdout.strip() if stat_res.returncode == 0 else ""
-                    return f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{res.stdout.strip()}"
+                    return (
+                        f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{res.stdout.strip()}"
+                    )
             except Exception:
                 pass
         result = task.get("result") or {}
-        return result.get("diff_stat", "No diff available")
+        return str(result.get("diff_stat", "No diff available"))
 
     def _invoke_agy(
         self,
@@ -110,11 +113,8 @@ class SeniorReviewEngine:
         effort: str | None = None,
     ) -> str:
         """Invokes AGY non-interactively with structured prompt."""
-        if settings.ENV == "test" or not self.agy_bin.exists():
-            # In test harness or mock environment, produce structured approval
-            if "claude" in model.lower():
-                return "# Round 2 Final Ruling\n\nVERDICT: 🟢 FINAL_APPROVAL\n\nAll invariants maintained."
-            return "# Round 1 Senior Review\n\nVERDICT: APPROVE\n\nImplementation is sound."
+        if not self.agy_bin.exists():
+            raise RuntimeError(f"AGY executable not found at {self.agy_bin}")
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(prompt)
@@ -137,6 +137,9 @@ class SeniorReviewEngine:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds + 30)
             if res.returncode != 0:
                 logger.warning("AGY %s returned non-zero %d: %s", model, res.returncode, res.stderr)
+                raise RuntimeError(
+                    f"AGY invocation failed with code {res.returncode}: {res.stderr}"
+                )
             return res.stdout or res.stderr
         finally:
             Path(prompt_file).unlink(missing_ok=True)
@@ -147,9 +150,7 @@ class SeniorReviewEngine:
             raise ValueError(f"Task '{task_id}' not found in triage queue.")
 
         if task["status"] != TriageStatus.COMPLETED.value:
-            raise ValueError(
-                f"Task '{task_id}' is not completed. Current status: {task['status']}"
-            )
+            raise ValueError(f"Task '{task_id}' is not completed. Current status: {task['status']}")
 
         result = task.get("result") or {}
         if not result.get("gates_passed", False):
@@ -176,9 +177,14 @@ Review Instructions:
 3. Check test coverage and acceptance criteria.
 4. Render your verdict explicitly as either 'VERDICT: APPROVE' or 'VERDICT: REPAIR_REQUIRED'.
 """
-        pro_out = self._invoke_agy("gemini-3.1-pro-high", pro_prompt, timeout_seconds=240, effort="high")
-        pro_approved = "APPROVE" in pro_out and "REPAIR_REQUIRED" not in pro_out
-        pro_verdict = "APPROVE" if pro_approved else "REPAIR_REQUIRED"
+        pro_out = self._invoke_agy(
+            "gemini-3.1-pro-high", pro_prompt, timeout_seconds=240, effort="high"
+        )
+        pro_match = re.search(
+            r"VERDICT:\s*(APPROVE|REPAIR_REQUIRED|REJECT)", pro_out, flags=re.MULTILINE
+        )
+        pro_verdict = pro_match.group(1) if pro_match else "REPAIR_REQUIRED"
+        pro_approved = pro_verdict == "APPROVE"
 
         # --- Round 1 Step 2: Claude Opus 4.6 Thinking ---
         logger.info("Executing Senior Review Round 2 (Claude Opus 4.6 Thinking) for %s...", task_id)
@@ -200,8 +206,9 @@ Instructions:
 3. Render your authoritative final ruling explicitly as either 'VERDICT: FINAL_APPROVAL' or 'VERDICT: REJECT'.
 """
         opus_out = self._invoke_agy("claude-opus-4-6-thinking", opus_prompt, timeout_seconds=360)
-        opus_approved = "FINAL_APPROVAL" in opus_out or ("APPROVE" in opus_out and "REJECT" not in opus_out)
-        opus_verdict = "FINAL_APPROVAL" if opus_approved else "REJECT"
+        opus_match = re.search(r"VERDICT:\s*(FINAL_APPROVAL|REJECT)", opus_out, flags=re.MULTILINE)
+        opus_verdict = opus_match.group(1) if opus_match else "REJECT"
+        opus_approved = opus_verdict == "FINAL_APPROVAL"
 
         unanimous = pro_approved and opus_approved
         verdict = SeniorReviewVerdict(

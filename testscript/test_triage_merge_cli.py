@@ -107,7 +107,7 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run):
 
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.Path.exists")
-def test_merge_successful_with_skip_senior_review(mock_exists, mock_run):
+def test_merge_fails_without_senior_review(mock_exists, mock_run):
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_skip",
@@ -120,11 +120,13 @@ def test_merge_successful_with_skip_senior_review(mock_exists, mock_run):
     mock_exists.return_value = True
     mock_run.return_value = MagicMock(returncode=0, stdout="Fast-forward")
 
-    args = MagicMock(task_id="task_skip", json=False, skip_senior_review=True)
-    assert cmd_merge(args, queue) == 0
+    args = MagicMock(task_id="task_skip", json=False)
+    assert cmd_merge(args, queue) == 1
 
 
-def test_cmd_senior_review_execution(tmp_path):
+@patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
+def test_cmd_senior_review_execution(mock_invoke, tmp_path):
+    mock_invoke.side_effect = ["VERDICT: APPROVE", "VERDICT: FINAL_APPROVAL"]
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_sr_test",
@@ -134,6 +136,5 @@ def test_cmd_senior_review_execution(tmp_path):
         "envelope": {"title": "Test Task", "repo": str(tmp_path)},
     }
     args = MagicMock(task_id="task_sr_test", json=False)
-    # Settings ENV is test, so SeniorReviewEngine returns mock approval
     assert cmd_senior_review(args, queue) == 0
     queue.record_senior_review.assert_called_once()

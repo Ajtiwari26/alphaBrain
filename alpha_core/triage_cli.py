@@ -18,6 +18,7 @@ import datetime
 import json
 import subprocess
 import sys
+from typing import Any, cast
 from pathlib import Path
 
 from alpha_core.queue.triage_queue import (
@@ -614,12 +615,10 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         return 1
 
     senior_review = result.get("senior_review") or {}
-    skip_sr = getattr(args, "skip_senior_review", False)
-    if not senior_review.get("approved", False) and not skip_sr:
+    if not senior_review.get("approved", False):
         print(
             f"Error: Task '{args.task_id}' has not passed 2-Round Senior Engineering Review (Pro + Opus).\n"
-            f"Run '.venv/bin/python -m alpha_core.triage_cli senior-review {args.task_id}' before merging,\n"
-            f"or supply --skip-senior-review for emergency operator override.",
+            f"Run '.venv/bin/python -m alpha_core.triage_cli senior-review {args.task_id}' before merging.",
             file=sys.stderr,
         )
         return 1
@@ -631,6 +630,35 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     if not branch_name:
         print(f"Error: Missing branch name in task record '{args.task_id}'.", file=sys.stderr)
         return 1
+
+    # A3: SLSA Provenance check - compare branch tip to result_sha
+    result_sha = result.get("result_sha")
+    if not result_sha:
+        # Fallback to senior_review payload if it was stored there
+        result_sha = senior_review.get("result_sha")
+
+    if result_sha:
+        try:
+            tip_res = subprocess.run(
+                ["git", "rev-parse", branch_name],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            branch_tip = tip_res.stdout.strip()
+            if branch_tip != result_sha:
+                print(
+                    f"Error: Security Violation. Branch tip '{branch_tip}' does not match reviewed SHA '{result_sha}'.",
+                    file=sys.stderr,
+                )
+                return 1
+        except subprocess.CalledProcessError as e:
+            print(
+                f"Error: Could not resolve branch tip for '{branch_name}'.\n{e.stderr}",
+                file=sys.stderr,
+            )
+            return 1
 
     print(f"Verifying gates passed and senior review for '{args.task_id}'... OK")
     print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")
@@ -695,7 +723,7 @@ def cmd_dag(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
     # Build a lookup and graph
     task_map = {t["id"]: t for t in tasks}
-    children = {t["id"]: [] for t in tasks}
+    children: dict[str, list[str]] = {t["id"]: [] for t in tasks}
 
     # Find roots (tasks with no dependencies)
     roots = []
@@ -794,15 +822,17 @@ def cmd_stats(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     print(f"Total Tasks: {stats['total_tasks']}")
     print("-" * 50)
     print("Counts by Status:")
-    for st, count in stats["by_status"].items():
+    for st, count in cast(dict[str, int], stats["by_status"]).items():
         print(f"  {st.ljust(15)}: {count}")
     print("-" * 50)
     print("Queue Wait (seconds):")
-    print(f"  Average: {stats['queue_wait_seconds']['average']:.2f}")
-    print(f"  Median:  {stats['queue_wait_seconds']['median']:.2f}")
+    print(f"  Average: {cast(dict[str, float], stats['queue_wait_seconds'])['average']:.2f}")
+    print(f"  Median:  {cast(dict[str, float], stats['queue_wait_seconds'])['median']:.2f}")
     print("Execution Duration (seconds):")
-    print(f"  Average: {stats['execution_duration_seconds']['average']:.2f}")
-    print(f"  Median:  {stats['execution_duration_seconds']['median']:.2f}")
+    print(
+        f"  Average: {cast(dict[str, float], stats['execution_duration_seconds'])['average']:.2f}"
+    )
+    print(f"  Median:  {cast(dict[str, float], stats['execution_duration_seconds'])['median']:.2f}")
     print("=" * 50)
 
     return 0

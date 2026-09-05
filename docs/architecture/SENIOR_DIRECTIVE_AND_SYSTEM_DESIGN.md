@@ -81,10 +81,10 @@ Eva connects to the existing LiveKit room solely as an observer participant.
 #### Token Grant Security
 Eva's LiveKit token must strictly enforce:
 ```python
-can_publish = False        # Cannot publish audio/video/screenshare
-can_subscribe = True       # Subscribes to audio only
-can_publish_data = False   # Cannot send data channel messages
-hidden = True              # Does not appear in human participant roster
+can_publish = False  # Cannot publish audio/video/screenshare
+can_subscribe = True  # Subscribes to audio only
+can_publish_data = False  # Cannot send data channel messages
+hidden = True  # Does not appear in human participant roster
 ```
 
 #### Directory Placement
@@ -602,6 +602,7 @@ Before any worker begins modifying source code, the task payload undergoes manda
 import hashlib
 import json
 
+
 def calculate_content_hash(task: dict) -> str:
     """
     Deterministic SHA-256 hash of the canonical task payload.
@@ -614,7 +615,8 @@ def calculate_content_hash(task: dict) -> str:
       - status, assigned_to, leased_at, updated_at
     """
     hashable_fields = {
-        k: task[k] for k in sorted(task.keys())
+        k: task[k]
+        for k in sorted(task.keys())
         if k not in {"status", "assigned_to", "leased_at", "updated_at", "result"}
     }
     canonical = json.dumps(hashable_fields, sort_keys=True, separators=(",", ":"))
@@ -661,6 +663,7 @@ The blast radius containment system ensures that no worker can modify files outs
 
 ```python
 WORKTREE_BRANCH_PREFIX = "alpha/"
+
 
 async def create_isolated_worktree(task_id: str, base_ref: str = "main") -> Path:
     """
@@ -777,23 +780,27 @@ async def run_acceptance_commands(
                 timeout=timeout,  # I-26: 120s hard ceiling
             )
         except asyncio.TimeoutError:
-            evidence.append(CommandEvidence(
-                command=cmd_str,
-                exit_code=-1,
-                stdout=b"",
-                stderr=b"TIMEOUT after 120s",
-                passed=False,
-            ))
+            evidence.append(
+                CommandEvidence(
+                    command=cmd_str,
+                    exit_code=-1,
+                    stdout=b"",
+                    stderr=b"TIMEOUT after 120s",
+                    passed=False,
+                )
+            )
             return AcceptanceResult(passed=False, evidence=evidence)
 
         passed = proc.returncode == 0
-        evidence.append(CommandEvidence(
-            command=cmd_str,
-            exit_code=proc.returncode,
-            stdout=stdout[-4096:],   # Truncate to last 4KB
-            stderr=stderr[-4096:],
-            passed=passed,
-        ))
+        evidence.append(
+            CommandEvidence(
+                command=cmd_str,
+                exit_code=proc.returncode,
+                stdout=stdout[-4096:],  # Truncate to last 4KB
+                stderr=stderr[-4096:],
+                passed=passed,
+            )
+        )
 
         if not passed:
             return AcceptanceResult(passed=False, evidence=evidence)
@@ -840,6 +847,7 @@ Changed-Files: {count}
 from dataclasses import dataclass
 from typing import FrozenSet
 
+
 @dataclass(frozen=True)
 class PRProposal:
     """
@@ -849,6 +857,7 @@ class PRProposal:
     This is a SECURITY property, not just a style choice — it prevents
     post-construction tampering with the proposal before submission.
     """
+
     # === Identity ===
     task_id: str
     project_id: str
@@ -857,21 +866,21 @@ class PRProposal:
     # === Content ===
     title: str
     description: str
-    branch_name: str                    # alpha/{task_id}
-    base_ref: str                       # typically "main"
-    commit_sha: str                     # SHA of the worktree commit
+    branch_name: str  # alpha/{task_id}
+    base_ref: str  # typically "main"
+    commit_sha: str  # SHA of the worktree commit
 
     # === Provenance ===
-    content_hash: str                   # SHA-256 from pre-execution gate
-    changed_files: FrozenSet[str]       # Immutable set of modified paths
+    content_hash: str  # SHA-256 from pre-execution gate
+    changed_files: FrozenSet[str]  # Immutable set of modified paths
 
     # === Verification ===
-    acceptance_passed: bool             # Must be True for submission
-    acceptance_evidence: tuple          # Frozen tuple of CommandEvidence
+    acceptance_passed: bool  # Must be True for submission
+    acceptance_evidence: tuple  # Frozen tuple of CommandEvidence
 
     # === Metadata ===
-    created_at: str                     # ISO 8601 timestamp
-    execution_duration_seconds: float   # Wall-clock time for worker execution
+    created_at: str  # ISO 8601 timestamp
+    execution_duration_seconds: float  # Wall-clock time for worker execution
 
     def to_result_payload(self) -> dict:
         """Serialize to API result payload for PUT /api/triage/tasks/{task_id}/result."""
@@ -915,17 +924,17 @@ The worker dispatch system must degrade gracefully under emergency conditions an
 ```python
 # Operations BLOCKED during emergency stop
 BLOCKED_OPERATIONS = {
-    "lease_task",           # No new work may be acquired
-    "create_worktree",      # No new worktrees may be created
-    "execute_task",         # No modifications may begin
+    "lease_task",  # No new work may be acquired
+    "create_worktree",  # No new worktrees may be created
+    "execute_task",  # No modifications may begin
 }
 
 # Operations PERMITTED during emergency stop (I-27)
 PERMITTED_OPERATIONS = {
-    "submit_result_complete",   # allow_during_emergency=True
-    "submit_result_failed",     # allow_during_emergency=True
-    "submit_result_rejected",   # allow_during_emergency=True
-    "cleanup_worktree",         # Must always be permitted for hygiene
+    "submit_result_complete",  # allow_during_emergency=True
+    "submit_result_failed",  # allow_during_emergency=True
+    "submit_result_rejected",  # allow_during_emergency=True
+    "cleanup_worktree",  # Must always be permitted for hygiene
 }
 ```
 
@@ -936,6 +945,7 @@ PERMITTED_OPERATIONS = {
 
 ```python
 STALE_THRESHOLD_SECONDS = 900  # 15 minutes
+
 
 async def reap_stale_executing_tasks() -> list[str]:
     """
@@ -1509,9 +1519,7 @@ computed_hash = hashlib.sha256(
 ).hexdigest()
 
 # Legacy hash (old, non-deterministic — MIGRATION SHIM)
-legacy_hash = hashlib.sha256(
-    json.dumps(envelope, default=str).encode("utf-8")
-).hexdigest()
+legacy_hash = hashlib.sha256(json.dumps(envelope, default=str).encode("utf-8")).hexdigest()
 
 # Accept either during migration window
 if stored_hash and computed_hash != stored_hash and legacy_hash != stored_hash:

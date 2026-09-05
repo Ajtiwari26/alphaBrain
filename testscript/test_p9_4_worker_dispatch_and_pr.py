@@ -195,7 +195,13 @@ def test_end_to_end_worker_dispatch_and_pr_generation(
         "repo": str(fixture_repo),
         "allowed_paths": ["FEATURES.md"],
         "acceptance_plan": {
-            "commands": [{"executable": "python", "args": ["-c", "import sys; sys.exit(0)"]}]
+            "commands": [
+                {
+                    "executable": "python",
+                    "args": ["-c", "import sys; sys.exit(0)"],
+                    "gate_type": "unit_test",
+                }
+            ]
         },
     }
     # Deterministic content hash
@@ -255,7 +261,11 @@ def test_worker_disallowed_path_fails_closed(
         "objective": "Modify restricted file",
         "repo": str(fixture_repo),
         "allowed_paths": ["docs/safe.md"],
-        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(0)"]}]},
+        "acceptance_plan": {
+            "commands": [
+                {"executable": "python", "args": ["-c", "exit(0)"], "gate_type": "unit_test"}
+            ]
+        },
     }
     import hashlib
 
@@ -298,7 +308,13 @@ def test_worker_acceptance_gate_failure(
         "repo": str(fixture_repo),
         "allowed_paths": ["test.py"],
         "acceptance_plan": {
-            "commands": [{"executable": "python", "args": ["-c", "import sys; sys.exit(42)"]}]
+            "commands": [
+                {
+                    "executable": "python",
+                    "args": ["-c", "import sys; sys.exit(42)"],
+                    "gate_type": "unit_test",
+                }
+            ]
         },
     }
     import hashlib
@@ -411,7 +427,11 @@ def test_cli_worker_cycle_command(
         "objective": "CLI worker test",
         "repo": str(fixture_repo),
         "allowed_paths": ["cli.txt"],
-        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(0)"]}]},
+        "acceptance_plan": {
+            "commands": [
+                {"executable": "python", "args": ["-c", "exit(0)"], "gate_type": "unit_test"}
+            ]
+        },
     }
     import hashlib
 
@@ -554,7 +574,11 @@ def test_zero_diff_worktree_fails_closed(
         "objective": "Zero diff task",
         "repo": str(fixture_repo),
         "allowed_paths": ["README.md"],
-        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(0)"]}]},
+        "acceptance_plan": {
+            "commands": [
+                {"executable": "python", "args": ["-c", "exit(0)"], "gate_type": "unit_test"}
+            ]
+        },
     }
     import hashlib
 
@@ -574,6 +598,7 @@ def test_zero_diff_worktree_fails_closed(
     assert task["status"] in (TriageStatus.APPROVED.value, TriageStatus.FAILED.value)
     assert "Fail-Closed Violation" in str(task["result_json"])
 
+
 def test_failure_evidence_injected_on_retry(
     isolated_queue: TaskTriageQueue, fixture_repo: Path, tmp_path: Path
 ) -> None:
@@ -587,7 +612,11 @@ def test_failure_evidence_injected_on_retry(
         "repo": str(fixture_repo),
         "allowed_paths": ["failing.txt"],
         "detailed_instructions": "Initial instructions.",
-        "acceptance_plan": {"commands": [{"executable": "python", "args": ["-c", "exit(1)"]}]},
+        "acceptance_plan": {
+            "commands": [
+                {"executable": "python", "args": ["-c", "exit(1)"], "gate_type": "unit_test"}
+            ]
+        },
     }
     import hashlib
 
@@ -628,4 +657,3 @@ def test_failure_evidence_injected_on_retry(
     assert "PREVIOUS ATTEMPT GATE FAILURES" in task_env.detailed_instructions
     assert "Failed Gate: python -c exit(1) (Exit 1)" in task_env.detailed_instructions
     assert task_env.detailed_instructions.startswith("Initial instructions.")
-

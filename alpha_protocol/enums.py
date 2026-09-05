@@ -113,6 +113,7 @@ class GateType(str, Enum):
     SECURITY_SCAN = "security_scan"
     INDEPENDENT_REVIEW = "independent_review"
     CODE_REVIEW_GRAPH = "code_review_graph"
+    TYPE_CHECK = "type_check"
 
 
 class ApprovalStatus(str, Enum):

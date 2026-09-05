@@ -1243,7 +1243,7 @@ def sanitize_client_event_details(details: dict[str, Any], depth: int = 0) -> di
                 continue
             result[k] = redact_secrets(v)
         elif isinstance(v, list):
-            sanitized_list = []
+            sanitized_list: list[Any] = []
             for item in v:
                 if isinstance(item, dict):
                     sub = sanitize_client_event_details(item, depth + 1)
@@ -2401,6 +2401,14 @@ async def post_triage_task_result(
         )
 
     if payload.status == "completed":
+        # A3 SLSA Provenance: Prevent executor from minting review/promotion evidence
+        forbidden_fields = {"senior_review", "promotion_id", "promotion_approved"}
+        if any(field in payload.result for field in forbidden_fields):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Executor cannot submit trusted senior_review or promotion fields in its own result.",
+            )
+
         success = queue.complete_task(
             task_id,
             result=payload.result,

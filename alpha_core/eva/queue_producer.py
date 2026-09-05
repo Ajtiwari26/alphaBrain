@@ -90,7 +90,9 @@ class EvaQueueProducer:
 
         # 3. Compute canonical content hash
         content_hash = hashlib.sha256(
-            json.dumps(envelope_dict, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+            json.dumps(envelope_dict, sort_keys=True, separators=(",", ":"), default=str).encode(
+                "utf-8"
+            )
         ).hexdigest()
 
         # 4. Create immutable provenance record

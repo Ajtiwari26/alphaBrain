@@ -18,8 +18,9 @@ def make_dummy_envelope(task_id: str, depends_on: list[str] | None = None):
         "base_commit": "HEAD",
         "objective": "Test",
         "allowed_paths": ["."],
-        "dependencies": deps
+        "dependencies": deps,
     }
+
 
 def make_dummy_provenance(task_id: str, depends_on: list[str] | None = None):
     content = f"{task_id}_{','.join(depends_on or [])}"
@@ -32,8 +33,9 @@ def make_dummy_provenance(task_id: str, depends_on: list[str] | None = None):
         extraction_confidence=1.0,
         eva_session_id="e1",
         created_at=time.time(),
-        content_hash=content
+        content_hash=content,
     )
+
 
 @pytest.fixture
 def queue(tmp_path: Path):
@@ -42,45 +44,40 @@ def queue(tmp_path: Path):
     q = TaskTriageQueue(db_path=db_path, emergency_lock_path=lock_path)
     return q
 
+
 def test_enqueue_cycle_detection(queue: TaskTriageQueue):
     queue.enqueue_task(
         "task_1",
         make_dummy_envelope("task_1", depends_on=["task_2"]),
-        make_dummy_provenance("task_1", depends_on=["task_2"])
+        make_dummy_provenance("task_1", depends_on=["task_2"]),
     )
     with pytest.raises(ValueError, match="Circular dependency detected"):
         queue.enqueue_task(
             "task_2",
             make_dummy_envelope("task_2", depends_on=["task_1"]),
-            make_dummy_provenance("task_2", depends_on=["task_1"])
+            make_dummy_provenance("task_2", depends_on=["task_1"]),
         )
 
+
 def test_modify_cycle_detection(queue: TaskTriageQueue):
-    queue.enqueue_task(
-        "task_1",
-        make_dummy_envelope("task_1"),
-        make_dummy_provenance("task_1")
-    )
+    queue.enqueue_task("task_1", make_dummy_envelope("task_1"), make_dummy_provenance("task_1"))
     queue.enqueue_task(
         "task_2",
         make_dummy_envelope("task_2", depends_on=["task_1"]),
-        make_dummy_provenance("task_2", depends_on=["task_1"])
+        make_dummy_provenance("task_2", depends_on=["task_1"]),
     )
     env1 = make_dummy_envelope("task_1", depends_on=["task_2"])
     with pytest.raises(ValueError, match="Circular dependency detected"):
         queue.modify_task("task_1", new_envelope=env1)
 
+
 def test_dag_leasing_blocked(queue: TaskTriageQueue):
     queue.enqueue_task(
         "task_1",
         make_dummy_envelope("task_1", depends_on=["task_2"]),
-        make_dummy_provenance("task_1", depends_on=["task_2"])
+        make_dummy_provenance("task_1", depends_on=["task_2"]),
     )
-    queue.enqueue_task(
-        "task_2",
-        make_dummy_envelope("task_2"),
-        make_dummy_provenance("task_2")
-    )
+    queue.enqueue_task("task_2", make_dummy_envelope("task_2"), make_dummy_provenance("task_2"))
     queue.approve_task("task_1")
     queue.approve_task("task_2")
     task = queue.lease_next_approved_task()
@@ -92,22 +89,20 @@ def test_dag_leasing_blocked(queue: TaskTriageQueue):
     assert task is not None
     assert task["id"] == "task_1"
 
+
 def test_cli_dag(queue: TaskTriageQueue):
-    queue.enqueue_task(
-        "task_1",
-        make_dummy_envelope("task_1"),
-        make_dummy_provenance("task_1")
-    )
+    queue.enqueue_task("task_1", make_dummy_envelope("task_1"), make_dummy_provenance("task_1"))
     queue.enqueue_task(
         "task_2",
         make_dummy_envelope("task_2", depends_on=["task_1"]),
-        make_dummy_provenance("task_2", depends_on=["task_1"])
+        make_dummy_provenance("task_2", depends_on=["task_1"]),
     )
     from alpha_core.triage_cli import cmd_dag
 
     args = Namespace(json=True)
     import io
     import sys
+
     out = io.StringIO()
     sys.stdout = out
     try:
