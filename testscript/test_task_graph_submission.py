@@ -39,8 +39,7 @@ def make_task(
         objective=f"Complete {task_id}",
         allowed_paths=["src", "testscript"],
         dependencies=[TaskDependency(task_id=dependency) for dependency in dependencies],
-        requires_approval=True,
-    )
+        requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 
 @pytest.mark.asyncio

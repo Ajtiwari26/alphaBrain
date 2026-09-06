@@ -136,8 +136,7 @@ async def test_approval_task_submission_preserves_postgres_fk_order(postgres_db)
         repo="/test",
         objective="Prove task row exists before pending approval insert",
         allowed_paths=["proof.txt"],
-        requires_approval=True,
-    )
+        requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     async with postgres_db() as session:
         task = await TaskEngine.submit_task(session, envelope)
@@ -165,8 +164,7 @@ async def test_verified_result_preserves_attempt_review_fk_order(postgres_db):
         repo="/test",
         objective="Prove attempt row exists before pending review approval insert",
         allowed_paths=["proof.txt"],
-        require_packet_binding=True,
-    )
+        require_packet_binding=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     async with postgres_db() as session:
         await TaskEngine.submit_task(session, envelope)
@@ -179,7 +177,7 @@ async def test_verified_result_preserves_attempt_review_fk_order(postgres_db):
             status=TaskStatus.COMPLETED,
             agent=AgentType.ANTIGRAVITY,
             model="gemini-3.1-pro-high",
-            base_commit="HEAD",
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="result_commit",
             files_changed=["proof.txt"],
             packet_sha256=compute_packet_digest(envelope),

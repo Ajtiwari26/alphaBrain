@@ -184,7 +184,7 @@ async def _submit_task(client: httpx.AsyncClient, api_token: str, task_id: str) 
             "retry_policy": {"max_attempts": 10, "backoff_base_seconds": 10, "backoff_multiplier": 1.0},
             "require_packet_binding": False,
             "repo": str(FIXTURE_REPO),
-            "base_commit": "HEAD",
+            "base_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         },
     )
     response.raise_for_status()

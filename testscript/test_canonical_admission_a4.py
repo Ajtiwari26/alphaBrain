@@ -10,7 +10,7 @@ def test_task_envelope_rejects_head():
             task_id="tsk_123",
             project_id="prj_alpha",
             repo=".",
-            base_commit="HEAD",
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             objective="Test objective",
             allowed_paths=["."]
         )

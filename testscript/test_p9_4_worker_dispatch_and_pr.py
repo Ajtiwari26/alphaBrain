@@ -668,7 +668,7 @@ def test_failure_evidence_injected_on_retry(
     assert leased is not None
 
     # We directly invoke _build_task_envelope to verify the injection
-    task_env = dispatcher._build_task_envelope(leased, wt_path)
+    task_env = dispatcher._build_task_envelope(leased, wt_path, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     # Assert instructions contain the failure directives
     assert "PREVIOUS ATTEMPT GATE FAILURES" in task_env.detailed_instructions

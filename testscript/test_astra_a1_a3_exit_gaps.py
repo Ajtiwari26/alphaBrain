@@ -32,7 +32,7 @@ def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
     app.dependency_overrides[require_api_principal] = mock_auth
 
     # Setup executing task
-    isolated_queue.enqueue_task("sec_task", {"base_commit": "HEAD"}, TaskProvenance(meeting_id="m1", speaker_id="s1", utterance_timestamp=1.0, transcript_excerpt="", extraction_model="", extraction_confidence=1.0, eva_session_id="", created_at=1.0, content_hash="hash"))
+    isolated_queue.enqueue_task("sec_task", {"base_commit": "HEAD"}, TaskProvenance(meeting_id="m1", speaker_id="s1", utterance_timestamp=1.0, transcript_excerpt="", extraction_model="", extraction_confidence=1.0, eva_session_id="", created_at=1.0, content_hash="hash-1"))
     isolated_queue.approve_task("sec_task")
     leased = isolated_queue.lease_next_approved_task()
 
@@ -78,7 +78,7 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
     import argparse
 
     from alpha_core.triage_cli import cmd_merge
-    isolated_queue.enqueue_task("tsk_merge", {"repo": ".", "base_commit": "HEAD"}, TaskProvenance(meeting_id="m1", speaker_id="s1", utterance_timestamp=1.0, transcript_excerpt="", extraction_model="", extraction_confidence=1.0, eva_session_id="", created_at=1.0, content_hash="hash"))
+    isolated_queue.enqueue_task("tsk_merge", {"repo": ".", "base_commit": "HEAD"}, TaskProvenance(meeting_id="m1", speaker_id="s1", utterance_timestamp=1.0, transcript_excerpt="", extraction_model="", extraction_confidence=1.0, eva_session_id="", created_at=1.0, content_hash="hash-1"))
     isolated_queue.approve_task("tsk_merge")
     isolated_queue.lease_next_approved_task()
     isolated_queue.complete_task("tsk_merge", {"gates_passed": True}, branch_name="test_branch")

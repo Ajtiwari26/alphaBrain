@@ -86,7 +86,7 @@ async def test_outage_buffers_result_then_replays_cleanly(tmp_path, mock_spool, 
         project_id="prj_outage",
         repo=str(tmp_path / "repo"),
         objective="Test outage safety",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         allowed_paths=["."],
     )
     lease = LeasedTask(lease_token="lease_outage_tok", task=task)
@@ -97,7 +97,7 @@ async def test_outage_buffers_result_then_replays_cleanly(tmp_path, mock_spool, 
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="gemini-3.7-flash-high",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     daemon.worktree_mgr = MagicMock()

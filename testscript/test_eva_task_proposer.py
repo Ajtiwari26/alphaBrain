@@ -23,7 +23,7 @@ def test_build_task_envelope_success():
         confidence_score=0.9,
     )
 
-    envelope = proposer.build_task_envelope(spec=spec, project_id="prj_stripe_001")
+    envelope = proposer.build_task_envelope(spec=spec, project_id="prj_stripe_001", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     assert envelope.task_id.startswith("tsk_eva_")
     assert envelope.project_id == "prj_stripe_001"
@@ -46,4 +46,4 @@ def test_build_task_envelope_rejects_non_actionable():
     )
 
     with pytest.raises(ValueError, match="Cannot propose a task"):
-        proposer.build_task_envelope(spec=spec, project_id="prj_test")
+        proposer.build_task_envelope(spec=spec, project_id="prj_test", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")

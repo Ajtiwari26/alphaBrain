@@ -125,8 +125,7 @@ def test_full_end_to_end_autonomous_lifecycle(
         project_id="proj_alphabrain",
         meeting_id="meet_live_e2e",
         transcript_excerpt="We need to deploy rate limiting middleware to prevent API abuse.",
-        speaker_id="founder_ajay",
-    )
+        speaker_id="founder_ajay", base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     # Inject repo path into envelope in queue and update content hash
     task_data = isolated_queue.get_task(task_id)
     assert task_data is not None
@@ -172,7 +171,7 @@ def test_full_end_to_end_autonomous_lifecycle(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id=task_id,
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     limiter_file = wt_path / "src" / "rate_limiter.py"
     limiter_file.parent.mkdir(parents=True, exist_ok=True)
@@ -475,7 +474,7 @@ def test_chaos_sandbox_escape_and_blast_radius_violations(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id="escape_task",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     # Legitimate edit

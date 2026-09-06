@@ -45,8 +45,7 @@ def make_test_task(
                     args=["-q"],
                 )
             ],
-        ),
-    )
+        ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 
 def test_blocked_approval_prevents_execution():

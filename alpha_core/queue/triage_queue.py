@@ -173,7 +173,9 @@ class TaskTriageQueue:
                 """
             )
             try:
-                conn.execute("ALTER TABLE task_triage_queue ADD COLUMN cumulative_retries INTEGER DEFAULT 0;")
+                conn.execute(
+                    "ALTER TABLE task_triage_queue ADD COLUMN cumulative_retries INTEGER DEFAULT 0;"
+                )
             except sqlite3.OperationalError:
                 pass
             conn.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_triage_queue(status);")
@@ -272,21 +274,29 @@ class TaskTriageQueue:
         now = time.time()
         cutoff = now - dedup_window_seconds
 
-        canonical_hash = hashlib.sha256(json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")).hexdigest()
+        canonical_hash = hashlib.sha256(
+            json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        ).hexdigest()
         if provenance.content_hash and len(provenance.content_hash) == 64:
             if provenance.content_hash != canonical_hash:
-                raise ValueError(f"Content hash mismatch: expected {canonical_hash}, got {provenance.content_hash}")
+                raise ValueError(
+                    f"Content hash mismatch: expected {canonical_hash}, got {provenance.content_hash}"
+                )
         elif provenance.content_hash and not (
             provenance.content_hash.startswith("hash-")
             or provenance.content_hash.startswith("hash_")
             or provenance.content_hash.startswith("identical-hash-")
         ):
-            raise ValueError(f"Legacy partial content hash {provenance.content_hash} requires explicit migration to full canonical SHA-256")
+            raise ValueError(
+                f"Legacy partial content hash {provenance.content_hash} requires explicit migration to full canonical SHA-256"
+            )
 
         if "base_commit" in envelope:
             base_commit = envelope["base_commit"]
             if not base_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(base_commit))):
-                raise ValueError("Task base_commit must be a fully resolved 40-character hexadecimal SHA")
+                raise ValueError(
+                    "Task base_commit must be a fully resolved 40-character hexadecimal SHA"
+                )
 
         def _insert(conn: sqlite3.Connection) -> str:
             # Deduplication check
@@ -345,7 +355,10 @@ class TaskTriageQueue:
         now = time.time()
 
         def _approve(conn: sqlite3.Connection) -> bool:
-            cursor = conn.execute("SELECT envelope_json FROM task_triage_queue WHERE id = ? AND status = ?;", (task_id, TriageStatus.PENDING_REVIEW.value))
+            cursor = conn.execute(
+                "SELECT envelope_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                (task_id, TriageStatus.PENDING_REVIEW.value),
+            )
             row = cursor.fetchone()
             if not row:
                 return False
@@ -353,7 +366,9 @@ class TaskTriageQueue:
             if "base_commit" in env:
                 base_commit = env["base_commit"]
                 if not base_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(base_commit))):
-                    raise ValueError("Task base_commit must be a fully resolved 40-character hexadecimal SHA")
+                    raise ValueError(
+                        "Task base_commit must be a fully resolved 40-character hexadecimal SHA"
+                    )
 
             cursor = conn.execute(
                 """
@@ -530,7 +545,11 @@ class TaskTriageQueue:
                 ORDER BY t1.created_at ASC
                 LIMIT 1;
                 """,
-                (TriageStatus.APPROVED.value, TriageStatus.COMPLETED.value, TriageStatus.COMPLETED.value),
+                (
+                    TriageStatus.APPROVED.value,
+                    TriageStatus.COMPLETED.value,
+                    TriageStatus.COMPLETED.value,
+                ),
             )
             selected_row = cursor.fetchone()
 
@@ -720,11 +739,24 @@ class TaskTriageQueue:
                 task_id,
                 TriageStatus.EXECUTING.value,
             ]
-            if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
-                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
-                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
-                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
-                where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+            if (
+                worker_id is not None
+                and lease_id is not None
+                and fencing_epoch is not None
+                and attempt_id is not None
+            ):
+                where_clause += (
+                    " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
+                )
+                where_clause += (
+                    " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
+                )
+                where_clause += (
+                    " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
+                )
+                where_clause += (
+                    " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                )
                 params.extend([worker_id, lease_id, fencing_epoch, attempt_id])
 
             update_cursor = conn.execute(
@@ -764,6 +796,7 @@ class TaskTriageQueue:
             result_data = json.loads(row[0]) if row[0] else {}
 
             import hashlib
+
             result_sha = result_data.get("head_commit", "") or result_data.get("result_sha", "")
             gate_manifest = json.dumps(result_data.get("acceptance_manifest", {}), sort_keys=True)
             reviewer_identity = "SYSTEM_SENIOR_REVIEW_ENGINE"
@@ -902,13 +935,26 @@ class TaskTriageQueue:
                 # Defensive SQL Security Note:
                 # Query fragments below are statically defined internal constants.
                 # All variable values are passed strictly via parameterized query bindings.
-                if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
+                if (
+                    worker_id is not None
+                    and lease_id is not None
+                    and fencing_epoch is not None
+                    and attempt_id is not None
+                ):
                     where_clause += " AND status = ?"
                     params.append(TriageStatus.EXECUTING.value)
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
+                    )
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
+                    )
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
+                    )
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                    )
                     params.extend([worker_id, lease_id, fencing_epoch, attempt_id])
 
                 up_cur = conn.execute(
@@ -939,13 +985,26 @@ class TaskTriageQueue:
                 # Defensive SQL Security Note:
                 # Query fragments below are statically defined internal constants.
                 # All variable values are passed strictly via parameterized query bindings.
-                if worker_id is not None and lease_id is not None and fencing_epoch is not None and attempt_id is not None:
+                if (
+                    worker_id is not None
+                    and lease_id is not None
+                    and fencing_epoch is not None
+                    and attempt_id is not None
+                ):
                     where_clause += " AND status = ?"
                     params.append(TriageStatus.EXECUTING.value)
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
-                    where_clause += " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.worker_id') = ?"
+                    )
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.lease_id') = ?"
+                    )
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.fencing_epoch') = ?"
+                    )
+                    where_clause += (
+                        " AND json_extract(provenance_json, '$.lease_metadata.attempt_id') = ?"
+                    )
                     params.extend([worker_id, lease_id, fencing_epoch, attempt_id])
 
                 up_cur = conn.execute(
@@ -993,7 +1052,10 @@ class TaskTriageQueue:
             max_cumulative = env.get("max_cumulative_retries", 5)
 
             if cumulative_retries >= max_cumulative:
-                payload = {"error": "Cumulative lifetime repair budget exhausted", "cumulative_retries": cumulative_retries}
+                payload = {
+                    "error": "Cumulative lifetime repair budget exhausted",
+                    "cumulative_retries": cumulative_retries,
+                }
                 conn.execute(
                     """
                     UPDATE task_triage_queue
@@ -1001,9 +1063,13 @@ class TaskTriageQueue:
                         updated_at = ?
                     WHERE id = ? AND status = ?;
                     """,
-                    (json.dumps(payload), now, task_id, TriageStatus.FAILED.value)
+                    (json.dumps(payload), now, task_id, TriageStatus.FAILED.value),
                 )
-                logger.error("Task %s repair budget exhausted (%d). Terminally failed.", task_id, cumulative_retries)
+                logger.error(
+                    "Task %s repair budget exhausted (%d). Terminally failed.",
+                    task_id,
+                    cumulative_retries,
+                )
                 return False
 
             canonical_env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
@@ -1068,14 +1134,18 @@ class TaskTriageQueue:
             reaped = 0
             for row in rows:
                 task_id = row["id"]
-                provenance_dict = json.loads(row["provenance_json"]) if "provenance_json" in row.keys() else {}
+                provenance_dict = (
+                    json.loads(row["provenance_json"]) if "provenance_json" in row.keys() else {}
+                )
                 if "audit_history" not in provenance_dict:
                     provenance_dict["audit_history"] = []
-                provenance_dict["audit_history"].append({
-                    "action": "task_reaped_by_watchdog",
-                    "timestamp": now,
-                    "timeout_seconds": timeout_seconds,
-                })
+                provenance_dict["audit_history"].append(
+                    {
+                        "action": "task_reaped_by_watchdog",
+                        "timestamp": now,
+                        "timeout_seconds": timeout_seconds,
+                    }
+                )
                 new_provenance_json = json.dumps(provenance_dict, default=str)
                 conn.execute(
                     """
@@ -1126,12 +1196,14 @@ class TaskTriageQueue:
             if "audit_history" not in provenance_dict:
                 provenance_dict["audit_history"] = []
 
-            provenance_dict["audit_history"].append({
-                "action": "task_reassigned",
-                "timestamp": now,
-                "old_worker_id": worker_id,
-                "new_worker_id": new_worker_id,
-            })
+            provenance_dict["audit_history"].append(
+                {
+                    "action": "task_reassigned",
+                    "timestamp": now,
+                    "old_worker_id": worker_id,
+                    "new_worker_id": new_worker_id,
+                }
+            )
 
             new_lease_id = str(uuid.uuid4())
             new_attempt_id = str(uuid.uuid4())
@@ -1164,7 +1236,10 @@ class TaskTriageQueue:
                     now,
                     task_id,
                     TriageStatus.EXECUTING.value,
-                    worker_id, lease_id, fencing_epoch, attempt_id
+                    worker_id,
+                    lease_id,
+                    fencing_epoch,
+                    attempt_id,
                 ),
             )
             return update_cursor.rowcount > 0

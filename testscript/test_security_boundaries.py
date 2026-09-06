@@ -48,7 +48,7 @@ def make_task(**overrides):
         "allowed_paths": ["src"],
     }
     data.update(overrides)
-    return TaskEnvelope(**data)
+    return TaskEnvelope(**data, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 
 @pytest.mark.asyncio

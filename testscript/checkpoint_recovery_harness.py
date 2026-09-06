@@ -232,7 +232,7 @@ async def _submit_task(client: httpx.AsyncClient, api_token: str, task_id: str) 
             },
             "require_packet_binding": False,
             "repo": str(FIXTURE_REPO),
-            "base_commit": "HEAD",
+            "base_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         },
     )
     response.raise_for_status()

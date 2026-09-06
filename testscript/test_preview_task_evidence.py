@@ -44,7 +44,7 @@ async def test_healthy_retained_preview_evidence(tmp_path, monkeypatch):
         status=TaskStatus.VERIFIED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     monkeypatch.setattr(
         daemon,
@@ -61,8 +61,7 @@ async def test_healthy_retained_preview_evidence(tmp_path, monkeypatch):
         repo="r",
         objective="o",
         allowed_paths=["."],
-        retain_worktree_for_preview=True,
-    )
+        retain_worktree_for_preview=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     monkeypatch.setattr(
         TaskEngine,
         "lease_next_task",
@@ -90,7 +89,7 @@ async def test_non_preview_task_behavior(tmp_path, monkeypatch):
         status=TaskStatus.VERIFIED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     monkeypatch.setattr(
         daemon,
@@ -106,8 +105,7 @@ async def test_non_preview_task_behavior(tmp_path, monkeypatch):
         repo="r",
         objective="o",
         allowed_paths=["."],
-        retain_worktree_for_preview=False,
-    )
+        retain_worktree_for_preview=False, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     monkeypatch.setattr(
         TaskEngine,
         "lease_next_task",
@@ -133,7 +131,7 @@ async def test_failed_http_preview_startup(tmp_path, monkeypatch):
         status=TaskStatus.VERIFIED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     monkeypatch.setattr(
         daemon,
@@ -149,8 +147,7 @@ async def test_failed_http_preview_startup(tmp_path, monkeypatch):
         repo="r",
         objective="o",
         allowed_paths=["."],
-        retain_worktree_for_preview=True,
-    )
+        retain_worktree_for_preview=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     monkeypatch.setattr(
         TaskEngine,
         "lease_next_task",
@@ -247,7 +244,7 @@ async def test_preview_eligibility_verified_without_gate():
         task_id="t1",
         project_id="p1",
         objective="obj",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         preferred_agent=AgentType.ANTIGRAVITY,
         repo="repo",
         allowed_paths=["src/"],
@@ -260,7 +257,7 @@ async def test_preview_eligibility_verified_without_gate():
         status=TaskStatus.VERIFIED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     assert d._is_eligible_for_preview(env, res) is True
 
@@ -272,7 +269,7 @@ async def test_preview_eligibility_completed_missing_or_failed_gates():
         task_id="t1",
         project_id="p1",
         objective="obj",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         preferred_agent=AgentType.ANTIGRAVITY,
         repo="repo",
         allowed_paths=["src/"],
@@ -285,7 +282,7 @@ async def test_preview_eligibility_completed_missing_or_failed_gates():
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     assert d._is_eligible_for_preview(env, res) is False
 
@@ -301,7 +298,7 @@ async def test_preview_eligibility_completed_passed_gates():
         task_id="t1",
         project_id="p1",
         objective="obj",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         preferred_agent=AgentType.ANTIGRAVITY,
         repo="repo",
         allowed_paths=["src/"],
@@ -314,7 +311,7 @@ async def test_preview_eligibility_completed_passed_gates():
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         gate_result=GateResult(task_id="t1", attempt_id="a1", all_passed=True, evidence_items=[]),
     )
     assert d._is_eligible_for_preview(env, res) is True
@@ -327,7 +324,7 @@ async def test_preview_eligibility_failed_status_denied():
         task_id="t1",
         project_id="p1",
         objective="obj",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         preferred_agent=AgentType.ANTIGRAVITY,
         repo="repo",
         allowed_paths=["src/"],
@@ -339,7 +336,7 @@ async def test_preview_eligibility_failed_status_denied():
         status=TaskStatus.RETRYABLE_FAILED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     assert d._is_eligible_for_preview(env, res) is False
 
@@ -365,7 +362,7 @@ async def test_preview_eligibility_remote_path_same_predicate(monkeypatch):
         task_id="t1",
         project_id="p1",
         objective="obj",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         preferred_agent=AgentType.ANTIGRAVITY,
         repo="repo",
         allowed_paths=["src/"],
@@ -377,7 +374,7 @@ async def test_preview_eligibility_remote_path_same_predicate(monkeypatch):
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="x",
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         gate_result=GateResult(task_id="t1", attempt_id="a1", all_passed=True, evidence_items=[]),
     )
 

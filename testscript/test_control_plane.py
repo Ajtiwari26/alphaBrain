@@ -25,8 +25,7 @@ def make_task() -> TaskEnvelope:
         project_id="prj_control_plane",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Verify control plane transport",
-        allowed_paths=["."],
-    )
+        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 
 @pytest.mark.asyncio
@@ -70,7 +69,7 @@ async def test_control_plane_leases_heartbeats_and_submits_with_identity_header(
                 status=TaskStatus.RETRYABLE_FAILED,
                 agent=AgentType.ANTIGRAVITY,
                 model="test",
-                base_commit="HEAD",
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             ),
             lease.lease_token,
         )

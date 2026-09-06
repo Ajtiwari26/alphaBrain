@@ -20,7 +20,7 @@ async def main():
         ),
         founder_identity="ajtiwari",
         requires_approval=True,
-        base_commit="HEAD",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     
     plan = AcceptancePlan(

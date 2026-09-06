@@ -276,8 +276,7 @@ async def main(args_list: list[str] | None = None):
                             args=["-e", "require('fs').readFileSync('docs/getting_started.md')"],
                         )
                     ],
-                ),
-            )
+                ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
             print("3. Submitting task through TaskEngine...")
             task = await TaskEngine.submit_task(session, envelope)

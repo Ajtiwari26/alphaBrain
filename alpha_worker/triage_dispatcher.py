@@ -190,7 +190,9 @@ class TriageTaskDispatcher:
 
         return all_passed, evidence
 
-    def get_git_diff_and_changed_files(self, worktree_path: Path, base_commit: str) -> tuple[list[str], str]:
+    def get_git_diff_and_changed_files(
+        self, worktree_path: Path, base_commit: str
+    ) -> tuple[list[str], str]:
         """Inspects git diff relative to base_commit inside the worktree, including uncommitted changes."""
         # 1. Changed files (committed on branch relative to base)
         ret, out, _ = self.run_command_in_worktree(
@@ -327,13 +329,17 @@ class TriageTaskDispatcher:
         repo_path = envelope.get("repo", ".")
         base_commit = envelope.get("base_commit", self.default_base_commit)
         if not base_commit or base_commit == "HEAD":
-            raise ValueError(f"Task '{task_id}' rejected: mutable HEAD or missing base_commit. Must provide a resolved SHA.")
+            raise ValueError(
+                f"Task '{task_id}' rejected: mutable HEAD or missing base_commit. Must provide a resolved SHA."
+            )
 
         # 1.5 Validate acceptance plan (Pre-Execution Typed Gate Validation)
         validation_error = self.validate_acceptance_plan(envelope.get("acceptance_plan", {}))
         if validation_error:
             logger.error(f"Task {task_id} validation failed: {validation_error}")
-            self.queue.fail_task(task_id, error_details={"error": validation_error}, allow_retry=False)
+            self.queue.fail_task(
+                task_id, error_details={"error": validation_error}, allow_retry=False
+            )
             return None
 
         # 1. Verify content_hash integrity
@@ -416,7 +422,9 @@ class TriageTaskDispatcher:
                     return None
 
             # 3. Check for worktree modifications and diff
-            changed_files, diff_stat = self.get_git_diff_and_changed_files(worktree_path, base_commit)
+            changed_files, diff_stat = self.get_git_diff_and_changed_files(
+                worktree_path, base_commit
+            )
 
             allowed_paths = envelope.get("allowed_paths", [])
             if changed_files:
@@ -470,28 +478,41 @@ class TriageTaskDispatcher:
             _ret, out, _ = self.run_command_in_worktree(
                 worktree_path, ["git", "diff", "--name-only", f"{base_commit}..{head_commit}"]
             )
-            final_changed_files = [line.strip('"') for line in out.strip().splitlines() if line.strip()]
+            final_changed_files = [
+                line.strip('"') for line in out.strip().splitlines() if line.strip()
+            ]
 
             if final_changed_files:
-                violations = WorktreeManager.find_disallowed_changes(final_changed_files, allowed_paths)
+                violations = WorktreeManager.find_disallowed_changes(
+                    final_changed_files, allowed_paths
+                )
                 if violations:
                     err_msg = f"Security Violation: Post-commit diff contains files outside allowed_paths: {violations}"
                     logger.error(err_msg)
-                    self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                    self.queue.fail_task(
+                        task_id, error_details={"error": err_msg}, allow_retry=False
+                    )
                     return None
 
             _ret, diff_tree_out, _ = self.run_command_in_worktree(
-                worktree_path, ["git", "diff-tree", "-r", "--diff-filter=ACMR", base_commit, head_commit]
+                worktree_path,
+                ["git", "diff-tree", "-r", "--diff-filter=ACMR", base_commit, head_commit],
             )
             for line in diff_tree_out.strip().splitlines():
                 parts = line.split()
                 if len(parts) >= 2 and (parts[1] == "120000" or parts[1] == "160000"):
-                    err_msg = "Security Violation: Symlink or submodule added/modified in final commit."
+                    err_msg = (
+                        "Security Violation: Symlink or submodule added/modified in final commit."
+                    )
                     logger.error(err_msg)
-                    self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                    self.queue.fail_task(
+                        task_id, error_details={"error": err_msg}, allow_retry=False
+                    )
                     return None
 
-            _ret, status_out, _ = self.run_command_in_worktree(worktree_path, ["git", "status", "--porcelain"])
+            _ret, status_out, _ = self.run_command_in_worktree(
+                worktree_path, ["git", "status", "--porcelain"]
+            )
             if status_out.strip():
                 err_msg = "Dirty uncommitted residue left behind after commit."
                 logger.error(err_msg)
@@ -511,8 +532,8 @@ class TriageTaskDispatcher:
                     worktree_path, ["git", "diff", "--shortstat", f"{base_commit}..{head_commit}"]
                 )
                 lines_changed = 0
-                match_ins = re.search(r'(\d+)\s+insertion', diff_stat_out)
-                match_del = re.search(r'(\d+)\s+deletion', diff_stat_out)
+                match_ins = re.search(r"(\d+)\s+insertion", diff_stat_out)
+                match_del = re.search(r"(\d+)\s+deletion", diff_stat_out)
                 if match_ins:
                     lines_changed += int(match_ins.group(1))
                 if match_del:
@@ -521,7 +542,9 @@ class TriageTaskDispatcher:
                 if lines_changed > max_diff_lines:
                     err_msg = f"Budget Error: Diff lines count ({lines_changed}) exceeds max_diff_lines ({max_diff_lines})."
                     logger.error(err_msg)
-                    self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                    self.queue.fail_task(
+                        task_id, error_details={"error": err_msg}, allow_retry=False
+                    )
                     return None
 
             # 6. Generate PR Proposal Artifact
@@ -578,7 +601,6 @@ class TriageTaskDispatcher:
         env_dict.setdefault("project_id", "alphabrain_triage")
         env_dict.setdefault("repo", str(worktree_path))
         env_dict.setdefault("base_commit", self.default_base_commit)
-
 
         env_dict.setdefault("preferred_agent", AgentType.ANTIGRAVITY)
         env_dict.setdefault("risk_class", RiskClass.LOW)

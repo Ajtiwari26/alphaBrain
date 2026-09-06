@@ -138,7 +138,7 @@ class AuthPrincipal:
 
     def __post_init__(self):
         if isinstance(self.role, str):
-            object.__setattr__(self, 'role', PrincipalRole(self.role))
+            object.__setattr__(self, "role", PrincipalRole(self.role))
 
     def has_permission(self, permission: str) -> bool:
         return permission in ROLE_PERMISSIONS.get(self.role, frozenset())

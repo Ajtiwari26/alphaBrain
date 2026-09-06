@@ -84,7 +84,7 @@ class TestTaskIDMismatch:
                     "status": "completed",
                     "agent": "antigravity",
                     "model": "gemini-pro",
-                    "base_commit": "HEAD",
+                    "base_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 },
             }
             # Send to URL /api/tasks/tsk_original_id/result but body has tsk_mismatched_id
@@ -218,8 +218,7 @@ class TestProgressHeartbeatWatchdog:
             project_id="prj_wd",
             repo="/repo/wd",
             objective="Stalled Task",
-            allowed_paths=["."],
-        )
+            allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         task = TaskRecord(
             id="tsk_stalled_01",
             project_id="prj_wd",
@@ -256,8 +255,7 @@ class TestProgressHeartbeatWatchdog:
             project_id="prj_wd2",
             repo="/repo/wd2",
             objective="Stalled Task Max",
-            allowed_paths=["."],
-        )
+            allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         task = TaskRecord(
             id="tsk_stalled_02",
             project_id="prj_wd2",
@@ -416,8 +414,7 @@ class TestGateEvidenceAndIndependentReview:
                     GateCommand(gate_type=GateType.LINT, executable="ruff"),
                     GateCommand(gate_type=GateType.UNIT_TEST, executable="pytest"),
                 ],
-            ),
-        )
+            ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         await TaskEngine.submit_task(async_db, envelope, "prj_gate")
         lease_res = await TaskEngine.lease_next_task(async_db, "worker-01")
         assert lease_res is not None
@@ -431,7 +428,7 @@ class TestGateEvidenceAndIndependentReview:
             attempt_id="att_gate_01",
             agent=AgentType.ANTIGRAVITY,
             model="gemini-pro",
-            base_commit="HEAD",
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             status=TaskStatus.COMPLETED,
             gate_result=GateResult(
                 task_id="tsk_gate_01",
@@ -465,8 +462,7 @@ class TestGateEvidenceAndIndependentReview:
             objective="High Risk Task",
             allowed_paths=["."],
             risk_class=RiskClass.HIGH,
-            requires_approval=True,
-        )
+            requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         await TaskEngine.submit_task(async_db, envelope, "prj_hr")
 
         # Approve task so it can be leased
@@ -485,7 +481,7 @@ class TestGateEvidenceAndIndependentReview:
             attempt_id="att_hr_01",
             agent=AgentType.ANTIGRAVITY,
             model="gemini-pro",
-            base_commit="HEAD",
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="HEAD",
             status=TaskStatus.COMPLETED,
             gate_result=GateResult(
@@ -530,8 +526,7 @@ class TestGateEvidenceAndIndependentReview:
             objective="High Risk Task 2",
             allowed_paths=["."],
             risk_class=RiskClass.HIGH,
-            requires_approval=True,
-        )
+            requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         await TaskEngine.submit_task(async_db, envelope2, "prj_hr")
         await TaskEngine.decide_approval(
             async_db, "tsk_hr_02", approved=True, decided_by="founder-01"
@@ -546,7 +541,7 @@ class TestGateEvidenceAndIndependentReview:
             attempt_id="att_hr_02",
             agent=AgentType.ANTIGRAVITY,
             model="gemini-pro",
-            base_commit="HEAD",
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="HEAD",
             status=TaskStatus.COMPLETED,
             gate_result=GateResult(
@@ -630,8 +625,7 @@ class TestReportingSnapshots:
             acceptance_plan=AcceptancePlan(
                 required_gates=[GateType.UNIT_TEST],
                 commands=[GateCommand(gate_type=GateType.UNIT_TEST, executable="pytest")],
-            ),
-        )
+            ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         await TaskEngine.submit_task(async_db, envelope, "prj_path")
         lease_res = await TaskEngine.lease_next_task(async_db, "worker-01")
         assert lease_res is not None
@@ -642,7 +636,7 @@ class TestReportingSnapshots:
             attempt_id="att_path_01",
             agent=AgentType.ANTIGRAVITY,
             model="gemini-pro",
-            base_commit="HEAD",
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="newcommit",
             status=TaskStatus.COMPLETED,
             files_changed=["docs/readme.md", "src/not_allowed.py"],

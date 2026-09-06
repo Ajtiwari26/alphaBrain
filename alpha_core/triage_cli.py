@@ -506,11 +506,7 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
     # Resolve HEAD to strict 40-char SHA
     base_commit_sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-        text=True
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
 
     envelope = proposer.build_task_envelope(
@@ -648,14 +644,20 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         result_sha = senior_review.get("result_sha")
 
     if not result_sha:
-        print("Error: Missing result_sha. Immutable result binding is required for promotion.", file=sys.stderr)
+        print(
+            "Error: Missing result_sha. Immutable result binding is required for promotion.",
+            file=sys.stderr,
+        )
         return 1
 
-    attestation_dict = senior_review.get("attestation") or (senior_review.get("details") or {}).get("attestation")
+    attestation_dict = senior_review.get("attestation") or (senior_review.get("details") or {}).get(
+        "attestation"
+    )
     if attestation_dict:
         import os
 
         from alpha_protocol.task import ReviewAttestation
+
         try:
             att = ReviewAttestation(**attestation_dict)
         except Exception as e:
@@ -668,12 +670,16 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
             return 1
 
         if att.result_sha != result_sha:
-            print("Error: Attestation result_sha does not match expected result_sha.", file=sys.stderr)
+            print(
+                "Error: Attestation result_sha does not match expected result_sha.", file=sys.stderr
+            )
             return 1
 
         expected_base_commit = task.get("envelope", {}).get("base_commit")
         if att.base_commit != expected_base_commit:
-            print("Error: Attestation base_commit does not match task base_commit.", file=sys.stderr)
+            print(
+                "Error: Attestation base_commit does not match task base_commit.", file=sys.stderr
+            )
             return 1
 
         if not att.approved:
@@ -686,11 +692,14 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
             cwd=repo_path,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         branch_tip = tip_res.stdout.strip()
         if branch_tip != result_sha:
-            print(f"Error: SLSA Provenance Failure. Branch tip {branch_tip} does not match approved result_sha {result_sha}.", file=sys.stderr)
+            print(
+                f"Error: SLSA Provenance Failure. Branch tip {branch_tip} does not match approved result_sha {result_sha}.",
+                file=sys.stderr,
+            )
             return 1
     except subprocess.CalledProcessError:
         print(f"Error: Could not resolve branch {branch_name}.", file=sys.stderr)
@@ -700,6 +709,7 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")
 
     import fcntl
+
     lock_file_path = Path(repo_path) / ".alphabrain" / "promotion.lock"
     lock_file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -707,7 +717,10 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         try:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            print("Error: Another promotion is currently in progress. Lock acquisition failed.", file=sys.stderr)
+            print(
+                "Error: Another promotion is currently in progress. Lock acquisition failed.",
+                file=sys.stderr,
+            )
             return 1
 
         try:

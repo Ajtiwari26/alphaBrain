@@ -49,8 +49,7 @@ def test_task_envelope_serialization():
                 ),
             ],
         ),
-        preferred_agent=AgentType.ANTIGRAVITY,
-    )
+        preferred_agent=AgentType.ANTIGRAVITY, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     data = task.model_dump()
     assert data["task_id"] == "tsk_test_101"
@@ -73,8 +72,7 @@ def test_disabled_execution_agents_are_rejected(agent):
             repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
             objective="Must not route to disabled agent",
             allowed_paths=["."],
-            preferred_agent=agent,
-        )
+            preferred_agent=agent, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 
 def test_gate_result_and_evidence():

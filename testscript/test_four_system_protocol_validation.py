@@ -339,8 +339,7 @@ class TestFourSystemProtocolValidation:
                 project_id="prj_alpha",
                 repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
                 objective="Test",
-                allowed_paths=["../../etc/passwd"],
-            )
+                allowed_paths=["../../etc/passwd"], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
         # 3. Invalid Protocol Version in Meeting Event
         with pytest.raises(ValidationError):

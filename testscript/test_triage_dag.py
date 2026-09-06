@@ -15,7 +15,7 @@ def make_dummy_envelope(task_id: str, depends_on: list[str] | None = None):
         "task_id": task_id,
         "project_id": "test_proj",
         "repo": ".",
-        "base_commit": "HEAD",
+        "base_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objective": "Test",
         "allowed_paths": ["."],
         "dependencies": deps,
@@ -33,7 +33,7 @@ def make_dummy_provenance(task_id: str, depends_on: list[str] | None = None):
         extraction_confidence=1.0,
         eva_session_id="e1",
         created_at=time.time(),
-        content_hash=content,
+        content_hash=f"hash-{content}",
     )
 
 

@@ -2438,11 +2438,16 @@ async def post_triage_task_result(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task not executing")
 
     lease_meta = task_rec.get("provenance", {}).get("lease_metadata", {})
-    if (lease_meta.get("worker_id") != payload.worker_id or
-        lease_meta.get("lease_id") != payload.lease_id or
-        lease_meta.get("fencing_epoch") != payload.fencing_epoch or
-        lease_meta.get("attempt_id") != payload.attempt_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Lease fencing violation: Ownership proof failed")
+    if (
+        lease_meta.get("worker_id") != payload.worker_id
+        or lease_meta.get("lease_id") != payload.lease_id
+        or lease_meta.get("fencing_epoch") != payload.fencing_epoch
+        or lease_meta.get("attempt_id") != payload.attempt_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Lease fencing violation: Ownership proof failed",
+        )
 
     if payload.status == "completed":
         # A3 SLSA Provenance: Prevent executor from minting review/promotion evidence

@@ -175,8 +175,7 @@ layout, and visible error handling. Run every declared gate before completion.
                 ),
             ],
         ),
-        retain_worktree_for_preview=True,
-    )
+        retain_worktree_for_preview=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     worktree = adapter.worktree_mgr.create_or_resume_worktree(str(repo), TASK_ID, "HEAD")
     result = await adapter.execute(task, worktree, "HEAD")
     if result.status != TaskStatus.COMPLETED:
