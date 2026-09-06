@@ -96,7 +96,9 @@ def test_worker_blindness_to_unapproved_tasks(
         "task_id": "task_unvetted_1",
         "objective": "Unvetted task",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["README.md"],
     }
     prov1 = make_test_provenance("task_unvetted_1", "hash_1")
@@ -110,7 +112,9 @@ def test_worker_blindness_to_unapproved_tasks(
         "task_id": "task_rejected_2",
         "objective": "Rejected task",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["README.md"],
     }
     prov2 = make_test_provenance("task_rejected_2", "hash_2")
@@ -131,7 +135,9 @@ def test_emergency_stop_halts_worker_leasing(
         "task_id": "task_appr_1",
         "objective": "Approved task",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["README.md"],
     }
     prov = make_test_provenance("task_appr_1", "hash_appr_1")
@@ -166,7 +172,9 @@ def test_content_hash_mismatch_fails_closed(
         "task_id": "task_tampered_1",
         "objective": "Legitimate objective",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["README.md"],
     }
     # Provide intentionally mismatched hash
@@ -199,7 +207,9 @@ def test_end_to_end_worker_dispatch_and_pr_generation(
         "objective": "Add features doc",
         "detailed_instructions": "Create FEATURES.md with feature list",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["FEATURES.md"],
         "acceptance_plan": {
             "commands": [
@@ -227,7 +237,9 @@ def test_end_to_end_worker_dispatch_and_pr_generation(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id="task_valid_e2e",
-        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
     features_file = wt_path / "FEATURES.md"
     features_file.write_text("# Feature List\n- Feature A\n- Feature B\n")
@@ -268,7 +280,9 @@ def test_worker_disallowed_path_fails_closed(
         "task_id": "task_disallowed_paths",
         "objective": "Modify restricted file",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["docs/safe.md"],
         "acceptance_plan": {
             "commands": [
@@ -289,7 +303,9 @@ def test_worker_disallowed_path_fails_closed(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id="task_disallowed_paths",
-        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
     forbidden_file = wt_path / "danger.sh"
     forbidden_file.write_text("echo hacked\n")
@@ -316,7 +332,9 @@ def test_worker_acceptance_gate_failure(
         "task_id": "task_gate_fail",
         "objective": "Broken test task",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["test.py"],
         "acceptance_plan": {
             "commands": [
@@ -379,7 +397,9 @@ def test_api_worker_endpoints_and_rbac(
         "task_id": "api_worker_task_1",
         "objective": "API worker task",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["doc.md"],
     }
     prov = make_test_provenance("api_worker_task_1", "hash_api_1")
@@ -405,7 +425,9 @@ def test_api_worker_endpoints_and_rbac(
             "worktree_path": "/tmp/wt/1",
             "worker_id": task_db.get("provenance", {}).get("lease_metadata", {}).get("worker_id"),
             "lease_id": task_db.get("provenance", {}).get("lease_metadata", {}).get("lease_id"),
-            "fencing_epoch": task_db.get("provenance", {}).get("lease_metadata", {}).get("fencing_epoch"),
+            "fencing_epoch": task_db.get("provenance", {})
+            .get("lease_metadata", {})
+            .get("fencing_epoch"),
             "attempt_id": task_db.get("provenance", {}).get("lease_metadata", {}).get("attempt_id"),
         },
     )
@@ -445,7 +467,9 @@ def test_cli_worker_cycle_command(
         "project_id": "cli_proj",
         "objective": "CLI worker test",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["cli.txt"],
         "acceptance_plan": {
             "commands": [
@@ -466,7 +490,9 @@ def test_cli_worker_cycle_command(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id="cli_worker_task_1",
-        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
     (wt_path / "cli.txt").write_text("CLI test output\n")
 
@@ -491,7 +517,9 @@ def test_empty_allowed_paths_strictly_blocks_any_file_modification(
         "task_id": "task_empty_allowed",
         "objective": "Read only task",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": [],  # STRICTLY NO FILES ALLOWED
     }
     import hashlib
@@ -507,7 +535,9 @@ def test_empty_allowed_paths_strictly_blocks_any_file_modification(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id="task_empty_allowed",
-        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
     mod_file = wt_path / "rogue.txt"
     mod_file.write_text("unauthorized write\n")
@@ -595,7 +625,9 @@ def test_zero_diff_worktree_fails_closed(
         "task_id": "task_zero_diff",
         "objective": "Zero diff task",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["README.md"],
         "acceptance_plan": {
             "commands": [
@@ -634,7 +666,9 @@ def test_failure_evidence_injected_on_retry(
         "task_id": "task_retry_loop",
         "objective": "Retry loop test",
         "repo": str(fixture_repo),
-        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
         "allowed_paths": ["failing.txt"],
         "detailed_instructions": "Initial instructions.",
         "acceptance_plan": {
@@ -656,7 +690,9 @@ def test_failure_evidence_injected_on_retry(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id="task_retry_loop",
-        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo).decode("utf-8").strip(),
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
     (wt_path / "failing.txt").write_text("modified\n")
 
@@ -676,7 +712,9 @@ def test_failure_evidence_injected_on_retry(
     assert leased is not None
 
     # We directly invoke _build_task_envelope to verify the injection
-    task_env = dispatcher._build_task_envelope(leased, wt_path, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    task_env = dispatcher._build_task_envelope(
+        leased, wt_path, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    )
 
     # Assert instructions contain the failure directives
     assert "PREVIOUS ATTEMPT GATE FAILURES" in task_env.detailed_instructions

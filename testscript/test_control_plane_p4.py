@@ -218,7 +218,9 @@ class TestProgressHeartbeatWatchdog:
             project_id="prj_wd",
             repo="/repo/wd",
             objective="Stalled Task",
-            allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            allowed_paths=["."],
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         task = TaskRecord(
             id="tsk_stalled_01",
             project_id="prj_wd",
@@ -255,7 +257,9 @@ class TestProgressHeartbeatWatchdog:
             project_id="prj_wd2",
             repo="/repo/wd2",
             objective="Stalled Task Max",
-            allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            allowed_paths=["."],
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         task = TaskRecord(
             id="tsk_stalled_02",
             project_id="prj_wd2",
@@ -414,7 +418,9 @@ class TestGateEvidenceAndIndependentReview:
                     GateCommand(gate_type=GateType.LINT, executable="ruff"),
                     GateCommand(gate_type=GateType.UNIT_TEST, executable="pytest"),
                 ],
-            ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            ),
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         await TaskEngine.submit_task(async_db, envelope, "prj_gate")
         lease_res = await TaskEngine.lease_next_task(async_db, "worker-01")
         assert lease_res is not None
@@ -463,7 +469,9 @@ class TestGateEvidenceAndIndependentReview:
             objective="High Risk Task",
             allowed_paths=["."],
             risk_class=RiskClass.HIGH,
-            requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            requires_approval=True,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         await TaskEngine.submit_task(async_db, envelope, "prj_hr")
 
         # Approve task so it can be leased
@@ -527,7 +535,9 @@ class TestGateEvidenceAndIndependentReview:
             objective="High Risk Task 2",
             allowed_paths=["."],
             risk_class=RiskClass.HIGH,
-            requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            requires_approval=True,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         await TaskEngine.submit_task(async_db, envelope2, "prj_hr")
         await TaskEngine.decide_approval(
             async_db, "tsk_hr_02", approved=True, decided_by="founder-01"
@@ -626,7 +636,9 @@ class TestReportingSnapshots:
             acceptance_plan=AcceptancePlan(
                 required_gates=[GateType.UNIT_TEST],
                 commands=[GateCommand(gate_type=GateType.UNIT_TEST, executable="pytest")],
-            ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            ),
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         await TaskEngine.submit_task(async_db, envelope, "prj_path")
         lease_res = await TaskEngine.lease_next_task(async_db, "worker-01")
         assert lease_res is not None

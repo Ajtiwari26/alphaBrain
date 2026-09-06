@@ -71,7 +71,9 @@ async def test_happy_path_kernel_proof(memory_db, fake_daemon, tmp_path, monkeyp
         retain_worktree_for_preview=True,
         acceptance_plan=AcceptancePlan(
             require_independent_review=False, required_gates=[GateType.BROWSER_SMOKE]
-        ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        ),
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     task = await TaskEngine.submit_task(session, envelope)
     assert task.status == TaskStatus.WAITING_APPROVAL.value
@@ -151,7 +153,9 @@ async def test_missing_approval(memory_db, fake_daemon, tmp_path):
         repo=str(tmp_path),
         objective="Build",
         allowed_paths=["."],
-        requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        requires_approval=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     task = await TaskEngine.submit_task(session, envelope)
     assert task.status == TaskStatus.WAITING_APPROVAL.value
 
@@ -170,7 +174,9 @@ async def test_agy_nonzero_exit(memory_db, fake_daemon, tmp_path, monkeypatch):
         repo=str(tmp_path),
         objective="Build",
         allowed_paths=["."],
-        requires_approval=False, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        requires_approval=False,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     task = await TaskEngine.submit_task(session, envelope)
 
     mock_adapter_result = TaskResult(
@@ -207,7 +213,9 @@ async def test_preview_unhealthy(memory_db, fake_daemon, tmp_path, monkeypatch):
         objective="Build",
         allowed_paths=["."],
         requires_approval=False,
-        retain_worktree_for_preview=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        retain_worktree_for_preview=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     task = await TaskEngine.submit_task(session, envelope)
 
     mock_adapter_result = TaskResult(
@@ -262,7 +270,9 @@ async def test_unknown_listener(memory_db, fake_daemon, tmp_path, monkeypatch):
         objective="Build",
         allowed_paths=["."],
         requires_approval=False,
-        retain_worktree_for_preview=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        retain_worktree_for_preview=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     task = await TaskEngine.submit_task(session, envelope)
 
     mock_adapter_result = TaskResult(

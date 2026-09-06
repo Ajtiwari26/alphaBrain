@@ -136,7 +136,9 @@ async def test_approval_task_submission_preserves_postgres_fk_order(postgres_db)
         repo="/test",
         objective="Prove task row exists before pending approval insert",
         allowed_paths=["proof.txt"],
-        requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        requires_approval=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     async with postgres_db() as session:
         task = await TaskEngine.submit_task(session, envelope)
@@ -164,7 +166,9 @@ async def test_verified_result_preserves_attempt_review_fk_order(postgres_db):
         repo="/test",
         objective="Prove attempt row exists before pending review approval insert",
         allowed_paths=["proof.txt"],
-        require_packet_binding=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        require_packet_binding=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     async with postgres_db() as session:
         await TaskEngine.submit_task(session, envelope)

@@ -61,7 +61,9 @@ async def test_healthy_retained_preview_evidence(tmp_path, monkeypatch):
         repo="r",
         objective="o",
         allowed_paths=["."],
-        retain_worktree_for_preview=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        retain_worktree_for_preview=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     monkeypatch.setattr(
         TaskEngine,
         "lease_next_task",
@@ -105,7 +107,9 @@ async def test_non_preview_task_behavior(tmp_path, monkeypatch):
         repo="r",
         objective="o",
         allowed_paths=["."],
-        retain_worktree_for_preview=False, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        retain_worktree_for_preview=False,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     monkeypatch.setattr(
         TaskEngine,
         "lease_next_task",
@@ -147,7 +151,9 @@ async def test_failed_http_preview_startup(tmp_path, monkeypatch):
         repo="r",
         objective="o",
         allowed_paths=["."],
-        retain_worktree_for_preview=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        retain_worktree_for_preview=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     monkeypatch.setattr(
         TaskEngine,
         "lease_next_task",

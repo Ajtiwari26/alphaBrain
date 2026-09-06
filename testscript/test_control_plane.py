@@ -25,7 +25,9 @@ def make_task() -> TaskEnvelope:
         project_id="prj_control_plane",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Verify control plane transport",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
 
 @pytest.mark.asyncio

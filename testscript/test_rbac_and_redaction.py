@@ -316,13 +316,17 @@ class TestAPICrossProjectAccess:
                 project_id="prj_alpha",
                 repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
                 objective="Alpha task",
-                allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                allowed_paths=["."],
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
             task_beta = TaskEnvelope(
                 task_id="tsk_api_proj_beta_01",
                 project_id="prj_beta",
                 repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
                 objective="Beta task",
-                allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                allowed_paths=["."],
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
             res_sub_alpha = await client.post(
                 "/api/tasks",
                 json=task_alpha.model_dump(mode="json"),
@@ -422,7 +426,9 @@ class TestKillSwitchAPIEnforcement:
                 project_id="prj_paused",
                 repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
                 objective="Paused task",
-                allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                allowed_paths=["."],
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
             res = await client.post(
                 "/api/tasks",
                 json=task.model_dump(mode="json"),

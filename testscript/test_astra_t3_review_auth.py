@@ -19,7 +19,7 @@ def test_valid_attestation_creation_and_verification():
         approved=True,
         reviewed_at=time.time(),
         evidence=evidence,
-        secret=secret
+        secret=secret,
     )
 
     assert attestation.verify(secret) is True
@@ -38,7 +38,7 @@ def test_tamper_detection():
         approved=True,
         reviewed_at=time.time(),
         evidence=evidence,
-        secret=secret
+        secret=secret,
     )
 
     # Modify result_sha
@@ -80,7 +80,7 @@ def test_wrong_secret():
         approved=True,
         reviewed_at=time.time(),
         evidence=evidence,
-        secret=secret
+        secret=secret,
     )
 
     assert attestation.verify(wrong_secret) is False
@@ -89,29 +89,21 @@ def test_wrong_secret():
 @patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
 def test_senior_review_engine_attestation(mock_invoke_agy):
     # Setup mock
-    mock_invoke_agy.side_effect = [
-        '{"verdict": "APPROVE"}',
-        '{"verdict": "FINAL_APPROVAL"}'
-    ]
+    mock_invoke_agy.side_effect = ['{"verdict": "APPROVE"}', '{"verdict": "FINAL_APPROVAL"}']
 
     mock_queue = MagicMock()
     mock_task = {
         "status": TriageStatus.COMPLETED.value,
-        "envelope": {
-            "base_commit": "b" * 40
-        },
+        "envelope": {"base_commit": "b" * 40},
         "result": {
             "gates_passed": True,
             "result_commit": "a" * 40,
-            "gate_result": {"status": "passed"}
-        }
+            "gate_result": {"status": "passed"},
+        },
     }
     mock_queue.get_task.return_value = mock_task
 
-    engine = SeniorReviewEngine(
-        queue=mock_queue,
-        signing_secret=b"engine_secret"
-    )
+    engine = SeniorReviewEngine(queue=mock_queue, signing_secret=b"engine_secret")
 
     verdict = engine.execute_senior_review("tsk_123")
 

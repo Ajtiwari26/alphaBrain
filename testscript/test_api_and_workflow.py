@@ -53,7 +53,9 @@ async def test_task_submission_and_details_api(tmp_path, monkeypatch, api_header
             repo=str(repo_path),
             objective="Test FastAPI task endpoints",
             allowed_paths=["."],
-            preferred_agent=AgentType.ANTIGRAVITY, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            preferred_agent=AgentType.ANTIGRAVITY,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
 
         # 1. Submit task with JSON-serializable dump
         sub_resp = await ac.post(
@@ -91,7 +93,9 @@ async def test_project_registration_is_remote_safe_and_repo_binding_is_immutable
         project_id=project["project_id"],
         repo=project["repo_path"],
         objective="Execute only on outbound Mac worker",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         registered = await ac.post("/api/projects", json=project, headers=api_headers)
@@ -151,7 +155,9 @@ async def test_staging_rejects_task_until_project_is_registered(tmp_path, monkey
         project_id="prj_staging_requires_project",
         repo=str(repo_reference),
         objective="Reject implicit remote project creation",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         rejected = await ac.post(
@@ -197,7 +203,9 @@ async def test_task_repo_must_match_registered_project_binding(tmp_path, monkeyp
         project_id=project["project_id"],
         repo=str(allowed_root / "wrong"),
         objective="Never execute against mismatched repository",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         registered = await ac.post("/api/projects", json=project, headers=api_headers)
@@ -227,7 +235,9 @@ async def test_approval_required_task_needs_founder_decision(tmp_path, monkeypat
         objective="Do not start before founder approval",
         allowed_paths=["."],
         preferred_agent=AgentType.ANTIGRAVITY,
-        requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        requires_approval=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         submitted = await ac.post(
@@ -261,7 +271,9 @@ async def test_project_progress_snapshot_reports_safe_task_state(
         repo=str(repo_path),
         objective="Show approval in progress report",
         allowed_paths=["."],
-        requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        requires_approval=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         submitted = await ac.post(
             "/api/tasks", json=envelope.model_dump(mode="json"), headers=api_headers
@@ -385,7 +397,9 @@ async def test_worker_control_plane_lease_heartbeat_result_vertical_slice(
         repo=str(repo_path),
         objective="Exercise worker control plane",
         allowed_paths=["."],
-        preferred_agent=AgentType.ANTIGRAVITY, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        preferred_agent=AgentType.ANTIGRAVITY,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     result = TaskResult(
         attempt_id="att-worker-e2e",
         task_id=envelope.task_id,
@@ -464,7 +478,9 @@ async def test_founder_cancellation_reaches_authenticated_active_worker(
         project_id="prj-worker-cancel",
         repo=str(repo_path),
         objective="Prove active cancellation delivery",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await ac.post(
             "/api/workers/register",
@@ -553,7 +569,9 @@ async def test_result_submission_rejects_task_id_mismatch(
         repo=str(repo_path),
         objective="Test mismatch",
         allowed_paths=["."],
-        preferred_agent=AgentType.ANTIGRAVITY, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        preferred_agent=AgentType.ANTIGRAVITY,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     result = TaskResult(
         attempt_id="att-match-test",
         task_id="tsk-DIFFERENT",

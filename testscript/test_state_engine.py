@@ -73,7 +73,9 @@ async def test_task_submission_and_leasing(test_db_session):
         allowed_paths=["."],
         risk_class=RiskClass.LOW,
         acceptance_plan=AcceptancePlan(required_gates=[GateType.UNIT_TEST]),
-        preferred_agent=AgentType.ANTIGRAVITY, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        preferred_agent=AgentType.ANTIGRAVITY,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     # 1. Submit task
     task = await TaskEngine.submit_task(test_db_session, envelope)
@@ -102,7 +104,9 @@ async def test_result_submission_with_gates(test_db_session):
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Implement authentication middleware",
         allowed_paths=["auth.py"],
-        preferred_agent=AgentType.ANTIGRAVITY, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        preferred_agent=AgentType.ANTIGRAVITY,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, envelope)
     lease = await TaskEngine.lease_next_task(test_db_session, worker_id="mac_worker_1")
     assert lease is not None
@@ -135,7 +139,9 @@ async def test_heartbeat_rejects_stolen_or_expired_lease(test_db_session):
         project_id="prj_state",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Exercise heartbeat ownership",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, envelope)
     leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
     assert leased is not None
@@ -163,7 +169,9 @@ async def test_duplicate_result_is_idempotent_and_stale_result_is_rejected(test_
         project_id="prj_state",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Exercise idempotent result submission",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, envelope)
     leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
     assert leased is not None
@@ -204,7 +212,9 @@ async def test_expired_lease_waits_for_backoff_then_blocks_at_retry_limit(test_d
         project_id="prj_state",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Recover abandoned work safely",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, envelope)
     leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
     assert leased is not None
@@ -241,7 +251,9 @@ async def test_watchdog_uses_latest_progress_heartbeat_not_original_lease_time(
         project_id="prj_state",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Keep healthy heartbeat from false stall recovery",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, envelope)
     leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
     assert leased is not None
@@ -266,7 +278,9 @@ async def test_watchdog_retries_task_with_stale_progress_heartbeat(test_db_sessi
         project_id="prj_state",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Recover task whose progress stopped",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, envelope)
     leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
     assert leased is not None
@@ -289,7 +303,9 @@ async def test_resubmission_cannot_replace_verified_task(test_db_session):
         project_id="prj_state",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Keep completed work immutable",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, envelope)
     leased = await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one")
     assert leased is not None
@@ -326,13 +342,17 @@ async def test_dependency_blocks_downstream_then_verified_upstream_unblocks_it(t
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Run only after upstream verification",
         allowed_paths=["."],
-        dependencies=[TaskDependency(task_id="tsk_state_upstream")], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        dependencies=[TaskDependency(task_id="tsk_state_upstream")],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     upstream = TaskEnvelope(
         task_id="tsk_state_upstream",
         project_id="prj_state_dag",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Create upstream evidence",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     await TaskEngine.submit_task(test_db_session, downstream)
     await TaskEngine.submit_task(test_db_session, upstream)
 
@@ -372,7 +392,9 @@ async def test_self_dependency_is_rejected(test_db_session):
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Invalid dependency graph",
         allowed_paths=["."],
-        dependencies=[TaskDependency(task_id="tsk_state_self_dependency")], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        dependencies=[TaskDependency(task_id="tsk_state_self_dependency")],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     with pytest.raises(ValueError, match="cannot depend on itself"):
         await TaskEngine.submit_task(test_db_session, task)
 
@@ -385,7 +407,9 @@ async def test_approval_required_task_cannot_lease_until_approved(test_db_sessio
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Wait for founder review",
         allowed_paths=["."],
-        requires_approval=True, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        requires_approval=True,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     task = await TaskEngine.submit_task(test_db_session, envelope)
     assert task.status == TaskStatus.WAITING_APPROVAL.value
     assert await TaskEngine.lease_next_task(test_db_session, worker_id="worker_one") is None
@@ -413,7 +437,9 @@ async def test_high_risk_task_requires_approval_even_without_request_flag(test_d
             repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
             objective="Run high-impact change",
             allowed_paths=["."],
-            risk_class=RiskClass.HIGH, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            risk_class=RiskClass.HIGH,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ),
     )
     assert task.status == TaskStatus.WAITING_APPROVAL.value
 
@@ -427,7 +453,9 @@ async def test_project_and_worker_concurrency_limits_gate_leasing(test_db_sessio
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="First project task",
         allowed_paths=["."],
-        concurrency_policy=project_policy, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        concurrency_policy=project_policy,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     second = first.model_copy(
         update={"task_id": "tsk_state_project_limit_two", "objective": "Second project task"}
     )
@@ -448,7 +476,9 @@ async def test_project_and_worker_concurrency_limits_gate_leasing(test_db_sessio
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Worker capped task",
         allowed_paths=["."],
-        concurrency_policy=other_project_policy, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        concurrency_policy=other_project_policy,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     fourth = third.model_copy(
         update={"task_id": "tsk_state_worker_limit_two", "objective": "Second worker capped task"}
     )
@@ -474,7 +504,9 @@ async def test_task_engine_rejects_illegal_status_transition(test_db_session):
             project_id="prj_state_transition",
             repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
             objective="Guard state table",
-            allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            allowed_paths=["."],
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ),
     )
     with pytest.raises(ValueError, match="Illegal task transition: queued -> verified"):
         TaskEngine._transition(task, TaskStatus.VERIFIED)
@@ -488,7 +520,9 @@ async def test_task_envelope_decoding_variants(test_db_session):
         project_id="prj_state_decoding",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Decode dictionary",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
     # 1. Dictionary value parses
     assert TaskEngine._parse_task_envelope(envelope.model_dump())
@@ -515,7 +549,9 @@ async def test_task_engine_string_backed_details_json(test_db_session):
         project_id="prj_state_decoding",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Lease with string json",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     task = await TaskEngine.submit_task(test_db_session, envelope)
 
     # Force string-backed details_json in DB (simulating bad dialect / parsing config)

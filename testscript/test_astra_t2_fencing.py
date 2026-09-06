@@ -357,7 +357,9 @@ def test_api_lease_tenant_access_denial_compensating_tx(queue, api_client):
         project_ids=("other_tenant",),
     )
 
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash_api_tenant")
+    prov = TaskProvenance(
+        "mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash_api_tenant"
+    )
     task_id = "tsk_api_tenant"
     queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
     queue.approve_task(task_id)

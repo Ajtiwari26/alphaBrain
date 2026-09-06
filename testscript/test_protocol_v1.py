@@ -53,7 +53,9 @@ def test_task_envelope_carries_version():
         project_id="prj_alpha",
         repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
         objective="Version check",
-        allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        allowed_paths=["."],
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
     assert task.protocol_version == "1"
 
 
@@ -66,7 +68,9 @@ class TestProtocolVersionEnforcement:
                 project_id="prj_alpha",
                 repo="/Users/ajaytiwari/Desktop/Projects/alphaBrain",
                 objective="Version check",
-                allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                allowed_paths=["."],
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
 
     def test_unsupported_version_fails_meeting_event(self):
         with pytest.raises(ValidationError):
@@ -143,7 +147,9 @@ class TestDAGDependencies:
                     task_id="tsk_upstream_2",
                     required_status=TaskStatus.VERIFIED,
                 ),
-            ], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            ],
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         assert len(task.dependencies) == 2
         assert task.dependencies[1].required_status == TaskStatus.VERIFIED
 
@@ -153,7 +159,9 @@ class TestDAGDependencies:
             project_id="prj_alpha",
             repo="/repo",
             objective="No deps",
-            allowed_paths=["."], base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            allowed_paths=["."],
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
         assert task.dependencies == []
 
 

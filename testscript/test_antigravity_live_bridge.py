@@ -43,7 +43,9 @@ def make_task(
                     args=["-q", "calculator_contract_test.py"],
                 )
             ],
-        ), base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        ),
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
 
 
 def valid_response(include_audit: bool = False) -> str:

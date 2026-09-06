@@ -1,4 +1,3 @@
-import pytest
 """
 Unit tests verifying the autonomous fast-forward PR merge engine for AlphaBrain.
 Ensures acceptance gate enforcement, 2-Round Senior Review enforcement, fail-closed handling,
@@ -6,6 +5,8 @@ clean fast-forward merge into main, and worktree/branch pruning.
 """
 
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from alpha_core.queue.triage_queue import TriageStatus
 from alpha_core.triage_cli import cmd_merge, cmd_senior_review
@@ -44,8 +45,11 @@ def test_merge_rejects_unapproved_senior_review():
     queue.get_task.return_value = {
         "id": "task_no_sr",
         "status": TriageStatus.COMPLETED.value,
-        "result": {"gates_passed": True,
-            "result_sha": "abc1234567890abcdef1234567890abcdef12345", "senior_review": {"approved": False}},
+        "result": {
+            "gates_passed": True,
+            "result_sha": "abc1234567890abcdef1234567890abcdef12345",
+            "senior_review": {"approved": False},
+        },
     }
     args = MagicMock(task_id="task_no_sr", json=False, skip_senior_review=False)
     # Must reject because senior review is not approved
@@ -57,8 +61,11 @@ def test_merge_rejects_missing_branch():
     queue.get_task.return_value = {
         "id": "task_no_branch",
         "status": TriageStatus.COMPLETED.value,
-        "result": {"gates_passed": True,
-            "result_sha": "abc1234567890abcdef1234567890abcdef12345", "senior_review": {"approved": True}},
+        "result": {
+            "gates_passed": True,
+            "result_sha": "abc1234567890abcdef1234567890abcdef12345",
+            "senior_review": {"approved": True},
+        },
         "branch_name": None,
     }
     args = MagicMock(task_id="task_no_branch", json=False, skip_senior_review=False)
@@ -87,11 +94,13 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run):
         "envelope": {"repo": "/repos/alphaBrain"},
     }
     mock_exists.return_value = True
+
     def mock_run_side_effect(*args, **kwargs):
         cmd = args[0]
         if cmd[1] == "rev-parse":
             return MagicMock(returncode=0, stdout="abc1234567890abcdef1234567890abcdef12345\n")
         return MagicMock(returncode=0, stdout="Updating 1234..5678\nFast-forward")
+
     mock_run.side_effect = mock_run_side_effect
 
     args = MagicMock(task_id="task_success", json=False, skip_senior_review=False)
@@ -136,17 +145,17 @@ def test_merge_fails_without_senior_review(mock_exists, mock_run):
 
 @patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
 def test_cmd_senior_review_execution(mock_invoke, tmp_path):
-    mock_invoke.side_effect = [
-        '{"verdict": "APPROVE"}',
-        '{"verdict": "FINAL_APPROVAL"}'
-    ]
+    mock_invoke.side_effect = ['{"verdict": "APPROVE"}', '{"verdict": "FINAL_APPROVAL"}']
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_sr_test",
         "status": TriageStatus.COMPLETED.value,
         "branch_name": "alpha/task_sr_test",
-        "result": {"gates_passed": True,
-            "result_sha": "abc1234567890abcdef1234567890abcdef12345", "diff_stat": "1 file changed"},
+        "result": {
+            "gates_passed": True,
+            "result_sha": "abc1234567890abcdef1234567890abcdef12345",
+            "diff_stat": "1 file changed",
+        },
         "envelope": {"title": "Test Task", "repo": str(tmp_path)},
     }
     args = MagicMock(task_id="task_sr_test", json=False)
