@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "description": "Your final decision on whether this code should be merged. Output 'APPROVE' if the code is correct, safe, and ready to be merged. Output 'REPAIR_REQUIRED' if there are bugs, security issues, or regressions that must be fixed before merging.",
+      "enum": ["APPROVE", "REPAIR_REQUIRED"]
+    }
+  },
+  "required": ["verdict"]
+}

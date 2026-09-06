@@ -77,7 +77,7 @@ class SeniorReviewEngine:
         except Exception as e:
             return 1, "", str(e)
 
-    def get_task_diff(self, task: dict[str, Any]) -> str:
+    def get_task_diff(self, task: dict[str, Any]) -> dict:
         branch_name = task.get("branch_name")
         repo_path = task.get("envelope", {}).get("repo", ".")
         if branch_name:
@@ -139,14 +139,7 @@ class SeniorReviewEngine:
         result = task.get("result") or {}
         return str(result.get("diff_stat", "No diff available"))
 
-    def _invoke_agy(
-        self,
-        model: str,
-        prompt: str,
-        cwd: str | None = None,
-        timeout_seconds: int = 300,
-        effort: str | None = None,
-    ) -> str:
+    def _invoke_agy(self, model: str, prompt: str, schema_path: str, cwd: str | None = None, timeout_seconds: int = 300, effort: str | None = None) -> dict:
         """Invokes AGY non-interactively with structured prompt."""
         if not self.agy_bin.exists():
             raise RuntimeError(f"AGY executable not found at {self.agy_bin}")
@@ -162,6 +155,10 @@ class SeniorReviewEngine:
                 model,
                 "--disable-slash-commands",
                 "--dangerously-skip-permissions",
+                "--output-format",
+                "json",
+                "--json-schema",
+                schema_path,
                 "--print-timeout",
                 f"{timeout_seconds}s",
             ]
@@ -169,19 +166,27 @@ class SeniorReviewEngine:
                 cmd.extend(["--effort", effort])
             cmd.extend(["--print", prompt])
 
+            env = dict(os.environ)
+            if "ALPHA_SIGNING_SECRET" in env:
+                del env["ALPHA_SIGNING_SECRET"]
+
             res = subprocess.run(
-                cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_seconds + 30
+                cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_seconds + 30, env=env
             )
             if res.returncode != 0:
-                logger.warning("AGY %s returned non-zero %d: %s", model, res.returncode, res.stderr)
+                logger.warning("AGY %s returned non-zero %d: stderr=%s stdout=%s", model, res.returncode, res.stderr, res.stdout)
                 raise RuntimeError(
-                    f"AGY invocation failed with code {res.returncode}: {res.stderr}"
+                    f"AGY invocation failed with code {res.returncode}: stderr={res.stderr} stdout={res.stdout}"
                 )
-            return res.stdout or res.stderr
+            try:
+                import json
+                return json.loads(res.stdout)
+            except Exception:
+                return {"response": res.stdout or res.stderr, "structured_output": {}}
         finally:
             Path(prompt_file).unlink(missing_ok=True)
 
-    def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> str:
+    def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> dict:
         """
         Parses a strict one-line JSON verdict from the response lines.
         Inspects only the absolute last non-empty line.
@@ -220,6 +225,15 @@ class SeniorReviewEngine:
             return default_verdict
 
     def execute_senior_review(self, task_id: str) -> SeniorReviewVerdict:
+        import os
+        from pathlib import Path
+        mcp_dir = Path(os.path.expanduser("~/.gemini/antigravity/mcp"))
+        mcp_hidden = Path(os.path.expanduser("~/.gemini/antigravity/mcp_hidden"))
+        if mcp_dir.exists():
+            try:
+                mcp_dir.rename(mcp_hidden)
+            except Exception:
+                pass
         task = self.queue.get_task(task_id)
         if not task:
             raise ValueError(f"Task '{task_id}' not found in triage queue.")
@@ -252,16 +266,21 @@ Review Instructions:
 3. Check test coverage and acceptance criteria.
 4. Render your verdict explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "APPROVE"}} or {{"verdict": "REPAIR_REQUIRED"}}. Do not output any other JSON.
 """
-        pro_out = self._invoke_agy(
+        pro_schema_path = Path(__file__).parent / "pro_schema.json"
+        pro_res = self._invoke_agy(
             "gemini-3.1-pro-high",
             pro_prompt,
+            schema_path=str(pro_schema_path),
             cwd=task.get("worktree_path"),
-            timeout_seconds=240,
+            timeout_seconds=900,
             effort="high",
         )
-        pro_verdict = self.parse_verdict_line(
-            pro_out, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED"
-        )
+        pro_out = pro_res.get("response", "")
+        pro_struct = pro_res.get("structured_output", {})
+        if isinstance(pro_struct, dict) and "verdict" in pro_struct:
+            pro_verdict = pro_struct["verdict"]
+        else:
+            pro_verdict = self.parse_verdict_line(pro_out, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
         pro_approved = pro_verdict == "APPROVE"
 
         # --- Round 1 Step 2: Claude Opus 4.6 Thinking ---
@@ -284,13 +303,20 @@ Instructions:
 3. CRITICAL: Do NOT invoke external tools or inspect files on disk. The repository on disk is at base_commit; all pending changes are provided in the 'Git Diff' above. Base your architectural evaluation strictly on the provided Git Diff and Round 1 debate context.
 4. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
-        opus_out = self._invoke_agy(
+        opus_schema_path = Path(__file__).parent / "opus_schema.json"
+        opus_res = self._invoke_agy(
             "claude-opus-4-6-thinking",
             opus_prompt,
+            schema_path=str(opus_schema_path),
             cwd=task.get("worktree_path"),
-            timeout_seconds=500,
+            timeout_seconds=900,
         )
-        opus_verdict = self.parse_verdict_line(opus_out, ["FINAL_APPROVAL", "REJECT"], "REJECT")
+        opus_out = opus_res.get("response", "")
+        opus_struct = opus_res.get("structured_output", {})
+        if isinstance(opus_struct, dict) and "verdict" in opus_struct:
+            opus_verdict = opus_struct["verdict"]
+        else:
+            opus_verdict = self.parse_verdict_line(opus_out, ["FINAL_APPROVAL", "REJECT"], "REJECT")
         opus_approved = opus_verdict == "FINAL_APPROVAL"
 
         unanimous = pro_approved and opus_approved
@@ -346,4 +372,9 @@ Instructions:
             self.queue.queue_task_for_senior_repair(task_id, repair_packet)
             logger.info("Task %s queued for autonomous senior repair turn in worktree.", task_id)
 
+        if mcp_hidden.exists():
+            try:
+                mcp_hidden.rename(mcp_dir)
+            except Exception:
+                pass
         return verdict
