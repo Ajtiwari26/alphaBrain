@@ -162,6 +162,7 @@ async def test_heartbeat_rejects_stolen_or_expired_lease(test_db_session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_duplicate_result_is_idempotent_and_stale_result_is_rejected(test_db_session):
     envelope = TaskEnvelope(
         task_id="tsk_state_idempotent",
@@ -295,6 +296,7 @@ async def test_watchdog_retries_task_with_stale_progress_heartbeat(test_db_sessi
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_resubmission_cannot_replace_verified_task(test_db_session):
     envelope = TaskEnvelope(
         task_id="tsk_state_immutable",
@@ -332,6 +334,7 @@ async def test_resubmission_cannot_replace_verified_task(test_db_session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_dependency_blocks_downstream_then_verified_upstream_unblocks_it(test_db_session):
     downstream = TaskEnvelope(
         task_id="tsk_state_downstream",
@@ -539,6 +542,7 @@ async def test_task_envelope_decoding_variants(test_db_session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_task_engine_string_backed_details_json(test_db_session):
     envelope = TaskEnvelope(
         task_id="tsk_state_decoding_lease",

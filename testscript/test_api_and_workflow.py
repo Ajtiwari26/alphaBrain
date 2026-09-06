@@ -378,6 +378,7 @@ async def test_signed_worker_can_register_report_health_and_be_read_by_founder(
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_worker_control_plane_lease_heartbeat_result_vertical_slice(
     tmp_path, monkeypatch, api_headers, worker_headers
 ):

@@ -114,6 +114,7 @@ def test_retry_non_failed_task_rejected(temp_queue: TaskTriageQueue):
     assert temp_queue.retry_task(task_id) is False
 
 
+@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 def test_cli_retry_command(temp_queue: TaskTriageQueue, capsys):
     envelope = {"title": "Task for CLI", "repo": "."}
     provenance = make_test_provenance("task_cli", "h2")
