@@ -6,8 +6,6 @@ clean fast-forward merge into main, and worktree/branch pruning.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from alpha_core.queue.triage_queue import TriageStatus
 from alpha_core.triage_cli import cmd_merge, cmd_senior_review
 
