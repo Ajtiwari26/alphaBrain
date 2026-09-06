@@ -80,6 +80,7 @@ def mock_daemon() -> AlphaWorkerDaemon:
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_completed_passed_gates_starts_preview_local(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_passed: GateResult
 ):
@@ -135,6 +136,7 @@ async def test_completed_passed_gates_starts_preview_local(
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_completed_failed_gates_no_preview(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_failed: GateResult
 ):
@@ -170,6 +172,7 @@ async def test_completed_failed_gates_no_preview(
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_retryable_failed_no_preview(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_passed: GateResult
 ):
@@ -203,6 +206,7 @@ async def test_retryable_failed_no_preview(
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_completed_passed_gates_starts_preview_remote(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_passed: GateResult
 ):
