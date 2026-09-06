@@ -9,6 +9,7 @@ docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 4.2)
 import hashlib
 import re
 import shlex
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -17,6 +18,96 @@ from alpha_core.eva.spec_extractor import ExtractedSpecification
 from alpha_protocol.enums import AgentType, GateType, RiskClass
 from alpha_protocol.gates import AcceptancePlan, GateCommand
 from alpha_protocol.task import TaskEnvelope
+
+
+def verify_and_resolve_repo_commit(
+    repo_path: str | Path,
+    base_commit: str | None = None,
+    timeout_seconds: float = 5.0,
+) -> str:
+    """
+    Verifies that the target repository exists and resolves/verifies the git base_commit.
+    - If base_commit is omitted (None, empty, or 'HEAD'), resolves current HEAD commit via git.
+    - If base_commit is supplied, verifies it is a valid 40-char hex SHA AND that it
+      exists in the target repository history (git rev-parse --verify {commit}^{commit}).
+    - Strict bounded timeout to prevent hanging.
+    - Fails closed with descriptive ValueError.
+    """
+    path = Path(repo_path).resolve()
+    if not path.is_dir():
+        raise ValueError(
+            f"Target repository path '{repo_path}' does not exist or is not a directory"
+        ) from None
+
+    if not base_commit or str(base_commit).strip() in ("", "HEAD"):
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=str(path),
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=True,
+            )
+            resolved = res.stdout.strip()
+        except subprocess.TimeoutExpired:
+            raise ValueError(
+                f"Timeout resolving HEAD commit from repository '{repo_path}'"
+            ) from None
+        except subprocess.CalledProcessError as e:
+            err = e.stderr.strip() if e.stderr else str(e)
+            raise ValueError(
+                f"Failed to resolve HEAD commit from repository '{repo_path}': {err}"
+            ) from None
+        except Exception as e:
+            raise ValueError(
+                f"Failed to resolve HEAD commit from repository '{repo_path}': {e}"
+            ) from None
+
+        if not bool(re.match(r"^[0-9a-fA-F]{40}$", resolved)):
+            raise ValueError(
+                f"Resolved HEAD '{resolved}' in '{repo_path}' is not a valid 40-character hexadecimal SHA"
+            )
+        return resolved
+
+    commit_str = str(base_commit).strip()
+    # Base commit supplied: validate format first
+    if not bool(re.match(r"^[0-9a-fA-F]{40}$", commit_str)):
+        raise ValueError(
+            f"Invalid base_commit format '{base_commit}': must be a 40-character hexadecimal SHA"
+        )
+
+    # Verify commit exists in the repository
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{commit_str}^{{commit}}"],
+            cwd=str(path),
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=True,
+        )
+        verified = res.stdout.strip()
+    except subprocess.TimeoutExpired:
+        raise ValueError(
+            f"Timeout verifying commit '{base_commit}' in repository '{repo_path}'"
+        ) from None
+    except subprocess.CalledProcessError as e:
+        err = e.stderr.strip() if e.stderr else "Commit not found"
+        raise ValueError(
+            f"Commit '{base_commit}' does not exist in repository '{repo_path}': {err}"
+        ) from None
+    except Exception as e:
+        raise ValueError(
+            f"Failed to verify commit '{base_commit}' in repository '{repo_path}': {e}"
+        ) from None
+
+    if verified.lower() != commit_str.lower():
+        raise ValueError(
+            f"Verified commit '{verified}' does not match expected '{base_commit}'"
+        ) from None
+
+    return verified
 
 
 class EvaTaskProposer:
@@ -36,31 +127,10 @@ class EvaTaskProposer:
     ) -> TaskEnvelope:
         """Constructs an Alpha Protocol TaskEnvelope ready for submission to the Control Plane."""
         if not spec.is_actionable:
-            raise ValueError("Cannot propose a task from a non-actionable specification.")
+            raise ValueError("Cannot propose a task from a non-actionable specification.") from None
 
         target_repo = repo or self.default_repo
-        resolved_commit = base_commit
-        if not resolved_commit:
-            import subprocess
-
-            try:
-                res = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    cwd=str(Path(target_repo).resolve()),
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                commit_out = res.stdout.strip()
-                if re.match(r"^[0-9a-fA-F]{40}$", commit_out):
-                    resolved_commit = commit_out
-            except Exception:
-                pass
-
-        if not resolved_commit or not re.match(r"^[0-9a-fA-F]{40}$", resolved_commit):
-            raise ValueError(
-                "A verified repository base_commit SHA must be supplied or resolvable from the repository"
-            )
+        resolved_commit = verify_and_resolve_repo_commit(target_repo, base_commit)
         base_commit = resolved_commit
 
         unique_seed = f"{project_id}:{spec.title}:{time.time()}:{uuid.uuid4().hex[:8]}"
@@ -134,7 +204,7 @@ class EvaTaskProposer:
             project_id=project_id,
             objective=spec.title,
             detailed_instructions=detailed_instructions,
-            repo=repo or self.default_repo,
+            repo=target_repo,
             base_commit=base_commit,
             allowed_paths=allowed_paths,
             allowed_tools=["edit_file", "view_file", "run_command"],

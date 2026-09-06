@@ -550,6 +550,44 @@ async def test_sdlc_workflow_runner():
 
 
 @pytest.mark.asyncio
+async def test_sdlc_workflow_runner_explicit_valid_commit():
+    repo = "/Users/ajaytiwari/Desktop/Projects/alphaBrain"
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+    runner = SDLCWorkflowRunner(
+        project_id="prj_sdlc_explicit",
+        repo_path=repo,
+        base_commit=head,
+    )
+    result = await runner.run("Client wants a dark mode dashboard with explicit commit.")
+    assert result["project_id"] == "prj_sdlc_explicit"
+    assert result["final_state"] == "DEPLOYED"
+
+
+@pytest.mark.asyncio
+async def test_sdlc_workflow_runner_explicit_nonexistent_commit():
+    repo = "/Users/ajaytiwari/Desktop/Projects/alphaBrain"
+    runner = SDLCWorkflowRunner(
+        project_id="prj_sdlc_fake",
+        repo_path=repo,
+        base_commit="f" * 40,
+    )
+    with pytest.raises(ValueError, match="does not exist in repository"):
+        await runner.run("Client task with nonexistent commit.")
+
+
+@pytest.mark.asyncio
+async def test_sdlc_workflow_runner_explicit_malformed_commit():
+    repo = "/Users/ajaytiwari/Desktop/Projects/alphaBrain"
+    runner = SDLCWorkflowRunner(
+        project_id="prj_sdlc_malformed",
+        repo_path=repo,
+        base_commit="invalid_sha_here",
+    )
+    with pytest.raises(ValueError, match="must be a 40-character hexadecimal SHA"):
+        await runner.run("Client task with malformed commit.")
+
+
+@pytest.mark.asyncio
 async def test_result_submission_rejects_task_id_mismatch(
     tmp_path, monkeypatch, api_headers, worker_headers
 ):

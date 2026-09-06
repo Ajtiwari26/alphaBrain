@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
+from alpha_core.eva.task_proposer import verify_and_resolve_repo_commit
 from alpha_protocol import (
     AcceptancePlan,
     AgentType,
@@ -60,28 +60,7 @@ class SDLCWorkflowRunner:
 
         # 3. Generate and Dispatch Core Task
         self.state = "BUILDING"
-        resolved_commit = self.base_commit
-        if not resolved_commit:
-            import re
-            import subprocess
-
-            try:
-                res = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    cwd=str(Path(self.repo_path).resolve()),
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                commit_out = res.stdout.strip()
-                if re.match(r"^[0-9a-fA-F]{40}$", commit_out):
-                    resolved_commit = commit_out
-            except Exception:
-                pass
-        if not resolved_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(resolved_commit))):
-            raise ValueError(
-                "A verified repository base_commit SHA must be supplied or resolvable from the repository"
-            )
+        resolved_commit = verify_and_resolve_repo_commit(self.repo_path, self.base_commit)
 
         task_envelope = TaskEnvelope(
             task_id=f"tsk_{self.project_id}_build",

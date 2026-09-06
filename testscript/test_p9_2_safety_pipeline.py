@@ -65,7 +65,6 @@ def test_eva_producer_enqueues_with_provenance(temp_queue: TaskTriageQueue) -> N
         meeting_id="room_livekit_architecture_sync",
         transcript_excerpt="Ajay: Let's create the user profile endpoint today.",
         speaker_id="ajay_founder",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     assert task_id.startswith("tsk_eva_")
@@ -97,7 +96,6 @@ def test_safety_gate_rejects_protected_paths_and_traversal(
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="Edit visualizer",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     v1 = safety_gate.review_task(t1, temp_queue)
     assert v1.passed is False
@@ -119,7 +117,6 @@ def test_safety_gate_rejects_protected_paths_and_traversal(
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="Expose config",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     v3 = safety_gate.review_task(t3, temp_queue)
     assert v3.passed is False
@@ -146,7 +143,6 @@ def test_safety_gate_avoids_substring_false_positives(
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="Legitimate work on environment and evaluate tools",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     v = safety_gate.review_task(t, temp_queue)
     assert v.passed is True, f"Legitimate files were falsely rejected: {v.reason}"
@@ -174,7 +170,6 @@ def test_safety_gate_rejects_blast_radius_overflow(
         project_id="proj_overflow",
         meeting_id="room_1",
         transcript_excerpt="Refactor all 12 files across the project",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     verdict = safety_gate.review_task(task_id, temp_queue)
@@ -238,7 +233,6 @@ def test_safety_gate_catches_command_evasions(
             project_id="proj_evasion",
             meeting_id="room_1",
             transcript_excerpt=f"Run command {cmd}",
-            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
         verdict = safety_gate.review_task(task_id, temp_queue)
         assert verdict.passed is False, f"Command '{cmd}' should have been rejected."
@@ -274,7 +268,6 @@ def test_safety_gate_permits_safe_quoted_and_argument_commands(
             project_id="proj_safe_cmd",
             meeting_id="room_1",
             transcript_excerpt=f"Run safe command {cmd}",
-            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
         verdict = safety_gate.review_task(task_id, temp_queue)
         assert verdict.passed is True, (
@@ -295,7 +288,6 @@ def test_safety_gate_catches_deep_adversarial_injection(
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="exp",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     assert safety_gate.review_task(t1, temp_queue).passed is False
 
@@ -309,7 +301,6 @@ def test_safety_gate_catches_deep_adversarial_injection(
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="exp",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     verdict2 = safety_gate.review_task(t2, temp_queue)
     assert verdict2.passed is False
@@ -332,7 +323,6 @@ def test_safety_gate_approves_clean_task(
         project_id="proj_clean",
         meeting_id="room_clean",
         transcript_excerpt="Ajay: Let's create the user profile endpoint.",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     verdict = safety_gate.review_task(task_id, temp_queue)
@@ -357,21 +347,18 @@ def test_sweep_and_review_pending_batch(
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="clean task",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     t2, _, _ = producer.enqueue_specification(
         spec=create_mock_spec(title="Unsafe path", target_paths=["alpha_meet/App.tsx"]),
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="touch alpha_meet",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     t3, _, _ = producer.enqueue_specification(
         spec=create_mock_spec(title="Delete all files in repo", target_paths=["src/clean2.py"]),
         project_id="p1",
         meeting_id="m1",
         transcript_excerpt="delete all files",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     results = safety_gate.sweep_and_review_pending(temp_queue, max_batch_size=10)

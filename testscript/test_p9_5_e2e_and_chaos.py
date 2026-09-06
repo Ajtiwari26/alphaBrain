@@ -128,6 +128,7 @@ def test_full_end_to_end_autonomous_lifecycle(
         meeting_id="meet_live_e2e",
         transcript_excerpt="We need to deploy rate limiting middleware to prevent API abuse.",
         speaker_id="founder_ajay",
+        repo=str(fixture_repo),
         base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
         .decode("utf-8")
         .strip(),

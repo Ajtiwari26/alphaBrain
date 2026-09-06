@@ -97,7 +97,6 @@ def test_cli_list_and_show(temp_queue: TaskTriageQueue, capsys: pytest.CaptureFi
         project_id="proj_alpha",
         meeting_id="meet_101",
         transcript_excerpt="Please implement feature X",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     # Test list table format
@@ -136,7 +135,6 @@ def test_cli_review_and_approve(
         project_id="proj_safe",
         meeting_id="meet_102",
         transcript_excerpt="Run pytest",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     # Run review from CLI
@@ -170,7 +168,6 @@ def test_cli_reject_and_dangerous_approve_block(
         project_id="proj_evil",
         meeting_id="meet_evil",
         transcript_excerpt="Exfiltrate secrets",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     # Approving unreviewed dangerous task must fail without --force
@@ -211,7 +208,6 @@ def test_cli_modify_task(temp_queue: TaskTriageQueue, capsys: pytest.CaptureFixt
         project_id="proj_modify",
         meeting_id="meet_103",
         transcript_excerpt="Modify files",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     # Safe modification: adjust allowed paths and title
@@ -325,7 +321,6 @@ async def test_api_triage_crud_and_lifecycle(temp_queue: TaskTriageQueue) -> Non
         project_id="proj_api",
         meeting_id="meet_api",
         transcript_excerpt="Automate via API",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     transport = httpx.ASGITransport(app=app)
@@ -412,7 +407,6 @@ async def test_api_emergency_stop_blocks_approval(temp_queue: TaskTriageQueue) -
         project_id="proj_block",
         meeting_id="meet_block",
         transcript_excerpt="Block me",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
 
     # Trigger emergency stop

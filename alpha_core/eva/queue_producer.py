@@ -62,7 +62,7 @@ class EvaQueueProducer:
         extraction_confidence: float = 1.0,
         eva_session_id: str = "eva_livekit_consumer",
         repo: str | None = None,
-        base_commit: str = "HEAD",
+        base_commit: str | None = None,
     ) -> tuple[str, TaskEnvelope, TaskProvenance]:
         """
         Converts an extracted specification into an Alpha Protocol TaskEnvelope and
