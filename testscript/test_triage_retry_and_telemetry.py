@@ -39,7 +39,9 @@ def test_retry_task_resets_count_and_transitions_failed_to_approved(temp_queue: 
         "allowed_paths": ["foo.py"],
         "acceptance_plan": {"commands": []},
     }
-    provenance = make_test_provenance("task_failing", "hash123")
+    provenance = make_test_provenance(
+        "task_failing", "aa6b12bc9f29fddcd781f5bf429c93576e79b5285f0d626f267e9bdd4d111ccc"
+    )
     task_id = "task_failing"
     temp_queue.enqueue_task(task_id, envelope, provenance)
     temp_queue.approve_task(task_id)
@@ -103,7 +105,9 @@ def test_retry_task_resets_count_and_transitions_failed_to_approved(temp_queue: 
 
 def test_retry_non_failed_task_rejected(temp_queue: TaskTriageQueue):
     envelope = {"title": "Pending Task", "repo": "."}
-    provenance = make_test_provenance("task_p1", "h1")
+    provenance = make_test_provenance(
+        "task_p1", "46ed35ae5ebfec9c6b7fd80f5dab267cffc601b7e2bdba697ee2c9af4d47216f"
+    )
     task_id = "task_p1"
     temp_queue.enqueue_task(task_id, envelope, provenance)
     # Task is in PENDING_REVIEW, not FAILED
@@ -114,10 +118,11 @@ def test_retry_non_failed_task_rejected(temp_queue: TaskTriageQueue):
     assert temp_queue.retry_task(task_id) is False
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 def test_cli_retry_command(temp_queue: TaskTriageQueue, capsys):
     envelope = {"title": "Task for CLI", "repo": "."}
-    provenance = make_test_provenance("task_cli", "h2")
+    provenance = make_test_provenance(
+        "task_cli", "5b44742b7fb9f8fb9d5e88b12e5f6bb3690ea6c2aa0c1ad8307970ae9a86588c"
+    )
     task_id = "task_cli"
     temp_queue.enqueue_task(task_id, envelope, provenance)
     temp_queue.approve_task(task_id)

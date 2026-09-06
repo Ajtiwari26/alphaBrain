@@ -490,7 +490,8 @@ class TestGateEvidenceAndIndependentReview:
             agent=AgentType.ANTIGRAVITY,
             model="gemini-pro",
             base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            result_commit="HEAD",
+            result_commit="b" * 40,
+            files_changed=["file.txt"],
             status=TaskStatus.COMPLETED,
             gate_result=GateResult(
                 task_id="tsk_hr_01",
@@ -552,7 +553,8 @@ class TestGateEvidenceAndIndependentReview:
             agent=AgentType.ANTIGRAVITY,
             model="gemini-pro",
             base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            result_commit="HEAD",
+            result_commit="b" * 40,
+            files_changed=["file.txt"],
             status=TaskStatus.COMPLETED,
             gate_result=GateResult(
                 task_id="tsk_hr_02",

@@ -249,7 +249,6 @@ async def test_02_repeated_review_decision_idempotent_conflicting_rejects(real_g
 # Acceptance Behavior 3: Wrong promotion digest rejects without state change
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_03_wrong_promotion_digest_rejects(real_git_repo, api_headers):
     repo_dir, base_commit, result_commit = real_git_repo
     task_id, project_id, _, review_sha = await create_completed_review_fixture(
@@ -289,7 +288,6 @@ async def test_03_wrong_promotion_digest_rejects(real_git_repo, api_headers):
 # Acceptance Behavior 4: Service/client/other worker cannot approve/fetch/report
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_04_auth_and_worker_boundaries(real_git_repo, api_headers, worker_headers):
     repo_dir, base_commit, result_commit = real_git_repo
     task_id, project_id, _worker_id, review_sha = await create_completed_review_fixture(
@@ -560,7 +558,6 @@ def test_11_changed_file_mismatch_and_disallowed_path_fail(real_git_repo, tmp_pa
 # Acceptance Behavior 12: Successful result report is idempotent and not fetched again
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_12_successful_result_report_idempotent_no_refetch(real_git_repo, api_headers):
     repo_dir, base_commit, result_commit = real_git_repo
     task_id, project_id, _worker_id, review_sha = await create_completed_review_fixture(
@@ -634,7 +631,6 @@ async def test_12_successful_result_report_idempotent_no_refetch(real_git_repo, 
 # Acceptance Behavior 13: Failed result is terminal and not auto-retried
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_13_failed_result_is_terminal_no_auto_retry(real_git_repo, api_headers):
     repo_dir, base_commit, result_commit = real_git_repo
     task_id, project_id, _worker_id, review_sha = await create_completed_review_fixture(
@@ -720,7 +716,6 @@ async def test_13_failed_result_is_terminal_no_auto_retry(real_git_repo, api_hea
 # Acceptance Behavior 14: Worker checks promotions before leasing code
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_14_worker_checks_promotions_before_leasing(tmp_path, real_git_repo, api_headers):
     repo_dir, base_commit, result_commit = real_git_repo
     task_id, project_id, _worker_id, review_sha = await create_completed_review_fixture(

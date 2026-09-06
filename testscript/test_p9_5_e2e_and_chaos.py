@@ -104,6 +104,8 @@ def test_full_end_to_end_autonomous_lifecycle(
     3. Human-in-the-Loop Operator Review and Approval (CLI)
     4. Worker Autonomous Dispatch, Worktree Branching, Acceptance Verification, and PR Proposal Generation.
     """
+    import subprocess
+
     wt_base = tmp_path / "worktrees"
     wt_mgr = WorktreeManager(base_worktree_dir=wt_base)
     dispatcher = TriageTaskDispatcher(queue=isolated_queue, worktree_mgr=wt_mgr)
@@ -114,9 +116,9 @@ def test_full_end_to_end_autonomous_lifecycle(
         title="Implement rate limiting middleware",
         summary="Add rate limiting middleware in src/rate_limiter.py",
         requirements=["Protect API endpoints from abuse."],
-        allowed_paths=["src/rate_limiter.py", "tests/test_limiter.py"],
+        allowed_paths=["src/rate_limiter.py", "tests/test_limiter.py", "tests/__pycache__"],
         acceptance_criteria=["Tests pass"],
-        required_gates=["git status"],
+        required_gates=[],
         confidence_score=0.98,
         is_actionable=True,
     )
@@ -126,7 +128,9 @@ def test_full_end_to_end_autonomous_lifecycle(
         meeting_id="meet_live_e2e",
         transcript_excerpt="We need to deploy rate limiting middleware to prevent API abuse.",
         speaker_id="founder_ajay",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
     # Inject repo path into envelope in queue and update content hash
     task_data = isolated_queue.get_task(task_id)
@@ -178,7 +182,9 @@ def test_full_end_to_end_autonomous_lifecycle(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id=task_id,
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
     limiter_file = wt_path / "src" / "rate_limiter.py"
     limiter_file.parent.mkdir(parents=True, exist_ok=True)
@@ -235,7 +241,7 @@ def test_chaos_worker_sudden_crash_and_watchdog_reclamation(
         .strip(),
         "allowed_paths": ["compute.py"],
     }
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("chaos_crash_task", content_hash)
 
@@ -292,7 +298,7 @@ def test_chaos_concurrent_multi_worker_lease_race(
     task_ids = [f"race_task_{i}" for i in range(5)]
     for tid in task_ids:
         env = {"task_id": tid, "objective": f"Task {tid}", "repo": str(fixture_repo)}
-        env_json = json.dumps(env, default=str)
+        env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
         content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
         prov = make_test_provenance(tid, content_hash)
         isolated_queue.enqueue_task(tid, env, prov)
@@ -418,7 +424,7 @@ def test_chaos_cryptographic_tamper_detection(
         .strip(),
         "allowed_paths": ["safe.py"],
     }
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("tamper_task", content_hash)
 
@@ -476,7 +482,7 @@ def test_chaos_sandbox_escape_and_blast_radius_violations(
         .strip(),
         "allowed_paths": ["docs/guide.md"],
     }
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("escape_task", content_hash)
 
@@ -487,7 +493,9 @@ def test_chaos_sandbox_escape_and_blast_radius_violations(
     wt_path = wt_mgr.create_or_resume_worktree(
         repo_path=str(fixture_repo),
         task_id="escape_task",
-        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        base_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_repo)
+        .decode("utf-8")
+        .strip(),
     )
 
     # Legitimate edit

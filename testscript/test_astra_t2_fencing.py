@@ -26,9 +26,21 @@ def clear_overrides():
 
 
 def test_happy_path(queue):
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_1"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     # Lease
@@ -59,9 +71,21 @@ def test_happy_path(queue):
 
 
 def test_cross_worker_denial(queue):
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash2")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_2"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
@@ -80,9 +104,21 @@ def test_cross_worker_denial(queue):
 
 
 def test_stale_reassignment_race(queue):
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash3")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_3"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
@@ -127,9 +163,21 @@ def test_stale_reassignment_race(queue):
 
 
 def test_expired_lease_denial(queue):
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash4")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_4"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     queue.lease_next_approved_task(worker_id="worker_1")
@@ -141,9 +189,21 @@ def test_expired_lease_denial(queue):
 
 
 def test_fail_task_fencing(queue):
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash5")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_5"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
@@ -172,9 +232,21 @@ def test_fail_task_fencing(queue):
 
 
 def test_release_lease_happy_path(queue):
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash_rel_1")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_rel_1"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
@@ -205,9 +277,21 @@ def test_release_lease_happy_path(queue):
 
 
 def test_release_lease_stale_fencing_denial(queue):
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash_rel_2")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_rel_2"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
@@ -244,9 +328,21 @@ def test_api_result_fencing_tamper_matrix(queue, api_client):
         subject="worker_1", role="worker"
     )
 
-    prov = TaskProvenance("mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash_api_1")
+    prov = TaskProvenance(
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
+    )
     task_id = "tsk_api_1"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
@@ -353,10 +449,20 @@ def test_api_lease_tenant_access_denial_compensating_tx(queue, api_client):
     )
 
     prov = TaskProvenance(
-        "mtg", "spk", 0.0, "exc", "mod", 1.0, "eva", time.time(), "hash_api_tenant"
+        "mtg",
+        "spk",
+        0.0,
+        "exc",
+        "mod",
+        1.0,
+        "eva",
+        time.time(),
+        "5bb6f2141a9b195c1175a7dbe611bbd689fdc4a988c6fbaf7c9a68da6d98a053",
     )
     task_id = "tsk_api_tenant"
-    queue.enqueue_task(task_id, {"project_id": "prj_alphabrain_dogfood"}, prov)
+    queue.enqueue_task(
+        task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
+    )
     queue.approve_task(task_id)
 
     # Poll lease 5 times; all must return 403 and release lease without burning retries

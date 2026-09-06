@@ -78,7 +78,7 @@ def test_triage_dispatcher_invokes_agy_live_bridge(
             ]
         },
     }
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = TaskProvenance(
         meeting_id="meet_1",
@@ -157,7 +157,24 @@ def test_triage_dispatcher_eva_hash_fallback(
         content_hash=eva_hash,
     )
 
+    import hashlib
+    import json
+
+    # Compute canonical hash to bypass enqueue_task validation
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
+    canonical_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    import dataclasses
+
+    prov = dataclasses.replace(prov, content_hash=canonical_hash)
     queue.enqueue_task("task_eva_hash_1", env, prov)
+
+    # Now artificially inject the eva_hash into the DB directly to test dispatcher fallback
+    with queue._get_connection() as conn:
+        conn.execute(
+            "UPDATE task_triage_queue SET content_hash = ? WHERE id = ?",
+            (eva_hash, "task_eva_hash_1"),
+        )
+        conn.commit()
     queue.approve_task("task_eva_hash_1")
 
     # Manually stage file in worktree for this test (since agent execution is False)

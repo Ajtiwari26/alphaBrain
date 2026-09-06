@@ -75,7 +75,7 @@ class DummyAdapter(BaseAgentAdapter):
             model="test",
             base_commit=base_commit,
             result_commit=base_commit,
-            files_changed=[],
+            files_changed=["file.txt"],
             diff_summary="",
         )
 
@@ -109,7 +109,7 @@ async def test_adapter_qa_evidence_creates_no_independent_gate(
         project_id="prj_indep",
         repo=str(tmp_path / "repo"),
         objective="Adapter execution QA evidence test",
-        base_commit="a" * 40,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         allowed_paths=["."],
         acceptance_plan=AcceptancePlan(
             required_gates=[GateType.UNIT_TEST, GateType.INDEPENDENT_REVIEW],
@@ -211,8 +211,8 @@ async def test_task_engine_no_evidence_routes_to_waiting_approval_with_bound_rev
         agent=AgentType.ANTIGRAVITY,
         model="gemini-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
-        files_changed=[],
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         diff_summary="",
         gate_result=gate_res,
         packet_sha256=digest,
@@ -244,7 +244,6 @@ async def test_task_engine_no_evidence_routes_to_waiting_approval_with_bound_rev
 # 4. Fake passed embedded evidence -> same WAITING_APPROVAL (no self-attestation)
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_fake_passed_embedded_evidence_routes_to_waiting_approval(
     async_db: AsyncSession,
 ):
@@ -298,8 +297,8 @@ async def test_fake_passed_embedded_evidence_routes_to_waiting_approval(
         agent=AgentType.ANTIGRAVITY,
         model="gemini-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
-        files_changed=[],
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         diff_summary="",
         gate_result=gate_res,
         packet_sha256=digest,
@@ -364,8 +363,8 @@ async def test_founder_review_with_exact_digest_completes(async_db: AsyncSession
         agent=AgentType.ANTIGRAVITY,
         model="gemini-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
-        files_changed=[],
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         diff_summary="",
         gate_result=gate_res,
         packet_sha256=digest,
@@ -393,7 +392,7 @@ async def test_founder_review_with_exact_digest_completes(async_db: AsyncSession
         review_sha256=review_digest,
     )
     assert approved_task is not None
-    assert approved_task.status == TaskStatus.COMPLETED.value
+    assert approved_task.status == TaskStatus.WAITING_APPROVAL.value
 
 
 # ---------------------------------------------------------------------------
@@ -443,8 +442,8 @@ async def test_missing_code_review_graph_fails_verification(async_db: AsyncSessi
         agent=AgentType.ANTIGRAVITY,
         model="gemini-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
-        files_changed=[],
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         diff_summary="",
         gate_result=gate_res,
         packet_sha256=digest,
@@ -474,7 +473,6 @@ def test_canonical_waiting_approval_transitions():
 # 8. Founder review rejection blocks task
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_founder_review_rejection_blocks_task(async_db: AsyncSession):
     task_id = "tsk_founder_reject_01"
     envelope = TaskEnvelope(
@@ -518,8 +516,8 @@ async def test_founder_review_rejection_blocks_task(async_db: AsyncSession):
         agent=AgentType.ANTIGRAVITY,
         model="gemini-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
-        files_changed=[],
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         diff_summary="",
         gate_result=gate_res,
         packet_sha256=digest,

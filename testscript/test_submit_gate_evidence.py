@@ -34,7 +34,6 @@ async def test_db_session():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_submit_gate_evidence_verified_and_failed(test_db_session):
     try:
         session = test_db_session
@@ -48,7 +47,7 @@ async def test_submit_gate_evidence_verified_and_failed(test_db_session):
                 project_id="prj_1",
                 repo="/tmp",
                 objective="obj",
-                base_commit="a" * 40,
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 allowed_paths=["."],
                 acceptance_plan=AcceptancePlan(commands=[]),
             ).model_dump(mode="json"),
@@ -68,8 +67,9 @@ async def test_submit_gate_evidence_verified_and_failed(test_db_session):
             status=TaskStatus.VERIFIED,
             agent="codex",
             model="gemini",
-            base_commit="a" * 40,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="abcd",
+            files_changed=["file.txt"],
             gate_result=GateResult(
                 task_id="tsk_123",
                 attempt_id="att_1",
@@ -121,7 +121,7 @@ async def test_submit_gate_evidence_verified_and_failed(test_db_session):
                 project_id="prj_1",
                 repo="/tmp",
                 objective="obj",
-                base_commit="a" * 40,
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 allowed_paths=["."],
                 acceptance_plan=AcceptancePlan(commands=[]),
             ).model_dump(mode="json"),
@@ -141,7 +141,7 @@ async def test_submit_gate_evidence_verified_and_failed(test_db_session):
             status=TaskStatus.RETRYABLE_FAILED,
             agent="codex",
             model="gemini",
-            base_commit="a" * 40,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             gate_result=GateResult(
                 task_id="tsk_124",
                 attempt_id="att_2",
@@ -179,7 +179,6 @@ async def test_submit_gate_evidence_verified_and_failed(test_db_session):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_duplicate_evidence_id_across_attempts(test_db_session):
     try:
         session = test_db_session
@@ -195,7 +194,7 @@ async def test_duplicate_evidence_id_across_attempts(test_db_session):
                 project_id="prj_1",
                 repo="/tmp",
                 objective="obj",
-                base_commit="a" * 40,
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 allowed_paths=["."],
                 acceptance_plan=AcceptancePlan(commands=[], required_gates=[GateType.UNIT_TEST]),
             ).model_dump(mode="json"),
@@ -219,7 +218,7 @@ async def test_duplicate_evidence_id_across_attempts(test_db_session):
                 project_id="prj_1",
                 repo="/tmp",
                 objective="obj",
-                base_commit="a" * 40,
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 allowed_paths=["."],
                 acceptance_plan=AcceptancePlan(commands=[], required_gates=[GateType.LINT]),
             ).model_dump(mode="json"),
@@ -240,8 +239,9 @@ async def test_duplicate_evidence_id_across_attempts(test_db_session):
             status=TaskStatus.VERIFIED,
             agent="codex",
             model="gemini",
-            base_commit="a" * 40,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="abcd",
+            files_changed=["file.txt"],
             gate_result=GateResult(
                 task_id="tsk_1",
                 attempt_id="att_1",
@@ -266,8 +266,9 @@ async def test_duplicate_evidence_id_across_attempts(test_db_session):
             status=TaskStatus.VERIFIED,
             agent="codex",
             model="gemini",
-            base_commit="a" * 40,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="abcd",
+            files_changed=["file.txt"],
             gate_result=GateResult(
                 task_id="tsk_2",
                 attempt_id="att_2",
@@ -308,7 +309,6 @@ async def test_duplicate_evidence_id_across_attempts(test_db_session):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_duplicate_evidence_id_long_attempt_ids(test_db_session):
     try:
         session = test_db_session
@@ -329,7 +329,7 @@ async def test_duplicate_evidence_id_long_attempt_ids(test_db_session):
                 project_id="prj_1",
                 repo="/tmp",
                 objective="obj",
-                base_commit="a" * 40,
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 allowed_paths=["."],
                 acceptance_plan=AcceptancePlan(commands=[], required_gates=[GateType.UNIT_TEST]),
             ).model_dump(mode="json"),
@@ -353,7 +353,7 @@ async def test_duplicate_evidence_id_long_attempt_ids(test_db_session):
                 project_id="prj_1",
                 repo="/tmp",
                 objective="obj",
-                base_commit="a" * 40,
+                base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 allowed_paths=["."],
                 acceptance_plan=AcceptancePlan(commands=[], required_gates=[GateType.LINT]),
             ).model_dump(mode="json"),
@@ -374,8 +374,9 @@ async def test_duplicate_evidence_id_long_attempt_ids(test_db_session):
             status=TaskStatus.VERIFIED,
             agent="codex",
             model="gemini",
-            base_commit="a" * 40,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="abcd",
+            files_changed=["file.txt"],
             gate_result=GateResult(
                 task_id="tsk_3",
                 attempt_id=att_long_1,
@@ -400,8 +401,9 @@ async def test_duplicate_evidence_id_long_attempt_ids(test_db_session):
             status=TaskStatus.VERIFIED,
             agent="codex",
             model="gemini",
-            base_commit="a" * 40,
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="abcd",
+            files_changed=["file.txt"],
             gate_result=GateResult(
                 task_id="tsk_4",
                 attempt_id=att_long_2,

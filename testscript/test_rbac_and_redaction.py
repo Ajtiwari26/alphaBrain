@@ -415,7 +415,6 @@ class TestKillSwitchAPIEnforcement:
         worker_kill_switch.resume_all()
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
     async def test_paused_project_rejects_task_submission(self, api_headers):
         worker_kill_switch.pause_project("prj_paused")
         transport = ASGITransport(app=app)

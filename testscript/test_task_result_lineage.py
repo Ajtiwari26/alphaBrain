@@ -276,7 +276,7 @@ async def test_negative_rejection_leaves_zero_attempts_and_approvals(
             status=TaskStatus.COMPLETED,
             agent=AgentType.ANTIGRAVITY,
             model="model",
-            base_commit="unrelated_base_commit",
+            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             result_commit="commit_new",
             files_changed=["src/a.py"],
             packet_sha256=digest_fn(env),

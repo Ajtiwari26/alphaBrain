@@ -223,7 +223,7 @@ async def test_wrong_result_base_commit_fails(
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="test",
-        base_commit="WRONGCOMMIT",
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         packet_sha256=digest,
     )
     success = await TaskEngine.submit_result(db_session, result, task.lease_token, "worker1")

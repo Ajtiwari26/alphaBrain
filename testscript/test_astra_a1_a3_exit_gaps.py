@@ -86,7 +86,7 @@ def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
 def test_dispatcher_rejects_mutable_head(isolated_queue: TaskTriageQueue):
     dispatcher = TriageTaskDispatcher(isolated_queue)
     with pytest.raises(ValueError, match="mutable HEAD or missing base_commit"):
-        dispatcher.execute_task({"id": "tsk_head", "envelope": {"base_commit": "a" * 40}})
+        dispatcher.execute_task({"id": "tsk_head", "envelope": {"base_commit": "HEAD"}})
 
 
 def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
@@ -106,7 +106,7 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
             extraction_confidence=1.0,
             eva_session_id="",
             created_at=1.0,
-            content_hash="c0fd89b027ee6da2820eb7f6a2da074f9716b143e90d9058c08ee7c5e761cbb8",
+            content_hash="5738110c53adb65ebf764ca89521d35781019c9d5d24c54f09433c635cf48531",
         ),
     )
     isolated_queue.approve_task("tsk_merge")

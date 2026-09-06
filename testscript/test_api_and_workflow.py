@@ -378,7 +378,6 @@ async def test_signed_worker_can_register_report_health_and_be_read_by_founder(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_worker_control_plane_lease_heartbeat_result_vertical_slice(
     tmp_path, monkeypatch, api_headers, worker_headers
 ):
@@ -407,7 +406,8 @@ async def test_worker_control_plane_lease_heartbeat_result_vertical_slice(
         agent=AgentType.ANTIGRAVITY,
         model="test",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
+        result_commit="b" * 40,
+        files_changed=["file.py"],
         gate_result=GateResult(
             task_id="tsk-worker-e2e",
             attempt_id="att-worker-e2e",
@@ -578,7 +578,8 @@ async def test_result_submission_rejects_task_id_mismatch(
         agent=AgentType.ANTIGRAVITY,
         model="test",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
+        result_commit="b" * 40,
+        files_changed=["file.py"],
         gate_result=GateResult(
             task_id="tsk-DIFFERENT",
             attempt_id="att-match-test",

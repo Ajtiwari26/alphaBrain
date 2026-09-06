@@ -72,7 +72,7 @@ def test_merge_rejects_missing_branch():
 
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.Path.exists")
-def test_merge_successful_with_senior_review_approved(mock_exists, mock_run):
+def test_merge_successful_with_senior_review_approved(mock_exists, mock_run, tmp_path):
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_success",
@@ -88,7 +88,7 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run):
                 "opus_verdict": "FINAL_APPROVAL",
             },
         },
-        "envelope": {"repo": "/repos/alphaBrain"},
+        "envelope": {"repo": str(tmp_path)},
     }
     mock_exists.return_value = True
 
@@ -107,14 +107,14 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run):
     # Verify execution sequence: checkout main -> ff merge -> prune worktree -> delete branch
     mock_run.assert_any_call(
         ["git", "checkout", "main"],
-        cwd="/repos/alphaBrain",
+        cwd=str(tmp_path),
         check=True,
         capture_output=True,
         text=True,
     )
     mock_run.assert_any_call(
-        ["git", "merge", "--ff-only", "alpha/task_success"],
-        cwd="/repos/alphaBrain",
+        ["git", "merge", "--ff-only", "abc1234567890abcdef1234567890abcdef12345"],
+        cwd=str(tmp_path),
         check=True,
         capture_output=True,
         text=True,
@@ -123,7 +123,7 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run):
 
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.Path.exists")
-def test_merge_fails_without_senior_review(mock_exists, mock_run):
+def test_merge_fails_without_senior_review(mock_exists, mock_run, tmp_path):
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_skip",
@@ -131,7 +131,7 @@ def test_merge_fails_without_senior_review(mock_exists, mock_run):
         "branch_name": "alpha/task_skip",
         "worktree_path": "/tmp/worktrees/task_skip",
         "result": {"gates_passed": True},  # No senior_review recorded
-        "envelope": {"repo": "/repos/alphaBrain"},
+        "envelope": {"repo": str(tmp_path)},
     }
     mock_exists.return_value = True
     mock_run.return_value = MagicMock(returncode=0, stdout="Fast-forward")

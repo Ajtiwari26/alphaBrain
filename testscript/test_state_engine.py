@@ -162,7 +162,6 @@ async def test_heartbeat_rejects_stolen_or_expired_lease(test_db_session):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_duplicate_result_is_idempotent_and_stale_result_is_rejected(test_db_session):
     envelope = TaskEnvelope(
         task_id="tsk_state_idempotent",
@@ -184,7 +183,8 @@ async def test_duplicate_result_is_idempotent_and_stale_result_is_rejected(test_
         agent=AgentType.ANTIGRAVITY,
         model="antigravity-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         gate_result=make_default_gate_result(leased_task.id, "att_state_idempotent_1"),
     )
 
@@ -296,7 +296,6 @@ async def test_watchdog_retries_task_with_stale_progress_heartbeat(test_db_sessi
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_resubmission_cannot_replace_verified_task(test_db_session):
     envelope = TaskEnvelope(
         task_id="tsk_state_immutable",
@@ -317,7 +316,8 @@ async def test_resubmission_cannot_replace_verified_task(test_db_session):
         agent=AgentType.ANTIGRAVITY,
         model="antigravity-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         gate_result=make_default_gate_result(leased_task.id, "att_state_immutable_1"),
     )
     assert await TaskEngine.submit_result(
@@ -334,7 +334,6 @@ async def test_resubmission_cannot_replace_verified_task(test_db_session):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_dependency_blocks_downstream_then_verified_upstream_unblocks_it(test_db_session):
     downstream = TaskEnvelope(
         task_id="tsk_state_downstream",
@@ -371,7 +370,8 @@ async def test_dependency_blocks_downstream_then_verified_upstream_unblocks_it(t
         agent=AgentType.ANTIGRAVITY,
         model="antigravity-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
         gate_result=make_default_gate_result(upstream.task_id, "att_state_upstream_1"),
     )
     assert await TaskEngine.submit_result(
@@ -542,7 +542,6 @@ async def test_task_envelope_decoding_variants(test_db_session):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_task_engine_string_backed_details_json(test_db_session):
     envelope = TaskEnvelope(
         task_id="tsk_state_decoding_lease",
@@ -578,7 +577,8 @@ async def test_task_engine_string_backed_details_json(test_db_session):
         agent=AgentType.ANTIGRAVITY,
         model="antigravity-flash",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
+        result_commit="b" * 40,
+        files_changed=["file.txt"],
     )
     await TaskEngine.submit_result(test_db_session, result, leased_task.lease_token, "worker_one")
 

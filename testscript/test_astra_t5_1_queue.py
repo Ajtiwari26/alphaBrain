@@ -76,7 +76,7 @@ def test_content_hash_mismatch(queue):
         extraction_confidence=1.0,
         eva_session_id="e1",
         created_at=time.time(),
-        content_hash="c0fd89b027ee6da2820eb7f6a2da074f9716b143e90d9058c08ee7c5e761cbb8",
+        content_hash="c39e33693a0596c508a83796a3505284a18c8d7dda4e6bc51bbbc7dc726a279f",
     )
     with pytest.raises(ValueError, match="Content hash mismatch"):
         queue.enqueue_task("task4", envelope, corrupt_prov)

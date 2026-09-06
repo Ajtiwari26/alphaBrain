@@ -4,14 +4,13 @@ from pydantic import ValidationError
 from alpha_protocol.task import TaskEnvelope
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 def test_task_envelope_rejects_head():
     with pytest.raises(ValidationError) as exc:
         TaskEnvelope(
             task_id="tsk_123",
             project_id="prj_alpha",
             repo=".",
-            base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            base_commit="HEAD",
             objective="Test objective",
             allowed_paths=["."],
         )

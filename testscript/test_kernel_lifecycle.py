@@ -52,7 +52,6 @@ def fake_daemon(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 async def test_happy_path_kernel_proof(memory_db, fake_daemon, tmp_path, monkeypatch):
     session = memory_db
     proj = await TaskEngine.create_project(
@@ -102,7 +101,8 @@ async def test_happy_path_kernel_proof(memory_db, fake_daemon, tmp_path, monkeyp
         agent=AgentType.ANTIGRAVITY,
         model="test",
         base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        result_commit="HEAD",
+        result_commit="b" * 40,
+        files_changed=["index.html"],
         gate_result=gate_res,
     )
     monkeypatch.setattr(

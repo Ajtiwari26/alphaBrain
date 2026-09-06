@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from alpha_protocol import (
@@ -18,10 +19,17 @@ def utc_now() -> datetime:
 class SDLCWorkflowRunner:
     """Deterministic SDLC Workflow runner coordinating end-to-end delivery cycles."""
 
-    def __init__(self, project_id: str, repo_path: str, founder_phone: str = "+1234567890"):
+    def __init__(
+        self,
+        project_id: str,
+        repo_path: str,
+        founder_phone: str = "+1234567890",
+        base_commit: str | None = None,
+    ):
         self.project_id = project_id
         self.repo_path = repo_path
         self.founder_phone = founder_phone
+        self.base_commit = base_commit
         self.state = "INTAKE"
         self.spec: dict[str, Any] | None = None
         self.spec_approved = False
@@ -52,8 +60,32 @@ class SDLCWorkflowRunner:
 
         # 3. Generate and Dispatch Core Task
         self.state = "BUILDING"
+        resolved_commit = self.base_commit
+        if not resolved_commit:
+            import re
+            import subprocess
+
+            try:
+                res = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=str(Path(self.repo_path).resolve()),
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                commit_out = res.stdout.strip()
+                if re.match(r"^[0-9a-fA-F]{40}$", commit_out):
+                    resolved_commit = commit_out
+            except Exception:
+                pass
+        if not resolved_commit or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(resolved_commit))):
+            raise ValueError(
+                "A verified repository base_commit SHA must be supplied or resolvable from the repository"
+            )
+
         task_envelope = TaskEnvelope(
             task_id=f"tsk_{self.project_id}_build",
+            base_commit=resolved_commit,
             project_id=self.project_id,
             repo=self.repo_path,
             objective="Implement core application features based on approved specification",

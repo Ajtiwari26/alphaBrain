@@ -33,7 +33,7 @@ async def test_daemon_failed_submit_returns_false_and_does_not_log_completed(mon
         project_id="prj_1",
         repo="repo",
         objective="obj",
-        base_commit="a" * 40,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         allowed_paths=["."],
         acceptance_plan=AcceptancePlan(commands=[]),
         risk_class=RiskClass.LOW,
@@ -52,7 +52,7 @@ async def test_daemon_failed_submit_returns_false_and_does_not_log_completed(mon
         status=TaskStatus.COMPLETED,
         agent="antigravity",
         model="gemini",
-        base_commit="a" * 40,
+        base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     mock_adapter.execute = AsyncMock(return_value=result)
     monkeypatch.setattr(daemon, "select_adapter", MagicMock(return_value=mock_adapter))

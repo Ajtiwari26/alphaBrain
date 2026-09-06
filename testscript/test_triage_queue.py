@@ -30,8 +30,14 @@ def temp_queue(tmp_path: Path) -> TaskTriageQueue:
 
 
 def create_sample_provenance(
-    seed: str = "meeting-1", content_hash: str = "hash-123"
+    envelope: dict, seed: str = "meeting-1", content_hash: str | None = None
 ) -> TaskProvenance:
+    if content_hash is None:
+        import hashlib
+        import json
+
+        canonical_env = json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str)
+        content_hash = hashlib.sha256(canonical_env.encode("utf-8")).hexdigest()
     return TaskProvenance(
         meeting_id=f"room_{seed}",
         speaker_id="founder_ajay",
@@ -48,7 +54,7 @@ def create_sample_provenance(
 def test_enqueue_and_provenance_roundtrip(temp_queue: TaskTriageQueue) -> None:
     task_id = "tsk_test_001"
     envelope = {"objective": "Build queue", "repo": ".", "allowed_paths": ["alpha_core/queue/"]}
-    prov = create_sample_provenance()
+    prov = create_sample_provenance(envelope)
 
     enqueued_id = temp_queue.enqueue_task(task_id, envelope, prov)
     assert enqueued_id == task_id
@@ -59,14 +65,20 @@ def test_enqueue_and_provenance_roundtrip(temp_queue: TaskTriageQueue) -> None:
     assert task["status"] == TriageStatus.PENDING_REVIEW.value
     assert task["envelope"]["objective"] == "Build queue"
     assert task["provenance"]["speaker_id"] == "founder_ajay"
-    assert task["provenance"]["content_hash"] == "hash-123"
+    import hashlib
+    import json
+
+    expected_hash = hashlib.sha256(
+        json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    assert task["provenance"]["content_hash"] == expected_hash
 
 
 def test_strict_worker_blindness_to_unvetted_tasks(temp_queue: TaskTriageQueue) -> None:
     """P9 Critical Law: Workers NEVER see or lease pending_review tasks."""
     task_id = "tsk_unvetted"
     envelope = {"objective": "Unchecked task"}
-    prov = create_sample_provenance(seed="unvetted", content_hash="hash-unvetted")
+    prov = create_sample_provenance(envelope, seed="unvetted")
 
     temp_queue.enqueue_task(task_id, envelope, prov)
 
@@ -78,7 +90,7 @@ def test_strict_worker_blindness_to_unvetted_tasks(temp_queue: TaskTriageQueue) 
 def test_approval_and_atomic_lease(temp_queue: TaskTriageQueue) -> None:
     task_id = "tsk_to_approve"
     envelope = {"objective": "Approved task"}
-    prov = create_sample_provenance(seed="appr", content_hash="hash-appr")
+    prov = create_sample_provenance(envelope, seed="appr")
 
     temp_queue.enqueue_task(task_id, envelope, prov)
 
@@ -105,7 +117,7 @@ def test_approval_and_atomic_lease(temp_queue: TaskTriageQueue) -> None:
 def test_task_rejection(temp_queue: TaskTriageQueue) -> None:
     task_id = "tsk_to_reject"
     envelope = {"objective": "Dangerous prompt injection"}
-    prov = create_sample_provenance(seed="bad", content_hash="hash-bad")
+    prov = create_sample_provenance(envelope, seed="bad")
 
     temp_queue.enqueue_task(task_id, envelope, prov)
     ok = temp_queue.reject_task(task_id, reason="Touches protected path")
@@ -122,7 +134,7 @@ def test_task_rejection(temp_queue: TaskTriageQueue) -> None:
 def test_retry_and_circuit_breaker(temp_queue: TaskTriageQueue) -> None:
     task_id = "tsk_flaky"
     envelope = {"objective": "Flaky test execution"}
-    prov = create_sample_provenance(seed="flaky", content_hash="hash-flaky")
+    prov = create_sample_provenance(envelope, seed="flaky")
 
     temp_queue.enqueue_task(task_id, envelope, prov)
     temp_queue.approve_task(task_id)
@@ -170,7 +182,7 @@ def test_retry_and_circuit_breaker(temp_queue: TaskTriageQueue) -> None:
 def test_completion_lifecycle(temp_queue: TaskTriageQueue) -> None:
     task_id = "tsk_success"
     envelope = {"objective": "Working feature"}
-    prov = create_sample_provenance(seed="success", content_hash="hash-success")
+    prov = create_sample_provenance(envelope, seed="success")
 
     temp_queue.enqueue_task(task_id, envelope, prov)
     temp_queue.approve_task(task_id)
@@ -197,8 +209,8 @@ def test_content_hash_deduplication(temp_queue: TaskTriageQueue) -> None:
     task_id1 = "tsk_orig"
     task_id2 = "tsk_duplicate"
     envelope = {"objective": "Duplicated spec"}
-    prov1 = create_sample_provenance(seed="meeting1", content_hash="identical-hash-xyz")
-    prov2 = create_sample_provenance(seed="meeting2", content_hash="identical-hash-xyz")
+    prov1 = create_sample_provenance(envelope, seed="meeting1")
+    prov2 = create_sample_provenance(envelope, seed="meeting2")
 
     res1 = temp_queue.enqueue_task(task_id1, envelope, prov1)
     assert res1 == task_id1
@@ -225,7 +237,7 @@ def test_emergency_stop_tombstone(temp_queue: TaskTriageQueue) -> None:
         temp_queue.enqueue_task(
             "tsk_blocked",
             {"obj": "blocked"},
-            create_sample_provenance(seed="blocked", content_hash="hash-blocked"),
+            create_sample_provenance({"obj": "blocked"}, seed="blocked"),
         )
 
     # 4. Worker leasing must return None
@@ -238,7 +250,7 @@ def test_emergency_stop_tombstone(temp_queue: TaskTriageQueue) -> None:
     enqueued = temp_queue.enqueue_task(
         "tsk_resumed",
         {"obj": "resumed"},
-        create_sample_provenance(seed="resumed", content_hash="hash-resumed"),
+        create_sample_provenance({"obj": "resumed"}, seed="resumed"),
     )
     assert enqueued == "tsk_resumed"
 
@@ -249,7 +261,7 @@ def test_concurrent_multi_thread_writes(temp_queue: TaskTriageQueue) -> None:
 
     def worker_write(idx: int) -> str:
         tid = f"tsk_concurrent_{idx}"
-        prov = create_sample_provenance(seed=f"thread_{idx}", content_hash=f"hash_thread_{idx}")
+        prov = create_sample_provenance({"idx": idx}, seed=f"thread_{idx}")
         return temp_queue.enqueue_task(tid, {"idx": idx}, prov)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:

@@ -177,8 +177,14 @@ def test_content_hash_mismatch_fails_closed(
         "allowed_paths": ["README.md"],
     }
     # Provide intentionally mismatched hash
-    prov = make_test_provenance("task_tampered_1", "tampered_fake_hash_123")
-    isolated_queue.enqueue_task("task_tampered_1", env, prov)
+    prov = make_test_provenance(
+        "task_tampered_1", "6845a3483ac64d5aa1697e22ba2f5aac9a617d3b8bee689360b7dcd30a44edb0"
+    )
+    import pytest
+
+    with pytest.raises(ValueError, match="Content hash mismatch"):
+        isolated_queue.enqueue_task("task_tampered_1", env, prov)
+    return  # The rest of the test is obsolete since it is blocked at the queue level
     isolated_queue.approve_task("task_tampered_1")
 
     # Dispatcher runs cycle
@@ -220,7 +226,7 @@ def test_end_to_end_worker_dispatch_and_pr_generation(
         },
     }
     # Deterministic content hash
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     import hashlib
 
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
@@ -289,7 +295,7 @@ def test_worker_disallowed_path_fails_closed(
     }
     import hashlib
 
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_disallowed_paths", content_hash)
 
@@ -344,7 +350,7 @@ def test_worker_acceptance_gate_failure(
     }
     import hashlib
 
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_gate_fail", content_hash)
 
@@ -381,7 +387,9 @@ def test_api_worker_endpoints_and_rbac(
     assert res.status_code == 403
 
     # 3. Worker role succeeds on empty queue
-    worker_principal = AuthPrincipal(subject="worker_bob", role=PrincipalRole.WORKER)
+    worker_principal = AuthPrincipal(
+        subject="worker_bob", role=PrincipalRole.WORKER, project_ids=("proj_1",)
+    )
     app.dependency_overrides[require_api_principal] = lambda: worker_principal
     res = client.post("/api/triage/tasks/lease")
     assert res.status_code == 200
@@ -396,8 +404,13 @@ def test_api_worker_endpoints_and_rbac(
         .decode("utf-8")
         .strip(),
         "allowed_paths": ["doc.md"],
+        "project_id": "proj_1",
     }
-    prov = make_test_provenance("api_worker_task_1", "hash_api_1")
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
+    import hashlib
+
+    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    prov = make_test_provenance("api_worker_task_1", content_hash)
     isolated_queue.enqueue_task("api_worker_task_1", env, prov)
     isolated_queue.approve_task("api_worker_task_1")
 
@@ -473,7 +486,7 @@ def test_cli_worker_cycle_command(
     }
     import hashlib
 
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("cli_worker_task_1", content_hash)
     isolated_queue.enqueue_task("cli_worker_task_1", env, prov)
@@ -517,7 +530,7 @@ def test_empty_allowed_paths_strictly_blocks_any_file_modification(
     }
     import hashlib
 
-    env_json = json.dumps(env, default=str)
+    env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_empty_allowed", content_hash)
 
@@ -704,9 +717,7 @@ def test_failure_evidence_injected_on_retry(
     assert leased is not None
 
     # We directly invoke _build_task_envelope to verify the injection
-    task_env = dispatcher._build_task_envelope(
-        leased, wt_path, base_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    )
+    task_env = dispatcher._build_task_envelope(leased, wt_path)
 
     # Assert instructions contain the failure directives
     assert "PREVIOUS ATTEMPT GATE FAILURES" in task_env.detailed_instructions

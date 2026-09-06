@@ -71,7 +71,6 @@ def test_modify_cycle_detection(queue: TaskTriageQueue):
         queue.modify_task("task_1", new_envelope=env1)
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending", strict=True, raises=AssertionError)
 def test_dag_leasing_blocked(queue: TaskTriageQueue):
     queue.enqueue_task(
         "task_1",
@@ -85,7 +84,7 @@ def test_dag_leasing_blocked(queue: TaskTriageQueue):
     assert task is not None
     assert task["id"] == "task_2"
     assert queue.lease_next_approved_task() is None
-    queue.complete_task("task_2", {"result": "ok"})
+    queue.complete_task("task_2", {"result": "ok", "senior_review": {"approved": True}})
     task = queue.lease_next_approved_task()
     assert task is not None
     assert task["id"] == "task_1"

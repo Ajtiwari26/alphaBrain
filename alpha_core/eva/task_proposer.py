@@ -11,6 +11,7 @@ import re
 import shlex
 import time
 import uuid
+from pathlib import Path
 
 from alpha_core.eva.spec_extractor import ExtractedSpecification
 from alpha_protocol.enums import AgentType, GateType, RiskClass
@@ -30,12 +31,37 @@ class EvaTaskProposer:
         spec: ExtractedSpecification,
         project_id: str,
         repo: str | None = None,
-        base_commit: str = "HEAD",
+        base_commit: str | None = None,
         risk_class: RiskClass = RiskClass.LOW,
     ) -> TaskEnvelope:
         """Constructs an Alpha Protocol TaskEnvelope ready for submission to the Control Plane."""
         if not spec.is_actionable:
             raise ValueError("Cannot propose a task from a non-actionable specification.")
+
+        target_repo = repo or self.default_repo
+        resolved_commit = base_commit
+        if not resolved_commit:
+            import subprocess
+
+            try:
+                res = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=str(Path(target_repo).resolve()),
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                commit_out = res.stdout.strip()
+                if re.match(r"^[0-9a-fA-F]{40}$", commit_out):
+                    resolved_commit = commit_out
+            except Exception:
+                pass
+
+        if not resolved_commit or not re.match(r"^[0-9a-fA-F]{40}$", resolved_commit):
+            raise ValueError(
+                "A verified repository base_commit SHA must be supplied or resolvable from the repository"
+            )
+        base_commit = resolved_commit
 
         unique_seed = f"{project_id}:{spec.title}:{time.time()}:{uuid.uuid4().hex[:8]}"
         task_hash = hashlib.sha256(unique_seed.encode()).hexdigest()[:12]
