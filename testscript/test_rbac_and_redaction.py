@@ -306,7 +306,6 @@ class TestScopedPrincipalTokens:
 
 class TestAPICrossProjectAccess:
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="R2-R6 gap pending")
     async def test_cross_project_api_returns_403_for_scoped_client(self, api_headers):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -416,7 +415,6 @@ class TestKillSwitchAPIEnforcement:
         worker_kill_switch.resume_all()
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="R2-R6 gap pending")
     async def test_paused_project_rejects_task_submission(self, api_headers):
         worker_kill_switch.pause_project("prj_paused")
         transport = ASGITransport(app=app)

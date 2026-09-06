@@ -71,7 +71,6 @@ def client_headers_factory():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_founder_receives_ordered_project_only_events(setup_db, founder_headers):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 10, 0, 0, tzinfo=UTC)
@@ -151,7 +150,6 @@ async def test_founder_receives_ordered_project_only_events(setup_db, founder_he
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_category_filter_returns_only_matching_classification(setup_db, founder_headers):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 12, 0, 0, tzinfo=UTC)
@@ -257,7 +255,6 @@ async def test_category_filter_returns_only_matching_classification(setup_db, fo
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_keyset_cursor_produces_stable_non_overlapping_pages(setup_db, founder_headers):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 14, 0, 0, tzinfo=UTC)
@@ -337,7 +334,6 @@ async def test_keyset_cursor_produces_stable_non_overlapping_pages(setup_db, fou
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_same_timestamp_ordering_uses_id_as_deterministic_tie_breaker(
     setup_db, founder_headers
 ):
@@ -412,7 +408,6 @@ async def test_same_timestamp_ordering_uses_id_as_deterministic_tie_breaker(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_malformed_cursor_returns_422(setup_db, founder_headers):
     session_factory = get_session_factory()
     async with session_factory() as session:
@@ -476,7 +471,6 @@ async def test_malformed_cursor_returns_422(setup_db, founder_headers):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_founder_sees_sanitized_actor_and_details(setup_db, founder_headers):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 17, 0, 0, tzinfo=UTC)
@@ -532,7 +526,6 @@ async def test_founder_sees_sanitized_actor_and_details(setup_db, founder_header
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_client_sees_system_actor_and_redacted_details(setup_db, client_headers_factory):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 18, 0, 0, tzinfo=UTC)
@@ -639,7 +632,6 @@ async def test_cross_project_principal_receives_403(setup_db, client_headers_fac
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_unknown_project_returns_404(setup_db, founder_headers):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -656,7 +648,6 @@ async def test_unknown_project_returns_404(setup_db, founder_headers):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_unknown_event_type_mapped_to_work_category(setup_db, founder_headers):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 20, 0, 0, tzinfo=UTC)
@@ -704,7 +695,6 @@ async def test_unknown_event_type_mapped_to_work_category(setup_db, founder_head
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_raw_secrets_never_appear_in_response(
     setup_db, founder_headers, client_headers_factory
 ):
@@ -771,7 +761,6 @@ async def test_raw_secrets_never_appear_in_response(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_limit_boundaries_and_query_validation(setup_db, founder_headers):
     session_factory = get_session_factory()
     t0 = datetime(2026, 9, 2, 22, 0, 0, tzinfo=UTC)
@@ -834,7 +823,6 @@ async def test_limit_boundaries_and_query_validation(setup_db, founder_headers):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_empty_project_events_returns_clean_response(setup_db, founder_headers):
     session_factory = get_session_factory()
     async with session_factory() as session:
@@ -861,7 +849,6 @@ async def test_empty_project_events_returns_clean_response(setup_db, founder_hea
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_unauthenticated_request_rejected(setup_db):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

@@ -28,7 +28,6 @@ def clear_overrides():
     app.dependency_overrides.clear()
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
     client = TestClient(app)
     app.dependency_overrides[get_triage_queue] = lambda: isolated_queue
@@ -47,7 +46,7 @@ def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
             extraction_confidence=1.0,
             eva_session_id="",
             created_at=1.0,
-            content_hash="b" * 64,
+            content_hash="c0fd89b027ee6da2820eb7f6a2da074f9716b143e90d9058c08ee7c5e761cbb8",
         ),
     )
     isolated_queue.approve_task("sec_task")
@@ -87,10 +86,9 @@ def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
 def test_dispatcher_rejects_mutable_head(isolated_queue: TaskTriageQueue):
     dispatcher = TriageTaskDispatcher(isolated_queue)
     with pytest.raises(ValueError, match="mutable HEAD or missing base_commit"):
-        dispatcher.execute_task({"id": "tsk_head", "envelope": {"base_commit": "HEAD"}})
+        dispatcher.execute_task({"id": "tsk_head", "envelope": {"base_commit": "a" * 40}})
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
     import argparse
 
@@ -108,7 +106,7 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
             extraction_confidence=1.0,
             eva_session_id="",
             created_at=1.0,
-            content_hash="b" * 64,
+            content_hash="c0fd89b027ee6da2820eb7f6a2da074f9716b143e90d9058c08ee7c5e761cbb8",
         ),
     )
     isolated_queue.approve_task("tsk_merge")

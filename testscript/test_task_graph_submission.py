@@ -295,7 +295,6 @@ async def test_exact_graph_resubmission_is_idempotent(tmp_path: Path, db_session
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_founder_can_submit_registered_project_graph_atomically(
     tmp_path: Path, monkeypatch, api_headers
 ):
@@ -344,7 +343,6 @@ async def test_founder_can_submit_registered_project_graph_atomically(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_service_principal_cannot_submit_task_graph(tmp_path: Path, monkeypatch, api_headers):
     allowed_root = tmp_path / "clientProjects"
     allowed_root.mkdir()

@@ -303,28 +303,24 @@ class TestFourSystemProtocolValidation:
         assert manifest.get("protocol_version") == "1"
         assert len(manifest.get("fixtures", {})) >= 12
 
-    @pytest.mark.xfail(reason="R2-R6 gap pending")
     def test_alpha_worker_validates_protocol_fixtures(self):
         report = AlphaWorkerValidationAdapter.validate_all()
         assert report["status"] == "PASS"
         for fixture, status in report["results"].items():
             assert status == "PASS", f"Alpha Worker failed fixture {fixture}"
 
-    @pytest.mark.xfail(reason="R2-R6 gap pending")
     def test_unifold_validates_protocol_fixtures(self):
         report = UnifoldValidationAdapter.validate_all()
         assert report["status"] == "PASS"
         for fixture, status in report["results"].items():
             assert status == "PASS", f"Unifold failed fixture {fixture}"
 
-    @pytest.mark.xfail(reason="R2-R6 gap pending")
     def test_agentline_validates_protocol_fixtures(self):
         report = AgentLineValidationAdapter.validate_all()
         assert report["status"] == "PASS"
         for fixture, status in report["results"].items():
             assert status == "PASS", f"AgentLine failed fixture {fixture}"
 
-    @pytest.mark.xfail(reason="R2-R6 gap pending")
     def test_inito_validates_protocol_fixtures(self):
         report = InitoValidationAdapter.validate_all()
         assert report["status"] == "PASS"

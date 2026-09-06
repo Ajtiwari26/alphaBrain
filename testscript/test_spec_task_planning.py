@@ -78,7 +78,7 @@ def make_spec(project_id: str, *, version: int = 1, unresolved: bool = False) ->
 
 def make_constraints() -> TaskGraphPlanningConstraints:
     return TaskGraphPlanningConstraints(
-        base_commit="abcdef1",
+        base_commit="a" * 40,
         allowed_paths=["src", "testscript"],
         acceptance_plan=AcceptancePlan(
             required_gates=[GateType.UNIT_TEST],
@@ -225,7 +225,6 @@ async def test_spec_tampering_fails_approval_and_post_approval_planning(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_approved_spec_drafts_stable_graph_without_persisting_tasks(
     tmp_path: Path, db_session: AsyncSession
 ):
@@ -267,7 +266,6 @@ async def test_approved_spec_drafts_stable_graph_without_persisting_tasks(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_draft_is_compatible_with_atomic_graph_admission(
     tmp_path: Path, db_session: AsyncSession
 ):
@@ -341,31 +339,31 @@ def test_planning_constraints_fail_closed_on_broad_or_unverifiable_scope():
     plan = make_constraints().acceptance_plan
     with pytest.raises(ValidationError, match="bounded paths"):
         TaskGraphPlanningConstraints(
-            base_commit="abcdef1",
+            base_commit="a" * 40,
             allowed_paths=[".", "testscript"],
             acceptance_plan=plan,
         )
     with pytest.raises(ValidationError, match="testscript directory"):
         TaskGraphPlanningConstraints(
-            base_commit="abcdef1",
+            base_commit="a" * 40,
             allowed_paths=["src"],
             acceptance_plan=plan,
         )
     with pytest.raises(ValidationError, match="typed gate commands"):
         TaskGraphPlanningConstraints(
-            base_commit="abcdef1",
+            base_commit="a" * 40,
             allowed_paths=["src", "testscript"],
             acceptance_plan=AcceptancePlan(required_gates=[GateType.UNIT_TEST]),
         )
     with pytest.raises(ValidationError, match="safe relative paths"):
         TaskGraphPlanningConstraints(
-            base_commit="abcdef1",
+            base_commit="a" * 40,
             allowed_paths=["../src", "testscript"],
             acceptance_plan=plan,
         )
     with pytest.raises(ValidationError, match="lack typed commands: security_scan"):
         TaskGraphPlanningConstraints(
-            base_commit="abcdef1",
+            base_commit="a" * 40,
             allowed_paths=["src", "testscript"],
             acceptance_plan=AcceptancePlan(
                 required_gates=[GateType.UNIT_TEST, GateType.SECURITY_SCAN],
@@ -375,7 +373,6 @@ def test_planning_constraints_fail_closed_on_broad_or_unverifiable_scope():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_founder_api_runs_spec_to_draft_without_task_side_effects(
     tmp_path: Path, monkeypatch, api_headers
 ):

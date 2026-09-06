@@ -92,7 +92,6 @@ def make_test_provenance(task_id: str, content_hash: str) -> TaskProvenance:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_full_end_to_end_autonomous_lifecycle(
     isolated_queue: TaskTriageQueue,
     fixture_repo: Path,
@@ -214,7 +213,6 @@ def test_full_end_to_end_autonomous_lifecycle(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_chaos_worker_sudden_crash_and_watchdog_reclamation(
     isolated_queue: TaskTriageQueue,
     fixture_repo: Path,
@@ -278,7 +276,6 @@ def test_chaos_worker_sudden_crash_and_watchdog_reclamation(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_chaos_concurrent_multi_worker_lease_race(
     isolated_queue: TaskTriageQueue,
     fixture_repo: Path,
@@ -397,7 +394,6 @@ def test_chaos_emergency_stop_interruption_and_resumption(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_chaos_cryptographic_tamper_detection(
     isolated_queue: TaskTriageQueue,
     fixture_repo: Path,
@@ -457,7 +453,6 @@ def test_chaos_cryptographic_tamper_detection(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_chaos_sandbox_escape_and_blast_radius_violations(
     isolated_queue: TaskTriageQueue,
     fixture_repo: Path,

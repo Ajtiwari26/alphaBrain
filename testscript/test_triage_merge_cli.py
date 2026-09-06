@@ -74,7 +74,6 @@ def test_merge_rejects_missing_branch():
 
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.Path.exists")
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_merge_successful_with_senior_review_approved(mock_exists, mock_run):
     queue = MagicMock()
     queue.get_task.return_value = {

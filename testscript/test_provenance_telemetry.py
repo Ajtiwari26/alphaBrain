@@ -5,7 +5,6 @@ import pytest
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_telemetry_recording(tmp_path):
     db_path = tmp_path / "test.db"
     lock_path = tmp_path / "lock.file"
@@ -22,7 +21,7 @@ def test_telemetry_recording(tmp_path):
         extraction_confidence=0.9,
         eva_session_id="session1",
         created_at=time.time(),
-        content_hash="hash123",
+        content_hash="c0fd89b027ee6da2820eb7f6a2da074f9716b143e90d9058c08ee7c5e761cbb8",
     )
 
     queue.enqueue_task(
@@ -68,7 +67,7 @@ def test_telemetry_recording(tmp_path):
         extraction_confidence=0.9,
         eva_session_id="session2",
         created_at=time.time(),
-        content_hash="hash456",
+        content_hash="c0fd89b027ee6da2820eb7f6a2da074f9716b143e90d9058c08ee7c5e761cbb8",
     )
 
     queue.enqueue_task(

@@ -21,7 +21,7 @@ def base_task() -> TaskEnvelope:
         task_id="task_preview_1",
         project_id="proj_preview_1",
         objective="Preview test",
-        base_commit="abc1234",
+        base_commit="a" * 40,
         preferred_agent=AgentType.ANTIGRAVITY,
         repo="https://github.com/test/repo.git",
         allowed_paths=["src/"],
@@ -80,7 +80,6 @@ def mock_daemon() -> AlphaWorkerDaemon:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_completed_passed_gates_starts_preview_local(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_passed: GateResult
 ):
@@ -93,7 +92,7 @@ async def test_completed_passed_gates_starts_preview_local(
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="test",
-        base_commit="abc1234",
+        base_commit="a" * 40,
         gate_result=fake_gate_result_passed,
     )
     mock_daemon.select_adapter(AgentType.ANTIGRAVITY).execute = AsyncMock(return_value=mock_result)
@@ -136,7 +135,6 @@ async def test_completed_passed_gates_starts_preview_local(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_completed_failed_gates_no_preview(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_failed: GateResult
 ):
@@ -148,7 +146,7 @@ async def test_completed_failed_gates_no_preview(
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="test",
-        base_commit="abc1234",
+        base_commit="a" * 40,
         gate_result=fake_gate_result_failed,
     )
     mock_daemon.select_adapter(AgentType.ANTIGRAVITY).execute = AsyncMock(return_value=mock_result)
@@ -172,7 +170,6 @@ async def test_completed_failed_gates_no_preview(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_retryable_failed_no_preview(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_passed: GateResult
 ):
@@ -184,7 +181,7 @@ async def test_retryable_failed_no_preview(
         status=TaskStatus.RETRYABLE_FAILED,
         agent=AgentType.ANTIGRAVITY,
         model="test",
-        base_commit="abc1234",
+        base_commit="a" * 40,
         gate_result=fake_gate_result_passed,
     )
     mock_daemon.select_adapter(AgentType.ANTIGRAVITY).execute = AsyncMock(return_value=mock_result)
@@ -206,7 +203,6 @@ async def test_retryable_failed_no_preview(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 async def test_completed_passed_gates_starts_preview_remote(
     mock_daemon: AlphaWorkerDaemon, base_task: TaskEnvelope, fake_gate_result_passed: GateResult
 ):
@@ -224,7 +220,7 @@ async def test_completed_passed_gates_starts_preview_remote(
         status=TaskStatus.COMPLETED,
         agent=AgentType.ANTIGRAVITY,
         model="test",
-        base_commit="abc1234",
+        base_commit="a" * 40,
         gate_result=fake_gate_result_passed,
     )
     mock_daemon.select_adapter(AgentType.ANTIGRAVITY).execute = AsyncMock(return_value=mock_result)
