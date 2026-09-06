@@ -37,7 +37,7 @@ def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
     # Setup executing task
     isolated_queue.enqueue_task(
         "sec_task",
-        {"base_commit": "HEAD"},
+        {"base_commit": "a" * 40},
         TaskProvenance(
             meeting_id="m1",
             speaker_id="s1",
@@ -47,7 +47,7 @@ def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
             extraction_confidence=1.0,
             eva_session_id="",
             created_at=1.0,
-            content_hash="hash-1",
+            content_hash="b" * 64,
         ),
     )
     isolated_queue.approve_task("sec_task")
@@ -98,7 +98,7 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
 
     isolated_queue.enqueue_task(
         "tsk_merge",
-        {"repo": ".", "base_commit": "HEAD"},
+        {"repo": ".", "base_commit": "a" * 40},
         TaskProvenance(
             meeting_id="m1",
             speaker_id="s1",
@@ -108,7 +108,7 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
             extraction_confidence=1.0,
             eva_session_id="",
             created_at=1.0,
-            content_hash="hash-1",
+            content_hash="b" * 64,
         ),
     )
     isolated_queue.approve_task("tsk_merge")
@@ -123,7 +123,6 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
     assert ret == 1  # Fails due to missing result_sha binding
 
 
-@pytest.mark.xfail(reason="R2-R6 gap pending")
 def test_senior_review_parser_strict_json():
     engine = SeniorReviewEngine(None)  # Queue not needed for parser tests
 
@@ -169,5 +168,12 @@ def test_senior_review_parser_strict_json():
     fenced = '```json\n{"verdict": "APPROVE"}\n```'
     assert (
         engine.parse_verdict_line(fenced, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
+        == "REPAIR_REQUIRED"
+    )
+
+    # 8. Trailing text on the same line
+    trailing = '{"verdict": "APPROVE"} and some text'
+    assert (
+        engine.parse_verdict_line(trailing, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
         == "REPAIR_REQUIRED"
     )

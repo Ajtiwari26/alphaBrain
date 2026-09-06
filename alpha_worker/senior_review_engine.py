@@ -184,7 +184,7 @@ class SeniorReviewEngine:
     def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> str:
         """
         Parses a strict one-line JSON verdict from the response lines.
-        Inspects lines from the bottom up, skipping markdown fences.
+        Inspects only the absolute last non-empty line.
         """
         if not output:
             return default_verdict
@@ -204,19 +204,16 @@ class SeniorReviewEngine:
                     d[k] = v
                 return d
 
-            for candidate_line in reversed(lines):
-                candidate_line = candidate_line.strip()
-                if not candidate_line or candidate_line.startswith("```"):
-                    continue
-                try:
-                    parsed = json.loads(candidate_line, object_pairs_hook=reject_duplicates)
-                    if not isinstance(parsed, dict) or len(parsed) != 1 or "verdict" not in parsed:
-                        continue
-                    val = parsed["verdict"]
-                    if isinstance(val, str) and val in valid_enums:
-                        return val
-                except Exception:
-                    continue
+            last_line = lines[-1]
+            try:
+                parsed = json.loads(last_line, object_pairs_hook=reject_duplicates)
+                if not isinstance(parsed, dict) or len(parsed) != 1 or "verdict" not in parsed:
+                    return default_verdict
+                val = parsed["verdict"]
+                if isinstance(val, str) and val in valid_enums:
+                    return val
+            except Exception:
+                return default_verdict
 
             return default_verdict
         except Exception:
