@@ -174,6 +174,15 @@ class SeniorReviewEngine:
             
             # Disable MCP servers by isolating the home directory
             tmp_home = tempfile.mkdtemp()
+            tmp_gemini = os.path.join(tmp_home, ".gemini")
+            os.makedirs(tmp_gemini)
+            
+            real_gemini = os.path.expanduser("~/.gemini")
+            creds = os.path.join(real_gemini, "credentials.json")
+            if os.path.exists(creds):
+                import shutil
+                shutil.copy(creds, os.path.join(tmp_gemini, "credentials.json"))
+            
             env["HOME"] = tmp_home
             
             if "ALPHA_SIGNING_SECRET" in env:
