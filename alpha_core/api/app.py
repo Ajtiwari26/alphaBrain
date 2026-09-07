@@ -2149,6 +2149,16 @@ def require_triage_access(principal: AuthPrincipal) -> None:
         )
 
 
+@app.get("/api/triage/stats")
+async def get_triage_stats(
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+) -> dict[str, Any]:
+    """Returns aggregate telemetry and operational metrics for the triage pipeline."""
+    require_triage_access(principal)
+    return queue.get_stats()
+
+
 @app.get("/api/triage/tasks")
 async def list_triage_tasks(
     status_filter: str | None = Query(None, alias="status"),

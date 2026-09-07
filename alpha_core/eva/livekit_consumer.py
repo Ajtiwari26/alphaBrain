@@ -117,6 +117,7 @@ class EvaLiveKitConsumer:
         await self.room.connect(self.livekit_url, token)
         self._is_running = True
         self._loop_task = asyncio.create_task(self._extraction_monitor_loop())
+        self._monitor_connection_task = asyncio.create_task(self._monitor_connection_loop())
         logger.info("Eva read-only consumer connected successfully.")
 
     async def stop(self) -> None:
@@ -130,9 +131,42 @@ class EvaLiveKitConsumer:
                 pass
             self._loop_task = None
 
+        if (
+            hasattr(self, "_monitor_connection_task")
+            and self._monitor_connection_task
+            and not self._monitor_connection_task.done()
+        ):
+            self._monitor_connection_task.cancel()
+            try:
+                await self._monitor_connection_task
+            except asyncio.CancelledError:
+                pass
+            self._monitor_connection_task = None
+
         if self.room.isconnected():
             await self.room.disconnect()
         logger.info("Eva read-only consumer stopped.")
+
+    async def _monitor_connection_loop(self) -> None:
+        """Periodically evaluates connection state and reconnects if dropped."""
+        while self._is_running:
+            try:
+                await asyncio.sleep(5.0)
+                if not self.room.isconnected():
+                    logger.warning(
+                        "Eva lost connection to LiveKit room %s. Attempting to reconnect...",
+                        self.room_name,
+                    )
+                    token = mint_eva_consumer_token(room_name=self.room_name)
+                    try:
+                        await self.room.connect(self.livekit_url, token)
+                        logger.info("Eva read-only consumer reconnected successfully.")
+                    except Exception as e:
+                        logger.error("Eva reconnect failed: %s", e)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Error in Eva connection monitor loop: %s", e)
 
     async def _extraction_monitor_loop(self) -> None:
         """Periodically evaluates if the transcript buffer is ready for specification extraction."""

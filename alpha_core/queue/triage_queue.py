@@ -1322,3 +1322,44 @@ class TaskTriageQueue:
                     telemetry["total_lifecycle_seconds"] = entry["total_lifecycle_seconds"]
 
         return telemetry
+
+    def get_stats(self) -> dict[str, Any]:
+        """Calculates aggregate telemetry and pipeline metrics."""
+        import statistics
+
+        tasks = self.list_tasks(limit=100000)
+        total_count = len(tasks)
+        status_counts = {s.value: 0 for s in TriageStatus}
+
+        queue_waits = []
+        exec_durations = []
+
+        for t in tasks:
+            status = t.get("status")
+            if status in status_counts:
+                status_counts[status] += 1
+
+            telemetry = self.get_task_telemetry(t["id"])
+
+            qw = telemetry.get("queue_wait_seconds")
+            if qw is not None:
+                queue_waits.append(qw)
+
+            ed = telemetry.get("execution_duration_seconds")
+            if ed is not None:
+                exec_durations.append(ed)
+
+        stats = {
+            "total_tasks": total_count,
+            "by_status": status_counts,
+            "queue_wait_seconds": {
+                "average": float(statistics.mean(queue_waits)) if queue_waits else 0.0,
+                "median": float(statistics.median(queue_waits)) if queue_waits else 0.0,
+            },
+            "execution_duration_seconds": {
+                "average": float(statistics.mean(exec_durations)) if exec_durations else 0.0,
+                "median": float(statistics.median(exec_durations)) if exec_durations else 0.0,
+            },
+        }
+
+        return stats
