@@ -26,7 +26,7 @@ def parse_pytest_output(output: str) -> list[dict[str, str]]:
                 summary_start = len(output)
 
         failures_block = output[failures_start:summary_start]
-        blocks = re.split(r"_{10,}\s+([a-zA-Z0-9_]+)\s+_{10,}", failures_block)
+        blocks = re.split(r"_{10,}\s+(\S+)\s+_{10,}", failures_block)
         for i in range(1, len(blocks), 2):
             test_name = blocks[i].strip()
             traceback = blocks[i+1].strip()
@@ -71,7 +71,7 @@ class FailureAnalyzer:
         components = []
         for f in sorted(pytest_failures, key=lambda x: x.get('test_name', '')):
             tb = normalize_traceback(f.get('traceback', ''))
-            components.append(f"pytest:{f.get('test_name')}:{f.get('message')}:{tb}")
+            components.append(f"pytest:{f.get('test_name', '')}:{f.get('message', '')}:{tb}")
         for v in sorted(ruff_violations, key=lambda x: (x.get('file', ''), x.get('code', ''))):
             components.append(f"ruff:{v.get('file')}:{v.get('code')}")
 

@@ -1,5 +1,6 @@
 from alpha_core.healing.failure_analyzer import (
     FailureAnalyzer,
+    normalize_traceback,
     parse_pytest_output,
     parse_ruff_output,
 )
@@ -24,6 +25,7 @@ FAILED test_file.py::test_something_that_fails - assert 1 == 2
     assert 'assert 1 == 2' in failures[0]['message']
     assert 'AssertionError' in failures[0]['traceback']
 
+
 def test_parse_ruff_output():
     output = """
 alpha_core/healing/failure_analyzer.py:10:5: F401 `os` imported but unused
@@ -37,6 +39,7 @@ Found 2 errors.
     assert violations[0]['message'] == '`os` imported but unused'
     assert violations[1]['code'] == 'E302'
 
+
 def test_compute_failure_signature():
     pytest_failures = [{'test_name': 'test_a', 'message': 'assert 1 == 2'}]
     ruff_violations = [{'file': 'file.py', 'code': 'F401', 'message': 'unused'}]
@@ -46,6 +49,7 @@ def test_compute_failure_signature():
 
     assert isinstance(sig, str)
     assert len(sig) == 64  # SHA256 length
+
 
 def test_failure_analyzer_integration():
     analyzer = FailureAnalyzer()
@@ -59,12 +63,14 @@ def test_failure_analyzer_integration():
     assert report['pytest_failures'][0]['test_name'] == 'test_x'
     assert report['ruff_violations'][0]['code'] == 'E501'
 
+
 def test_empty_input():
     analyzer = FailureAnalyzer()
     report = analyzer.analyze("", "")
     assert report['pytest_failures'] == []
     assert report['ruff_violations'] == []
     assert isinstance(report['signature'], str)
+
 
 def test_multi_failure():
     output = """
@@ -88,6 +94,7 @@ FAILED test_file.py::test_b - assert 2 == 3
     assert failures[0]['test_name'] == 'test_a'
     assert failures[1]['test_name'] == 'test_b'
 
+
 def test_signature_determinism_proof():
     analyzer = FailureAnalyzer()
     # Different order of failures should yield same signature
@@ -104,8 +111,15 @@ def test_signature_determinism_proof():
     assert sig1 == sig2
     assert sig1 == sig3
 
+
 def test_parameterized_test_names():
     output = """
+=================================== FAILURES ===================================
+_________________________ test_func[param1] __________________________
+    def test_func():
+>       assert False
+E       assert False
+test_file.py:10: AssertionError
 =========================== short test summary info ============================
 FAILED test_file.py::test_func[param1] - assert False
 FAILED test_file.py::test_func[param2] - assert False
@@ -113,4 +127,34 @@ FAILED test_file.py::test_func[param2] - assert False
     failures = parse_pytest_output(output)
     assert len(failures) == 2
     assert failures[0]['test_name'] == 'test_func[param1]'
+    assert failures[0]['traceback'] != ''
     assert failures[1]['test_name'] == 'test_func[param2]'
+
+
+def test_failures_block_without_summary():
+    output = """
+=================================== FAILURES ===================================
+_________________________ test_without_summary __________________________
+    def test_without_summary():
+>       assert False
+E       assert False
+test_file.py:10: AssertionError
+"""
+    failures = parse_pytest_output(output)
+    assert len(failures) == 1
+    assert failures[0]['test_name'] == 'test_without_summary'
+    assert 'assert False' in failures[0]['traceback']
+
+
+def test_normalize_traceback_isolation():
+    tb_input = "test_file.py:123: AssertionError\n  123 | assert False"
+    tb_output = normalize_traceback(tb_input)
+    assert "test_file.py:123:" not in tb_output
+    assert "FILE:LINE:" in tb_output
+    assert "LINE |" in tb_output
+
+
+def test_malformed_ruff_input():
+    output = "This is some junk output\\nthat shouldn't match anything."
+    violations = parse_ruff_output(output)
+    assert violations == []
