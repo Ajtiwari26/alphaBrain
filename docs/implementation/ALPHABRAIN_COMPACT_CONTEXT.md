@@ -2,24 +2,34 @@
 
 ## CURRENT SNAPSHOT — 2026-09-07 (read this section only for routine status)
 
-Source: Supervised bootstrap repair `NEXT-R2A` branched from verified baseline `0499ab8fccd82560f50f3b6c6dd91ecb125822c9`.
+Source: Verified `main` branch at `1669c21` after full autonomous delivery and merge of `NEXT-R2A` and `NEXT-R2B`.
 
-**Decision: NEXT-R2A (promotion authorization & review checkout validation) verified locally; full R2-R6 autonomous delivery remains in progress.**
+**Decision: R2 (Mandatory Authenticated Review, Promotion Authorization, and Replay Defense) is FULLY VERIFIED and MERGED into main. Roadmap advances to R3.**
 
-Verified repairs in NEXT-R2A:
-1. **Repaired `cmd_merge` control flow (`alpha_core/triage_cli.py`)**: Fixed critical indentation bug that rendered result_sha, base_commit, and approval checks unreachable after `return 1`. Independently enforced: valid HMAC signature, matching task_id, matching base_commit, matching result_sha, approved=True with consistent verdicts (`pro_verdict == "APPROVE"`, `opus_verdict == "FINAL_APPROVAL"`), and matching evidence_digest. All checks execute before acquiring lock or executing Git operations.
-2. **Removed default reviewer signing key (`alpha_worker/senior_review_engine.py`)**: Removed fallback to `"alphabrain_senior_review_key"`. Missing `ALPHA_SIGNING_SECRET` halts review with `ValueError` prior to any model invocation.
-3. **Enforced mandatory reviewer checkout validation (`alpha_worker/senior_review_engine.py`)**: Missing/nonexistent worktree, git errors, dirty state (`git status --porcelain`), or HEAD mismatch (`head_sha != result_sha`) strictly raises `ValueError` and halts review. No silent fallback to main.
-4. **Boundary regression test coverage**: Added comprehensive unit tests in `testscript/test_astra_t3_review_auth.py` and updated `test_astra_t4_promotion.py`, `test_triage_merge_cli.py`, `test_astra_t6_integrated.py`.
+Verified deliveries in R2:
+1. **NEXT-R2A (Enforceable Promotion Authorization & Checkout Validation)**:
+   - Fixed dead-code indentation in `alpha_core/triage_cli.py` (`cmd_merge`).
+   - Enforced 7 independent fail-closed checks before acquiring promotion locks or running mutating Git commands (valid signature, matching task ID, matching base commit, matching result SHA, consensus verdicts `pro_verdict == 'APPROVE'` / `opus_verdict == 'FINAL_APPROVAL'`, and matching `evidence_digest`).
+   - Zero-Git mutation invariant: all invalid promotion attempts fail-closed with 0 Git ref/worktree mutations.
+   - Removed default signing key fallback from `alpha_worker/senior_review_engine.py` (missing secret strictly halts review before model execution).
+   - Enforced mandatory reviewer checkout validation (missing worktree, git error, dirty working tree, or HEAD mismatch strictly raises `ValueError`).
+2. **NEXT-R2B (Cryptographic Provenance, Expiry TTL, Replay Nonce & Principal Separation)**:
+   - Upgraded `ReviewAttestation` to explicit `schema_version: '2.0'`.
+   - Principal separation: `executor_id != reviewer_id` enforced at Pydantic model validator and merge gate.
+   - Temporal TTL: `issued_at` and `expires_at` validated at deserialization; expired attestations fail-closed.
+   - Replay attack defense: unique `nonce` bound to cryptographic attestation and persisted in `.alphabrain/seen_nonces.txt`. Replays immediately rejected.
+   - Key management: `key_id` bound to attestation; revoked keys (`ALPHA_REVOKED_KEYS`) rejected.
+   - Tree digest: `tree_digest` (Git tree SHA) bound to attestation and validated against branch tip tree.
+   - Robust terminal protocol parsing in `alpha_worker/adapters/antigravity_live.py` supporting markdown formatting and resumed conversation tokens.
+   - Executed through AlphaBrain's autonomous self-development pipeline (`admit` $\rightarrow$ `review` $\rightarrow$ `approve` $\rightarrow$ `worker-cycle` $\rightarrow$ `senior-review` $\rightarrow$ `merge`) with 2-round senior review debate and autonomous repair turn.
 
 Verified local evidence:
-- Full test suite: **699 passed, 11 skipped, 0 failed** in 47.90s via pytest.
-- Ruff lint & format: clean (0 errors across workspace).
-- Mypy static typing: 0 errors across 74 source files.
+- Full test suite: **703 passed, 11 skipped, 0 failed** in 56.44s via pytest (`--runxfail`).
+- Ruff lint & format: clean (0 diagnostics, 223 files compliant).
+- Mypy static typing: 0 errors across 61 source files.
 
 Remaining gaps in roadmap:
-- Complete remaining R2 identity/expiry/replay bindings.
-- R3: Mandatory 4-tuple lease fencing on every queue mutation.
+- R3: Mandatory 4-tuple lease fencing on every queue mutation (`worker_id`, `lease_id`, `fencing_epoch`, `attempt_id`).
 - R4: Crash-safe atomic promotion with target revision verification.
 - R5: Meaningful verification profiles & cumulative repair budget limits.
 - R6: Real integrated autonomous proof without mocks.
