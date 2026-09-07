@@ -196,12 +196,10 @@ class SeniorReviewEngine:
                         continue
                     os.symlink(os.path.join(real_agy, item), os.path.join(tmp_agy, item))
             
-            # Symlink gcloud auth for Vertex AI
-            tmp_config = os.path.join(tmp_home, ".config")
-            os.makedirs(tmp_config)
-            real_gcloud = os.path.expanduser("~/.config/gcloud")
-            if os.path.exists(real_gcloud):
-                os.symlink(real_gcloud, os.path.join(tmp_config, "gcloud"))
+            # Set GOOGLE_APPLICATION_CREDENTIALS to the real path to bypass HOME mocking
+            real_adc = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
+            if os.path.exists(real_adc):
+                env["GOOGLE_APPLICATION_CREDENTIALS"] = real_adc
             
             env["HOME"] = tmp_home
             
