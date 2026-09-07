@@ -791,7 +791,13 @@ async def test_scheduler_transient_failure_does_not_terminate(monkeypatch):
 
     # Run the scheduler task for a short time
     task = asyncio.create_task(app_module.watchdog_scheduler())
-    await asyncio.sleep(0.05)
+
+    # Wait for the scheduler to loop at least twice
+    for _ in range(20):
+        if mock_check.call_count >= 2:
+            break
+        await asyncio.sleep(0.05)
+
     task.cancel()
 
     import contextlib
