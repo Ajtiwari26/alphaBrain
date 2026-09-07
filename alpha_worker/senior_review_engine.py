@@ -196,6 +196,13 @@ class SeniorReviewEngine:
                         continue
                     os.symlink(os.path.join(real_agy, item), os.path.join(tmp_agy, item))
             
+            # Symlink gcloud auth for Vertex AI
+            tmp_config = os.path.join(tmp_home, ".config")
+            os.makedirs(tmp_config)
+            real_gcloud = os.path.expanduser("~/.config/gcloud")
+            if os.path.exists(real_gcloud):
+                os.symlink(real_gcloud, os.path.join(tmp_config, "gcloud"))
+            
             env["HOME"] = tmp_home
             
             if "ALPHA_SIGNING_SECRET" in env:
