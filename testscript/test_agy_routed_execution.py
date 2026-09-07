@@ -38,6 +38,7 @@ def mock_lease():
 @pytest.mark.asyncio
 async def test_feature_off_preserves_old_path(mock_router, mock_lease, tmp_path):
     settings.MODEL_ROUTING_ENABLED = False
+    settings.ANTIGRAVITY_EXECUTION_ENABLED = True
     bridge = AntigravityLiveBridge()
     bridge.session_store_dir = tmp_path
 
@@ -78,6 +79,7 @@ async def test_feature_off_preserves_old_path(mock_router, mock_lease, tmp_path)
 @pytest.mark.asyncio
 async def test_429_exhausts_eligible_profiles(mock_router, mock_reporter, mock_lease, tmp_path):
     settings.MODEL_ROUTING_ENABLED = True
+    settings.ANTIGRAVITY_EXECUTION_ENABLED = True
     settings.MAX_ELIGIBLE_ATTEMPTS = 2
     bridge = AntigravityLiveBridge()
     bridge.session_store_dir = tmp_path
@@ -118,6 +120,7 @@ async def test_429_exhausts_eligible_profiles(mock_router, mock_reporter, mock_l
 async def test_auth_failure_blocks_dispatch(mock_router, mock_reporter, tmp_path):
     # Test that exception in lease causes blocked reason auth_failed
     settings.MODEL_ROUTING_ENABLED = True
+    settings.ANTIGRAVITY_EXECUTION_ENABLED = True
     settings.MAX_ELIGIBLE_ATTEMPTS = 2
     bridge = AntigravityLiveBridge()
     bridge.session_store_dir = tmp_path
