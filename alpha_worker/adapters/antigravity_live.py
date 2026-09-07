@@ -319,21 +319,28 @@ def evaluate_agy_execution_outcome(
     final_marker = None
     blocked_msg = ""
 
-    for line in response.splitlines():
-        line = line.strip()
-        if not line:
-            continue
+    lines = [line.strip() for line in response.splitlines() if line.strip()]
 
-        clean_line = line.strip("`*# ")
-        if clean_line == COMPLETION_TOKEN or line == COMPLETION_TOKEN:
-            final_marker = COMPLETION_TOKEN
-            blocked_msg = ""
-        elif clean_line.startswith(BLOCKED_TOKEN) or line.startswith(BLOCKED_TOKEN):
-            target = clean_line if clean_line.startswith(BLOCKED_TOKEN) else line
-            remainder = target[len(BLOCKED_TOKEN) :].strip()
+    def is_valid_marker(line: str) -> tuple[str | None, str]:
+        if line == COMPLETION_TOKEN:
+            return COMPLETION_TOKEN, ""
+        elif line.startswith(BLOCKED_TOKEN):
+            remainder = line[len(BLOCKED_TOKEN) :].strip()
             if not remainder or remainder.startswith(":"):
-                final_marker = BLOCKED_TOKEN
-                blocked_msg = remainder.lstrip(": ")
+                return BLOCKED_TOKEN, remainder.lstrip(": ")
+        return None, ""
+
+    valid_markers = []
+    for i, line in enumerate(lines):
+        marker, msg = is_valid_marker(line)
+        if marker:
+            valid_markers.append((i, marker, msg))
+
+    if len(valid_markers) == 1:
+        marker_idx, marker, msg = valid_markers[0]
+        if marker_idx == len(lines) - 1:
+            final_marker = marker
+            blocked_msg = msg
 
     if final_marker == BLOCKED_TOKEN:
         blocked_msg = blocked_msg or "Blocked without reason"

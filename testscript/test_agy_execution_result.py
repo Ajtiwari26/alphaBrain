@@ -543,8 +543,8 @@ Wait, no I fixed it.
         expected_qa_gates=("unit_test", "lint"),
         expected_project_id=PROJECT_ID,
     )
-    assert outcome.completed is True
-    assert outcome.status == AGYAttemptStatus.SUCCEEDED
+    assert outcome.completed is False
+    assert outcome.status == AGYAttemptStatus.FAILED
 
 
 def test_earlier_done_then_final_blocked_blocks():
@@ -573,8 +573,7 @@ Actually no.
         expected_project_id=PROJECT_ID,
     )
     assert outcome.completed is False
-    assert outcome.status == AGYAttemptStatus.BLOCKED
-    assert outcome.blocked_reason == "found a new issue"
+    assert outcome.status == AGYAttemptStatus.FAILED
 
 
 def test_stream_bookkeeping_after_final_result_cannot_override_result_payload():

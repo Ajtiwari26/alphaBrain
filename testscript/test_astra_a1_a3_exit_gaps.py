@@ -175,3 +175,17 @@ def test_senior_review_parser_strict_json():
         engine.parse_verdict_line(trailing, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
         == "REPAIR_REQUIRED"
     )
+
+    # 9. Multiple valid terminal markers across different lines
+    multiple_valid = '{"verdict": "APPROVE"}\n{"verdict": "APPROVE"}'
+    assert (
+        engine.parse_verdict_line(multiple_valid, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
+        == "REPAIR_REQUIRED"
+    )
+
+    # 10. Valid terminal marker, but not on the last line
+    not_last_line = '{"verdict": "APPROVE"}\nsome trailing text'
+    assert (
+        engine.parse_verdict_line(not_last_line, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
+        == "REPAIR_REQUIRED"
+    )

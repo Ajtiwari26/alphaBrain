@@ -216,7 +216,8 @@ class SeniorReviewEngine:
     def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> str:
         """
         Parses a strict one-line JSON verdict from the response lines.
-        Inspects only the absolute last non-empty line.
+        Inspects only the absolute last non-empty line, and ensures no other
+        valid terminal markers exist anywhere else in the response.
         """
         if not output:
             return default_verdict
@@ -236,18 +237,32 @@ class SeniorReviewEngine:
                     d[k] = v
                 return d
 
-            last_line = lines[-1]
-            try:
-                parsed = json.loads(last_line, object_pairs_hook=reject_duplicates)
-                if not isinstance(parsed, dict) or len(parsed) != 1 or "verdict" not in parsed:
-                    return default_verdict
-                val = parsed["verdict"]
-                if isinstance(val, str) and val in valid_enums:
-                    return val
-            except Exception:
+            def is_valid_marker(line: str) -> str | None:
+                try:
+                    parsed = json.loads(line, object_pairs_hook=reject_duplicates)
+                    if isinstance(parsed, dict) and len(parsed) == 1 and "verdict" in parsed:
+                        val = parsed["verdict"]
+                        if isinstance(val, str) and val in valid_enums:
+                            return val
+                except Exception:
+                    pass
+                return None
+
+            valid_markers = []
+            for i, line in enumerate(lines):
+                marker_val = is_valid_marker(line)
+                if marker_val:
+                    valid_markers.append((i, marker_val))
+
+            if len(valid_markers) != 1:
                 return default_verdict
 
-            return default_verdict
+            marker_idx, marker_val = valid_markers[0]
+            if marker_idx != len(lines) - 1:
+                return default_verdict
+
+            return marker_val
+
         except Exception:
             return default_verdict
 
