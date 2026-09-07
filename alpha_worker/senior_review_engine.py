@@ -176,8 +176,7 @@ class SeniorReviewEngine:
                 cmd.extend(["--effort", effort])
             cmd.extend(["--print", prompt])
 
-            env = dict(os.environ)
-            env.pop("ALPHA_SIGNING_SECRET", None)
+            env = {k: v for k, v in os.environ.items() if not k.startswith("ALPHA_SIGNING_SECRET")}
 
             res = subprocess.run(
                 cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_seconds + 30, env=env
@@ -394,6 +393,18 @@ Instructions:
         for name, val in [("attempt_id", attempt_id), ("worker_id", executor_id)]:
             if not val or val in ("worker_unknown", "att_unknown", "None"):
                 raise ValueError(f"Missing or invalid {name} in task result")
+
+        lease_meta = task.get("provenance", {}).get("lease_metadata") or {}
+        auth_attempt_id = lease_meta.get("attempt_id")
+        auth_worker_id = lease_meta.get("worker_id")
+        if auth_attempt_id and attempt_id != auth_attempt_id:
+            raise ValueError(
+                f"Task result attempt_id '{attempt_id}' does not match authoritative lease attempt_id '{auth_attempt_id}'"
+            )
+        if auth_worker_id and executor_id != auth_worker_id:
+            raise ValueError(
+                f"Task result worker_id '{executor_id}' does not match authoritative lease worker_id '{auth_worker_id}'"
+            )
 
         key_id = self.key_id
         if key_id not in REGISTERED_REVIEW_KEYS:

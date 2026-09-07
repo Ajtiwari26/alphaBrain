@@ -52,7 +52,7 @@ class MockQueue(TaskTriageQueue):
             {"task_id": task_id, "error": error_details.get("error") if error_details else None}
         )
 
-    def complete_task(self, task_id, result, worktree_path, branch_name):
+    def complete_task(self, task_id, result, worktree_path, branch_name, *args, **kwargs):
         self.completed_tasks.append(task_id)
         return True
 
@@ -113,7 +113,23 @@ def build_task(task_id, envelope):
 
     env_json = json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str)
     ch = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
-    return {"id": task_id, "envelope": envelope, "content_hash": ch}
+    return {
+        "id": task_id,
+        "envelope": envelope,
+        "content_hash": ch,
+        "attempt_id": f"att_{task_id}_1",
+        "worker_id": "test_worker_1",
+        "lease_id": "test_lease_1",
+        "fencing_epoch": 1,
+        "provenance": {
+            "lease_metadata": {
+                "attempt_id": f"att_{task_id}_1",
+                "worker_id": "test_worker_1",
+                "lease_id": "test_lease_1",
+                "fencing_epoch": 1,
+            }
+        },
+    }
 
 
 def test_post_commit_symlink_rejection(temp_repo):

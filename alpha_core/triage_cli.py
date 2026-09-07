@@ -756,6 +756,24 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print("Error: Task result is missing attempt_id or worker_id.", file=sys.stderr)
         return 1
 
+    lease_meta = task.get("provenance", {}).get("lease_metadata") or {}
+    auth_attempt_id = lease_meta.get("attempt_id")
+    auth_worker_id = lease_meta.get("worker_id")
+
+    if auth_attempt_id and expected_attempt_id != auth_attempt_id:
+        print(
+            f"Error: Task result attempt_id '{expected_attempt_id}' does not match authoritative lease metadata '{auth_attempt_id}'.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if auth_worker_id and expected_worker_id != auth_worker_id:
+        print(
+            f"Error: Task result worker_id '{expected_worker_id}' does not match authoritative lease metadata '{auth_worker_id}'.",
+            file=sys.stderr,
+        )
+        return 1
+
     if att.attempt_id != expected_attempt_id:
         print(
             f"Error: Attestation attempt_id '{att.attempt_id}' does not match expected attempt_id '{expected_attempt_id}'.",
@@ -827,6 +845,14 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         except BlockingIOError:
             print(
                 "Error: Another promotion is currently in progress. Lock acquisition failed.",
+                file=sys.stderr,
+            )
+            return 1
+
+        now_crit = time.time()
+        if now_crit >= att.expires_at or now_crit < att.issued_at - 60.0:
+            print(
+                "Error: Attestation freshness validation failed inside promotion critical section.",
                 file=sys.stderr,
             )
             return 1

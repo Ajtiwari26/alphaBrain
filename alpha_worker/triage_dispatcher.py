@@ -26,7 +26,6 @@ import re
 import subprocess
 import sys
 import time
-import uuid
 from pathlib import Path
 from typing import Any, cast
 
@@ -379,8 +378,17 @@ class TriageTaskDispatcher:
             return None
 
         worktree_path = worktree_path_obj
-        attempt_id = f"att_{task_id}_{uuid.uuid4().hex[:6]}"
-        worker_id = f"worker_{uuid.uuid4().hex[:8]}"
+        lease_meta = leased_task.get("provenance", {}).get("lease_metadata") or {}
+        attempt_id = leased_task.get("attempt_id") or lease_meta.get("attempt_id")
+        worker_id = leased_task.get("worker_id") or lease_meta.get("worker_id")
+        lease_id = leased_task.get("lease_id") or lease_meta.get("lease_id")
+        fencing_epoch = leased_task.get("fencing_epoch") or lease_meta.get("fencing_epoch")
+
+        if not attempt_id or not worker_id:
+            err_msg = f"Task {task_id} missing authoritative lease metadata (attempt_id={attempt_id}, worker_id={worker_id})"
+            logger.critical(err_msg)
+            self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+            return None
 
         try:
             # 2.5. Launch the local AGY coding agent inside the worktree if enabled
@@ -570,15 +578,22 @@ class TriageTaskDispatcher:
                 worker_id=worker_id,
             )
 
-            # 7. Complete task in queue
+            # 7. Complete task in queue with lease ownership verification
             success = self.queue.complete_task(
                 task_id=task_id,
                 result=pr_proposal.to_dict(),
                 worktree_path=str(worktree_path),
                 branch_name=branch_name,
+                worker_id=worker_id,
+                lease_id=lease_id,
+                fencing_epoch=fencing_epoch,
+                attempt_id=attempt_id,
             )
             if not success:
-                logger.error(f"Failed to mark task {task_id} as COMPLETED in queue")
+                logger.error(
+                    f"Failed to mark task {task_id} as COMPLETED in queue (lease ownership validation failed)"
+                )
+                return None
 
             return pr_proposal
 

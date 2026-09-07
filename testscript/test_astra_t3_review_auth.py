@@ -880,3 +880,232 @@ def test_cmd_merge_freshness_revalidation_failure(monkeypatch, tmp_path):
     with patch("subprocess.run") as mock_run:
         mock_run.side_effect = fake_git_for_tests
         assert cmd_merge(args, q) == 1
+
+
+def test_senior_review_engine_purges_all_signing_secrets_from_agy_subprocess(monkeypatch, tmp_path):
+    from unittest.mock import MagicMock, patch
+
+    from alpha_worker.senior_review_engine import SeniorReviewEngine
+
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "generic_secret")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_production_v1", "prod_secret_123")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_456")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_custom", "custom_secret_789")
+    monkeypatch.setenv("ALPHA_SAFE_VAR", "safe_value")
+
+    schema_file = tmp_path / "schema.json"
+    schema_file.write_text("{}")
+
+    engine = SeniorReviewEngine(queue=MagicMock())
+    captured_env = None
+
+    def fake_subprocess_run(cmd, **kwargs):
+        nonlocal captured_env
+        captured_env = kwargs.get("env")
+        m = MagicMock()
+        m.returncode = 0
+        m.stdout = '{"verdict": "APPROVE"}'
+        m.stderr = ""
+        return m
+
+    with patch("subprocess.run", side_effect=fake_subprocess_run):
+        engine._invoke_agy(
+            prompt="test prompt",
+            model="gemini-3.1-pro-high",
+            schema_path=str(schema_file),
+            cwd=str(tmp_path),
+        )
+
+    assert captured_env is not None
+    assert captured_env.get("ALPHA_SAFE_VAR") == "safe_value"
+    # Ensure zero signing secrets leaked to AGY subprocess
+    signing_keys_leaked = [k for k in captured_env if k.startswith("ALPHA_SIGNING_SECRET")]
+    assert signing_keys_leaked == [], f"Found leaked signing secrets: {signing_keys_leaked}"
+
+
+def test_lease_metadata_ownership_binding_in_review_and_merge(tmp_path, monkeypatch):
+    import argparse
+    import time
+    from unittest.mock import MagicMock, patch
+
+    import pytest
+
+    from alpha_core.queue.triage_queue import TriageStatus
+    from alpha_core.triage_cli import cmd_merge
+    from alpha_protocol.task import ReviewAttestation
+    from alpha_worker.senior_review_engine import SeniorReviewEngine
+
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_123")
+
+    task_record = {
+        "id": "tsk_lease_test",
+        "status": TriageStatus.COMPLETED.value,
+        "branch_name": "alpha/tsk_lease_test",
+        "worktree_path": str(tmp_path),
+        "envelope": {"repo": str(tmp_path), "base_commit": "a" * 40},
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "auth_worker_real",
+                "attempt_id": "auth_att_real",
+                "lease_id": "lease_123",
+                "fencing_epoch": 123456,
+            }
+        },
+        "result": {
+            "gates_passed": True,
+            "worker_id": "forged_worker_fake",
+            "attempt_id": "auth_att_real",
+            "result_sha": "b" * 40,
+            "evidence": {},
+        },
+    }
+
+    mock_queue = MagicMock()
+    mock_queue.get_task.return_value = task_record
+
+    engine = SeniorReviewEngine(
+        queue=mock_queue, key_id="alpha_test_key", signing_secret="test_secret_123"
+    )
+
+    def fake_git_checkout(cmd, **kwargs):
+        if cmd[:2] == ["git", "rev-parse"]:
+            return "b" * 40 + "\n"
+        if cmd[:2] == ["git", "status"]:
+            return ""
+        return ""
+
+    with (
+        patch("subprocess.check_output", side_effect=fake_git_checkout),
+        patch.object(
+            SeniorReviewEngine,
+            "_invoke_agy",
+            return_value={"response": "", "structured_output": {"verdict": "APPROVE"}},
+        ),
+    ):
+        # Senior review must reject execution when worker_id mismatches authoritative lease provenance
+        with pytest.raises(ValueError, match="does not match authoritative lease worker_id"):
+            engine.execute_senior_review("tsk_lease_test")
+
+        # Now fix result worker_id but tamper attempt_id
+        task_record["result"]["worker_id"] = "auth_worker_real"
+        task_record["result"]["attempt_id"] = "forged_att_fake"
+        with pytest.raises(ValueError, match="does not match authoritative lease attempt_id"):
+            engine.execute_senior_review("tsk_lease_test")
+
+    # Now verify cmd_merge also strictly enforces authoritative lease metadata
+    att_dict = ReviewAttestation.create(
+        task_id="tsk_lease_test",
+        attempt_id="forged_att_fake",
+        result_sha="b" * 40,
+        base_commit="a" * 40,
+        tree_digest="c" * 40,
+        pro_verdict="APPROVE",
+        opus_verdict="FINAL_APPROVAL",
+        approved=True,
+        reviewed_at=time.time(),
+        evidence={},
+        secret="test_secret_123",
+        nonce="nonce_lease_1",
+        executor_id="auth_worker_real",
+        key_id="alpha_test_key",
+    ).model_dump()
+    task_record["result"]["senior_review"] = {"approved": True, "attestation": att_dict}
+
+    args = argparse.Namespace(task_id="tsk_lease_test", json=False)
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = fake_git_for_tests
+        assert cmd_merge(args, mock_queue) == 1
+
+
+def test_cmd_merge_freshness_recheck_inside_lock_critical_section_rejects_expiry_during_intervening_work(
+    monkeypatch, tmp_path
+):
+    import argparse
+    import time
+    from unittest.mock import MagicMock, patch
+
+    from alpha_core.queue.triage_queue import TriageStatus
+    from alpha_core.triage_cli import cmd_merge
+    from alpha_protocol.task import ReviewAttestation
+
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_123")
+    args = argparse.Namespace(task_id="tsk_crit_freshness", json=False)
+
+    base_time = time.time()
+
+    # Attestation expires in 100 seconds
+    att_dict = ReviewAttestation.create(
+        task_id="tsk_crit_freshness",
+        attempt_id="att_1",
+        result_sha="2" * 40,
+        base_commit="1" * 40,
+        tree_digest="c" * 40,
+        pro_verdict="APPROVE",
+        opus_verdict="FINAL_APPROVAL",
+        approved=True,
+        reviewed_at=base_time,
+        issued_at=base_time,
+        expires_at=base_time + 100.0,
+        evidence={},
+        secret="test_secret_123",
+        nonce="nonce_crit_1",
+        executor_id="exec_1",
+        key_id="alpha_test_key",
+    ).model_dump()
+
+    t = {
+        "id": "tsk_crit_freshness",
+        "status": TriageStatus.COMPLETED.value,
+        "branch_name": "alpha/tsk_crit_freshness",
+        "worktree_path": str(tmp_path),
+        "result": {
+            "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
+            "result_sha": "2" * 40,
+            "evidence": {},
+            "senior_review": {"approved": True, "attestation": att_dict},
+        },
+        "envelope": {"repo": str(tmp_path), "base_commit": "1" * 40},
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+            }
+        },
+    }
+
+    q = MagicMock()
+    q.get_task.return_value = t
+
+    # Simulate time advancing: fresh (+10s) at initial outer check,
+    # but expired (+150s) inside the lock critical section.
+    time_calls = [
+        base_time + 10.0,  # initial check before git inspection: valid!
+        base_time + 150.0,  # inside lock critical section: EXPIRED!
+    ]
+
+    def mock_time():
+        if time_calls:
+            return time_calls.pop(0)
+        return base_time + 200.0
+
+    git_calls = []
+
+    def mock_git_tracking(cmd, **kwargs):
+        git_calls.append(cmd)
+        return fake_git_for_tests(cmd, **kwargs)
+
+    with (
+        patch("time.time", side_effect=mock_time),
+        patch("subprocess.run", side_effect=mock_git_tracking),
+    ):
+        exit_code = cmd_merge(args, q)
+        assert exit_code == 1
+
+        # Verify mutation commands were NEVER executed
+        for cmd in git_calls:
+            assert cmd[:3] != ["git", "merge", "--ff-only"], (
+                "git merge --ff-only must not be called"
+            )
+            assert cmd[:3] != ["git", "checkout", "main"], "git checkout main must not be called"
