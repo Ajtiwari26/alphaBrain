@@ -268,7 +268,7 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
                 "result_sha": result_sha,
                 "evidence": evidence,
                 "senior_review": {
-                    "approved": att_approved,
+                    "approved": True,  # Outer task approved is True to strictly isolate attestation validation
                     "attestation": att.model_dump(),
                 },
             },
@@ -276,6 +276,14 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
         return task
 
     args = argparse.Namespace(task_id=task_id, json=False)
+
+    def assert_zero_mutating_git(mock_run):
+        for call in mock_run.call_args_list:
+            cmd = call[0][0] if call[0] else []
+            if cmd and cmd[0] == "git":
+                assert cmd[1] not in ["merge", "checkout", "branch", "worktree"], (
+                    f"Forbidden mutating Git command executed on rejection: {cmd}"
+                )
 
     with patch.dict("os.environ", {"ALPHA_SIGNING_SECRET": secret}):
         with patch("subprocess.run") as mock_run:
@@ -293,35 +301,48 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             mock_run.side_effect = fake_git
 
             # Case 1: Wrong task_id in attestation (signed with secret)
+            mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att(att_task_id="tsk_WRONG_TASK")
             assert cmd_merge(args, q) == 1, "Must reject attestation with wrong task_id"
+            assert_zero_mutating_git(mock_run)
 
             # Case 2: Wrong result_sha in attestation (signed with secret)
+            mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att(att_result_sha="3" * 40)
             assert cmd_merge(args, q) == 1, "Must reject attestation with wrong result_sha"
+            assert_zero_mutating_git(mock_run)
 
             # Case 3: Wrong base_commit in attestation (signed with secret)
+            mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att(att_base_commit="4" * 40)
             assert cmd_merge(args, q) == 1, "Must reject attestation with wrong base_commit"
+            assert_zero_mutating_git(mock_run)
 
-            # Case 4: Approved is False in attestation (signed with secret)
+            # Case 4: Approved is False in attestation (signed with secret, outer task approved=True)
+            mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att(
                 att_approved=False, att_pro="REPAIR_REQUIRED", att_opus="REJECT"
             )
-            assert cmd_merge(args, q) == 1, "Must reject attestation when approved is False"
+            assert cmd_merge(args, q) == 1, (
+                "Must reject attestation when attestation approved is False"
+            )
+            assert_zero_mutating_git(mock_run)
 
             # Case 5: Inconsistent verdicts (e.g. approved=True but pro='REPAIR_REQUIRED')
+            mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att(
                 att_approved=True, att_pro="REPAIR_REQUIRED", att_opus="FINAL_APPROVAL"
             )
             assert cmd_merge(args, q) == 1, "Must reject attestation with inconsistent pro verdict"
+            assert_zero_mutating_git(mock_run)
 
             # Case 6: Evidence digest mismatch (signed with secret)
+            mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att(
                 att_evidence={"tampered_evidence": "different"}
@@ -329,8 +350,10 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             assert cmd_merge(args, q) == 1, (
                 "Must reject attestation with mismatched evidence digest"
             )
+            assert_zero_mutating_git(mock_run)
 
             # Case 7: Valid attestation passes
+            mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att()
             with patch("fcntl.flock"):
