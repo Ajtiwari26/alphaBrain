@@ -172,17 +172,29 @@ class SeniorReviewEngine:
 
             env = dict(os.environ)
             
-            # Disable MCP servers by isolating the home directory
+            # Disable MCP servers by isolating the home directory, while keeping auth/config
             tmp_home = tempfile.mkdtemp()
             tmp_gemini = os.path.join(tmp_home, ".gemini")
             os.makedirs(tmp_gemini)
             
             real_gemini = os.path.expanduser("~/.gemini")
-            for token_file in ["credentials.json", "jetski-standalone-oauth-token"]:
-                src = os.path.join(real_gemini, token_file)
-                if os.path.exists(src):
-                    import shutil
-                    shutil.copy(src, os.path.join(tmp_gemini, token_file))
+            
+            # Link root files
+            for item in os.listdir(real_gemini):
+                src = os.path.join(real_gemini, item)
+                if item == "antigravity":
+                    continue
+                os.symlink(src, os.path.join(tmp_gemini, item))
+            
+            # Reconstruct antigravity without mcp
+            real_agy = os.path.join(real_gemini, "antigravity")
+            tmp_agy = os.path.join(tmp_gemini, "antigravity")
+            if os.path.exists(real_agy):
+                os.makedirs(tmp_agy)
+                for item in os.listdir(real_agy):
+                    if item in ["mcp", "mcp_hidden"]:
+                        continue
+                    os.symlink(os.path.join(real_agy, item), os.path.join(tmp_agy, item))
             
             env["HOME"] = tmp_home
             
