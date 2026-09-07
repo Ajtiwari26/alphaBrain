@@ -48,17 +48,26 @@ def e2e_setup(tmp_path):
 
 
 def create_valid_attestation(
-    task_id, result_sha, base_commit, secret="alphabrain_senior_review_key", approved=True
+    task_id,
+    result_sha,
+    base_commit,
+    secret="alphabrain_senior_review_key",
+    approved=True,
+    pro_verdict="APPROVE",
+    opus_verdict="FINAL_APPROVAL",
+    evidence=None,
 ):
+    if evidence is None:
+        evidence = {"dummy": "evidence"}
     return ReviewAttestation.create(
         task_id=task_id,
         result_sha=result_sha,
         base_commit=base_commit,
-        pro_verdict="Looks good",
-        opus_verdict="Approved",
+        pro_verdict=pro_verdict,
+        opus_verdict=opus_verdict,
         approved=approved,
         reviewed_at=123456789.0,
-        evidence={"dummy": "evidence"},
+        evidence=evidence,
         secret=secret,
     ).model_dump()
 
@@ -135,11 +144,11 @@ def test_full_happy_path_lifecycle(e2e_setup, monkeypatch):
     assert proposal.gates_passed is True
 
     result_sha = proposal.head_commit
-    attestation = create_valid_attestation(task_id, result_sha, base_commit)
-
     task_data = queue.get_task(task_id)
     res = task_data["result"]
     res["result_sha"] = result_sha
+    evidence = res.get("evidence", {})
+    attestation = create_valid_attestation(task_id, result_sha, base_commit, evidence=evidence)
     res["senior_review"] = {"approved": True, "attestation": attestation}
     with sqlite3.connect(queue.db_path) as conn:
         conn.execute(

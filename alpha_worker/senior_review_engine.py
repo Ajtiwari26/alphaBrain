@@ -66,9 +66,7 @@ class SeniorReviewEngine:
 
         self.queue = queue
         self.agy_bin = agy_bin or (Path.home() / ".local" / "bin" / "agy")
-        self.signing_secret = signing_secret or os.environ.get(
-            "ALPHA_SIGNING_SECRET", "alphabrain_senior_review_key"
-        )
+        self.signing_secret = signing_secret or os.environ.get("ALPHA_SIGNING_SECRET")
 
     def run_command(self, cmd: list[str], timeout: int = 120) -> tuple[int, str, str]:
         try:
@@ -271,23 +269,32 @@ class SeniorReviewEngine:
             or ("0" * 40)
         )
 
+        if not self.signing_secret:
+            raise ValueError(
+                "ALPHA_SIGNING_SECRET is missing. Explicit cryptographic signing configuration is required."
+            )
+
         worktree_path = task.get("worktree_path")
-        if worktree_path and Path(worktree_path).exists():
-            try:
-                head_sha = subprocess.check_output(
-                    ["git", "rev-parse", "HEAD"], cwd=worktree_path, text=True
-                ).strip()
-                if head_sha != result_sha:
-                    raise ValueError(
-                        f"Worktree HEAD {head_sha} does not match task result_sha {result_sha}"
-                    )
-                status = subprocess.check_output(
-                    ["git", "status", "--porcelain"], cwd=worktree_path, text=True
-                ).strip()
-                if status:
-                    raise ValueError("Worktree is not clean. Uncommitted changes detected.")
-            except subprocess.CalledProcessError:
-                pass
+        if not worktree_path or not Path(worktree_path).is_dir():
+            raise ValueError(
+                f"Worktree path '{worktree_path}' does not exist or is missing. Mandatory checkout validation failed."
+            )
+
+        try:
+            head_sha = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=worktree_path, text=True
+            ).strip()
+            if head_sha != result_sha:
+                raise ValueError(
+                    f"Worktree HEAD {head_sha} does not match task result_sha {result_sha}."
+                )
+            status = subprocess.check_output(
+                ["git", "status", "--porcelain"], cwd=worktree_path, text=True
+            ).strip()
+            if status:
+                raise ValueError(f"Worktree is not clean. Uncommitted changes detected: {status}")
+        except subprocess.CalledProcessError as e:
+            raise ValueError(f"Git command failed during worktree validation: {e}") from e
 
         diff_content = self.get_task_diff(task)
         title = task.get("envelope", {}).get("title", "Autonomous Task")

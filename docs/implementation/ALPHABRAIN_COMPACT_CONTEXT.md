@@ -1,39 +1,28 @@
 # AlphaBrain Compact Execution Context
 
-## CURRENT SNAPSHOT — 2026-09-05 (read this section only for routine status)
+## CURRENT SNAPSHOT — 2026-09-07 (read this section only for routine status)
 
-Source: `main` at `a13a24d9e98ede77f624a9db6540baf8f7fea263`.
-Existing user-owned dirty change: `alpha_worker/senior_review_engine.py` restores `--dangerously-skip-permissions`; preserve and reconcile ownership before editing.
+Source: Supervised bootstrap repair `NEXT-R2A` branched from verified baseline `0499ab8fccd82560f50f3b6c6dd91ecb125822c9`.
 
-**Decision: partial hardening; A1/A3 security acceptance still rejected.**
+**Decision: NEXT-R2A (promotion authorization & review checkout validation) verified locally; full R2-R6 autonomous delivery remains in progress.**
 
-Historical H5 and later audit-export/DAG/telemetry/metrics commits establish bounded supervised code generation. They do not prove safe unattended project delivery. Original and newer P9 roadmaps use conflicting phase labels; use named capabilities and exact evidence, not blanket completion percentages.
+Verified repairs in NEXT-R2A:
+1. **Repaired `cmd_merge` control flow (`alpha_core/triage_cli.py`)**: Fixed critical indentation bug that rendered result_sha, base_commit, and approval checks unreachable after `return 1`. Independently enforced: valid HMAC signature, matching task_id, matching base_commit, matching result_sha, approved=True with consistent verdicts (`pro_verdict == "APPROVE"`, `opus_verdict == "FINAL_APPROVAL"`), and matching evidence_digest. All checks execute before acquiring lock or executing Git operations.
+2. **Removed default reviewer signing key (`alpha_worker/senior_review_engine.py`)**: Removed fallback to `"alphabrain_senior_review_key"`. Missing `ALPHA_SIGNING_SECRET` halts review with `ValueError` prior to any model invocation.
+3. **Enforced mandatory reviewer checkout validation (`alpha_worker/senior_review_engine.py`)**: Missing/nonexistent worktree, git errors, dirty state (`git status --porcelain`), or HEAD mismatch (`head_sha != result_sha`) strictly raises `ValueError` and halts review. No silent fallback to main.
+4. **Boundary regression test coverage**: Added comprehensive unit tests in `testscript/test_astra_t3_review_auth.py` and updated `test_astra_t4_promotion.py`, `test_triage_merge_cli.py`, `test_astra_t6_integrated.py`.
 
-Recent repairs:
-- `be31645`: missing/nonzero reviewer invocation, incomplete/exceptional dispatch, commit failures, and missing required gate coverage now fail.
-- `a13a24d`: missing result SHA blocks promotion; lease metadata added; literal `HEAD` rejected; JSON reviewer parser introduced.
+Verified local evidence:
+- Full test suite: **699 passed, 11 skipped, 0 failed** in 47.90s via pytest.
+- Ruff lint & format: clean (0 errors across workspace).
+- Mypy static typing: 0 errors across 74 source files.
 
-Confirmed remaining gaps:
-1. Reviewer extracts JSON anywhere, not strictly from terminal line. Two mocked outputs containing quoted approval JSON followed by `Final decision: REJECT` produced `approved=True`.
-2. Existing parser test returns `APPROVE` to both models; Opus rejects wrong enum, masking Pro parser defect. Test each stage independently.
-3. Review persistence uses plain SHA-256 and hardcoded reviewer identity; no authenticated signature. It hashes `acceptance_manifest` while dispatcher emits `evidence`.
-4. Merge never verifies signature, prefers result SHA over reviewed SHA, checks branch then merges mutable branch name without promotion lock.
-5. Lease API omits authenticated owner; result checks payload against metadata, not principal subject. Pre-read validation and completion mutation are separate, without atomic fencing predicate.
-6. Base guard rejects literal `HEAD`, not all mutable refs. Partial legacy packet hashes remain accepted.
-7. Scope check precedes gates and uses working-tree status; committed agent changes and gate-generated changes require final base-to-result diff validation.
-8. DAG defaults to parent `completed` before review/promotion. Retry resets and execution containment remain unresolved.
-
-Independent current checks: 12 focused tests passed (`test_astra_a1_a3_exit_gaps.py`, `test_triage_merge_cli.py`); Ruff check passed for four trust-boundary files; Ruff format failed on all four. Full-suite 641-pass commit claim has not been independently reverified here. No current remote deployment claim.
-
-Graph refreshed during this update using installed local `code-review-graph` CLI (MCP not exposed). Check graph metadata and `git status` before reuse: graph HEAD alone does not identify dirty source. Graph is navigation context, not security/test evidence.
-
-Read next: `ASTRA_EXIT_GAP_REPAIR_PACKETS_2026-09-05.md`, T1–T6. Then broader `ASTRA_RESEARCH_AND_AUTONOMY_EXECUTION_PLAN.md` for containment, durability, research contracts, framework comparison, architecture, and project-specific gates.
-
-Navigation: original `alpha_core/state/task_engine.py` has stronger typed contracts; newer `alpha_core/queue/triage_queue.py` has weaker parallel lifecycle. Inspect `alpha_worker/{triage_dispatcher,senior_review_engine}.py`, `alpha_core/triage_cli.py`, and triage routes in `alpha_core/api/app.py` for current work. Reuse original contracts where practical. Tests/evidence stay under `testscript/`; `alpha_meet/` remains immutable.
-
-Cost control: current snapshot + one packet + graph queries + incremental diff only. Avoid old chat history. Keep source edits in authorized self-development flow. This docs/graph update grants no task approval, bootstrap bypass, merge, push, deployment, or secret change.
-
-Canonical Opus-owned architecture still has outdated completion/containment claims; owner reconciliation is queued. Earlier audit remains historical evidence. Everything below is archived August 31 context and must not override this snapshot or current code.
+Remaining gaps in roadmap:
+- Complete remaining R2 identity/expiry/replay bindings.
+- R3: Mandatory 4-tuple lease fencing on every queue mutation.
+- R4: Crash-safe atomic promotion with target revision verification.
+- R5: Meaningful verification profiles & cumulative repair budget limits.
+- R6: Real integrated autonomous proof without mocks.
 
 ---
 

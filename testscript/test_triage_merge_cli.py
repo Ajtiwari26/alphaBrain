@@ -73,9 +73,16 @@ def test_merge_rejects_missing_branch():
 @patch("alpha_protocol.task.ReviewAttestation.verify")
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.Path.exists")
-def test_merge_successful_with_senior_review_approved(mock_exists, mock_run, mock_verify, tmp_path, monkeypatch):
+def test_merge_successful_with_senior_review_approved(
+    mock_exists, mock_run, mock_verify, tmp_path, monkeypatch
+):
     monkeypatch.setenv("ALPHA_SIGNING_SECRET", "dummy_secret")
     mock_verify.return_value = True
+    evidence = {"test_metric": 10}
+    from alpha_protocol.task import ReviewAttestation
+
+    ev_digest = ReviewAttestation.compute_evidence_digest(evidence)
+
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_success",
@@ -85,6 +92,7 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run, moc
         "result": {
             "gates_passed": True,
             "result_sha": "abc1234567890abcdef1234567890abcdef12345",
+            "evidence": evidence,
             "senior_review": {
                 "approved": True,
                 "pro_verdict": "APPROVE",
@@ -96,13 +104,13 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run, moc
                     "pro_verdict": "APPROVE",
                     "opus_verdict": "FINAL_APPROVAL",
                     "approved": True,
-                    "evidence_digest": "e" * 64,
+                    "evidence_digest": ev_digest,
                     "reviewed_at": 1690000000.0,
-                    "signature": "f" * 64
-                }
+                    "signature": "f" * 64,
+                },
             },
         },
-        "envelope": {"repo": str(tmp_path)},
+        "envelope": {"repo": str(tmp_path), "base_commit": "b" * 40},
     }
     mock_exists.return_value = True
 
@@ -155,16 +163,18 @@ def test_merge_fails_without_senior_review(mock_exists, mock_run, tmp_path):
 
 
 @patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
-def test_cmd_senior_review_execution(mock_invoke, tmp_path):
+def test_cmd_senior_review_execution(mock_invoke, tmp_path, monkeypatch):
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "test_sr_signing_secret")
     mock_invoke.side_effect = [
         {"response": "", "structured_output": {"verdict": "APPROVE"}},
-        {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}}
+        {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}},
     ]
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_sr_test",
         "status": TriageStatus.COMPLETED.value,
         "branch_name": "alpha/task_sr_test",
+        "worktree_path": str(tmp_path),
         "result": {
             "gates_passed": True,
             "result_sha": "abc1234567890abcdef1234567890abcdef12345",
@@ -173,5 +183,17 @@ def test_cmd_senior_review_execution(mock_invoke, tmp_path):
         "envelope": {"title": "Test Task", "repo": str(tmp_path)},
     }
     args = MagicMock(task_id="task_sr_test", json=False)
-    assert cmd_senior_review(args, queue) == 0
-    queue.record_senior_review.assert_called_once()
+
+    with patch("subprocess.check_output") as mock_git:
+
+        def fake_git(cmd, **kwargs):
+            if cmd[:2] == ["git", "rev-parse"]:
+                return "abc1234567890abcdef1234567890abcdef12345\n"
+            if cmd[:2] == ["git", "status"]:
+                return ""
+            return ""
+
+        mock_git.side_effect = fake_git
+
+        assert cmd_senior_review(args, queue) == 0
+        queue.record_senior_review.assert_called_once()

@@ -12,17 +12,26 @@ from alpha_protocol.task import ReviewAttestation
 
 
 def create_valid_attestation(
-    task_id, result_sha, base_commit, secret="alphabrain_senior_review_key", approved=True
+    task_id,
+    result_sha,
+    base_commit,
+    secret="test_promotion_signing_secret_123",
+    approved=True,
+    pro_verdict="APPROVE",
+    opus_verdict="FINAL_APPROVAL",
+    evidence=None,
 ):
+    if evidence is None:
+        evidence = {"dummy": "evidence"}
     return ReviewAttestation.create(
         task_id=task_id,
         result_sha=result_sha,
         base_commit=base_commit,
-        pro_verdict="Looks good",
-        opus_verdict="Approved",
+        pro_verdict=pro_verdict,
+        opus_verdict=opus_verdict,
         approved=approved,
         reviewed_at=123456789.0,
-        evidence={"dummy": "evidence"},
+        evidence=evidence,
         secret=secret,
     ).model_dump()
 
@@ -37,6 +46,7 @@ def mock_queue():
 def base_task(tmp_path):
     repo_path = str(tmp_path / "repo")
     os.makedirs(repo_path, exist_ok=True)
+    evidence = {"dummy": "evidence"}
     return {
         "id": "tsk_123",
         "status": TriageStatus.COMPLETED.value,
@@ -48,12 +58,14 @@ def base_task(tmp_path):
         "result": {
             "gates_passed": True,
             "result_sha": "b" * 40,
+            "evidence": evidence,
             "senior_review": {
                 "approved": True,
                 "attestation": create_valid_attestation(
                     task_id="tsk_123",
                     result_sha="b" * 40,
                     base_commit="a" * 40,
+                    evidence=evidence,
                 ),
             },
         },
@@ -65,7 +77,7 @@ def test_successful_promotion_merging_exact_sha(mock_queue, base_task):
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
     with (
-        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "alphabrain_senior_review_key"}),
+        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}),
         patch("subprocess.run") as mock_run,
     ):
         # mock git rev-parse branch_name to return result_sha
@@ -98,7 +110,7 @@ def test_promotion_rejected_invalid_forged_attestation(mock_queue, base_task):
     mock_queue.get_task.return_value = base_task
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
-    with patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "alphabrain_senior_review_key"}):
+    with patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}):
         exit_code = cmd_merge(args, mock_queue)
     assert exit_code == 1
 
@@ -113,7 +125,7 @@ def test_promotion_rejected_result_sha_mismatch(mock_queue, base_task):
     mock_queue.get_task.return_value = base_task
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
-    with patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "alphabrain_senior_review_key"}):
+    with patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}):
         exit_code = cmd_merge(args, mock_queue)
     assert exit_code == 1
 
@@ -123,7 +135,7 @@ def test_promotion_rejected_branch_tip_mismatch(mock_queue, base_task):
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
     with (
-        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "alphabrain_senior_review_key"}),
+        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}),
         patch("subprocess.run") as mock_run,
     ):
 
@@ -151,7 +163,7 @@ def test_cross_process_promotion_lock(mock_queue, base_task):
     lock_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     with (
-        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "alphabrain_senior_review_key"}),
+        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}),
         patch("subprocess.run") as mock_run,
     ):
 

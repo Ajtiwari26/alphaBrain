@@ -87,16 +87,17 @@ def test_wrong_secret():
 
 
 @patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
-def test_senior_review_engine_attestation(mock_invoke_agy):
+def test_senior_review_engine_attestation(mock_invoke_agy, tmp_path):
     # Setup mock
     mock_invoke_agy.side_effect = [
         {"response": "", "structured_output": {"verdict": "APPROVE"}},
-        {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}}
+        {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}},
     ]
 
     mock_queue = MagicMock()
     mock_task = {
         "status": TriageStatus.COMPLETED.value,
+        "worktree_path": str(tmp_path),
         "envelope": {"base_commit": "b" * 40},
         "result": {
             "gates_passed": True,
@@ -106,9 +107,19 @@ def test_senior_review_engine_attestation(mock_invoke_agy):
     }
     mock_queue.get_task.return_value = mock_task
 
-    engine = SeniorReviewEngine(queue=mock_queue, signing_secret=b"engine_secret")
+    with patch("subprocess.check_output") as mock_git:
 
-    verdict = engine.execute_senior_review("tsk_123")
+        def fake_git(cmd, **kwargs):
+            if cmd[:2] == ["git", "rev-parse"]:
+                return "a" * 40 + "\n"
+            if cmd[:2] == ["git", "status"]:
+                return ""
+            return ""
+
+        mock_git.side_effect = fake_git
+
+        engine = SeniorReviewEngine(queue=mock_queue, signing_secret=b"engine_secret")
+        verdict = engine.execute_senior_review("tsk_123")
 
     assert verdict.approved is True
     assert verdict.attestation is not None
@@ -120,3 +131,207 @@ def test_senior_review_engine_attestation(mock_invoke_agy):
     assert att.base_commit == "b" * 40
     assert att.pro_verdict == "APPROVE"
     assert att.opus_verdict == "FINAL_APPROVAL"
+
+
+def test_senior_review_engine_rejects_missing_signing_secret(tmp_path, monkeypatch):
+    monkeypatch.delenv("ALPHA_SIGNING_SECRET", raising=False)
+    mock_queue = MagicMock()
+    mock_queue.get_task.return_value = {
+        "status": TriageStatus.COMPLETED.value,
+        "worktree_path": str(tmp_path),
+        "result": {"gates_passed": True, "result_sha": "a" * 40},
+    }
+    engine = SeniorReviewEngine(queue=mock_queue, signing_secret=None)
+    import pytest
+
+    with pytest.raises(ValueError, match="ALPHA_SIGNING_SECRET is missing"):
+        engine.execute_senior_review("tsk_123")
+
+
+def test_senior_review_engine_rejects_missing_or_nonexistent_worktree():
+    mock_queue = MagicMock()
+    mock_queue.get_task.return_value = {
+        "status": TriageStatus.COMPLETED.value,
+        "worktree_path": "/nonexistent/path/to/worktree",
+        "result": {"gates_passed": True, "result_sha": "a" * 40},
+    }
+    engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
+    import pytest
+
+    with pytest.raises(ValueError, match="Mandatory checkout validation failed"):
+        engine.execute_senior_review("tsk_123")
+
+
+def test_senior_review_engine_rejects_dirty_worktree(tmp_path):
+    mock_queue = MagicMock()
+    mock_queue.get_task.return_value = {
+        "status": TriageStatus.COMPLETED.value,
+        "worktree_path": str(tmp_path),
+        "result": {"gates_passed": True, "result_sha": "a" * 40},
+    }
+    engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
+
+    with patch("subprocess.check_output") as mock_git:
+
+        def fake_git(cmd, **kwargs):
+            if cmd[:2] == ["git", "rev-parse"]:
+                return "a" * 40 + "\n"
+            if cmd[:2] == ["git", "status"]:
+                return " M dirty_file.py\n"
+            return ""
+
+        mock_git.side_effect = fake_git
+
+        import pytest
+
+        with pytest.raises(ValueError, match="Worktree is not clean"):
+            engine.execute_senior_review("tsk_123")
+
+
+def test_senior_review_engine_rejects_worktree_head_mismatch(tmp_path):
+    mock_queue = MagicMock()
+    mock_queue.get_task.return_value = {
+        "status": TriageStatus.COMPLETED.value,
+        "worktree_path": str(tmp_path),
+        "result": {"gates_passed": True, "result_sha": "a" * 40},
+    }
+    engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
+
+    with patch("subprocess.check_output") as mock_git:
+
+        def fake_git(cmd, **kwargs):
+            if cmd[:2] == ["git", "rev-parse"]:
+                return "b" * 40 + "\n"  # Mismatch with result_sha
+            if cmd[:2] == ["git", "status"]:
+                return ""
+            return ""
+
+        mock_git.side_effect = fake_git
+
+        import pytest
+
+        with pytest.raises(ValueError, match="does not match task result_sha"):
+            engine.execute_senior_review("tsk_123")
+
+
+def test_reproduce_unreachable_checks_in_cmd_merge():
+    """
+    Reproduce that cmd_merge must independently reject validly signed attestations
+    that have wrong task_id, wrong result_sha, wrong base_commit, approved=False,
+    or mismatched evidence digest.
+    """
+    import argparse
+
+    from alpha_core.triage_cli import cmd_merge
+
+    secret = "temp_test_secret_12345"
+    task_id = "tsk_test_merge_auth"
+    base_commit = "1" * 40
+    result_sha = "2" * 40
+    evidence = {"test_runs": 5, "passed": True}
+
+    def make_task_and_att(
+        att_task_id=task_id,
+        att_result_sha=result_sha,
+        att_base_commit=base_commit,
+        att_approved=True,
+        att_pro="APPROVE",
+        att_opus="FINAL_APPROVAL",
+        att_evidence=evidence,
+        corrupt_sig=False,
+    ):
+        att = ReviewAttestation.create(
+            task_id=att_task_id,
+            result_sha=att_result_sha,
+            base_commit=att_base_commit,
+            pro_verdict=att_pro,
+            opus_verdict=att_opus,
+            approved=att_approved,
+            reviewed_at=time.time(),
+            evidence=att_evidence,
+            secret=secret,
+        )
+        if corrupt_sig:
+            att.signature = "0" * 64
+
+        task = {
+            "id": task_id,
+            "status": TriageStatus.COMPLETED.value,
+            "branch_name": f"alpha/{task_id}",
+            "worktree_path": f"/tmp/worktrees/{task_id}",
+            "envelope": {
+                "repo": ".",
+                "base_commit": base_commit,
+            },
+            "result": {
+                "gates_passed": True,
+                "result_sha": result_sha,
+                "evidence": evidence,
+                "senior_review": {
+                    "approved": att_approved,
+                    "attestation": att.model_dump(),
+                },
+            },
+        }
+        return task
+
+    args = argparse.Namespace(task_id=task_id, json=False)
+
+    with patch.dict("os.environ", {"ALPHA_SIGNING_SECRET": secret}):
+        with patch("subprocess.run") as mock_run:
+            # Mock git rev-parse to return matching result_sha
+            def fake_git(cmd, **kwargs):
+                m = MagicMock()
+                if cmd[:2] == ["git", "rev-parse"]:
+                    m.stdout = result_sha + "\n"
+                    m.returncode = 0
+                    return m
+                m.stdout = ""
+                m.returncode = 0
+                return m
+
+            mock_run.side_effect = fake_git
+
+            # Case 1: Wrong task_id in attestation (signed with secret)
+            q = MagicMock()
+            q.get_task.return_value = make_task_and_att(att_task_id="tsk_WRONG_TASK")
+            assert cmd_merge(args, q) == 1, "Must reject attestation with wrong task_id"
+
+            # Case 2: Wrong result_sha in attestation (signed with secret)
+            q = MagicMock()
+            q.get_task.return_value = make_task_and_att(att_result_sha="3" * 40)
+            assert cmd_merge(args, q) == 1, "Must reject attestation with wrong result_sha"
+
+            # Case 3: Wrong base_commit in attestation (signed with secret)
+            q = MagicMock()
+            q.get_task.return_value = make_task_and_att(att_base_commit="4" * 40)
+            assert cmd_merge(args, q) == 1, "Must reject attestation with wrong base_commit"
+
+            # Case 4: Approved is False in attestation (signed with secret)
+            q = MagicMock()
+            q.get_task.return_value = make_task_and_att(
+                att_approved=False, att_pro="REPAIR_REQUIRED", att_opus="REJECT"
+            )
+            assert cmd_merge(args, q) == 1, "Must reject attestation when approved is False"
+
+            # Case 5: Inconsistent verdicts (e.g. approved=True but pro='REPAIR_REQUIRED')
+            q = MagicMock()
+            q.get_task.return_value = make_task_and_att(
+                att_approved=True, att_pro="REPAIR_REQUIRED", att_opus="FINAL_APPROVAL"
+            )
+            assert cmd_merge(args, q) == 1, "Must reject attestation with inconsistent pro verdict"
+
+            # Case 6: Evidence digest mismatch (signed with secret)
+            q = MagicMock()
+            q.get_task.return_value = make_task_and_att(
+                att_evidence={"tampered_evidence": "different"}
+            )
+            assert cmd_merge(args, q) == 1, (
+                "Must reject attestation with mismatched evidence digest"
+            )
+
+            # Case 7: Valid attestation passes
+            q = MagicMock()
+            q.get_task.return_value = make_task_and_att()
+            with patch("fcntl.flock"):
+                assert cmd_merge(args, q) == 0, "Valid attestation must pass"

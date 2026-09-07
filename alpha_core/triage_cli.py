@@ -676,22 +676,42 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
         return 1
 
-        if att.result_sha != result_sha:
-            print(
-                "Error: Attestation result_sha does not match expected result_sha.", file=sys.stderr
-            )
-            return 1
+    if att.task_id != args.task_id:
+        print(
+            f"Error: Attestation task_id '{att.task_id}' does not match target task_id '{args.task_id}'.",
+            file=sys.stderr,
+        )
+        return 1
 
-        expected_base_commit = task.get("envelope", {}).get("base_commit")
-        if att.base_commit != expected_base_commit:
-            print(
-                "Error: Attestation base_commit does not match task base_commit.", file=sys.stderr
-            )
-            return 1
+    if att.result_sha != result_sha:
+        print(
+            f"Error: Attestation result_sha '{att.result_sha}' does not match expected result_sha '{result_sha}'.",
+            file=sys.stderr,
+        )
+        return 1
 
-        if not att.approved:
-            print("Error: Attestation indicates senior review was not approved.", file=sys.stderr)
-            return 1
+    expected_base_commit = task.get("envelope", {}).get("base_commit")
+    if att.base_commit != expected_base_commit:
+        print(
+            f"Error: Attestation base_commit '{att.base_commit}' does not match task base_commit '{expected_base_commit}'.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not att.approved or att.pro_verdict != "APPROVE" or att.opus_verdict != "FINAL_APPROVAL":
+        print(
+            "Error: Attestation indicates senior review was not approved or contains inconsistent verdicts.",
+            file=sys.stderr,
+        )
+        return 1
+
+    expected_evidence_digest = ReviewAttestation.compute_evidence_digest(result.get("evidence", {}))
+    if att.evidence_digest != expected_evidence_digest:
+        print(
+            f"Error: Attestation evidence_digest '{att.evidence_digest}' does not match task evidence_digest '{expected_evidence_digest}'.",
+            file=sys.stderr,
+        )
+        return 1
 
     try:
         tip_res = subprocess.run(
