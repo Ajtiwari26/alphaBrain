@@ -58,3 +58,59 @@ def test_failure_analyzer_integration():
     assert 'signature' in report
     assert report['pytest_failures'][0]['test_name'] == 'test_x'
     assert report['ruff_violations'][0]['code'] == 'E501'
+
+def test_empty_input():
+    analyzer = FailureAnalyzer()
+    report = analyzer.analyze("", "")
+    assert report['pytest_failures'] == []
+    assert report['ruff_violations'] == []
+    assert isinstance(report['signature'], str)
+
+def test_multi_failure():
+    output = """
+=================================== FAILURES ===================================
+_________________________ test_a __________________________
+    def test_a():
+>       assert 1 == 2
+E       assert 1 == 2
+test_file.py:10: AssertionError
+_________________________ test_b __________________________
+    def test_b():
+>       assert 2 == 3
+E       assert 2 == 3
+test_file.py:15: AssertionError
+=========================== short test summary info ============================
+FAILED test_file.py::test_a - assert 1 == 2
+FAILED test_file.py::test_b - assert 2 == 3
+"""
+    failures = parse_pytest_output(output)
+    assert len(failures) == 2
+    assert failures[0]['test_name'] == 'test_a'
+    assert failures[1]['test_name'] == 'test_b'
+
+def test_signature_determinism_proof():
+    analyzer = FailureAnalyzer()
+    # Different order of failures should yield same signature
+    pytest_failures1 = [{'test_name': 'test_a', 'message': 'err', 'traceback': 'foo.py:10: error'}, {'test_name': 'test_b', 'message': 'err2', 'traceback': 'bar.py:20: error'}]
+    pytest_failures2 = [{'test_name': 'test_b', 'message': 'err2', 'traceback': 'bar.py:20: error'}, {'test_name': 'test_a', 'message': 'err', 'traceback': 'foo.py:10: error'}]
+
+    # Line numbers should be normalized
+    pytest_failures3 = [{'test_name': 'test_a', 'message': 'err', 'traceback': 'foo.py:11: error'}, {'test_name': 'test_b', 'message': 'err2', 'traceback': 'bar.py:21: error'}]
+
+    sig1 = analyzer.compute_signature(pytest_failures1, [])
+    sig2 = analyzer.compute_signature(pytest_failures2, [])
+    sig3 = analyzer.compute_signature(pytest_failures3, [])
+
+    assert sig1 == sig2
+    assert sig1 == sig3
+
+def test_parameterized_test_names():
+    output = """
+=========================== short test summary info ============================
+FAILED test_file.py::test_func[param1] - assert False
+FAILED test_file.py::test_func[param2] - assert False
+"""
+    failures = parse_pytest_output(output)
+    assert len(failures) == 2
+    assert failures[0]['test_name'] == 'test_func[param1]'
+    assert failures[1]['test_name'] == 'test_func[param2]'

@@ -43,6 +43,15 @@ def parse_pytest_output(output: str) -> list[dict[str, str]]:
 
     return list(summaries.values())
 
+
+def normalize_traceback(tb: str) -> str:
+    # Replace file paths and line numbers like "file.py:123:" with "FILE:LINE:"
+    tb = re.sub(r"[/\w\.\-]+:\d+:", "FILE:LINE:", tb)
+    # Replace stack trace line numbers like "  123 |" or similar patterns if they exist
+    tb = re.sub(r"\n\s*\d+\s*\|", "\n  LINE |", tb)
+    return tb
+
+
 def parse_ruff_output(output: str) -> list[dict[str, str]]:
     violations = []
     # Match lines like "file.py:line:col: CODE message"
@@ -55,12 +64,14 @@ def parse_ruff_output(output: str) -> list[dict[str, str]]:
         })
     return violations
 
+
 class FailureAnalyzer:
     def compute_signature(self, pytest_failures: list[dict[str, str]], ruff_violations: list[dict[str, str]]) -> str:
         # Create a stable string representation
         components = []
         for f in sorted(pytest_failures, key=lambda x: x.get('test_name', '')):
-            components.append(f"pytest:{f.get('test_name')}:{f.get('message')}:{f.get('traceback', '')}")
+            tb = normalize_traceback(f.get('traceback', ''))
+            components.append(f"pytest:{f.get('test_name')}:{f.get('message')}:{tb}")
         for v in sorted(ruff_violations, key=lambda x: (x.get('file', ''), x.get('code', ''))):
             components.append(f"ruff:{v.get('file')}:{v.get('code')}")
 

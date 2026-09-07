@@ -143,7 +143,7 @@ def test_senior_review_engine_attestation(mock_invoke_agy, tmp_path):
 
         mock_git.side_effect = fake_git
 
-        engine = SeniorReviewEngine(queue=mock_queue, signing_secret=b"engine_secret")
+        engine = SeniorReviewEngine(queue=mock_queue, signing_secret=b"engine_secret", key_id="alpha_test_key")
         verdict = engine.execute_senior_review("tsk_123")
 
     assert verdict.approved is True
