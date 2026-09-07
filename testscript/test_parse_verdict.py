@@ -1,5 +1,6 @@
 import json
 
+
 def parse_verdict_line(output: str, valid_enums: list[str], default_verdict: str) -> str:
     if not output:
         return default_verdict
