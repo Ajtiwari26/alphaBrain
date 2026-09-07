@@ -141,6 +141,11 @@ class SeniorReviewEngine:
 
     def _invoke_agy(self, model: str, prompt: str, schema_path: str, cwd: str | None = None, timeout_seconds: int = 300, effort: str | None = None) -> dict:
         """Invokes AGY non-interactively with structured prompt."""
+        import tempfile
+        import os
+        import shutil
+        import json
+        
         if not self.agy_bin.exists():
             raise RuntimeError(f"AGY executable not found at {self.agy_bin}")
 
@@ -165,8 +170,6 @@ class SeniorReviewEngine:
                 cmd.extend(["--effort", effort])
             cmd.extend(["--print", prompt])
 
-            import os
-            import tempfile
             env = dict(os.environ)
             
             # Disable MCP servers by isolating the home directory
@@ -185,7 +188,6 @@ class SeniorReviewEngine:
                     f"AGY invocation failed with code {res.returncode}: stderr={res.stderr} stdout={res.stdout}"
                 )
             try:
-                import json
                 def reject_duplicates(ordered_pairs):
                     d = {}
                     for k, v in ordered_pairs:
@@ -197,7 +199,6 @@ class SeniorReviewEngine:
             except Exception:
                 return {"response": res.stdout or res.stderr, "structured_output": {}}
         finally:
-            import shutil
             Path(prompt_file).unlink(missing_ok=True)
             if 'tmp_home' in locals():
                 shutil.rmtree(tmp_home, ignore_errors=True)
