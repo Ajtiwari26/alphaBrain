@@ -1,9 +1,11 @@
+
 """
 Unit tests verifying the autonomous fast-forward PR merge engine for AlphaBrain.
 Ensures acceptance gate enforcement, 2-Round Senior Review enforcement, fail-closed handling,
 clean fast-forward merge into main, and worktree/branch pruning.
 """
 
+import time
 from unittest.mock import MagicMock, patch
 
 from alpha_core.queue.triage_queue import TriageStatus
@@ -98,14 +100,23 @@ def test_merge_successful_with_senior_review_approved(
                 "pro_verdict": "APPROVE",
                 "opus_verdict": "FINAL_APPROVAL",
                 "attestation": {
+                    "schema_version": "2.0",
                     "task_id": "task_success",
+                    "attempt_id": "att_1",
                     "base_commit": "b" * 40,
                     "result_sha": "abc1234567890abcdef1234567890abcdef12345",
+                    "tree_digest": "c" * 40,
                     "pro_verdict": "APPROVE",
                     "opus_verdict": "FINAL_APPROVAL",
                     "approved": True,
                     "evidence_digest": ev_digest,
-                    "reviewed_at": 1690000000.0,
+                    "reviewed_at": time.time(),
+                    "issued_at": time.time(),
+                    "expires_at": time.time() + 3600,
+                    "nonce": "n",
+                    "executor_id": "e",
+                    "key_id": "k",
+                    "reviewer_id": "SYSTEM_SENIOR_REVIEW_ENGINE",
                     "signature": "f" * 64,
                 },
             },
@@ -117,6 +128,8 @@ def test_merge_successful_with_senior_review_approved(
     def mock_run_side_effect(*args, **kwargs):
         cmd = args[0]
         if cmd[1] == "rev-parse":
+            if "^{tree}" in cmd[2]:
+                return MagicMock(returncode=0, stdout="c" * 40 + "\n")
             return MagicMock(returncode=0, stdout="abc1234567890abcdef1234567890abcdef12345\n")
         return MagicMock(returncode=0, stdout="Updating 1234..5678\nFast-forward")
 

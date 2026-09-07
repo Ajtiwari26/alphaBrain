@@ -57,18 +57,26 @@ def create_valid_attestation(
     opus_verdict="FINAL_APPROVAL",
     evidence=None,
 ):
+    import time
     if evidence is None:
         evidence = {"dummy": "evidence"}
     return ReviewAttestation.create(
         task_id=task_id,
+        attempt_id="att_1",
         result_sha=result_sha,
         base_commit=base_commit,
+        tree_digest="c" * 40,
         pro_verdict=pro_verdict,
         opus_verdict=opus_verdict,
         approved=approved,
-        reviewed_at=123456789.0,
+        reviewed_at=time.time(),
+        issued_at=time.time(),
+        expires_at=time.time() + 3600,
         evidence=evidence,
         secret=secret,
+        nonce="nonce",
+        executor_id="exec",
+        key_id="k1",
     ).model_dump()
 
 
@@ -163,7 +171,10 @@ def test_full_happy_path_lifecycle(e2e_setup, monkeypatch):
         def side_effect(cmd, **kwargs):
             if cmd[:2] == ["git", "rev-parse"]:
                 m = MagicMock()
-                m.stdout = result_sha + "\n"
+                if "^{tree}" in cmd[2]:
+                    m.stdout = "c" * 40 + "\n"
+                else:
+                    m.stdout = result_sha + "\n"
                 return m
             elif cmd[:2] == ["git", "merge"]:
                 m = MagicMock()
@@ -390,7 +401,10 @@ def test_cross_process_promotion_lock(e2e_setup, monkeypatch):
         def side_effect(cmd, **kwargs):
             if cmd[:2] == ["git", "rev-parse"]:
                 m = MagicMock()
-                m.stdout = "b" * 40 + "\n"
+                if "^{tree}" in cmd[2]:
+                    m.stdout = "c" * 40 + "\n"
+                else:
+                    m.stdout = "b" * 40 + "\n"
                 return m
             m = MagicMock()
             m.stdout = ""

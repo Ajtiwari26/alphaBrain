@@ -21,18 +21,24 @@ def create_valid_attestation(
     opus_verdict="FINAL_APPROVAL",
     evidence=None,
 ):
+    import time
     if evidence is None:
         evidence = {"dummy": "evidence"}
     return ReviewAttestation.create(
         task_id=task_id,
+        attempt_id="att_1",
         result_sha=result_sha,
         base_commit=base_commit,
+        tree_digest="c" * 40,
         pro_verdict=pro_verdict,
         opus_verdict=opus_verdict,
         approved=approved,
-        reviewed_at=123456789.0,
+        reviewed_at=time.time(),
         evidence=evidence,
         secret=secret,
+        nonce="nonce",
+        executor_id="exec",
+        key_id="key1",
     ).model_dump()
 
 
@@ -84,7 +90,7 @@ def test_successful_promotion_merging_exact_sha(mock_queue, base_task):
         def side_effect(cmd, **kwargs):
             if cmd[:2] == ["git", "rev-parse"]:
                 m = MagicMock()
-                m.stdout = "b" * 40 + "\n"
+                m.stdout = ("c" * 40 if "^{tree}" in cmd[2] else "b" * 40) + "\n"
                 return m
             m = MagicMock()
             m.stdout = ""
@@ -142,7 +148,7 @@ def test_promotion_rejected_branch_tip_mismatch(mock_queue, base_task):
         def side_effect(cmd, **kwargs):
             if cmd[:2] == ["git", "rev-parse"]:
                 m = MagicMock()
-                m.stdout = "c" * 40 + "\n"  # Branch tip does not match expected result_sha ("b"*40)
+                m.stdout = "c" * 40 + "\n"  # Branch tip does not match expected result_sha
                 return m
             m = MagicMock()
             m.stdout = ""
@@ -170,7 +176,7 @@ def test_cross_process_promotion_lock(mock_queue, base_task):
         def side_effect(cmd, **kwargs):
             if cmd[:2] == ["git", "rev-parse"]:
                 m = MagicMock()
-                m.stdout = "b" * 40 + "\n"
+                m.stdout = ("c" * 40 if "^{tree}" in cmd[2] else "b" * 40) + "\n"
                 return m
             m = MagicMock()
             m.stdout = ""

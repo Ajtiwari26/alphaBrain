@@ -376,16 +376,33 @@ Instructions:
 
         evidence = task.get("result", {}).get("evidence", {})
 
+        import uuid
+
+        try:
+            tree_digest = subprocess.check_output(
+                ["git", "rev-parse", "HEAD^{tree}"], cwd=worktree_path, text=True
+            ).strip()
+        except subprocess.CalledProcessError as e:
+            raise ValueError(f"Failed to get tree digest: {e}") from e
+
+        attempt_id = task.get("result", {}).get("attempt_id") or "att_unknown"
+        executor_id = task.get("result", {}).get("worker_id") or "worker_unknown"
+
         att = ReviewAttestation.create(
             task_id=task_id,
+            attempt_id=attempt_id,
             result_sha=result_sha,
             base_commit=base_commit,
+            tree_digest=tree_digest,
             pro_verdict=pro_verdict,
             opus_verdict=opus_verdict,
             approved=unanimous,
             reviewed_at=time.time(),
             evidence=evidence,
             secret=self.signing_secret,
+            nonce=uuid.uuid4().hex,
+            executor_id=executor_id,
+            key_id="alpha_production_v1",
         )
 
         verdict = SeniorReviewVerdict(

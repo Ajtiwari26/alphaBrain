@@ -13,7 +13,7 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .enums import (
     EXECUTION_ENABLED_AGENTS,
@@ -76,16 +76,40 @@ class ConcurrencyPolicy(BaseModel):
 class ReviewAttestation(BaseModel):
     """Cryptographic attestation of senior review execution."""
 
+    schema_version: Literal["2.0"] = "2.0"
     task_id: str
+    attempt_id: str
     result_sha: str = Field(pattern=r"^[a-f0-9]{40}$")
     base_commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+    tree_digest: str = Field(pattern=r"^[a-f0-9]{40}$")
     pro_verdict: str
     opus_verdict: str
     approved: bool
     reviewed_at: float
+    issued_at: float
+    expires_at: float
+    nonce: str
+    executor_id: str
+    reviewer_id: str = "SYSTEM_SENIOR_REVIEW_ENGINE"
+    key_id: str
     evidence_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
-    signer_identity: str = "SYSTEM_SENIOR_REVIEW_ENGINE"
     signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode='after')
+    def validate_principals(self) -> "ReviewAttestation":
+        if self.executor_id == self.reviewer_id:
+            raise ValueError("Principal separation failed: executor_id and reviewer_id must be different")
+        return self
+
+    @model_validator(mode='after')
+    def validate_ttl(self) -> "ReviewAttestation":
+        import time
+        now = time.time()
+        if self.expires_at <= self.issued_at:
+            raise ValueError("expires_at must be strictly greater than issued_at")
+        if now > self.expires_at:
+            raise ValueError("Attestation has expired")
+        return self
 
     def compute_digest(self) -> str:
         import hashlib
@@ -121,24 +145,48 @@ class ReviewAttestation(BaseModel):
     def create(
         cls,
         task_id: str,
+        attempt_id: str,
         result_sha: str,
         base_commit: str,
+        tree_digest: str,
         pro_verdict: str,
         opus_verdict: str,
         approved: bool,
         reviewed_at: float,
         evidence: Any,
         secret: bytes | str,
+        nonce: str,
+        executor_id: str,
+        key_id: str,
+        issued_at: float | None = None,
+        expires_at: float | None = None,
+        reviewer_id: str = "SYSTEM_SENIOR_REVIEW_ENGINE"
     ) -> "ReviewAttestation":
+        import time
+        now = time.time()
+        if issued_at is None:
+            issued_at = now
+        if expires_at is None:
+            expires_at = now + 3600  # Default 1 hour TTL
+
         evidence_digest = cls.compute_evidence_digest(evidence)
         att = cls(
+            schema_version="2.0",
             task_id=task_id,
+            attempt_id=attempt_id,
             result_sha=result_sha,
             base_commit=base_commit,
+            tree_digest=tree_digest,
             pro_verdict=pro_verdict,
             opus_verdict=opus_verdict,
             approved=approved,
             reviewed_at=reviewed_at,
+            issued_at=issued_at,
+            expires_at=expires_at,
+            nonce=nonce,
+            executor_id=executor_id,
+            reviewer_id=reviewer_id,
+            key_id=key_id,
             evidence_digest=evidence_digest,
             signature="0" * 64,  # Placeholder to satisfy validation
         )

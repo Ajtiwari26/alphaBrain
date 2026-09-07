@@ -13,7 +13,7 @@ def test_valid_attestation_creation_and_verification():
     attestation = ReviewAttestation.create(
         task_id="tsk_123",
         result_sha="a" * 40,
-        base_commit="b" * 40,
+        base_commit="b" * 40, attempt_id="att_1", tree_digest="c" * 40, nonce="nonce", executor_id="worker", key_id="key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -32,7 +32,7 @@ def test_tamper_detection():
     attestation = ReviewAttestation.create(
         task_id="tsk_123",
         result_sha="a" * 40,
-        base_commit="b" * 40,
+        base_commit="b" * 40, attempt_id="att_1", tree_digest="c" * 40, nonce="nonce", executor_id="worker", key_id="key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -74,7 +74,7 @@ def test_wrong_secret():
     attestation = ReviewAttestation.create(
         task_id="tsk_123",
         result_sha="a" * 40,
-        base_commit="b" * 40,
+        base_commit="b" * 40, attempt_id="att_1", tree_digest="c" * 40, nonce="nonce", executor_id="worker", key_id="key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -233,7 +233,7 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
     def make_task_and_att(
         att_task_id=task_id,
         att_result_sha=result_sha,
-        att_base_commit=base_commit,
+        att_base_commit=base_commit, attempt_id="att_1", tree_digest="t"*40, nonce="n", executor_id="w", key_id="k",
         att_approved=True,
         att_pro="APPROVE",
         att_opus="FINAL_APPROVAL",
@@ -242,14 +242,19 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
     ):
         att = ReviewAttestation.create(
             task_id=att_task_id,
+            attempt_id="att_1",
             result_sha=att_result_sha,
             base_commit=att_base_commit,
+            tree_digest="c" * 40,
             pro_verdict=att_pro,
             opus_verdict=att_opus,
             approved=att_approved,
             reviewed_at=time.time(),
             evidence=att_evidence,
             secret=secret,
+            nonce="nonce",
+            executor_id="exec",
+            key_id="k1",
         )
         if corrupt_sig:
             att.signature = "0" * 64
@@ -291,7 +296,10 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             def fake_git(cmd, **kwargs):
                 m = MagicMock()
                 if cmd[:2] == ["git", "rev-parse"]:
-                    m.stdout = result_sha + "\n"
+                    if "^{tree}" in cmd[2]:
+                        m.stdout = "c" * 40 + "\n"
+                    else:
+                        m.stdout = result_sha + "\n"
                     m.returncode = 0
                     return m
                 m.stdout = ""

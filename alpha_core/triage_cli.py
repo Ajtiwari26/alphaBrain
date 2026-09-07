@@ -713,6 +713,14 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         )
         return 1
 
+    expected_attempt_id = result.get("attempt_id")
+    if expected_attempt_id and att.attempt_id != expected_attempt_id:
+        print(
+            f"Error: Attestation attempt_id '{att.attempt_id}' does not match expected attempt_id '{expected_attempt_id}'.",
+            file=sys.stderr,
+        )
+        return 1
+
     try:
         tip_res = subprocess.run(
             ["git", "rev-parse", branch_name],
@@ -728,8 +736,23 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                 file=sys.stderr,
             )
             return 1
+
+        tree_res = subprocess.run(
+            ["git", "rev-parse", f"{branch_name}^{{tree}}"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        branch_tree = tree_res.stdout.strip()
+        if branch_tree != att.tree_digest:
+            print(
+                f"Error: SLSA Provenance Failure. Branch tree {branch_tree} does not match attestation tree_digest {att.tree_digest}.",
+                file=sys.stderr,
+            )
+            return 1
     except subprocess.CalledProcessError:
-        print(f"Error: Could not resolve branch {branch_name}.", file=sys.stderr)
+        print(f"Error: Could not resolve branch {branch_name} or its tree.", file=sys.stderr)
         return 1
 
     print(f"Verifying gates passed and senior review for '{args.task_id}'... OK")
