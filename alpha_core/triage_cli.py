@@ -656,8 +656,9 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     if not attestation_dict:
         print("Error: Missing cryptographically signed ReviewAttestation.", file=sys.stderr)
         return 1
-        
+
     import os
+
     from alpha_protocol.task import ReviewAttestation
 
     try:
@@ -670,7 +671,7 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     if not signing_secret:
         print("Error: ALPHA_SIGNING_SECRET environment variable is not set.", file=sys.stderr)
         return 1
-        
+
     if not att.verify(signing_secret):
         print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
         return 1

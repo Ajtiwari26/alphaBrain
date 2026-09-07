@@ -77,7 +77,7 @@ class SeniorReviewEngine:
         except Exception as e:
             return 1, "", str(e)
 
-    def get_task_diff(self, task: dict[str, Any]) -> dict:
+    def get_task_diff(self, task: dict[str, Any]) -> str:
         branch_name = task.get("branch_name")
         repo_path = task.get("envelope", {}).get("repo", ".")
         if branch_name:
@@ -139,13 +139,19 @@ class SeniorReviewEngine:
         result = task.get("result") or {}
         return str(result.get("diff_stat", "No diff available"))
 
-    def _invoke_agy(self, model: str, prompt: str, schema_path: str, cwd: str | None = None, timeout_seconds: int = 300, effort: str | None = None) -> dict:
+    def _invoke_agy(
+        self,
+        model: str,
+        prompt: str,
+        schema_path: str,
+        cwd: str | None = None,
+        timeout_seconds: int = 300,
+        effort: str | None = None,
+    ) -> dict:
         """Invokes AGY non-interactively with structured prompt."""
-        import tempfile
-        import os
-        import shutil
         import json
-        
+        import os
+
         if not self.agy_bin.exists():
             raise RuntimeError(f"AGY executable not found at {self.agy_bin}")
 
@@ -171,50 +177,24 @@ class SeniorReviewEngine:
             cmd.extend(["--print", prompt])
 
             env = dict(os.environ)
-            
-            # Disable MCP servers by isolating the home directory, while keeping auth/config
-            tmp_home = tempfile.mkdtemp()
-            tmp_gemini = os.path.join(tmp_home, ".gemini")
-            os.makedirs(tmp_gemini)
-            
-            real_gemini = os.path.expanduser("~/.gemini")
-            
-            # Link root files
-            for item in os.listdir(real_gemini):
-                src = os.path.join(real_gemini, item)
-                if item == "antigravity":
-                    continue
-                os.symlink(src, os.path.join(tmp_gemini, item))
-            
-            # Reconstruct antigravity without mcp
-            real_agy = os.path.join(real_gemini, "antigravity")
-            tmp_agy = os.path.join(tmp_gemini, "antigravity")
-            if os.path.exists(real_agy):
-                os.makedirs(tmp_agy)
-                for item in os.listdir(real_agy):
-                    if item in ["mcp", "mcp_hidden"]:
-                        continue
-                    os.symlink(os.path.join(real_agy, item), os.path.join(tmp_agy, item))
-            
-            # Set GOOGLE_APPLICATION_CREDENTIALS to the real path to bypass HOME mocking
-            real_adc = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
-            if os.path.exists(real_adc):
-                env["GOOGLE_APPLICATION_CREDENTIALS"] = real_adc
-            
-            env["HOME"] = tmp_home
-            
-            if "ALPHA_SIGNING_SECRET" in env:
-                del env["ALPHA_SIGNING_SECRET"]
+            env.pop("ALPHA_SIGNING_SECRET", None)
 
             res = subprocess.run(
                 cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_seconds + 30, env=env
             )
             if res.returncode != 0:
-                logger.warning("AGY %s returned non-zero %d: stderr=%s stdout=%s", model, res.returncode, res.stderr, res.stdout)
+                logger.warning(
+                    "AGY %s returned non-zero %d: stderr=%s stdout=%s",
+                    model,
+                    res.returncode,
+                    res.stderr,
+                    res.stdout,
+                )
                 raise RuntimeError(
                     f"AGY invocation failed with code {res.returncode}: stderr={res.stderr} stdout={res.stdout}"
                 )
             try:
+
                 def reject_duplicates(ordered_pairs):
                     d = {}
                     for k, v in ordered_pairs:
@@ -222,15 +202,17 @@ class SeniorReviewEngine:
                             raise ValueError(f"Duplicate key: {k}")
                         d[k] = v
                     return d
-                return json.loads(res.stdout, object_pairs_hook=reject_duplicates)
+
+                parsed = json.loads(res.stdout, object_pairs_hook=reject_duplicates)
+                if isinstance(parsed, dict):
+                    return parsed
+                return {"response": res.stdout or res.stderr, "structured_output": {}}
             except Exception:
                 return {"response": res.stdout or res.stderr, "structured_output": {}}
         finally:
             Path(prompt_file).unlink(missing_ok=True)
-            if 'tmp_home' in locals():
-                shutil.rmtree(tmp_home, ignore_errors=True)
 
-    def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> dict:
+    def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> str:
         """
         Parses a strict one-line JSON verdict from the response lines.
         Inspects only the absolute last non-empty line.
@@ -288,14 +270,20 @@ class SeniorReviewEngine:
             or task.get("result", {}).get("result_commit")
             or ("0" * 40)
         )
-        
+
         worktree_path = task.get("worktree_path")
         if worktree_path and Path(worktree_path).exists():
             try:
-                head_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=worktree_path, text=True).strip()
+                head_sha = subprocess.check_output(
+                    ["git", "rev-parse", "HEAD"], cwd=worktree_path, text=True
+                ).strip()
                 if head_sha != result_sha:
-                    raise ValueError(f"Worktree HEAD {head_sha} does not match task result_sha {result_sha}")
-                status = subprocess.check_output(["git", "status", "--porcelain"], cwd=worktree_path, text=True).strip()
+                    raise ValueError(
+                        f"Worktree HEAD {head_sha} does not match task result_sha {result_sha}"
+                    )
+                status = subprocess.check_output(
+                    ["git", "status", "--porcelain"], cwd=worktree_path, text=True
+                ).strip()
                 if status:
                     raise ValueError("Worktree is not clean. Uncommitted changes detected.")
             except subprocess.CalledProcessError:
@@ -338,7 +326,9 @@ Review Instructions:
             if pro_verdict not in ["APPROVE", "REPAIR_REQUIRED"]:
                 pro_verdict = "REPAIR_REQUIRED"
         else:
-            pro_verdict = self.parse_verdict_line(pro_out, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
+            pro_verdict = self.parse_verdict_line(
+                pro_out, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED"
+            )
         pro_approved = pro_verdict == "APPROVE"
 
         # --- Round 2 Step 2: Claude Opus 4.6 Thinking ---
