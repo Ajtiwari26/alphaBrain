@@ -127,6 +127,14 @@ def test_merge_successful_with_senior_review_approved(
             },
         },
         "envelope": {"repo": str(tmp_path), "base_commit": "b" * 40},
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+                "lease_id": "lease_123",
+                "fencing_epoch": 1,
+            }
+        },
     }
 
     def mock_exists_side_effect(*args, **kwargs):
@@ -206,6 +214,14 @@ def test_cmd_senior_review_execution(mock_invoke, tmp_path, monkeypatch):
             "diff_stat": "1 file changed",
         },
         "envelope": {"title": "Test Task", "repo": str(tmp_path)},
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+                "lease_id": "lease_123",
+                "fencing_epoch": 1,
+            }
+        },
     }
     args = MagicMock(task_id="task_sr_test", json=False)
 

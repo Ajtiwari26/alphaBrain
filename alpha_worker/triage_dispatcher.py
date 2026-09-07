@@ -362,6 +362,33 @@ class TriageTaskDispatcher:
                 self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
                 return None
 
+        # 1.5. Validate complete authoritative lease tuple before provisioning worktree or launching agents
+        lease_meta = (leased_task.get("provenance") or {}).get("lease_metadata") or {}
+        attempt_id = leased_task.get("attempt_id") or lease_meta.get("attempt_id")
+        worker_id = leased_task.get("worker_id") or lease_meta.get("worker_id")
+        lease_id = leased_task.get("lease_id") or lease_meta.get("lease_id")
+        fencing_epoch = leased_task.get("fencing_epoch")
+        if fencing_epoch is None:
+            fencing_epoch = lease_meta.get("fencing_epoch")
+
+        if (
+            not attempt_id
+            or attempt_id in ("att_unknown", "None", "")
+            or not worker_id
+            or worker_id in ("worker_unknown", "None", "")
+            or not lease_id
+            or lease_id in ("lease_unknown", "None", "")
+            or fencing_epoch is None
+            or fencing_epoch in ("None", "")
+        ):
+            err_msg = (
+                f"Task {task_id} missing complete authoritative lease tuple: "
+                f"worker_id={worker_id}, attempt_id={attempt_id}, lease_id={lease_id}, fencing_epoch={fencing_epoch}"
+            )
+            logger.critical(err_msg)
+            self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+            return None
+
         # 2. Provision isolated worktree
         branch_name = f"alpha/{task_id}"
         worktree_path_obj: Path | None = None
@@ -378,17 +405,6 @@ class TriageTaskDispatcher:
             return None
 
         worktree_path = worktree_path_obj
-        lease_meta = leased_task.get("provenance", {}).get("lease_metadata") or {}
-        attempt_id = leased_task.get("attempt_id") or lease_meta.get("attempt_id")
-        worker_id = leased_task.get("worker_id") or lease_meta.get("worker_id")
-        lease_id = leased_task.get("lease_id") or lease_meta.get("lease_id")
-        fencing_epoch = leased_task.get("fencing_epoch") or lease_meta.get("fencing_epoch")
-
-        if not attempt_id or not worker_id:
-            err_msg = f"Task {task_id} missing authoritative lease metadata (attempt_id={attempt_id}, worker_id={worker_id})"
-            logger.critical(err_msg)
-            self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
-            return None
 
         try:
             # 2.5. Launch the local AGY coding agent inside the worktree if enabled
@@ -579,6 +595,24 @@ class TriageTaskDispatcher:
             )
 
             # 7. Complete task in queue with lease ownership verification
+            if (
+                not worker_id
+                or worker_id in ("worker_unknown", "None", "")
+                or not attempt_id
+                or attempt_id in ("att_unknown", "None", "")
+                or not lease_id
+                or lease_id in ("lease_unknown", "None", "")
+                or fencing_epoch is None
+                or fencing_epoch in ("None", "")
+            ):
+                err_msg = (
+                    f"Dispatcher cannot complete task {task_id}: incomplete authoritative lease tuple "
+                    f"(worker_id={worker_id}, attempt_id={attempt_id}, lease_id={lease_id}, fencing_epoch={fencing_epoch})"
+                )
+                logger.critical(err_msg)
+                self.queue.fail_task(task_id, error_details={"error": err_msg}, allow_retry=False)
+                return None
+
             success = self.queue.complete_task(
                 task_id=task_id,
                 result=pr_proposal.to_dict(),
@@ -586,7 +620,7 @@ class TriageTaskDispatcher:
                 branch_name=branch_name,
                 worker_id=worker_id,
                 lease_id=lease_id,
-                fencing_epoch=fencing_epoch,
+                fencing_epoch=int(fencing_epoch),
                 attempt_id=attempt_id,
             )
             if not success:

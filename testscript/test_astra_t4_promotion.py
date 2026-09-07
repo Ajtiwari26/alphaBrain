@@ -78,6 +78,14 @@ def base_task(tmp_path):
                 ),
             },
         },
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+                "lease_id": "lease_123",
+                "fencing_epoch": 1,
+            }
+        },
     }
 
 

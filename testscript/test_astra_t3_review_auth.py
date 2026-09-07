@@ -121,6 +121,14 @@ def test_senior_review_engine_attestation(mock_invoke_agy, tmp_path):
             "result_commit": "a" * 40,
             "gate_result": {"status": "passed"},
         },
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+                "lease_id": "lease_123",
+                "fencing_epoch": 1,
+            }
+        },
     }
     mock_queue.get_task.return_value = mock_task
 
@@ -181,6 +189,14 @@ def test_senior_review_engine_rejects_missing_or_nonexistent_worktree():
             "worker_id": "exec_1",
             "result_sha": "a" * 40,
         },
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+                "lease_id": "lease_123",
+                "fencing_epoch": 1,
+            }
+        },
     }
     engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
     import pytest
@@ -199,6 +215,14 @@ def test_senior_review_engine_rejects_dirty_worktree(tmp_path):
             "attempt_id": "att_1",
             "worker_id": "exec_1",
             "result_sha": "a" * 40,
+        },
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+                "lease_id": "lease_123",
+                "fencing_epoch": 1,
+            }
         },
     }
     engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
@@ -230,6 +254,14 @@ def test_senior_review_engine_rejects_worktree_head_mismatch(tmp_path):
             "attempt_id": "att_1",
             "worker_id": "exec_1",
             "result_sha": "a" * 40,
+        },
+        "provenance": {
+            "lease_metadata": {
+                "worker_id": "exec_1",
+                "attempt_id": "att_1",
+                "lease_id": "lease_123",
+                "fencing_epoch": 1,
+            }
         },
     }
     engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
@@ -323,6 +355,14 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
                     "approved": True,  # Outer task approved is True to strictly isolate attestation validation
                     "attestation": att.model_dump(),
                 },
+            },
+            "provenance": {
+                "lease_metadata": {
+                    "worker_id": "exec_1",
+                    "attempt_id": "att_1",
+                    "lease_id": "lease_123",
+                    "fencing_epoch": 1,
+                }
             },
         }
         return task
@@ -1109,3 +1149,301 @@ def test_cmd_merge_freshness_recheck_inside_lock_critical_section_rejects_expiry
                 "git merge --ff-only must not be called"
             )
             assert cmd[:3] != ["git", "checkout", "main"], "git checkout main must not be called"
+
+
+def test_authoritative_lease_provenance_boundaries_in_review_merge_and_dispatcher(
+    monkeypatch, tmp_path
+):
+    """
+    Exhaustively tests authoritative lease provenance boundary enforcement:
+    1. Reviewer path: absent, empty, missing individual fields, mismatches, valid case.
+    2. Merge path: absent, empty, missing individual fields, mismatches, valid case.
+    3. Dispatcher path: absent, empty, incomplete lease tuple, complete tuple.
+    Asserts rejected cases invoke NEITHER AGY nor mutating Git commands.
+    """
+    import argparse
+    import time
+    from unittest.mock import MagicMock, patch
+
+    import pytest
+
+    from alpha_core.queue.triage_queue import TriageStatus
+    from alpha_core.triage_cli import cmd_merge
+    from alpha_protocol.task import ReviewAttestation
+    from alpha_worker.senior_review_engine import SeniorReviewEngine
+    from alpha_worker.triage_dispatcher import TriageTaskDispatcher
+
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "secret_auth_boundary_123")
+
+    # Helper to build baseline valid task dict
+    def build_valid_task():
+        return {
+            "id": "tsk_boundary_test",
+            "status": TriageStatus.COMPLETED.value,
+            "branch_name": "alpha/tsk_boundary_test",
+            "worktree_path": str(tmp_path),
+            "envelope": {"repo": str(tmp_path), "base_commit": "1" * 40},
+            "provenance": {
+                "lease_metadata": {
+                    "worker_id": "auth_exec_1",
+                    "attempt_id": "auth_att_1",
+                    "lease_id": "lease_123",
+                    "fencing_epoch": 1000,
+                }
+            },
+            "result": {
+                "gates_passed": True,
+                "worker_id": "auth_exec_1",
+                "attempt_id": "auth_att_1",
+                "result_sha": "2" * 40,
+                "evidence": {"test": "ok"},
+            },
+        }
+
+    # 1. REVIEWER PATH BOUNDARIES
+    invalid_reviewer_cases = [
+        (
+            "absent_provenance",
+            lambda t: t.pop("provenance", None),
+            "missing or invalid authoritative lease attempt_id",
+        ),
+        (
+            "none_provenance",
+            lambda t: t.update({"provenance": None}),
+            "missing or invalid authoritative lease attempt_id",
+        ),
+        (
+            "missing_lease_metadata",
+            lambda t: t["provenance"].pop("lease_metadata", None),
+            "missing or invalid authoritative lease attempt_id",
+        ),
+        (
+            "empty_lease_metadata",
+            lambda t: t["provenance"].update({"lease_metadata": {}}),
+            "missing or invalid authoritative lease attempt_id",
+        ),
+        (
+            "missing_worker_id",
+            lambda t: t["provenance"]["lease_metadata"].pop("worker_id"),
+            "missing or invalid authoritative lease worker_id",
+        ),
+        (
+            "empty_worker_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"worker_id": ""}),
+            "missing or invalid authoritative lease worker_id",
+        ),
+        (
+            "placeholder_worker_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"worker_id": "worker_unknown"}),
+            "missing or invalid authoritative lease worker_id",
+        ),
+        (
+            "missing_attempt_id",
+            lambda t: t["provenance"]["lease_metadata"].pop("attempt_id"),
+            "missing or invalid authoritative lease attempt_id",
+        ),
+        (
+            "empty_attempt_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"attempt_id": ""}),
+            "missing or invalid authoritative lease attempt_id",
+        ),
+        (
+            "placeholder_attempt_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"attempt_id": "att_unknown"}),
+            "missing or invalid authoritative lease attempt_id",
+        ),
+        (
+            "mismatch_worker_id",
+            lambda t: t["result"].update({"worker_id": "wrong_worker"}),
+            "does not match authoritative lease worker_id",
+        ),
+        (
+            "mismatch_attempt_id",
+            lambda t: t["result"].update({"attempt_id": "wrong_attempt"}),
+            "does not match authoritative lease attempt_id",
+        ),
+    ]
+
+    for _label, mutate_fn, expected_match in invalid_reviewer_cases:
+        task = build_valid_task()
+        mutate_fn(task)
+        q = MagicMock()
+        q.get_task.return_value = task
+        engine = SeniorReviewEngine(
+            queue=q, key_id="alpha_test_key", signing_secret="secret_auth_boundary_123"
+        )
+
+        with (
+            patch.object(SeniorReviewEngine, "_invoke_agy") as mock_agy,
+            patch("subprocess.check_output") as mock_check_output,
+            patch("subprocess.run") as mock_sub_run,
+        ):
+            with pytest.raises(ValueError, match=expected_match):
+                engine.execute_senior_review("tsk_boundary_test")
+
+            # Assert rejected cases invoke neither AGY nor mutating Git commands
+            mock_agy.assert_not_called()
+            mock_check_output.assert_not_called()
+            mock_sub_run.assert_not_called()
+
+    # Valid reviewer case passes and invokes AGY
+    valid_task = build_valid_task()
+    q_valid = MagicMock()
+    q_valid.get_task.return_value = valid_task
+    engine_valid = SeniorReviewEngine(
+        queue=q_valid, key_id="alpha_test_key", signing_secret="secret_auth_boundary_123"
+    )
+
+    def fake_git_read(cmd, **kwargs):
+        if cmd[:2] == ["git", "rev-parse"]:
+            return ("c" * 40 if "^{tree}" in cmd[2] else "2" * 40) + "\n"
+        if cmd[:2] == ["git", "status"]:
+            return ""
+        return ""
+
+    with (
+        patch.object(
+            SeniorReviewEngine,
+            "_invoke_agy",
+            side_effect=[
+                {"response": "", "structured_output": {"verdict": "APPROVE"}},
+                {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}},
+            ],
+        ) as mock_agy,
+        patch("subprocess.check_output", side_effect=fake_git_read),
+    ):
+        verdict = engine_valid.execute_senior_review("tsk_boundary_test")
+        assert verdict.approved is True
+        assert mock_agy.call_count == 2  # Round 1 & Round 2 executed for valid case
+
+    # 2. MERGE PATH BOUNDARIES
+    args = argparse.Namespace(task_id="tsk_boundary_test", json=False)
+
+    def attach_valid_attestation(task):
+        att = ReviewAttestation.create(
+            task_id="tsk_boundary_test",
+            attempt_id="auth_att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=time.time(),
+            evidence={"test": "ok"},
+            secret="secret_auth_boundary_123",
+            nonce="nonce_boundary_123",
+            executor_id="auth_exec_1",
+            key_id="alpha_test_key",
+        )
+        task["result"]["senior_review"] = {
+            "approved": True,
+            "attestation": att.model_dump(),
+        }
+
+    invalid_merge_cases = [
+        ("absent_provenance", lambda t: t.pop("provenance", None)),
+        ("none_provenance", lambda t: t.update({"provenance": None})),
+        ("missing_lease_metadata", lambda t: t["provenance"].pop("lease_metadata", None)),
+        ("empty_lease_metadata", lambda t: t["provenance"].update({"lease_metadata": {}})),
+        ("missing_worker_id", lambda t: t["provenance"]["lease_metadata"].pop("worker_id")),
+        (
+            "empty_worker_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"worker_id": ""}),
+        ),
+        (
+            "placeholder_worker_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"worker_id": "worker_unknown"}),
+        ),
+        ("missing_attempt_id", lambda t: t["provenance"]["lease_metadata"].pop("attempt_id")),
+        (
+            "empty_attempt_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"attempt_id": ""}),
+        ),
+        (
+            "placeholder_attempt_id",
+            lambda t: t["provenance"]["lease_metadata"].update({"attempt_id": "att_unknown"}),
+        ),
+        ("mismatch_result_worker", lambda t: t["result"].update({"worker_id": "forged_worker"})),
+        ("mismatch_result_attempt", lambda t: t["result"].update({"attempt_id": "forged_attempt"})),
+    ]
+
+    for label, mutate_fn in invalid_merge_cases:
+        task = build_valid_task()
+        attach_valid_attestation(task)
+        mutate_fn(task)
+        q = MagicMock()
+        q.get_task.return_value = task
+
+        with patch("subprocess.run") as mock_sub_run:
+            mock_sub_run.side_effect = fake_git_for_tests
+            code = cmd_merge(args, q)
+            assert code == 1, f"Merge must reject invalid case: {label}"
+
+            # Verify mutating git commands are NEVER invoked
+            for call in mock_sub_run.call_args_list:
+                cmd = call[0][0] if call[0] else []
+                if cmd and cmd[0] == "git":
+                    assert cmd[1] not in ["merge", "checkout", "branch", "reset"], (
+                        f"Forbidden mutating Git command executed on rejected merge ({label}): {cmd}"
+                    )
+
+    # Valid merge case passes and performs merge
+    valid_merge_task = build_valid_task()
+    attach_valid_attestation(valid_merge_task)
+    q_valid_merge = MagicMock()
+    q_valid_merge.get_task.return_value = valid_merge_task
+
+    with patch("subprocess.run") as mock_sub_run:
+        mock_sub_run.side_effect = fake_git_for_tests
+        code = cmd_merge(args, q_valid_merge)
+        assert code == 0
+
+    # 3. DISPATCHER PATH BOUNDARIES (execute_task)
+    invalid_dispatcher_cases = [
+        ("absent_provenance", lambda t: t.pop("provenance", None)),
+        ("none_provenance", lambda t: t.update({"provenance": None})),
+        ("missing_lease_metadata", lambda t: t["provenance"].pop("lease_metadata", None)),
+        ("empty_lease_metadata", lambda t: t["provenance"].update({"lease_metadata": {}})),
+        ("missing_worker_id", lambda t: t["provenance"]["lease_metadata"].pop("worker_id")),
+        ("missing_attempt_id", lambda t: t["provenance"]["lease_metadata"].pop("attempt_id")),
+        ("missing_lease_id", lambda t: t["provenance"]["lease_metadata"].pop("lease_id")),
+        ("missing_fencing_epoch", lambda t: t["provenance"]["lease_metadata"].pop("fencing_epoch")),
+    ]
+
+    for label, mutate_fn in invalid_dispatcher_cases:
+        leased_task = {
+            "id": "tsk_disp_boundary",
+            "status": TriageStatus.EXECUTING.value,
+            "envelope": {"repo": str(tmp_path), "base_commit": "a" * 40, "title": "test"},
+            "provenance": {
+                "lease_metadata": {
+                    "worker_id": "auth_exec_1",
+                    "attempt_id": "auth_att_1",
+                    "lease_id": "lease_123",
+                    "fencing_epoch": 1000,
+                }
+            },
+        }
+        mutate_fn(leased_task)
+
+        mock_disp_queue = MagicMock()
+        mock_worktree_mgr = MagicMock()
+        mock_bridge = MagicMock()
+        mock_bridge.check_readiness.return_value = (True, "Ready")
+
+        disp = TriageTaskDispatcher(
+            queue=mock_disp_queue,
+            worktree_mgr=mock_worktree_mgr,
+            live_bridge=mock_bridge,
+            enable_agent_execution=True,
+        )
+
+        with patch("subprocess.run") as mock_disp_git:
+            res = disp.execute_task(leased_task)
+            assert res is None, f"Dispatcher must return None on invalid case: {label}"
+            mock_disp_queue.fail_task.assert_called_once()
+            # Assert neither worktree manager nor Git commands nor complete_task invoked
+            mock_worktree_mgr.create_or_resume_worktree.assert_not_called()
+            mock_disp_queue.complete_task.assert_not_called()
+            mock_disp_git.assert_not_called()

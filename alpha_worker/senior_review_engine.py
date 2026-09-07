@@ -18,15 +18,17 @@ Review Workflow:
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import tempfile
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
-from alpha_protocol.task import ReviewAttestation
+from alpha_protocol.task import REGISTERED_REVIEW_KEYS, ReviewAttestation
 
 logger = logging.getLogger("alphabrain.worker.senior_review")
 
@@ -273,6 +275,41 @@ class SeniorReviewEngine:
         if not self.signing_secret:
             raise ValueError(f"Missing signing secret for key {self.key_id}")
 
+        key_id = self.key_id
+
+        if key_id not in REGISTERED_REVIEW_KEYS:
+            raise ValueError(f"Key {key_id} is not a registered review key")
+
+        revoked_keys = os.environ.get("ALPHA_REVOKED_KEYS", "").split(",")
+        if key_id in revoked_keys:
+            raise ValueError(f"Key {key_id} has been revoked")
+
+        lease_meta = (task.get("provenance") or {}).get("lease_metadata") or {}
+        auth_attempt_id = lease_meta.get("attempt_id")
+        auth_worker_id = lease_meta.get("worker_id")
+
+        if not auth_attempt_id or auth_attempt_id in ("att_unknown", "None", ""):
+            raise ValueError("Task provenance missing or invalid authoritative lease attempt_id")
+        if not auth_worker_id or auth_worker_id in ("worker_unknown", "None", ""):
+            raise ValueError("Task provenance missing or invalid authoritative lease worker_id")
+
+        result = task.get("result") or {}
+        attempt_id = result.get("attempt_id")
+        executor_id = result.get("worker_id")
+
+        for name, val in [("attempt_id", attempt_id), ("worker_id", executor_id)]:
+            if not val or val in ("worker_unknown", "att_unknown", "None", ""):
+                raise ValueError(f"Missing or invalid {name} in task result")
+
+        if attempt_id != auth_attempt_id:
+            raise ValueError(
+                f"Task result attempt_id '{attempt_id}' does not match authoritative lease attempt_id '{auth_attempt_id}'"
+            )
+        if executor_id != auth_worker_id:
+            raise ValueError(
+                f"Task result worker_id '{executor_id}' does not match authoritative lease worker_id '{auth_worker_id}'"
+            )
+
         worktree_path = task.get("worktree_path")
         if not worktree_path or not Path(worktree_path).is_dir():
             raise ValueError(
@@ -375,11 +412,6 @@ Instructions:
 
         evidence = task.get("result", {}).get("evidence", {})
 
-        import os
-        import uuid
-
-        from alpha_protocol.task import REGISTERED_REVIEW_KEYS
-
         try:
             tree_digest = subprocess.check_output(
                 ["git", "rev-parse", "HEAD^{tree}"], cwd=worktree_path, text=True
@@ -387,36 +419,7 @@ Instructions:
         except subprocess.CalledProcessError as e:
             raise ValueError(f"Failed to get tree digest: {e}") from e
 
-        attempt_id = task.get("result", {}).get("attempt_id")
-        executor_id = task.get("result", {}).get("worker_id")
-
-        for name, val in [("attempt_id", attempt_id), ("worker_id", executor_id)]:
-            if not val or val in ("worker_unknown", "att_unknown", "None"):
-                raise ValueError(f"Missing or invalid {name} in task result")
-
-        lease_meta = task.get("provenance", {}).get("lease_metadata") or {}
-        auth_attempt_id = lease_meta.get("attempt_id")
-        auth_worker_id = lease_meta.get("worker_id")
-        if auth_attempt_id and attempt_id != auth_attempt_id:
-            raise ValueError(
-                f"Task result attempt_id '{attempt_id}' does not match authoritative lease attempt_id '{auth_attempt_id}'"
-            )
-        if auth_worker_id and executor_id != auth_worker_id:
-            raise ValueError(
-                f"Task result worker_id '{executor_id}' does not match authoritative lease worker_id '{auth_worker_id}'"
-            )
-
-        key_id = self.key_id
-        if key_id not in REGISTERED_REVIEW_KEYS:
-            raise ValueError(f"Key {key_id} is not a registered review key")
-
-        revoked_keys = os.environ.get("ALPHA_REVOKED_KEYS", "").split(",")
-        if key_id in revoked_keys:
-            raise ValueError(f"Key {key_id} has been revoked")
-
         secret = os.environ.get(f"ALPHA_SIGNING_SECRET_{key_id}") or self.signing_secret
-        if not secret:
-            raise ValueError(f"Missing signing secret for key {key_id}")
 
         att = ReviewAttestation.create(
             task_id=task_id,

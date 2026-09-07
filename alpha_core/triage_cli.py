@@ -749,41 +749,59 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         )
         return 1
 
-    expected_attempt_id = result.get("attempt_id")
-    expected_worker_id = result.get("worker_id")
-
-    if not expected_attempt_id or not expected_worker_id:
-        print("Error: Task result is missing attempt_id or worker_id.", file=sys.stderr)
-        return 1
-
-    lease_meta = task.get("provenance", {}).get("lease_metadata") or {}
+    lease_meta = (task.get("provenance") or {}).get("lease_metadata") or {}
     auth_attempt_id = lease_meta.get("attempt_id")
     auth_worker_id = lease_meta.get("worker_id")
 
-    if auth_attempt_id and expected_attempt_id != auth_attempt_id:
+    if not auth_attempt_id or auth_attempt_id in ("att_unknown", "None", ""):
+        print(
+            "Error: Task provenance is missing or has invalid authoritative lease attempt_id.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not auth_worker_id or auth_worker_id in ("worker_unknown", "None", ""):
+        print(
+            "Error: Task provenance is missing or has invalid authoritative lease worker_id.",
+            file=sys.stderr,
+        )
+        return 1
+
+    expected_attempt_id = result.get("attempt_id")
+    expected_worker_id = result.get("worker_id")
+
+    if not expected_attempt_id or expected_attempt_id in ("att_unknown", "None", ""):
+        print("Error: Task result is missing or has invalid attempt_id.", file=sys.stderr)
+        return 1
+
+    if not expected_worker_id or expected_worker_id in ("worker_unknown", "None", ""):
+        print("Error: Task result is missing or has invalid worker_id.", file=sys.stderr)
+        return 1
+
+    if expected_attempt_id != auth_attempt_id:
         print(
             f"Error: Task result attempt_id '{expected_attempt_id}' does not match authoritative lease metadata '{auth_attempt_id}'.",
             file=sys.stderr,
         )
         return 1
 
-    if auth_worker_id and expected_worker_id != auth_worker_id:
+    if expected_worker_id != auth_worker_id:
         print(
             f"Error: Task result worker_id '{expected_worker_id}' does not match authoritative lease metadata '{auth_worker_id}'.",
             file=sys.stderr,
         )
         return 1
 
-    if att.attempt_id != expected_attempt_id:
+    if att.attempt_id != auth_attempt_id:
         print(
-            f"Error: Attestation attempt_id '{att.attempt_id}' does not match expected attempt_id '{expected_attempt_id}'.",
+            f"Error: Attestation attempt_id '{att.attempt_id}' does not match authoritative lease metadata '{auth_attempt_id}'.",
             file=sys.stderr,
         )
         return 1
 
-    if att.executor_id != expected_worker_id:
+    if att.executor_id != auth_worker_id:
         print(
-            f"Error: Attestation executor_id '{att.executor_id}' does not match expected worker_id '{expected_worker_id}'.",
+            f"Error: Attestation executor_id '{att.executor_id}' does not match authoritative lease metadata '{auth_worker_id}'.",
             file=sys.stderr,
         )
         return 1
