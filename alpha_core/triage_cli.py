@@ -659,15 +659,31 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
     import os
 
+    import pydantic
+
     from alpha_protocol.task import ReviewAttestation
 
     try:
         att = ReviewAttestation(**attestation_dict)
+    except pydantic.ValidationError as e:
+        if "Attestation has expired" in str(e):
+            print("Error: Review attestation has expired (TTL exceeded).", file=sys.stderr)
+        else:
+            print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
+        return 1
     except Exception as e:
         print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
         return 1
 
-    signing_secret = os.environ.get("ALPHA_SIGNING_SECRET")
+    revoked_keys = os.environ.get("ALPHA_REVOKED_KEYS", "").split(",")
+    if att.key_id and att.key_id in revoked_keys:
+        print(f"Error: Attestation signed with a revoked key_id '{att.key_id}'.", file=sys.stderr)
+        return 1
+
+    signing_secret = os.environ.get(f"ALPHA_SIGNING_SECRET_{att.key_id}") if att.key_id else None
+    if not signing_secret:
+        signing_secret = os.environ.get("ALPHA_SIGNING_SECRET")
+
     if not signing_secret:
         print("Error: ALPHA_SIGNING_SECRET environment variable is not set.", file=sys.stderr)
         return 1
@@ -675,6 +691,16 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     if not att.verify(signing_secret):
         print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
         return 1
+
+    nonce_file = Path(repo_path) / ".alphabrain" / "seen_nonces.txt"
+    if nonce_file.exists():
+        with open(nonce_file) as f:
+            if att.nonce in f.read().splitlines():
+                print(
+                    f"Error: Replay attack detected. Nonce '{att.nonce}' has already been used.",
+                    file=sys.stderr,
+                )
+                return 1
 
     if att.task_id != args.task_id:
         print(
@@ -826,6 +852,11 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print(json.dumps({"task_id": args.task_id, "status": "merged"}))
     else:
         print(f"✅ Successfully merged and pruned task '{args.task_id}'.")
+
+    nonce_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(nonce_file, "a") as f:
+        f.write(att.nonce + "\n")
+
     return 0
 
 

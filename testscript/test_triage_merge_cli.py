@@ -1,4 +1,3 @@
-
 """
 Unit tests verifying the autonomous fast-forward PR merge engine for AlphaBrain.
 Ensures acceptance gate enforcement, 2-Round Senior Review enforcement, fail-closed handling,
@@ -123,7 +122,11 @@ def test_merge_successful_with_senior_review_approved(
         },
         "envelope": {"repo": str(tmp_path), "base_commit": "b" * 40},
     }
-    mock_exists.return_value = True
+
+    def mock_exists_side_effect(*args, **kwargs):
+        return any("task_success" in str(arg) for arg in args) if args else False
+
+    mock_exists.side_effect = mock_exists_side_effect
 
     def mock_run_side_effect(*args, **kwargs):
         cmd = args[0]

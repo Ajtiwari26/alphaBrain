@@ -95,15 +95,18 @@ class ReviewAttestation(BaseModel):
     evidence_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
     signature: str = Field(pattern=r"^[a-f0-9]{64}$")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_principals(self) -> "ReviewAttestation":
         if self.executor_id == self.reviewer_id:
-            raise ValueError("Principal separation failed: executor_id and reviewer_id must be different")
+            raise ValueError(
+                "Principal separation failed: executor_id and reviewer_id must be different"
+            )
         return self
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_ttl(self) -> "ReviewAttestation":
         import time
+
         now = time.time()
         if self.expires_at <= self.issued_at:
             raise ValueError("expires_at must be strictly greater than issued_at")
@@ -160,9 +163,10 @@ class ReviewAttestation(BaseModel):
         key_id: str,
         issued_at: float | None = None,
         expires_at: float | None = None,
-        reviewer_id: str = "SYSTEM_SENIOR_REVIEW_ENGINE"
+        reviewer_id: str = "SYSTEM_SENIOR_REVIEW_ENGINE",
     ) -> "ReviewAttestation":
         import time
+
         now = time.time()
         if issued_at is None:
             issued_at = now

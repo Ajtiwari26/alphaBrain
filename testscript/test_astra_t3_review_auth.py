@@ -13,7 +13,12 @@ def test_valid_attestation_creation_and_verification():
     attestation = ReviewAttestation.create(
         task_id="tsk_123",
         result_sha="a" * 40,
-        base_commit="b" * 40, attempt_id="att_1", tree_digest="c" * 40, nonce="nonce", executor_id="worker", key_id="key",
+        base_commit="b" * 40,
+        attempt_id="att_1",
+        tree_digest="c" * 40,
+        nonce="nonce",
+        executor_id="worker",
+        key_id="key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -32,7 +37,12 @@ def test_tamper_detection():
     attestation = ReviewAttestation.create(
         task_id="tsk_123",
         result_sha="a" * 40,
-        base_commit="b" * 40, attempt_id="att_1", tree_digest="c" * 40, nonce="nonce", executor_id="worker", key_id="key",
+        base_commit="b" * 40,
+        attempt_id="att_1",
+        tree_digest="c" * 40,
+        nonce="nonce",
+        executor_id="worker",
+        key_id="key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -74,7 +84,12 @@ def test_wrong_secret():
     attestation = ReviewAttestation.create(
         task_id="tsk_123",
         result_sha="a" * 40,
-        base_commit="b" * 40, attempt_id="att_1", tree_digest="c" * 40, nonce="nonce", executor_id="worker", key_id="key",
+        base_commit="b" * 40,
+        attempt_id="att_1",
+        tree_digest="c" * 40,
+        nonce="nonce",
+        executor_id="worker",
+        key_id="key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -230,16 +245,24 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
     result_sha = "2" * 40
     evidence = {"test_runs": 5, "passed": True}
 
+    import uuid
+
     def make_task_and_att(
         att_task_id=task_id,
         att_result_sha=result_sha,
-        att_base_commit=base_commit, attempt_id="att_1", tree_digest="t"*40, nonce="n", executor_id="w", key_id="k",
+        att_base_commit=base_commit,
+        attempt_id="att_1",
+        tree_digest="t" * 40,
+        nonce=None,
+        executor_id="w",
+        key_id="k",
         att_approved=True,
         att_pro="APPROVE",
         att_opus="FINAL_APPROVAL",
         att_evidence=evidence,
         corrupt_sig=False,
     ):
+        nonce = nonce or uuid.uuid4().hex
         att = ReviewAttestation.create(
             task_id=att_task_id,
             attempt_id="att_1",
@@ -252,9 +275,9 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             reviewed_at=time.time(),
             evidence=att_evidence,
             secret=secret,
-            nonce="nonce",
-            executor_id="exec",
-            key_id="k1",
+            nonce=nonce,
+            executor_id=executor_id,
+            key_id=key_id,
         )
         if corrupt_sig:
             att.signature = "0" * 64
@@ -366,3 +389,172 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             q.get_task.return_value = make_task_and_att()
             with patch("fcntl.flock"):
                 assert cmd_merge(args, q) == 0, "Valid attestation must pass"
+
+
+def make_standalone_task_and_att(
+    task_id, attempt_id, nonce, key_id, repo_path, secret="test_secret_123"
+):
+    import time
+
+    from alpha_core.queue.triage_queue import TriageStatus
+    from alpha_protocol.task import ReviewAttestation
+
+    att_dict = ReviewAttestation.create(
+        task_id=task_id,
+        attempt_id=attempt_id,
+        result_sha="2" * 40,
+        base_commit="1" * 40,
+        tree_digest="c" * 40,
+        pro_verdict="APPROVE",
+        opus_verdict="FINAL_APPROVAL",
+        approved=True,
+        reviewed_at=time.time(),
+        evidence={},
+        secret=secret,
+        nonce=nonce,
+        executor_id="exec",
+        key_id=key_id,
+        reviewer_id="SYSTEM_SENIOR_REVIEW_ENGINE",
+    )
+
+    t = {
+        "id": task_id,
+        "status": TriageStatus.COMPLETED.value,
+        "branch_name": f"alpha/{task_id}",
+        "result": {
+            "gates_passed": True,
+            "result_sha": "2" * 40,
+            "evidence": {},
+            "senior_review": {"approved": True, "attestation": att_dict},
+        },
+        "envelope": {"repo": str(repo_path), "base_commit": "1" * 40},
+    }
+    return t
+
+
+def test_attestation_expiration_rejected():
+    import time
+
+    import pytest
+    from pydantic import ValidationError
+
+    from alpha_protocol.task import ReviewAttestation
+
+    with pytest.raises(ValidationError) as exc_info:
+        ReviewAttestation.create(
+            task_id="tsk_1",
+            attempt_id="att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=time.time(),
+            issued_at=time.time() - 7200,
+            expires_at=time.time() - 3600,
+            evidence={},
+            secret="test_secret",
+            nonce="nonce",
+            executor_id="exec",
+            key_id="k1",
+        )
+    assert "Attestation has expired" in str(exc_info.value)
+
+
+def test_principal_collision_rejected():
+    import time
+
+    import pytest
+    from pydantic import ValidationError
+
+    from alpha_protocol.task import ReviewAttestation
+
+    with pytest.raises(ValidationError) as exc_info:
+        ReviewAttestation.create(
+            task_id="tsk_1",
+            attempt_id="att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=time.time(),
+            evidence={},
+            secret="test_secret",
+            nonce="nonce",
+            executor_id="SYSTEM_SENIOR_REVIEW_ENGINE",
+            reviewer_id="SYSTEM_SENIOR_REVIEW_ENGINE",
+            key_id="k1",
+        )
+    assert "Principal separation failed" in str(exc_info.value)
+
+
+def fake_git_for_tests(cmd, **kwargs):
+    from unittest.mock import MagicMock
+
+    m = MagicMock()
+    if cmd[:2] == ["git", "rev-parse"]:
+        if "^{tree}" in cmd[2]:
+            m.stdout = "c" * 40 + "\n"
+        else:
+            m.stdout = "2" * 40 + "\n"
+        m.returncode = 0
+        return m
+    m.stdout = ""
+    m.returncode = 0
+    return m
+
+
+def test_replay_attack_rejected(monkeypatch, tmp_path):
+    import argparse
+    from unittest.mock import MagicMock, patch
+
+    from alpha_core.triage_cli import cmd_merge
+
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    nonce_file = repo_path / ".alphabrain" / "seen_nonces.txt"
+    nonce_file.parent.mkdir(parents=True)
+    nonce_file.write_text("my_test_nonce\n")
+
+    args = argparse.Namespace(task_id="tsk_test_merge_auth", json=False)
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "test_secret_123")
+
+    q = MagicMock()
+    q.get_task.return_value = make_standalone_task_and_att(
+        task_id="tsk_test_merge_auth",
+        attempt_id="att_1",
+        nonce="my_test_nonce",
+        key_id="k1",
+        repo_path=str(repo_path),
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = fake_git_for_tests
+        assert cmd_merge(args, q) == 1
+
+
+def test_key_revocation_rejected(monkeypatch, tmp_path):
+    import argparse
+    from unittest.mock import MagicMock, patch
+
+    from alpha_core.triage_cli import cmd_merge
+
+    args = argparse.Namespace(task_id="tsk_test_merge_auth", json=False)
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "test_secret_123")
+    monkeypatch.setenv("ALPHA_REVOKED_KEYS", "k1,bad_key")
+
+    q = MagicMock()
+    q.get_task.return_value = make_standalone_task_and_att(
+        task_id="tsk_test_merge_auth",
+        attempt_id="att_1",
+        nonce="some_other_nonce",
+        key_id="k1",
+        repo_path=str(tmp_path),
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = fake_git_for_tests
+        assert cmd_merge(args, q) == 1

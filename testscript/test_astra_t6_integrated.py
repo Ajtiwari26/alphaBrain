@@ -58,6 +58,7 @@ def create_valid_attestation(
     evidence=None,
 ):
     import time
+
     if evidence is None:
         evidence = {"dummy": "evidence"}
     return ReviewAttestation.create(
