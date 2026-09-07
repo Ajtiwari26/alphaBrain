@@ -178,10 +178,11 @@ class SeniorReviewEngine:
             os.makedirs(tmp_gemini)
             
             real_gemini = os.path.expanduser("~/.gemini")
-            creds = os.path.join(real_gemini, "credentials.json")
-            if os.path.exists(creds):
-                import shutil
-                shutil.copy(creds, os.path.join(tmp_gemini, "credentials.json"))
+            for token_file in ["credentials.json", "jetski-standalone-oauth-token"]:
+                src = os.path.join(real_gemini, token_file)
+                if os.path.exists(src):
+                    import shutil
+                    shutil.copy(src, os.path.join(tmp_gemini, token_file))
             
             env["HOME"] = tmp_home
             
