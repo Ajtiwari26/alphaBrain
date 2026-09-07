@@ -324,11 +324,13 @@ def evaluate_agy_execution_outcome(
         if not line:
             continue
 
-        if line == COMPLETION_TOKEN:
+        clean_line = line.strip("`*# ")
+        if clean_line == COMPLETION_TOKEN or line == COMPLETION_TOKEN:
             final_marker = COMPLETION_TOKEN
             blocked_msg = ""
-        elif line.startswith(BLOCKED_TOKEN):
-            remainder = line[len(BLOCKED_TOKEN) :].strip()
+        elif clean_line.startswith(BLOCKED_TOKEN) or line.startswith(BLOCKED_TOKEN):
+            target = clean_line if clean_line.startswith(BLOCKED_TOKEN) else line
+            remainder = target[len(BLOCKED_TOKEN) :].strip()
             if not remainder or remainder.startswith(":"):
                 final_marker = BLOCKED_TOKEN
                 blocked_msg = remainder.lstrip(": ")
@@ -1057,7 +1059,7 @@ Emit a single-line JSON manifest before termination exactly matching this format
 {QA_EVIDENCE_TOKEN}{{"contract_version": 1, "skill": "{SDLC_SKILL_NAME}", "testscript_root": "testscript", "project_id": "{task.project_id}", "task_id": "{task.task_id}", "executed_commands": [{{"command": "...", "exit_code": 0, "summary": "..."}}], "required_gates": {required_gates_json}, "passed_gates": [], "review_calls": 2, "security_review": {{"executed": true}}, "artifacts": [], "blockers": []}}
 
 8. TERMINAL PROTOCOL:
-- SUCCESS: ONLY after every gate passes (exit code 0), emit exactly {COMPLETION_TOKEN} on its own line.
+- SUCCESS: ONLY after every gate passes (exit code 0), emit exactly {COMPLETION_TOKEN} on its own line. If resuming an existing conversation where gates have already passed, you MUST still emit {QA_EVIDENCE_TOKEN}<json> and {COMPLETION_TOKEN} on their own lines in this response.
 - FAILURE: On blocked or failing gate, emit exactly {BLOCKED_TOKEN}: <exact reason>. NEVER emit {COMPLETION_TOKEN}.
 
 9. EXPLICIT ANTI-PATTERNS (Will cause immediate contract termination):
