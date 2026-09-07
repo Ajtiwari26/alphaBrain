@@ -165,9 +165,16 @@ def test_merge_successful_with_senior_review_approved(
         text=True,
     )
     mock_run.assert_any_call(
-        ["git", "merge", "--ff-only", "abc1234567890abcdef1234567890abcdef12345"],
+        [
+            "git",
+            "update-ref",
+            "-m",
+            "Atomic promotion",
+            "refs/heads/main",
+            "abc1234567890abcdef1234567890abcdef12345",
+            "b" * 40,
+        ],
         cwd=str(tmp_path),
-        check=True,
         capture_output=True,
         text=True,
     )

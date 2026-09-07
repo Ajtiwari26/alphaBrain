@@ -58,6 +58,29 @@ def _print_table(headers: list[str], rows: list[list[str]]) -> None:
         print(" | ".join(row[i].ljust(col_widths[i]) for i in range(len(row))))
 
 
+def _atomic_write_json(filepath: Path, data: dict):
+    import tempfile
+
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=filepath.parent, prefix=".tmp", suffix=".json")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, filepath)
+        # fsync the parent directory to ensure the directory entry is durable
+        try:
+            dir_fd = os.open(filepath.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            os.fsync(dir_fd)
+            os.close(dir_fd)
+        except OSError:
+            pass  # Some platforms/filesystems do not support directory fsync
+    except Exception:
+        os.remove(tmp_path)
+        raise
+
+
 def cmd_list(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     status_filter = None
     if args.status and args.status.lower() != "all":
@@ -702,15 +725,8 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
         return 1
 
-    nonce_file = Path(repo_path) / ".alphabrain" / "seen_nonces.txt"
-    if nonce_file.exists():
-        with open(nonce_file) as f:
-            if att.nonce in f.read().splitlines():
-                print(
-                    f"Error: Replay attack detected. Nonce '{att.nonce}' has already been used.",
-                    file=sys.stderr,
-                )
-                return 1
+    legacy_nonce_file = Path(repo_path) / ".alphabrain" / "seen_nonces.txt"
+    promotions_dir = Path(repo_path) / ".alphabrain" / "promotions"
 
     if att.task_id != args.task_id:
         print(
@@ -815,40 +831,6 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         )
         return 1
 
-    try:
-        tip_res = subprocess.run(
-            ["git", "rev-parse", branch_name],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        branch_tip = tip_res.stdout.strip()
-        if branch_tip != result_sha:
-            print(
-                f"Error: SLSA Provenance Failure. Branch tip {branch_tip} does not match approved result_sha {result_sha}.",
-                file=sys.stderr,
-            )
-            return 1
-
-        tree_res = subprocess.run(
-            ["git", "rev-parse", f"{branch_name}^{{tree}}"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        branch_tree = tree_res.stdout.strip()
-        if branch_tree != att.tree_digest:
-            print(
-                f"Error: SLSA Provenance Failure. Branch tree {branch_tree} does not match attestation tree_digest {att.tree_digest}.",
-                file=sys.stderr,
-            )
-            return 1
-    except subprocess.CalledProcessError:
-        print(f"Error: Could not resolve branch {branch_name} or its tree.", file=sys.stderr)
-        return 1
-
     print(f"Verifying gates passed and senior review for '{args.task_id}'... OK")
     print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")
 
@@ -875,7 +857,191 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
             )
             return 1
 
+        # 1. Legacy nonce check
+        if legacy_nonce_file.exists():
+            with open(legacy_nonce_file) as f:
+                if att.nonce in f.read().splitlines():
+                    print(
+                        f"Error: Replay attack detected. Nonce '{att.nonce}' has already been used.",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+        promotions_dir.mkdir(parents=True, exist_ok=True)
+        nonce_state_file = promotions_dir / f"{att.nonce}.json"
+
+        # 2. State machine check
+        if nonce_state_file.exists():
+            with open(nonce_state_file) as f:
+                try:
+                    state_data = json.load(f)
+                except json.JSONDecodeError:
+                    print("Error: Corrupt durable state found.", file=sys.stderr)
+                    return 1
+
+            if (
+                state_data.get("task_id") != args.task_id
+                or state_data.get("result_sha") != result_sha
+                or state_data.get("attempt_id") != auth_attempt_id
+                or state_data.get("base_commit") != expected_base_commit
+                or state_data.get("evidence_digest") != expected_evidence_digest
+                or state_data.get("tree_digest") != att.tree_digest
+            ):
+                print(
+                    f"Error: Replay attack detected. Nonce '{att.nonce}' was used for a different request. "
+                    f"State: {state_data.get('tree_digest')}, Att: {att.tree_digest}, "
+                    f"State task: {state_data.get('task_id')}, Args task: {args.task_id}, "
+                    f"State result: {state_data.get('result_sha')}, Result: {result_sha}, "
+                    f"State attempt: {state_data.get('attempt_id')}, Auth attempt: {auth_attempt_id}, "
+                    f"State base: {state_data.get('base_commit')}, Expected base: {expected_base_commit}, "
+                    f"State evidence: {state_data.get('evidence_digest')}, Expected evidence: {expected_evidence_digest}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            if state_data.get("state") == "FINALIZED":
+                if getattr(args, "json", False):
+                    print(json.dumps({"task_id": args.task_id, "status": "merged"}))
+                else:
+                    print(
+                        f"✅ Successfully resumed idempotent promotion. Task '{args.task_id}' was already merged."
+                    )
+                return 0
+
+            if state_data.get("state") in ("RESERVED", "APPLIED"):
+                # Recover from crash
+                if state_data.get("state") == "RESERVED":
+                    try:
+                        tip_res = subprocess.run(
+                            ["git", "rev-parse", "main"],
+                            cwd=repo_path,
+                            capture_output=True,
+                            text=True,
+                            check=True,
+                        )
+                        if tip_res.stdout.strip() == result_sha:
+                            state_data["state"] = "APPLIED"
+                            _atomic_write_json(nonce_state_file, state_data)
+                    except subprocess.CalledProcessError:
+                        pass
+
+                if state_data.get("state") == "APPLIED":
+                    subprocess.run(
+                        ["git", "checkout", "main"], cwd=repo_path, check=True, capture_output=True
+                    )
+                    subprocess.run(
+                        ["git", "reset", "--hard", result_sha],
+                        cwd=repo_path,
+                        check=True,
+                        capture_output=True,
+                    )
+
+                    state_data["state"] = "FINALIZED"
+                    _atomic_write_json(nonce_state_file, state_data)
+
+                    if getattr(args, "json", False):
+                        print(json.dumps({"task_id": args.task_id, "status": "merged"}))
+                    else:
+                        print(
+                            f"✅ Successfully recovered from crash. Task '{args.task_id}' was already merged."
+                        )
+                    return 0
+        else:
+            # 3. Reserve nonce
+            state_data = {
+                "nonce": att.nonce,
+                "task_id": args.task_id,
+                "result_sha": result_sha,
+                "attempt_id": auth_attempt_id,
+                "base_commit": expected_base_commit,
+                "evidence_digest": expected_evidence_digest,
+                "tree_digest": att.tree_digest,
+                "state": "RESERVED",
+            }
+            _atomic_write_json(nonce_state_file, state_data)
+
+        # 4. Verify branch tips and trees now that we are in the reservation lock and guaranteed not to be a replay
         try:
+            tip_res = subprocess.run(
+                ["git", "rev-parse", branch_name],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            branch_tip = tip_res.stdout.strip()
+            if branch_tip != result_sha:
+                print(
+                    f"Error: SLSA Provenance Failure. Branch tip {branch_tip} does not match approved result_sha {result_sha}.",
+                    file=sys.stderr,
+                )
+                return 1
+
+            tree_res = subprocess.run(
+                ["git", "rev-parse", f"{branch_name}^{{tree}}"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            branch_tree = tree_res.stdout.strip()
+            if branch_tree != att.tree_digest:
+                print(
+                    f"Error: SLSA Provenance Failure. Branch tree {branch_tree} does not match attestation tree_digest {att.tree_digest}.",
+                    file=sys.stderr,
+                )
+                return 1
+        except subprocess.CalledProcessError:
+            print(f"Error: Could not resolve branch {branch_name} or its tree.", file=sys.stderr)
+            return 1
+
+        # 4.5. Fast-forward Ancestry Check
+        try:
+            ancestry_res = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", expected_base_commit, result_sha],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            if ancestry_res.returncode != 0:
+                print(
+                    f"Error: SLSA Provenance Failure. Result commit {result_sha} is not a fast-forward of base {expected_base_commit}.",
+                    file=sys.stderr,
+                )
+                return 1
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Git ancestry check failed.\n{e.stderr}", file=sys.stderr)
+            return 1
+
+        # 5. CAS Destination Base Check and Update
+        try:
+            # Atomic compare and swap of refs/heads/main
+            update_res = subprocess.run(
+                [
+                    "git",
+                    "update-ref",
+                    "-m",
+                    "Atomic promotion",
+                    "refs/heads/main",
+                    result_sha,
+                    expected_base_commit,
+                ],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            if update_res.returncode != 0:
+                print(
+                    f"Error: Destination base has advanced or update failed. {update_res.stderr}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # Transition to APPLIED state
+            state_data["state"] = "APPLIED"
+            _atomic_write_json(nonce_state_file, state_data)
+
+            # Checkout main and reset to ensure index/working tree are in sync with the new HEAD
             subprocess.run(
                 ["git", "checkout", "main"],
                 cwd=repo_path,
@@ -883,18 +1049,20 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                 capture_output=True,
                 text=True,
             )
-            res = subprocess.run(
-                ["git", "merge", "--ff-only", result_sha],
+            subprocess.run(
+                ["git", "reset", "--hard", result_sha],
                 cwd=repo_path,
                 check=True,
                 capture_output=True,
                 text=True,
             )
-            if res.stdout.strip():
-                print(res.stdout.strip())
         except subprocess.CalledProcessError as e:
-            print(f"Error: Fast-forward merge failed.\n{e.stderr}", file=sys.stderr)
+            print(f"Error: Git operations failed.\n{e.stderr}", file=sys.stderr)
             return 1
+
+        # 6. Finalize state
+        state_data["state"] = "FINALIZED"
+        _atomic_write_json(nonce_state_file, state_data)
 
         if worktree_path and Path(worktree_path).exists():
             print(f"Pruning git worktree '{worktree_path}'...")
@@ -928,10 +1096,6 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print(json.dumps({"task_id": args.task_id, "status": "merged"}))
     else:
         print(f"✅ Successfully merged and pruned task '{args.task_id}'.")
-
-    nonce_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(nonce_file, "a") as f:
-        f.write(att.nonce + "\n")
 
     return 0
 

@@ -202,12 +202,12 @@ def test_full_happy_path_lifecycle(e2e_setup, monkeypatch):
 
         assert cmd_merge(args, queue) == 0
 
-        # Verify git merge --ff-only was called with result_sha
+        # Verify git update-ref was called
         merge_called = False
         for call in mock_run.call_args_list:
-            if call[0][0] == ["git", "merge", "--ff-only", result_sha]:
+            if call[0][0][:3] == ["git", "update-ref", "-m"]:
                 merge_called = True
-        assert merge_called, "Exact result_sha should be merged"
+        assert merge_called, "Exact result_sha should be updated"
 
 
 def test_stale_fencing_rejection(e2e_setup):

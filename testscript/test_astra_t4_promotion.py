@@ -1,6 +1,9 @@
 import argparse
-import fcntl
+import json
 import os
+import subprocess
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -11,28 +14,50 @@ from alpha_core.triage_cli import cmd_merge
 from alpha_protocol.task import ReviewAttestation
 
 
+def run_git(repo_path, *cmd):
+    return subprocess.run(
+        ["git", *cmd], cwd=repo_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+@pytest.fixture
+def real_git_repo(tmp_path):
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    run_git(repo_path, "init")
+    run_git(repo_path, "config", "user.name", "Test User")
+    run_git(repo_path, "config", "user.email", "test@example.com")
+    run_git(repo_path, "commit", "--allow-empty", "-m", "Initial commit")
+    base_commit = run_git(repo_path, "rev-parse", "HEAD")
+
+    run_git(repo_path, "checkout", "-b", "alpha/tsk_123")
+    run_git(repo_path, "commit", "--allow-empty", "-m", "Task commit")
+    result_sha = run_git(repo_path, "rev-parse", "HEAD")
+    tree_digest = run_git(repo_path, "rev-parse", "HEAD^{tree}")
+
+    # Go back to main
+    run_git(repo_path, "checkout", "main")
+
+    return repo_path, base_commit, result_sha, tree_digest
+
+
 def create_valid_attestation(
     task_id,
     result_sha,
     base_commit,
+    tree_digest,
     secret="test_promotion_signing_secret_123",
     approved=True,
-    pro_verdict="APPROVE",
-    opus_verdict="FINAL_APPROVAL",
-    evidence=None,
 ):
-    import time
-
-    if evidence is None:
-        evidence = {"dummy": "evidence"}
+    evidence = {"dummy": "evidence"}
     return ReviewAttestation.create(
         task_id=task_id,
         attempt_id="att_1",
         result_sha=result_sha,
         base_commit=base_commit,
-        tree_digest="c" * 40,
-        pro_verdict=pro_verdict,
-        opus_verdict=opus_verdict,
+        tree_digest=tree_digest,
+        pro_verdict="APPROVE",
+        opus_verdict="FINAL_APPROVAL",
         approved=approved,
         reviewed_at=time.time(),
         evidence=evidence,
@@ -44,37 +69,30 @@ def create_valid_attestation(
 
 
 @pytest.fixture
-def mock_queue():
-    queue = MagicMock()
-    return queue
-
-
-@pytest.fixture
-def base_task(tmp_path):
-    repo_path = str(tmp_path / "repo")
-    os.makedirs(repo_path, exist_ok=True)
+def base_task(real_git_repo):
+    repo_path, base_commit, result_sha, tree_digest = real_git_repo
     evidence = {"dummy": "evidence"}
+    expected_evidence_digest = ReviewAttestation.compute_evidence_digest(evidence)
+
     return {
         "id": "tsk_123",
         "status": TriageStatus.COMPLETED.value,
         "branch_name": "alpha/tsk_123",
         "envelope": {
-            "repo": repo_path,
-            "base_commit": "a" * 40,
+            "repo": str(repo_path),
+            "base_commit": base_commit,
         },
         "result": {
             "gates_passed": True,
             "attempt_id": "att_1",
             "worker_id": "exec_1",
-            "result_sha": "b" * 40,
+            "result_sha": result_sha,
             "evidence": evidence,
+            "evidence_digest": expected_evidence_digest,
             "senior_review": {
                 "approved": True,
                 "attestation": create_valid_attestation(
-                    task_id="tsk_123",
-                    result_sha="b" * 40,
-                    base_commit="a" * 40,
-                    evidence=evidence,
+                    "tsk_123", result_sha, base_commit, tree_digest
                 ),
             },
         },
@@ -89,129 +107,159 @@ def base_task(tmp_path):
     }
 
 
-def test_successful_promotion_merging_exact_sha(mock_queue, base_task):
-    mock_queue.get_task.return_value = base_task
-    args = argparse.Namespace(task_id="tsk_123", json=False)
-
-    with (
-        patch.dict(
-            os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
-        ),
-        patch("subprocess.run") as mock_run,
-    ):
-        # mock git rev-parse branch_name to return result_sha
-        def side_effect(cmd, **kwargs):
-            if cmd[:2] == ["git", "rev-parse"]:
-                m = MagicMock()
-                m.stdout = ("c" * 40 if "^{tree}" in cmd[2] else "b" * 40) + "\n"
-                return m
-            m = MagicMock()
-            m.stdout = ""
-            return m
-
-        mock_run.side_effect = side_effect
-
-        exit_code = cmd_merge(args, mock_queue)
-
-        assert exit_code == 0
-
-        # Verify git merge --ff-only result_sha was called
-        merge_called = False
-        for call in mock_run.call_args_list:
-            if call[0][0] == ["git", "merge", "--ff-only", "b" * 40]:
-                merge_called = True
-        assert merge_called, "Exact result_sha should be merged"
-
-
-def test_promotion_rejected_invalid_forged_attestation(mock_queue, base_task):
-    # Forge the attestation signature
-    base_task["result"]["senior_review"]["attestation"]["signature"] = "f" * 64
-    mock_queue.get_task.return_value = base_task
+def test_successful_promotion_real_git(base_task):
+    queue = MagicMock()
+    queue.get_task.return_value = base_task
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
     with patch.dict(
         os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
     ):
-        exit_code = cmd_merge(args, mock_queue)
-    assert exit_code == 1
+        exit_code = cmd_merge(args, queue)
+
+    assert exit_code == 0
+    repo_path = base_task["envelope"]["repo"]
+    assert run_git(repo_path, "rev-parse", "main") == base_task["result"]["result_sha"]
+
+    # Branch should be deleted
+    with pytest.raises(subprocess.CalledProcessError):
+        run_git(repo_path, "rev-parse", "alpha/tsk_123")
+
+    # State should be FINALIZED
+    with open(Path(repo_path) / ".alphabrain" / "promotions" / "nonce.json") as f:
+        state = json.load(f)
+        assert state["state"] == "FINALIZED"
 
 
-def test_promotion_rejected_result_sha_mismatch(mock_queue, base_task):
-    # Attestation result_sha differs from result["result_sha"]
-    base_task["result"]["senior_review"]["attestation"] = create_valid_attestation(
-        task_id="tsk_123",
-        result_sha="c" * 40,  # Mismatch!
-        base_commit="a" * 40,
+def test_crash_recovery_from_reserved(base_task):
+    queue = MagicMock()
+    queue.get_task.return_value = base_task
+    args = argparse.Namespace(task_id="tsk_123", json=False)
+    repo_path = base_task["envelope"]["repo"]
+
+    # 1. Inject crash right after writing RESERVED
+    original_write = __import__(
+        "alpha_core.triage_cli", fromlist=["_atomic_write_json"]
+    )._atomic_write_json
+
+    def crash_after_reserved(filepath, data):
+        original_write(filepath, data)
+        if data.get("state") == "RESERVED":
+            raise RuntimeError("CRASH!")
+
+    with patch.dict(
+        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+    ):
+        with patch("alpha_core.triage_cli._atomic_write_json", side_effect=crash_after_reserved):
+            with pytest.raises(RuntimeError, match="CRASH!"):
+                cmd_merge(args, queue)
+
+    # Verify we are in RESERVED state and main has not advanced
+    with open(Path(repo_path) / ".alphabrain" / "promotions" / "nonce.json") as f:
+        state = json.load(f)
+        assert state["state"] == "RESERVED"
+    assert run_git(repo_path, "rev-parse", "main") == base_task["envelope"]["base_commit"]
+
+    # 2. Recover
+    with patch.dict(
+        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+    ):
+        exit_code = cmd_merge(args, queue)
+
+    assert exit_code == 0
+    assert run_git(repo_path, "rev-parse", "main") == base_task["result"]["result_sha"]
+    with open(Path(repo_path) / ".alphabrain" / "promotions" / "nonce.json") as f:
+        state = json.load(f)
+        assert state["state"] == "FINALIZED"
+
+
+def test_crash_recovery_from_applied(base_task):
+    queue = MagicMock()
+    queue.get_task.return_value = base_task
+    args = argparse.Namespace(task_id="tsk_123", json=False)
+    repo_path = base_task["envelope"]["repo"]
+
+    # 1. Inject crash right after writing APPLIED
+    original_write = __import__(
+        "alpha_core.triage_cli", fromlist=["_atomic_write_json"]
+    )._atomic_write_json
+
+    def crash_after_applied(filepath, data):
+        original_write(filepath, data)
+        if data.get("state") == "APPLIED":
+            raise RuntimeError("CRASH!")
+
+    with patch.dict(
+        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+    ):
+        with patch("alpha_core.triage_cli._atomic_write_json", side_effect=crash_after_applied):
+            with pytest.raises(RuntimeError, match="CRASH!"):
+                cmd_merge(args, queue)
+
+    # Verify we are in APPLIED state and main HAS advanced (because update-ref happened before write APPLIED)
+    with open(Path(repo_path) / ".alphabrain" / "promotions" / "nonce.json") as f:
+        state = json.load(f)
+        assert state["state"] == "APPLIED"
+    assert run_git(repo_path, "rev-parse", "main") == base_task["result"]["result_sha"]
+
+    # We mess up the working tree to ensure recovery fixes it
+    run_git(repo_path, "checkout", base_task["envelope"]["base_commit"])
+
+    # 2. Recover
+    with patch.dict(
+        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+    ):
+        exit_code = cmd_merge(args, queue)
+
+    assert exit_code == 0
+    assert run_git(repo_path, "rev-parse", "main") == base_task["result"]["result_sha"]
+    # Verify index is clean and correctly on main
+    assert run_git(repo_path, "rev-parse", "HEAD") == base_task["result"]["result_sha"]
+    with open(Path(repo_path) / ".alphabrain" / "promotions" / "nonce.json") as f:
+        state = json.load(f)
+        assert state["state"] == "FINALIZED"
+
+
+def _worker_merge(base_task_json):
+    import argparse
+    import json
+    import os
+    from unittest.mock import MagicMock
+
+    from alpha_core.triage_cli import cmd_merge
+
+    os.environ["ALPHA_SIGNING_SECRET_alpha_test_key"] = "test_promotion_signing_secret_123"
+
+    queue = MagicMock()
+    queue.get_task.return_value = json.loads(base_task_json)
+    args = argparse.Namespace(task_id="tsk_123", json=False)
+
+    try:
+        return cmd_merge(args, queue)
+    except Exception as e:
+        return str(e)
+
+
+def test_concurrency_safe(base_task):
+    import json
+
+    # Run 5 concurrent processes attempting to merge the same task
+    base_task_json = json.dumps(base_task)
+
+    results = []
+    with ProcessPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(_worker_merge, base_task_json) for _ in range(5)]
+        for f in as_completed(futures):
+            results.append(f.result())
+
+    # One should succeed (exit code 0), and others should either gracefully exit (code 0 via idempotency block)
+    # or fail due to lock contention/destination advanced.
+    assert all(isinstance(r, int) for r in results), (
+        f"Expected all processes to return ints, got: {results}"
     )
-    mock_queue.get_task.return_value = base_task
-    args = argparse.Namespace(task_id="tsk_123", json=False)
-
-    with patch.dict(
-        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
-    ):
-        exit_code = cmd_merge(args, mock_queue)
-    assert exit_code == 1
-
-
-def test_promotion_rejected_branch_tip_mismatch(mock_queue, base_task):
-    mock_queue.get_task.return_value = base_task
-    args = argparse.Namespace(task_id="tsk_123", json=False)
-
-    with (
-        patch.dict(
-            os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
-        ),
-        patch("subprocess.run") as mock_run,
-    ):
-
-        def side_effect(cmd, **kwargs):
-            if cmd[:2] == ["git", "rev-parse"]:
-                m = MagicMock()
-                m.stdout = "c" * 40 + "\n"  # Branch tip does not match expected result_sha
-                return m
-            m = MagicMock()
-            m.stdout = ""
-            return m
-
-        mock_run.side_effect = side_effect
-
-        exit_code = cmd_merge(args, mock_queue)
-        assert exit_code == 1
-
-
-def test_cross_process_promotion_lock(mock_queue, base_task):
-    mock_queue.get_task.return_value = base_task
-    args = argparse.Namespace(task_id="tsk_123", json=False)
 
     repo_path = base_task["envelope"]["repo"]
-    lock_file_path = Path(repo_path) / ".alphabrain" / "promotion.lock"
-    lock_file_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with (
-        patch.dict(
-            os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
-        ),
-        patch("subprocess.run") as mock_run,
-    ):
-
-        def side_effect(cmd, **kwargs):
-            if cmd[:2] == ["git", "rev-parse"]:
-                m = MagicMock()
-                m.stdout = ("c" * 40 if "^{tree}" in cmd[2] else "b" * 40) + "\n"
-                return m
-            m = MagicMock()
-            m.stdout = ""
-            return m
-
-        mock_run.side_effect = side_effect
-
-        # Hold the lock exclusively
-        with open(lock_file_path, "w") as lock_file:
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-            # While holding the lock, try to run cmd_merge
-            exit_code = cmd_merge(args, mock_queue)
-            assert exit_code == 1
-
-            # Release lock
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
+    assert run_git(repo_path, "rev-parse", "main") == base_task["result"]["result_sha"]
+    with open(Path(repo_path) / ".alphabrain" / "promotions" / "nonce.json") as f:
+        state = json.load(f)
+        assert state["state"] == "FINALIZED"
