@@ -653,21 +653,27 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     attestation_dict = senior_review.get("attestation") or (senior_review.get("details") or {}).get(
         "attestation"
     )
-    if attestation_dict:
-        import os
+    if not attestation_dict:
+        print("Error: Missing cryptographically signed ReviewAttestation.", file=sys.stderr)
+        return 1
+        
+    import os
+    from alpha_protocol.task import ReviewAttestation
 
-        from alpha_protocol.task import ReviewAttestation
+    try:
+        att = ReviewAttestation(**attestation_dict)
+    except Exception as e:
+        print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
+        return 1
 
-        try:
-            att = ReviewAttestation(**attestation_dict)
-        except Exception as e:
-            print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
-            return 1
-
-        signing_secret = os.environ.get("ALPHA_SIGNING_SECRET", "alphabrain_senior_review_key")
-        if not att.verify(signing_secret):
-            print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
-            return 1
+    signing_secret = os.environ.get("ALPHA_SIGNING_SECRET")
+    if not signing_secret:
+        print("Error: ALPHA_SIGNING_SECRET environment variable is not set.", file=sys.stderr)
+        return 1
+        
+    if not att.verify(signing_secret):
+        print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
+        return 1
 
         if att.result_sha != result_sha:
             print(

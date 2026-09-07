@@ -70,9 +70,12 @@ def test_merge_rejects_missing_branch():
     assert cmd_merge(args, queue) == 1
 
 
+@patch("alpha_protocol.task.ReviewAttestation.verify")
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.Path.exists")
-def test_merge_successful_with_senior_review_approved(mock_exists, mock_run, tmp_path):
+def test_merge_successful_with_senior_review_approved(mock_exists, mock_run, mock_verify, tmp_path, monkeypatch):
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "dummy_secret")
+    mock_verify.return_value = True
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_success",
@@ -86,6 +89,17 @@ def test_merge_successful_with_senior_review_approved(mock_exists, mock_run, tmp
                 "approved": True,
                 "pro_verdict": "APPROVE",
                 "opus_verdict": "FINAL_APPROVAL",
+                "attestation": {
+                    "task_id": "task_success",
+                    "base_commit": "b" * 40,
+                    "result_sha": "abc1234567890abcdef1234567890abcdef12345",
+                    "pro_verdict": "APPROVE",
+                    "opus_verdict": "FINAL_APPROVAL",
+                    "approved": True,
+                    "evidence_digest": "e" * 64,
+                    "reviewed_at": 1690000000.0,
+                    "signature": "f" * 64
+                }
             },
         },
         "envelope": {"repo": str(tmp_path)},
@@ -142,7 +156,10 @@ def test_merge_fails_without_senior_review(mock_exists, mock_run, tmp_path):
 
 @patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
 def test_cmd_senior_review_execution(mock_invoke, tmp_path):
-    mock_invoke.side_effect = ['{"verdict": "APPROVE"}', '{"verdict": "FINAL_APPROVAL"}']
+    mock_invoke.side_effect = [
+        {"response": "", "structured_output": {"verdict": "APPROVE"}},
+        {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}}
+    ]
     queue = MagicMock()
     queue.get_task.return_value = {
         "id": "task_sr_test",

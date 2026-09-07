@@ -154,7 +154,6 @@ class SeniorReviewEngine:
                 "--model",
                 model,
                 "--disable-slash-commands",
-                "--dangerously-skip-permissions",
                 "--output-format",
                 "json",
                 "--json-schema",
@@ -166,7 +165,14 @@ class SeniorReviewEngine:
                 cmd.extend(["--effort", effort])
             cmd.extend(["--print", prompt])
 
+            import os
+            import tempfile
             env = dict(os.environ)
+            
+            # Disable MCP servers by isolating the home directory
+            tmp_home = tempfile.mkdtemp()
+            env["HOME"] = tmp_home
+            
             if "ALPHA_SIGNING_SECRET" in env:
                 del env["ALPHA_SIGNING_SECRET"]
 
@@ -180,11 +186,21 @@ class SeniorReviewEngine:
                 )
             try:
                 import json
-                return json.loads(res.stdout)
+                def reject_duplicates(ordered_pairs):
+                    d = {}
+                    for k, v in ordered_pairs:
+                        if k in d:
+                            raise ValueError(f"Duplicate key: {k}")
+                        d[k] = v
+                    return d
+                return json.loads(res.stdout, object_pairs_hook=reject_duplicates)
             except Exception:
                 return {"response": res.stdout or res.stderr, "structured_output": {}}
         finally:
+            import shutil
             Path(prompt_file).unlink(missing_ok=True)
+            if 'tmp_home' in locals():
+                shutil.rmtree(tmp_home, ignore_errors=True)
 
     def parse_verdict_line(self, output: str, valid_enums: list[str], default_verdict: str) -> dict:
         """
@@ -225,15 +241,6 @@ class SeniorReviewEngine:
             return default_verdict
 
     def execute_senior_review(self, task_id: str) -> SeniorReviewVerdict:
-        import os
-        from pathlib import Path
-        mcp_dir = Path(os.path.expanduser("~/.gemini/antigravity/mcp"))
-        mcp_hidden = Path(os.path.expanduser("~/.gemini/antigravity/mcp_hidden"))
-        if mcp_dir.exists():
-            try:
-                mcp_dir.rename(mcp_hidden)
-            except Exception:
-                pass
         task = self.queue.get_task(task_id)
         if not task:
             raise ValueError(f"Task '{task_id}' not found in triage queue.")
@@ -244,6 +251,27 @@ class SeniorReviewEngine:
         result = task.get("result") or {}
         if not result.get("gates_passed", False):
             raise ValueError(f"Acceptance gates failed or not run for task '{task_id}'.")
+
+        # Extract fields for attestation and verification
+        base_commit = task.get("envelope", {}).get("base_commit") or ("0" * 40)
+        result_sha = (
+            task.get("result", {}).get("result_sha")
+            or task.get("result", {}).get("head_commit")
+            or task.get("result", {}).get("result_commit")
+            or ("0" * 40)
+        )
+        
+        worktree_path = task.get("worktree_path")
+        if worktree_path and Path(worktree_path).exists():
+            try:
+                head_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=worktree_path, text=True).strip()
+                if head_sha != result_sha:
+                    raise ValueError(f"Worktree HEAD {head_sha} does not match task result_sha {result_sha}")
+                status = subprocess.check_output(["git", "status", "--porcelain"], cwd=worktree_path, text=True).strip()
+                if status:
+                    raise ValueError("Worktree is not clean. Uncommitted changes detected.")
+            except subprocess.CalledProcessError:
+                pass
 
         diff_content = self.get_task_diff(task)
         title = task.get("envelope", {}).get("title", "Autonomous Task")
@@ -277,16 +305,19 @@ Review Instructions:
         )
         pro_out = pro_res.get("response", "")
         pro_struct = pro_res.get("structured_output", {})
-        if isinstance(pro_struct, dict) and "verdict" in pro_struct:
+        if isinstance(pro_struct, dict) and len(pro_struct) == 1 and "verdict" in pro_struct:
             pro_verdict = pro_struct["verdict"]
+            if pro_verdict not in ["APPROVE", "REPAIR_REQUIRED"]:
+                pro_verdict = "REPAIR_REQUIRED"
         else:
             pro_verdict = self.parse_verdict_line(pro_out, ["APPROVE", "REPAIR_REQUIRED"], "REPAIR_REQUIRED")
         pro_approved = pro_verdict == "APPROVE"
 
-        # --- Round 1 Step 2: Claude Opus 4.6 Thinking ---
+        # --- Round 2 Step 2: Claude Opus 4.6 Thinking ---
         logger.info("Executing Senior Review Round 2 (Claude Opus 4.6 Thinking) for %s...", task_id)
+        opus_schema_path = Path(__file__).parent / "opus_schema.json"
         opus_prompt = f"""You are Claude Opus 4.6 Thinking, Supreme Lead Architect for AlphaBrain.
-You are conducting Round 2 Step 2 of the Senior Engineering Review and Debate for task {task_id}.
+You are conducting an independent Round 2 Senior Engineering Review for task {task_id}.
 Title: {title}
 
 Git Diff:
@@ -294,16 +325,11 @@ Git Diff:
 {diff_content}
 ```
 
-Gemini 3.1 Pro High Round 1 Finding:
-{pro_out[:10000]}
-
 Instructions:
-1. Debate Gemini Pro's findings.
-2. Verify overall system design and AlphaBrain Invariant compliance.
-3. CRITICAL: Do NOT invoke external tools or inspect files on disk. The repository on disk is at base_commit; all pending changes are provided in the 'Git Diff' above. Base your architectural evaluation strictly on the provided Git Diff and Round 1 debate context.
-4. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
+1. Verify overall system design and AlphaBrain Invariant compliance.
+2. CRITICAL: Do NOT invoke external tools or inspect files on disk. The repository on disk is at base_commit; all pending changes are provided in the 'Git Diff' above. Base your architectural evaluation strictly on the provided Git Diff.
+3. Render your authoritative final ruling explicitly by outputting a strict JSON verdict.
 """
-        opus_schema_path = Path(__file__).parent / "opus_schema.json"
         opus_res = self._invoke_agy(
             "claude-opus-4-6-thinking",
             opus_prompt,
@@ -313,23 +339,17 @@ Instructions:
         )
         opus_out = opus_res.get("response", "")
         opus_struct = opus_res.get("structured_output", {})
-        if isinstance(opus_struct, dict) and "verdict" in opus_struct:
+        if isinstance(opus_struct, dict) and len(opus_struct) == 1 and "verdict" in opus_struct:
             opus_verdict = opus_struct["verdict"]
+            if opus_verdict not in ["FINAL_APPROVAL", "REJECT"]:
+                opus_verdict = "REJECT"
         else:
             opus_verdict = self.parse_verdict_line(opus_out, ["FINAL_APPROVAL", "REJECT"], "REJECT")
         opus_approved = opus_verdict == "FINAL_APPROVAL"
 
         unanimous = pro_approved and opus_approved
 
-        # Extract fields for attestation
-        base_commit = task.get("envelope", {}).get("base_commit") or ("0" * 40)
-        result_sha = (
-            task.get("result", {}).get("result_sha")
-            or task.get("result", {}).get("head_commit")
-            or task.get("result", {}).get("result_commit")
-            or ("0" * 40)
-        )
-        evidence = task.get("result", {}).get("gate_result", {})
+        evidence = task.get("result", {}).get("evidence", {})
 
         att = ReviewAttestation.create(
             task_id=task_id,
@@ -372,9 +392,4 @@ Instructions:
             self.queue.queue_task_for_senior_repair(task_id, repair_packet)
             logger.info("Task %s queued for autonomous senior repair turn in worktree.", task_id)
 
-        if mcp_hidden.exists():
-            try:
-                mcp_hidden.rename(mcp_dir)
-            except Exception:
-                pass
         return verdict

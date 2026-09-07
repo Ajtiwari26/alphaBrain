@@ -89,7 +89,10 @@ def test_wrong_secret():
 @patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
 def test_senior_review_engine_attestation(mock_invoke_agy):
     # Setup mock
-    mock_invoke_agy.side_effect = ['{"verdict": "APPROVE"}', '{"verdict": "FINAL_APPROVAL"}']
+    mock_invoke_agy.side_effect = [
+        {"response": "", "structured_output": {"verdict": "APPROVE"}},
+        {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}}
+    ]
 
     mock_queue = MagicMock()
     mock_task = {

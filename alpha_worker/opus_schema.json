@@ -7,5 +7,6 @@
       "enum": ["FINAL_APPROVAL", "REJECT"]
     }
   },
-  "required": ["verdict"]
+  "required": ["verdict"],
+  "additionalProperties": false
 }

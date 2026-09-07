@@ -7,5 +7,6 @@
       "enum": ["APPROVE", "REPAIR_REQUIRED"]
     }
   },
-  "required": ["verdict"]
+  "required": ["verdict"],
+  "additionalProperties": false
 }
