@@ -1185,6 +1185,25 @@ def cmd_stats(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_healing_daemon(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    try:
+        # Import dynamically to avoid circular dependencies or path issues
+        from alpha_worker.ci_healing_daemon import CIHealingDaemon
+        daemon = CIHealingDaemon(queue)
+        daemon.run_once()
+        if args.json:
+            print(json.dumps({"status": "ok", "message": "Healing daemon run completed"}))
+        else:
+            print("✅ Healing daemon completed.")
+        return 0
+    except Exception as e:
+        if args.json:
+            print(json.dumps({"error": str(e)}))
+        else:
+            print(f"❌ Error running healing daemon: {e}", file=sys.stderr)
+        return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="alphabrain triage",
@@ -1324,6 +1343,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_stats.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # healing-daemon
+    p_healing = subparsers.add_parser(
+        "healing-daemon", help="Run CIHealingDaemon to orchestrate auto-merge and failure diagnosis"
+    )
+    p_healing.add_argument("--json", action="store_true", help="Output JSON format")
+
     return parser
 
 
@@ -1354,6 +1379,7 @@ def main(argv: list[str] | None = None) -> int:
         "export-audit": cmd_export_audit,
         "dag": cmd_dag,
         "stats": cmd_stats,
+        "healing-daemon": cmd_healing_daemon,
     }
 
     handler = handlers.get(args.subcommand)
