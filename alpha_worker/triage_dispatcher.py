@@ -56,6 +56,8 @@ class PRProposal:
     gates_passed: bool
     evidence: list[dict[str, Any]]
     created_at: float
+    attempt_id: str
+    worker_id: str
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -377,6 +379,8 @@ class TriageTaskDispatcher:
             return None
 
         worktree_path = worktree_path_obj
+        attempt_id = f"att_{task_id}_{uuid.uuid4().hex[:6]}"
+        worker_id = f"worker_{uuid.uuid4().hex[:8]}"
 
         try:
             # 2.5. Launch the local AGY coding agent inside the worktree if enabled
@@ -393,7 +397,6 @@ class TriageTaskDispatcher:
                 logger.info("Launching local AGY coding agent inside worktree: %s", worktree_path)
                 try:
                     task_env = self._build_task_envelope(leased_task, worktree_path)
-                    attempt_id = f"att_{task_id}_{uuid.uuid4().hex[:6]}"
                     session_dir = self.adapter.setup_session_in_memory_graph(
                         task_env, worktree_path
                     )
@@ -563,6 +566,8 @@ class TriageTaskDispatcher:
                 gates_passed=gates_passed,
                 evidence=evidence,
                 created_at=time.time(),
+                attempt_id=attempt_id,
+                worker_id=worker_id,
             )
 
             # 7. Complete task in queue

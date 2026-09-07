@@ -61,12 +61,14 @@ class SeniorReviewEngine:
         queue: TaskTriageQueue,
         agy_bin: Path | None = None,
         signing_secret: str | bytes | None = None,
+        key_id: str = "alpha_production_v1",
     ) -> None:
         import os
 
         self.queue = queue
         self.agy_bin = agy_bin or (Path.home() / ".local" / "bin" / "agy")
-        self.signing_secret = signing_secret or os.environ.get("ALPHA_SIGNING_SECRET")
+        self.key_id = key_id
+        self.signing_secret = signing_secret or os.environ.get(f"ALPHA_SIGNING_SECRET_{key_id}")
 
     def run_command(self, cmd: list[str], timeout: int = 120) -> tuple[int, str, str]:
         try:
@@ -270,9 +272,7 @@ class SeniorReviewEngine:
         )
 
         if not self.signing_secret:
-            raise ValueError(
-                "ALPHA_SIGNING_SECRET is missing. Explicit cryptographic signing configuration is required."
-            )
+            raise ValueError(f"Missing signing secret for key {self.key_id}")
 
         worktree_path = task.get("worktree_path")
         if not worktree_path or not Path(worktree_path).is_dir():
@@ -376,7 +376,10 @@ Instructions:
 
         evidence = task.get("result", {}).get("evidence", {})
 
+        import os
         import uuid
+
+        from alpha_protocol.task import REGISTERED_REVIEW_KEYS
 
         try:
             tree_digest = subprocess.check_output(
@@ -385,8 +388,24 @@ Instructions:
         except subprocess.CalledProcessError as e:
             raise ValueError(f"Failed to get tree digest: {e}") from e
 
-        attempt_id = task.get("result", {}).get("attempt_id") or "att_unknown"
-        executor_id = task.get("result", {}).get("worker_id") or "worker_unknown"
+        attempt_id = task.get("result", {}).get("attempt_id")
+        executor_id = task.get("result", {}).get("worker_id")
+
+        for name, val in [("attempt_id", attempt_id), ("worker_id", executor_id)]:
+            if not val or val in ("worker_unknown", "att_unknown", "None"):
+                raise ValueError(f"Missing or invalid {name} in task result")
+
+        key_id = self.key_id
+        if key_id not in REGISTERED_REVIEW_KEYS:
+            raise ValueError(f"Key {key_id} is not a registered review key")
+
+        revoked_keys = os.environ.get("ALPHA_REVOKED_KEYS", "").split(",")
+        if key_id in revoked_keys:
+            raise ValueError(f"Key {key_id} has been revoked")
+
+        secret = os.environ.get(f"ALPHA_SIGNING_SECRET_{key_id}") or self.signing_secret
+        if not secret:
+            raise ValueError(f"Missing signing secret for key {key_id}")
 
         att = ReviewAttestation.create(
             task_id=task_id,
@@ -399,10 +418,10 @@ Instructions:
             approved=unanimous,
             reviewed_at=time.time(),
             evidence=evidence,
-            secret=self.signing_secret,
+            secret=secret,
             nonce=uuid.uuid4().hex,
             executor_id=executor_id,
-            key_id="alpha_production_v1",
+            key_id=key_id,
         )
 
         verdict = SeniorReviewVerdict(

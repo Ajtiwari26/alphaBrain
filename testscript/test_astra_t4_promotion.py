@@ -38,8 +38,8 @@ def create_valid_attestation(
         evidence=evidence,
         secret=secret,
         nonce="nonce",
-        executor_id="exec",
-        key_id="key1",
+        executor_id="exec_1",
+        key_id="alpha_test_key",
     ).model_dump()
 
 
@@ -64,6 +64,8 @@ def base_task(tmp_path):
         },
         "result": {
             "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
             "result_sha": "b" * 40,
             "evidence": evidence,
             "senior_review": {
@@ -84,7 +86,9 @@ def test_successful_promotion_merging_exact_sha(mock_queue, base_task):
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
     with (
-        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}),
+        patch.dict(
+            os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+        ),
         patch("subprocess.run") as mock_run,
     ):
         # mock git rev-parse branch_name to return result_sha
@@ -117,7 +121,9 @@ def test_promotion_rejected_invalid_forged_attestation(mock_queue, base_task):
     mock_queue.get_task.return_value = base_task
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
-    with patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}):
+    with patch.dict(
+        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+    ):
         exit_code = cmd_merge(args, mock_queue)
     assert exit_code == 1
 
@@ -132,7 +138,9 @@ def test_promotion_rejected_result_sha_mismatch(mock_queue, base_task):
     mock_queue.get_task.return_value = base_task
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
-    with patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}):
+    with patch.dict(
+        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+    ):
         exit_code = cmd_merge(args, mock_queue)
     assert exit_code == 1
 
@@ -142,7 +150,9 @@ def test_promotion_rejected_branch_tip_mismatch(mock_queue, base_task):
     args = argparse.Namespace(task_id="tsk_123", json=False)
 
     with (
-        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}),
+        patch.dict(
+            os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+        ),
         patch("subprocess.run") as mock_run,
     ):
 
@@ -170,7 +180,9 @@ def test_cross_process_promotion_lock(mock_queue, base_task):
     lock_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     with (
-        patch.dict(os.environ, {"ALPHA_SIGNING_SECRET": "test_promotion_signing_secret_123"}),
+        patch.dict(
+            os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+        ),
         patch("subprocess.run") as mock_run,
     ):
 

@@ -30,6 +30,9 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+REGISTERED_REVIEW_KEYS = frozenset({"alpha_production_v1", "alpha_staging_v1", "alpha_test_key"})
+
+
 # ---------------------------------------------------------------------------
 # DAG Dependency Contract
 # ---------------------------------------------------------------------------
@@ -101,16 +104,29 @@ class ReviewAttestation(BaseModel):
             raise ValueError(
                 "Principal separation failed: executor_id and reviewer_id must be different"
             )
+        for val in (self.executor_id, self.reviewer_id):
+            if not val or val in ("worker_unknown", "att_unknown", "None"):
+                raise ValueError("Placeholder or empty principals are not allowed")
         return self
 
     @model_validator(mode="after")
     def validate_ttl(self) -> "ReviewAttestation":
+        import math
         import time
 
         now = time.time()
-        if self.expires_at <= self.issued_at:
-            raise ValueError("expires_at must be strictly greater than issued_at")
-        if now > self.expires_at:
+        for field in (self.issued_at, self.expires_at, self.reviewed_at):
+            if not math.isfinite(field):
+                raise ValueError("Timestamps must be finite")
+
+        if self.issued_at > now + 60.0:
+            raise ValueError("Attestation issued in the future")
+
+        ttl = self.expires_at - self.issued_at
+        if not (10.0 <= ttl <= 7200.0):
+            raise ValueError("TTL must be between 10.0 and 7200.0 seconds")
+
+        if now >= self.expires_at:
             raise ValueError("Attestation has expired")
         return self
 
@@ -138,8 +154,13 @@ class ReviewAttestation(BaseModel):
         digest = self.compute_digest().encode("utf-8")
         return hmac.new(secret, digest, hashlib.sha256).hexdigest()
 
-    def verify(self, secret: bytes | str) -> bool:
+    def verify(self, secret: bytes | str, now: float | None = None) -> bool:
         import hmac
+        import time
+
+        current_time = now if now is not None else time.time()
+        if current_time >= self.expires_at or current_time < self.issued_at - 60.0:
+            return False
 
         expected_signature = self.sign(secret)
         return hmac.compare_digest(self.signature, expected_signature)

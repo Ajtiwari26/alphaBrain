@@ -56,6 +56,8 @@ def create_valid_attestation(
     pro_verdict="APPROVE",
     opus_verdict="FINAL_APPROVAL",
     evidence=None,
+    attempt_id="att_1",
+    executor_id="exec_1",
 ):
     import time
 
@@ -63,7 +65,7 @@ def create_valid_attestation(
         evidence = {"dummy": "evidence"}
     return ReviewAttestation.create(
         task_id=task_id,
-        attempt_id="att_1",
+        attempt_id=attempt_id,
         result_sha=result_sha,
         base_commit=base_commit,
         tree_digest="c" * 40,
@@ -76,8 +78,8 @@ def create_valid_attestation(
         evidence=evidence,
         secret=secret,
         nonce="nonce",
-        executor_id="exec",
-        key_id="k1",
+        executor_id=executor_id,
+        key_id="alpha_test_key",
     ).model_dump()
 
 
@@ -157,7 +159,14 @@ def test_full_happy_path_lifecycle(e2e_setup, monkeypatch):
     res = task_data["result"]
     res["result_sha"] = result_sha
     evidence = res.get("evidence", {})
-    attestation = create_valid_attestation(task_id, result_sha, base_commit, evidence=evidence)
+    attestation = create_valid_attestation(
+        task_id,
+        result_sha,
+        base_commit,
+        evidence=evidence,
+        attempt_id=res.get("attempt_id", "att_1"),
+        executor_id=res.get("worker_id", "exec_1"),
+    )
     res["senior_review"] = {"approved": True, "attestation": attestation}
     with sqlite3.connect(queue.db_path) as conn:
         conn.execute(
@@ -165,7 +174,7 @@ def test_full_happy_path_lifecycle(e2e_setup, monkeypatch):
         )
 
     args = argparse.Namespace(task_id=task_id, json=False)
-    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "alphabrain_senior_review_key")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "alphabrain_senior_review_key")
 
     with patch("subprocess.run") as mock_run:
 
@@ -270,6 +279,8 @@ def test_review_forgery_rejection(e2e_setup, monkeypatch):
 
     res = {
         "gates_passed": True,
+        "attempt_id": "att_1",
+        "worker_id": "exec_1",
         "result_sha": "b" * 40,
         "senior_review": {"approved": True, "attestation": attestation},
     }
@@ -279,7 +290,7 @@ def test_review_forgery_rejection(e2e_setup, monkeypatch):
         )
 
     args = argparse.Namespace(task_id=task_id, json=False)
-    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "alphabrain_senior_review_key")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "alphabrain_senior_review_key")
     assert cmd_merge(args, queue) == 1
 
 
@@ -383,6 +394,8 @@ def test_cross_process_promotion_lock(e2e_setup, monkeypatch):
     attestation = create_valid_attestation(task_id, "b" * 40, base_commit)
     res = {
         "gates_passed": True,
+        "attempt_id": "att_1",
+        "worker_id": "exec_1",
         "result_sha": "b" * 40,
         "senior_review": {"approved": True, "attestation": attestation},
     }
@@ -392,7 +405,7 @@ def test_cross_process_promotion_lock(e2e_setup, monkeypatch):
         )
 
     args = argparse.Namespace(task_id=task_id, json=False)
-    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "alphabrain_senior_review_key")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "alphabrain_senior_review_key")
 
     lock_file_path = repo_path / ".alphabrain" / "promotion.lock"
     lock_file_path.parent.mkdir(parents=True, exist_ok=True)

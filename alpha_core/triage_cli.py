@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -576,7 +577,13 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 def cmd_senior_review(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     from alpha_worker.senior_review_engine import SeniorReviewEngine
 
-    engine = SeniorReviewEngine(queue=queue)
+    key_id_arg = getattr(args, "key_id", None)
+    key_id = (
+        key_id_arg
+        if isinstance(key_id_arg, str)
+        else os.environ.get("ALPHA_REVIEW_KEY_ID", "alpha_production_v1")
+    )
+    engine = SeniorReviewEngine(queue=queue, key_id=key_id)
     try:
         verdict = engine.execute_senior_review(args.task_id)
     except ValueError as e:
@@ -675,17 +682,20 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
         return 1
 
+    from alpha_protocol.task import REGISTERED_REVIEW_KEYS
+
+    if att.key_id not in REGISTERED_REVIEW_KEYS:
+        print(f"Error: Unknown or unregistered key_id '{att.key_id}'.", file=sys.stderr)
+        return 1
+
     revoked_keys = os.environ.get("ALPHA_REVOKED_KEYS", "").split(",")
-    if att.key_id and att.key_id in revoked_keys:
+    if att.key_id in revoked_keys:
         print(f"Error: Attestation signed with a revoked key_id '{att.key_id}'.", file=sys.stderr)
         return 1
 
-    signing_secret = os.environ.get(f"ALPHA_SIGNING_SECRET_{att.key_id}") if att.key_id else None
+    signing_secret = os.environ.get(f"ALPHA_SIGNING_SECRET_{att.key_id}")
     if not signing_secret:
-        signing_secret = os.environ.get("ALPHA_SIGNING_SECRET")
-
-    if not signing_secret:
-        print("Error: ALPHA_SIGNING_SECRET environment variable is not set.", file=sys.stderr)
+        print(f"Error: Missing specific signing secret for key_id '{att.key_id}'.", file=sys.stderr)
         return 1
 
     if not att.verify(signing_secret):
@@ -740,10 +750,32 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         return 1
 
     expected_attempt_id = result.get("attempt_id")
-    if expected_attempt_id and att.attempt_id != expected_attempt_id:
+    expected_worker_id = result.get("worker_id")
+
+    if not expected_attempt_id or not expected_worker_id:
+        print("Error: Task result is missing attempt_id or worker_id.", file=sys.stderr)
+        return 1
+
+    if att.attempt_id != expected_attempt_id:
         print(
             f"Error: Attestation attempt_id '{att.attempt_id}' does not match expected attempt_id '{expected_attempt_id}'.",
             file=sys.stderr,
+        )
+        return 1
+
+    if att.executor_id != expected_worker_id:
+        print(
+            f"Error: Attestation executor_id '{att.executor_id}' does not match expected worker_id '{expected_worker_id}'.",
+            file=sys.stderr,
+        )
+        return 1
+
+    import time
+
+    now = time.time()
+    if now >= att.expires_at or now < att.issued_at - 60.0:
+        print(
+            "Error: Attestation freshness validation failed just before promotion.", file=sys.stderr
         )
         return 1
 
@@ -1089,6 +1121,7 @@ def build_parser() -> argparse.ArgumentParser:
         "senior-review", help="Execute 2-round senior engineering review (Pro + Opus)"
     )
     p_senior.add_argument("task_id", help="ID of the completed task to review")
+    p_senior.add_argument("--key-id", default=None, help="Registered signing key identifier")
     p_senior.add_argument("--json", action="store_true", help="Output JSON format")
 
     # merge

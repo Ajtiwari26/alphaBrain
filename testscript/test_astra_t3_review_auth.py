@@ -18,7 +18,7 @@ def test_valid_attestation_creation_and_verification():
         tree_digest="c" * 40,
         nonce="nonce",
         executor_id="worker",
-        key_id="key",
+        key_id="alpha_test_key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -42,7 +42,7 @@ def test_tamper_detection():
         tree_digest="c" * 40,
         nonce="nonce",
         executor_id="worker",
-        key_id="key",
+        key_id="alpha_test_key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -89,7 +89,7 @@ def test_wrong_secret():
         tree_digest="c" * 40,
         nonce="nonce",
         executor_id="worker",
-        key_id="key",
+        key_id="alpha_test_key",
         pro_verdict="APPROVE",
         opus_verdict="FINAL_APPROVAL",
         approved=True,
@@ -116,6 +116,8 @@ def test_senior_review_engine_attestation(mock_invoke_agy, tmp_path):
         "envelope": {"base_commit": "b" * 40},
         "result": {
             "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
             "result_commit": "a" * 40,
             "gate_result": {"status": "passed"},
         },
@@ -149,17 +151,22 @@ def test_senior_review_engine_attestation(mock_invoke_agy, tmp_path):
 
 
 def test_senior_review_engine_rejects_missing_signing_secret(tmp_path, monkeypatch):
-    monkeypatch.delenv("ALPHA_SIGNING_SECRET", raising=False)
+    monkeypatch.delenv("ALPHA_SIGNING_SECRET_alpha_test_key", raising=False)
     mock_queue = MagicMock()
     mock_queue.get_task.return_value = {
         "status": TriageStatus.COMPLETED.value,
         "worktree_path": str(tmp_path),
-        "result": {"gates_passed": True, "result_sha": "a" * 40},
+        "result": {
+            "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
+            "result_sha": "a" * 40,
+        },
     }
-    engine = SeniorReviewEngine(queue=mock_queue, signing_secret=None)
+    engine = SeniorReviewEngine(queue=mock_queue, signing_secret=None, key_id="alpha_test_key")
     import pytest
 
-    with pytest.raises(ValueError, match="ALPHA_SIGNING_SECRET is missing"):
+    with pytest.raises(ValueError, match="Missing signing secret for key"):
         engine.execute_senior_review("tsk_123")
 
 
@@ -168,7 +175,12 @@ def test_senior_review_engine_rejects_missing_or_nonexistent_worktree():
     mock_queue.get_task.return_value = {
         "status": TriageStatus.COMPLETED.value,
         "worktree_path": "/nonexistent/path/to/worktree",
-        "result": {"gates_passed": True, "result_sha": "a" * 40},
+        "result": {
+            "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
+            "result_sha": "a" * 40,
+        },
     }
     engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
     import pytest
@@ -182,7 +194,12 @@ def test_senior_review_engine_rejects_dirty_worktree(tmp_path):
     mock_queue.get_task.return_value = {
         "status": TriageStatus.COMPLETED.value,
         "worktree_path": str(tmp_path),
-        "result": {"gates_passed": True, "result_sha": "a" * 40},
+        "result": {
+            "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
+            "result_sha": "a" * 40,
+        },
     }
     engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
 
@@ -208,7 +225,12 @@ def test_senior_review_engine_rejects_worktree_head_mismatch(tmp_path):
     mock_queue.get_task.return_value = {
         "status": TriageStatus.COMPLETED.value,
         "worktree_path": str(tmp_path),
-        "result": {"gates_passed": True, "result_sha": "a" * 40},
+        "result": {
+            "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
+            "result_sha": "a" * 40,
+        },
     }
     engine = SeniorReviewEngine(queue=mock_queue, signing_secret="secret123")
 
@@ -254,8 +276,8 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
         attempt_id="att_1",
         tree_digest="t" * 40,
         nonce=None,
-        executor_id="w",
-        key_id="k",
+        executor_id="exec_1",
+        key_id="alpha_test_key",
         att_approved=True,
         att_pro="APPROVE",
         att_opus="FINAL_APPROVAL",
@@ -293,6 +315,8 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             },
             "result": {
                 "gates_passed": True,
+                "attempt_id": "att_1",
+                "worker_id": "exec_1",
                 "result_sha": result_sha,
                 "evidence": evidence,
                 "senior_review": {
@@ -313,7 +337,7 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
                     f"Forbidden mutating Git command executed on rejection: {cmd}"
                 )
 
-    with patch.dict("os.environ", {"ALPHA_SIGNING_SECRET": secret}):
+    with patch.dict("os.environ", {"ALPHA_SIGNING_SECRET_alpha_test_key": secret}):
         with patch("subprocess.run") as mock_run:
             # Mock git rev-parse to return matching result_sha
             def fake_git(cmd, **kwargs):
@@ -412,7 +436,7 @@ def make_standalone_task_and_att(
         evidence={},
         secret=secret,
         nonce=nonce,
-        executor_id="exec",
+        executor_id="exec_1",
         key_id=key_id,
         reviewer_id="SYSTEM_SENIOR_REVIEW_ENGINE",
     )
@@ -423,6 +447,8 @@ def make_standalone_task_and_att(
         "branch_name": f"alpha/{task_id}",
         "result": {
             "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
             "result_sha": "2" * 40,
             "evidence": {},
             "senior_review": {"approved": True, "attestation": att_dict},
@@ -456,8 +482,8 @@ def test_attestation_expiration_rejected():
             evidence={},
             secret="test_secret",
             nonce="nonce",
-            executor_id="exec",
-            key_id="k1",
+            executor_id="exec_1",
+            key_id="alpha_test_key",
         )
     assert "Attestation has expired" in str(exc_info.value)
 
@@ -486,7 +512,7 @@ def test_principal_collision_rejected():
             nonce="nonce",
             executor_id="SYSTEM_SENIOR_REVIEW_ENGINE",
             reviewer_id="SYSTEM_SENIOR_REVIEW_ENGINE",
-            key_id="k1",
+            key_id="alpha_test_key",
         )
     assert "Principal separation failed" in str(exc_info.value)
 
@@ -520,14 +546,14 @@ def test_replay_attack_rejected(monkeypatch, tmp_path):
     nonce_file.write_text("my_test_nonce\n")
 
     args = argparse.Namespace(task_id="tsk_test_merge_auth", json=False)
-    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "test_secret_123")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_123")
 
     q = MagicMock()
     q.get_task.return_value = make_standalone_task_and_att(
         task_id="tsk_test_merge_auth",
         attempt_id="att_1",
         nonce="my_test_nonce",
-        key_id="k1",
+        key_id="alpha_test_key",
         repo_path=str(repo_path),
     )
 
@@ -543,7 +569,7 @@ def test_key_revocation_rejected(monkeypatch, tmp_path):
     from alpha_core.triage_cli import cmd_merge
 
     args = argparse.Namespace(task_id="tsk_test_merge_auth", json=False)
-    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "test_secret_123")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_123")
     monkeypatch.setenv("ALPHA_REVOKED_KEYS", "k1,bad_key")
 
     q = MagicMock()
@@ -551,9 +577,305 @@ def test_key_revocation_rejected(monkeypatch, tmp_path):
         task_id="tsk_test_merge_auth",
         attempt_id="att_1",
         nonce="some_other_nonce",
-        key_id="k1",
+        key_id="alpha_test_key",
         repo_path=str(tmp_path),
     )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = fake_git_for_tests
+        assert cmd_merge(args, q) == 1
+
+
+def test_attestation_exact_expiry_rejected():
+    import time
+
+    import pytest
+    from pydantic import ValidationError
+
+    from alpha_protocol.task import ReviewAttestation
+
+    now = time.time()
+    with pytest.raises(ValidationError, match="Attestation has expired"):
+        with patch("time.time", return_value=now):
+            ReviewAttestation.create(
+                task_id="tsk_1",
+                attempt_id="att_1",
+                result_sha="2" * 40,
+                base_commit="1" * 40,
+                tree_digest="c" * 40,
+                pro_verdict="APPROVE",
+                opus_verdict="FINAL_APPROVAL",
+                approved=True,
+                reviewed_at=now - 5,
+                issued_at=now - 10,
+                expires_at=now,
+                evidence={},
+                secret="test_secret",
+                nonce="nonce",
+                executor_id="exec_1",
+                key_id="alpha_test_key",
+            )
+
+
+def test_attestation_future_issued_rejected():
+    import time
+
+    import pytest
+    from pydantic import ValidationError
+
+    from alpha_protocol.task import ReviewAttestation
+
+    now = time.time()
+    with pytest.raises(ValidationError, match="Attestation issued in the future"):
+        ReviewAttestation.create(
+            task_id="tsk_1",
+            attempt_id="att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=now,
+            issued_at=now + 65.0,
+            expires_at=now + 3600.0,
+            evidence={},
+            secret="test",
+            nonce="nonce",
+            executor_id="exec_1",
+            key_id="alpha_test_key",
+        )
+
+
+def test_attestation_non_finite_timestamps_rejected():
+    import math
+    import time
+
+    import pytest
+    from pydantic import ValidationError
+
+    from alpha_protocol.task import ReviewAttestation
+
+    now = time.time()
+    with pytest.raises(ValidationError, match="Timestamps must be finite"):
+        ReviewAttestation.create(
+            task_id="tsk_1",
+            attempt_id="att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=now,
+            issued_at=now,
+            expires_at=math.inf,
+            evidence={},
+            secret="test",
+            nonce="nonce",
+            executor_id="exec_1",
+            key_id="alpha_test_key",
+        )
+
+
+def test_attestation_ttl_bounds_rejected():
+    import time
+
+    import pytest
+    from pydantic import ValidationError
+
+    from alpha_protocol.task import ReviewAttestation
+
+    now = time.time()
+    with pytest.raises(ValidationError, match=r"TTL must be between 10\.0 and 7200\.0 seconds"):
+        ReviewAttestation.create(
+            task_id="tsk_1",
+            attempt_id="att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=now,
+            issued_at=now,
+            expires_at=now + 5.0,  # Too short
+            evidence={},
+            secret="test",
+            nonce="nonce",
+            executor_id="exec_1",
+            key_id="alpha_test_key",
+        )
+
+    with pytest.raises(ValidationError, match=r"TTL must be between 10\.0 and 7200\.0 seconds"):
+        ReviewAttestation.create(
+            task_id="tsk_1",
+            attempt_id="att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=now,
+            issued_at=now,
+            expires_at=now + 8000.0,  # Too long
+            evidence={},
+            secret="test",
+            nonce="nonce",
+            executor_id="exec_1",
+            key_id="alpha_test_key",
+        )
+
+
+def test_cmd_merge_unknown_key_rejected(monkeypatch, tmp_path):
+    import argparse
+    from unittest.mock import MagicMock, patch
+
+    from alpha_core.triage_cli import cmd_merge
+
+    args = argparse.Namespace(task_id="tsk_test_merge_auth", json=False)
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_123")
+
+    q = MagicMock()
+    q.get_task.return_value = make_standalone_task_and_att(
+        task_id="tsk_test_merge_auth",
+        attempt_id="att_1",
+        nonce="my_test_nonce",
+        key_id="unknown_key_123",
+        repo_path=str(tmp_path),
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = fake_git_for_tests
+        assert cmd_merge(args, q) == 1
+
+
+def test_cmd_merge_missing_attempt_or_worker_rejected(monkeypatch, tmp_path):
+    import argparse
+    import time
+    from unittest.mock import MagicMock, patch
+
+    from alpha_core.queue.triage_queue import TriageStatus
+    from alpha_core.triage_cli import cmd_merge
+    from alpha_protocol.task import ReviewAttestation
+
+    args = argparse.Namespace(task_id="tsk_test_merge_auth", json=False)
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_123")
+
+    att_dict = ReviewAttestation.create(
+        task_id="tsk_test_merge_auth",
+        attempt_id="att_1",
+        result_sha="2" * 40,
+        base_commit="1" * 40,
+        tree_digest="c" * 40,
+        pro_verdict="APPROVE",
+        opus_verdict="FINAL_APPROVAL",
+        approved=True,
+        reviewed_at=time.time(),
+        evidence={},
+        secret="test_secret_123",
+        nonce="n1",
+        executor_id="exec_1",
+        key_id="alpha_test_key",
+        reviewer_id="SYSTEM_SENIOR_REVIEW_ENGINE",
+    ).model_dump()
+
+    # 1. Missing attempt_id in result
+    t = {
+        "id": "tsk_test_merge_auth",
+        "status": TriageStatus.COMPLETED.value,
+        "branch_name": "alpha/tsk_test_merge_auth",
+        "result": {
+            "gates_passed": True,
+            "worker_id": "exec_1",
+            "result_sha": "2" * 40,
+            "evidence": {},
+            "senior_review": {"approved": True, "attestation": att_dict},
+        },
+        "envelope": {"repo": str(tmp_path), "base_commit": "1" * 40},
+    }
+
+    q = MagicMock()
+    q.get_task.return_value = t
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = fake_git_for_tests
+        # Missing attempt_id -> rejected
+        assert cmd_merge(args, q) == 1
+
+        # Missing worker_id -> rejected
+        t["result"]["attempt_id"] = "att_1"
+        del t["result"]["worker_id"]
+        assert cmd_merge(args, q) == 1
+
+        # Placeholder worker_id -> rejected
+        t["result"]["worker_id"] = "worker_unknown"
+        assert cmd_merge(args, q) == 1
+
+        # Placeholder attempt_id -> rejected
+        t["result"]["worker_id"] = "exec_1"
+        t["result"]["attempt_id"] = "att_unknown"
+        assert cmd_merge(args, q) == 1
+
+        # Mismatched attempt_id -> rejected
+        t["result"]["attempt_id"] = "att_mismatch"
+        assert cmd_merge(args, q) == 1
+
+
+def test_cmd_merge_freshness_revalidation_failure(monkeypatch, tmp_path):
+    import argparse
+    import time
+    from unittest.mock import MagicMock, patch
+
+    from alpha_core.queue.triage_queue import TriageStatus
+    from alpha_core.triage_cli import cmd_merge
+    from alpha_protocol.task import ReviewAttestation
+
+    args = argparse.Namespace(task_id="tsk_test_merge_auth", json=False)
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_secret_123")
+
+    now = time.time()
+
+    with patch("time.time", return_value=now - 2000.0):
+        # Create an attestation that is signed 2000s ago, expiring in 1000s. (So currently expired).
+        att_dict = ReviewAttestation.create(
+            task_id="tsk_test_merge_auth",
+            attempt_id="att_1",
+            result_sha="2" * 40,
+            base_commit="1" * 40,
+            tree_digest="c" * 40,
+            pro_verdict="APPROVE",
+            opus_verdict="FINAL_APPROVAL",
+            approved=True,
+            reviewed_at=now - 2000.0,
+            issued_at=now - 2000.0,
+            expires_at=now - 1000.0,  # Expires before now
+            evidence={},
+            secret="test_secret_123",
+            nonce="n1",
+            executor_id="exec_1",
+            key_id="alpha_test_key",
+            reviewer_id="SYSTEM_SENIOR_REVIEW_ENGINE",
+        ).model_dump()
+
+    t = {
+        "id": "tsk_test_merge_auth",
+        "status": TriageStatus.COMPLETED.value,
+        "branch_name": "alpha/tsk_test_merge_auth",
+        "result": {
+            "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
+            "result_sha": "2" * 40,
+            "evidence": {},
+            "senior_review": {"approved": True, "attestation": att_dict},
+        },
+        "envelope": {"repo": str(tmp_path), "base_commit": "1" * 40},
+    }
+
+    q = MagicMock()
+    q.get_task.return_value = t
 
     with patch("subprocess.run") as mock_run:
         mock_run.side_effect = fake_git_for_tests

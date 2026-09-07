@@ -46,6 +46,8 @@ def test_merge_rejects_unapproved_senior_review():
         "status": TriageStatus.COMPLETED.value,
         "result": {
             "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
             "result_sha": "abc1234567890abcdef1234567890abcdef12345",
             "senior_review": {"approved": False},
         },
@@ -62,6 +64,8 @@ def test_merge_rejects_missing_branch():
         "status": TriageStatus.COMPLETED.value,
         "result": {
             "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
             "result_sha": "abc1234567890abcdef1234567890abcdef12345",
             "senior_review": {"approved": True},
         },
@@ -77,7 +81,7 @@ def test_merge_rejects_missing_branch():
 def test_merge_successful_with_senior_review_approved(
     mock_exists, mock_run, mock_verify, tmp_path, monkeypatch
 ):
-    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "dummy_secret")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "dummy_secret")
     mock_verify.return_value = True
     evidence = {"test_metric": 10}
     from alpha_protocol.task import ReviewAttestation
@@ -92,6 +96,8 @@ def test_merge_successful_with_senior_review_approved(
         "worktree_path": "/tmp/worktrees/task_success",
         "result": {
             "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
             "result_sha": "abc1234567890abcdef1234567890abcdef12345",
             "evidence": evidence,
             "senior_review": {
@@ -113,8 +119,8 @@ def test_merge_successful_with_senior_review_approved(
                     "issued_at": time.time(),
                     "expires_at": time.time() + 3600,
                     "nonce": "n",
-                    "executor_id": "e",
-                    "key_id": "k",
+                    "executor_id": "exec_1",
+                    "key_id": "alpha_test_key",
                     "reviewer_id": "SYSTEM_SENIOR_REVIEW_ENGINE",
                     "signature": "f" * 64,
                 },
@@ -180,7 +186,8 @@ def test_merge_fails_without_senior_review(mock_exists, mock_run, tmp_path):
 
 @patch("alpha_worker.senior_review_engine.SeniorReviewEngine._invoke_agy")
 def test_cmd_senior_review_execution(mock_invoke, tmp_path, monkeypatch):
-    monkeypatch.setenv("ALPHA_SIGNING_SECRET", "test_sr_signing_secret")
+    monkeypatch.setenv("ALPHA_REVIEW_KEY_ID", "alpha_test_key")
+    monkeypatch.setenv("ALPHA_SIGNING_SECRET_alpha_test_key", "test_sr_signing_secret")
     mock_invoke.side_effect = [
         {"response": "", "structured_output": {"verdict": "APPROVE"}},
         {"response": "", "structured_output": {"verdict": "FINAL_APPROVAL"}},
@@ -193,6 +200,8 @@ def test_cmd_senior_review_execution(mock_invoke, tmp_path, monkeypatch):
         "worktree_path": str(tmp_path),
         "result": {
             "gates_passed": True,
+            "attempt_id": "att_1",
+            "worker_id": "exec_1",
             "result_sha": "abc1234567890abcdef1234567890abcdef12345",
             "diff_stat": "1 file changed",
         },
