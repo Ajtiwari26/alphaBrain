@@ -178,6 +178,13 @@ class TaskTriageQueue:
                 )
             except sqlite3.OperationalError:
                 pass
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS circuit_breaker_state ("
+                "root_id TEXT PRIMARY KEY, "
+                "state_json TEXT NOT NULL, "
+                "updated_at REAL NOT NULL"
+                ");"
+            )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_triage_queue(status);")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_content_hash ON task_triage_queue(content_hash);"
@@ -1385,3 +1392,34 @@ class TaskTriageQueue:
         }
 
         return stats
+
+    def save_circuit_breaker(self, root_id: str, state_dict: dict[str, Any]) -> None:
+        """Persists circuit breaker state for a task root_id durably across restarts."""
+        now = time.time()
+        state_json = json.dumps(state_dict)
+
+        def _write(conn: sqlite3.Connection) -> None:
+            conn.execute(
+                """
+                INSERT INTO circuit_breaker_state (root_id, state_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(root_id) DO UPDATE SET
+                    state_json = excluded.state_json,
+                    updated_at = excluded.updated_at;
+                """,
+                (root_id, state_json, now),
+            )
+
+        self._execute_write_with_retry(_write)
+
+    def get_circuit_breaker(self, root_id: str) -> dict[str, Any] | None:
+        """Retrieves persisted circuit breaker state for a task root_id, or None if not found."""
+        with closing(self._get_connection()) as conn:
+            cursor = conn.execute(
+                "SELECT state_json FROM circuit_breaker_state WHERE root_id = ?",
+                (root_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return json.loads(row["state_json"])
+            return None

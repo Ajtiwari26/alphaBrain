@@ -108,3 +108,38 @@ class CircuitBreaker:
             current_time = time.time()
         self._update_state(current_time)
         return self.state in (CircuitBreakerState.CLOSED, CircuitBreakerState.HALF_OPEN)
+
+    def to_dict(self) -> dict[str, object]:
+        """Serializes the circuit breaker state to a dictionary for persistence."""
+        return {
+            "state": self.state.value,
+            "max_identical_signatures": self.max_identical_signatures,
+            "max_attempts": self.max_attempts,
+            "base_delay_sec": self.base_delay_sec,
+            "reset_timeout_sec": self.reset_timeout_sec,
+            "attempts": self.attempts,
+            "identical_count": self.identical_count,
+            "last_signature": self.last_signature,
+            "opened_at": self.opened_at,
+            "trip_reason": self.trip_reason.value,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> "CircuitBreaker":
+        """Reconstructs a CircuitBreaker from a serialized dictionary."""
+        cb = cls(
+            max_identical_signatures=int(data.get("max_identical_signatures", 3)),
+            max_attempts=int(data.get("max_attempts", 5)),
+            base_delay_sec=float(data.get("base_delay_sec", 1.0)),
+            reset_timeout_sec=float(data.get("reset_timeout_sec", 60.0)),
+        )
+        state_str = str(data.get("state", CircuitBreakerState.CLOSED.value))
+        cb.state = CircuitBreakerState(state_str)
+        cb.attempts = int(data.get("attempts", 0))
+        cb.identical_count = int(data.get("identical_count", 0))
+        raw_sig = data.get("last_signature")
+        cb.last_signature = str(raw_sig) if raw_sig is not None else None
+        cb.opened_at = float(data.get("opened_at", 0.0))
+        reason_str = str(data.get("trip_reason", TripReason.NONE.value))
+        cb.trip_reason = TripReason(reason_str)
+        return cb

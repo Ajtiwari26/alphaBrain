@@ -28,8 +28,23 @@ class CIHealingDaemon:
     def get_circuit_breaker(self, task_id: str) -> CircuitBreaker:
         root_id = task_id.split("_repair_")[0]
         if root_id not in self.circuit_breakers:
-            self.circuit_breakers[root_id] = CircuitBreaker()
+            persisted = None
+            try:
+                persisted = self.queue.get_circuit_breaker(root_id)
+            except Exception:
+                pass
+            if isinstance(persisted, dict):
+                self.circuit_breakers[root_id] = CircuitBreaker.from_dict(persisted)
+            else:
+                self.circuit_breakers[root_id] = CircuitBreaker()
         return self.circuit_breakers[root_id]
+
+    def _save_circuit_breaker(self, task_id: str, cb: CircuitBreaker) -> None:
+        root_id = task_id.split("_repair_")[0]
+        try:
+            self.queue.save_circuit_breaker(root_id, cb.to_dict())
+        except Exception as e:
+            logger.warning(f"Could not persist circuit breaker for {root_id}: {e}")
 
     def process_completed_task(self, task: dict[str, Any]) -> None:
         task_id = task["id"]
@@ -52,19 +67,19 @@ class CIHealingDaemon:
 
             if result.returncode != 0:
                 logger.error(f"Senior review failed for {task_id}: {result.stderr}")
-                self.processed_tasks.add(task_id)
+                # Do NOT add to processed_tasks so it remains eligible for retry
                 return
 
             try:
                 review_data = json.loads(result.stdout)
             except json.JSONDecodeError:
                 logger.error(f"Failed to parse senior review output: {result.stdout}")
-                self.processed_tasks.add(task_id)
+                # Do NOT add to processed_tasks so it remains eligible for retry
                 return
 
             if not review_data.get("approved", False):
                 logger.info(f"Task {task_id} not approved by senior review. Repair required.")
-                self.processed_tasks.add(task_id)
+                # Do NOT add to processed_tasks so repair cycles can continue
                 return
 
             logger.info(f"Task {task_id} approved. Executing auto-merge.")
@@ -79,10 +94,13 @@ class CIHealingDaemon:
 
             if merge_result.returncode == 0:
                 logger.info(f"Successfully auto-merged {task_id}")
+                cb = self.get_circuit_breaker(task_id)
+                cb.record_success()
+                self._save_circuit_breaker(task_id, cb)
+                self.processed_tasks.add(task_id)
             else:
                 logger.error(f"Auto-merge failed for {task_id}: {merge_result.stderr}")
-
-            self.processed_tasks.add(task_id)
+                # Do NOT add to processed_tasks so merge can be retried
 
         except Exception as e:
             logger.error(f"Error processing completed task {task_id}: {e}")
@@ -119,6 +137,7 @@ class CIHealingDaemon:
 
         cb = self.get_circuit_breaker(task_id)
         trip_reason = cb.record_failure(signature)
+        self._save_circuit_breaker(task_id, cb)
 
         if trip_reason == TripReason.ESCALATED_HUMAN_REVIEW:
             logger.warning(f"Circuit breaker tripped for {task_id}. Escalating to human review.")

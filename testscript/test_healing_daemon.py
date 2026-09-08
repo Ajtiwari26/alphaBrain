@@ -61,7 +61,7 @@ def test_daemon_handles_completed_task_not_approved(mock_queue):
         daemon.run_once()
 
         assert mock_run.call_count == 1
-        assert "task_1" in daemon.processed_tasks
+        assert "task_1" not in daemon.processed_tasks
 
 
 def test_daemon_handles_failed_task(mock_queue, tmp_path):
@@ -165,7 +165,7 @@ def test_senior_review_non_zero_exit(mock_queue):
         mock_run.return_value = MagicMock(returncode=1, stderr="error")
         daemon.run_once()
         assert mock_run.call_count == 1
-        assert "task_1" in daemon.processed_tasks
+        assert "task_1" not in daemon.processed_tasks
 
 
 def test_auto_merge_failure(mock_queue):
@@ -178,7 +178,7 @@ def test_auto_merge_failure(mock_queue):
         ]
         daemon.run_once()
         assert mock_run.call_count == 2
-        assert "task_1" in daemon.processed_tasks
+        assert "task_1" not in daemon.processed_tasks
 
 
 def test_json_decode_error(mock_queue):
@@ -188,7 +188,7 @@ def test_json_decode_error(mock_queue):
         mock_run.return_value = MagicMock(returncode=0, stdout="not json")
         daemon.run_once()
         assert mock_run.call_count == 1
-        assert "task_1" in daemon.processed_tasks
+        assert "task_1" not in daemon.processed_tasks
 
 
 def test_multiple_tasks_error_isolation(mock_queue):
