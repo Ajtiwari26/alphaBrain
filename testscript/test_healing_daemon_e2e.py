@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from alpha_core.healing.circuit_breaker import CircuitBreaker
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
 from alpha_worker.ci_healing_daemon import CIHealingDaemon
 
@@ -21,11 +20,6 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
     queue, tmp_path = temp_env
     daemon = CIHealingDaemon(queue)
 
-    def grouped_get_circuit_breaker(task_id: str) -> CircuitBreaker:
-        root_id = task_id.split("_repair_")[0]
-        if root_id not in daemon.circuit_breakers:
-            daemon.circuit_breakers[root_id] = CircuitBreaker()
-        return daemon.circuit_breakers[root_id]
 
     worktree = tmp_path / "worktree_e2e"
     worktree.mkdir()
@@ -91,7 +85,12 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
         )
         conn.commit()
 
-    daemon.run_once()
+    with patch.object(queue, 'reject_task', wraps=queue.reject_task) as mock_reject:
+        daemon.run_once()
+        mock_reject.assert_any_call(
+            repair_task_1_id,
+            reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention."
+        )
 
     failed = queue.list_tasks(status=TriageStatus.FAILED)
     tripped_task = next((t for t in failed if t["id"] == repair_task_1_id), None)
