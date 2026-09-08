@@ -18,6 +18,7 @@ def mock_queue():
     # mock get_task
     queue.get_task.return_value = {
         "id": "tsk_123",
+        "envelope": {"project_id": "prj_alpha"},
         "provenance": {"meeting_id": "meet_123"},
         "result": {"senior_review": {"approved": True}}
     }
@@ -61,8 +62,14 @@ def test_portal_task_trace(client, mock_queue):
     assert data["status"] == "ok"
     assert data["task_id"] == "tsk_123"
     assert data["provenance"] == {"meeting_id": "meet_123"}
+    # attestation might be redacted, but for our mock there are no secrets so it should be same
     assert data["attestation"] == {"approved": True}
     assert data["telemetry"] == {"transition_count": 5}
+
+
+def test_portal_task_trace_invalid_id(client, mock_queue):
+    response = client.get("/api/portal/tasks/invalid!id/trace")
+    assert response.status_code == 422
 
 
 def test_portal_task_trace_not_found(client, mock_queue):
@@ -71,7 +78,10 @@ def test_portal_task_trace_not_found(client, mock_queue):
     assert response.status_code == 404
 
 
-
+def test_portal_overview_unauthorized():
+    with TestClient(app) as unauth_client:
+        response = unauth_client.get("/api/portal/overview")
+        assert response.status_code == 401
 
 @pytest.mark.asyncio
 async def test_portal_stream(mock_queue):

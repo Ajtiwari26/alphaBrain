@@ -2510,48 +2510,65 @@ async def post_triage_task_result(
 # Portal API Endpoints
 # ==========================================
 
-@app.get("/api/portal/overview")
+@app.get("/api/portal/overview", response_model=dict[str, Any])
 async def get_portal_overview(
     principal: AuthPrincipal = Depends(require_api_principal),
     queue: TaskTriageQueue = Depends(get_triage_queue),
 ):
+    """Returns portal overview stats and metrics."""
     require_permission(principal, "audit:read")
     return {"status": "ok", "stats": queue.get_stats()}
 
 
-@app.get("/api/portal/tasks/{task_id}/trace")
+@app.get("/api/portal/tasks/{task_id}/trace", response_model=dict[str, Any])
 async def get_portal_task_trace(
     task_id: str,
     principal: AuthPrincipal = Depends(require_api_principal),
     queue: TaskTriageQueue = Depends(get_triage_queue),
 ):
+    """Returns provenance, attestation, and telemetry for a specific task."""
     require_permission(principal, "task:read")
+
+    if not SAFE_EXTERNAL_ID.fullmatch(task_id):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid task ID")
+
     task = queue.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    # Enforce tenant isolation (Invariant I-33)
+    project_id = task.get("envelope", {}).get("project_id")
+    if project_id:
+        require_project_access(principal, project_id)
+
+    # Redact attestation to prevent raw data exposure
+    senior_review = task.get("result", {}).get("senior_review", {}) if task.get("result") else None
+    redacted_attestation = redact_dict(senior_review) if senior_review else None
 
     return {
         "status": "ok",
         "task_id": task_id,
         "provenance": task.get("provenance", {}),
-        "attestation": task.get("result", {}).get("senior_review", {}) if task.get("result") else None,
+        "attestation": redacted_attestation,
         "telemetry": queue.get_task_telemetry(task_id)
     }
 
 
-async def portal_stream_generator():
-    """Simple SSE heartbeat generator for live portal stream."""
+async def portal_stream_generator(max_duration_seconds: int = 3600):
+    """Simple SSE heartbeat generator for live portal stream with a TTL."""
+    deadline = asyncio.get_event_loop().time() + max_duration_seconds
     try:
-        while True:
+        while asyncio.get_event_loop().time() < deadline:
             yield "event: heartbeat\ndata: {}\n\n"
             await asyncio.sleep(15)
     except asyncio.CancelledError:
         pass
 
 
-@app.get("/api/portal/stream")
+@app.get("/api/portal/stream", response_class=StreamingResponse)
 async def stream_portal_events(
     principal: AuthPrincipal = Depends(require_api_principal),
 ):
     require_permission(principal, "audit:read")
     return StreamingResponse(portal_stream_generator(), media_type="text/event-stream")
+
