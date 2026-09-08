@@ -91,7 +91,14 @@ async def test_get_service_url_missing(adapter):
 
 @pytest.mark.asyncio
 async def test_deploy_preview_success(adapter):
-    with patch.object(adapter, "_make_request", return_value={"id": "dep_123"}) as mock_make:
+    def mock_make_request(method, endpoint, data=None):
+        if method == "GET" and endpoint == "/services/srv_123":
+            return {"service": {"env": "preview"}}
+        if method == "POST" and endpoint == "/services/srv_123/deploys":
+            return {"id": "dep_123"}
+        return {}
+
+    with patch.object(adapter, "_make_request", side_effect=mock_make_request) as mock_make:
         with patch.object(adapter, "poll_status", return_value="LIVE"):
             with patch.object(
                 adapter, "_get_service_url", return_value="https://test-app.onrender.com"
@@ -102,12 +109,17 @@ async def test_deploy_preview_success(adapter):
                     assert result.url == "https://test-app.onrender.com"
                     assert result.status == "LIVE"
                     assert result.health_ok is True
-                    mock_make.assert_called_once_with("POST", "/services/srv_123/deploys")
+                    assert mock_make.call_count >= 2
 
 
 @pytest.mark.asyncio
 async def test_deploy_preview_missing_id(adapter):
-    with patch.object(adapter, "_make_request", return_value={"status": "created"}):
+    def mock_make_request(method, endpoint, data=None):
+        if method == "GET" and endpoint == "/services/srv_123":
+            return {"service": {"env": "preview"}}
+        return {"status": "created"}
+
+    with patch.object(adapter, "_make_request", side_effect=mock_make_request):
         with pytest.raises(RuntimeError, match="Failed to extract deploy ID"):
             await adapter.deploy_preview()
 
@@ -149,3 +161,39 @@ async def test_check_health_exception(adapter):
     with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
         health_ok = await adapter.check_health("https://test-app.onrender.com")
         assert health_ok is False
+
+@pytest.mark.asyncio
+async def test_deploy_preview_with_commit_id(adapter):
+    def mock_make_request(method, endpoint, data=None):
+        if method == "GET" and endpoint == "/services/srv_123":
+            return {"service": {"env": "preview"}}
+        if method == "POST" and endpoint == "/services/srv_123/deploys":
+            import json
+            if data:
+                parsed = json.loads(data)
+                assert parsed.get("commitId") == "abc1234"
+            return {"id": "dep_123"}
+        if method == "GET" and endpoint == "/services/srv_123/deploys/dep_123":
+            return {"commitId": "abc123456"}
+        return {}
+
+    with patch.object(adapter, "_make_request", side_effect=mock_make_request):
+        with patch.object(adapter, "poll_status", return_value="LIVE"):
+            with patch.object(
+                adapter, "_get_service_url", return_value="https://test-app.onrender.com"
+            ):
+                with patch.object(adapter, "check_health", return_value=True):
+                    result = await adapter.deploy_preview(commit_id="abc1234")
+                    assert result.url == "https://test-app.onrender.com"
+                    assert result.status == "LIVE"
+
+@pytest.mark.asyncio
+async def test_deploy_preview_rejects_production(adapter):
+    def mock_make_request(method, endpoint, data=None):
+        if method == "GET" and endpoint == "/services/srv_123":
+            return {"service": {"environment": "production"}}
+        return {}
+
+    with patch.object(adapter, "_make_request", side_effect=mock_make_request):
+        with pytest.raises(RuntimeError, match="Cannot deploy to production targets in preview mode"):
+            await adapter.deploy_preview()

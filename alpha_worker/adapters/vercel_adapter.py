@@ -44,7 +44,14 @@ class VercelAdapter:
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=600)
+        except TimeoutError:
+            try:
+                process.kill()
+            except Exception:
+                pass
+            raise RuntimeError("Vercel deployment timed out") from None
 
         if process.returncode != 0:
             error_msg = self._mask_secrets(stderr.decode())
@@ -92,7 +99,14 @@ class VercelAdapter:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            stdout, stderr = await process.communicate()
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+            except TimeoutError:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+                continue
 
             if process.returncode != 0:
                 error_msg = self._mask_secrets(stderr.decode())

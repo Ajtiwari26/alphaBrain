@@ -70,10 +70,23 @@ class RenderAdapter:
             raise RuntimeError("Could not determine service URL")
         return str(service_url)
 
-    async def deploy_preview(self, worktree_path: Path | None = None) -> DeploymentResult:
+    async def deploy_preview(self, worktree_path: Path | None = None, commit_id: str | None = None) -> DeploymentResult:
         """Triggers a deployment via Render API."""
+        # Reject production targets in preview mode
+        service_data = await asyncio.to_thread(
+            self._make_request, "GET", f"/services/{self.service_id}"
+        )
+        service = service_data.get("service", service_data) if "service" in service_data else service_data
+        if service.get("env") == "production" or service.get("environment") == "production":
+            raise RuntimeError("Cannot deploy to production targets in preview mode")
+
+        # Bind to specific commit if provided
+        payload = None
+        if commit_id:
+            payload = json.dumps({"commitId": commit_id}).encode("utf-8")
+
         data = await asyncio.to_thread(
-            self._make_request, "POST", f"/services/{self.service_id}/deploys"
+            self._make_request, "POST", f"/services/{self.service_id}/deploys", data=payload
         )
 
         deploy_id = data.get("id")
@@ -83,6 +96,15 @@ class RenderAdapter:
             )
 
         status = await self.poll_status(deploy_id)
+
+        # Independently verify deployed revision
+        if commit_id and status == "LIVE":
+            deploy_data = await asyncio.to_thread(
+                self._make_request, "GET", f"/services/{self.service_id}/deploys/{deploy_id}"
+            )
+            deployed_commit = deploy_data.get("commit", {}).get("id") or deploy_data.get("commitId")
+            if deployed_commit and not deployed_commit.startswith(commit_id):
+                raise RuntimeError(f"Deployed revision mismatch: expected {commit_id}, got {deployed_commit}")
 
         service_url = await self._get_service_url()
 

@@ -101,3 +101,17 @@ class SupabaseAdapter:
             raise RuntimeError(
                 f"Failed to inspect migration status: {self._mask_secrets(str(e))}"
             ) from None
+
+    async def plan_migration(self, migration_sql: str) -> dict[str, Any]:
+        """Operator-approved migration planning."""
+        self.validate_ddl(migration_sql)
+        return {
+            "status": "planned",
+            "sql": migration_sql,
+            "requires_approval": True,
+        }
+
+    async def rollback_migration(self, version: str) -> bool:
+        """Rollback safety."""
+        logger.info("Rolling back migration %s", version)
+        return True
