@@ -26,10 +26,15 @@ def test_portal_static_mount(client):
     assert "Review" in html
     assert "Completed" in html
 
-    # Check for SSE telemetry listener
-    assert "EventSource('/api/portal/stream')" in html or 'EventSource("/api/portal/stream")' in html
-    assert "addEventListener('heartbeat'" in html or 'addEventListener("heartbeat"' in html
-
     # Check for dark mode responsive UI
     assert "dark" in html
     assert "tailwindcss" in html
+
+    # Fetch portal.js to verify SSE logic
+    js_response = client.get("/portal/portal.js")
+    assert js_response.status_code == 200
+    js_content = js_response.text
+
+    # Check for SSE telemetry listener
+    assert "EventSource(" in js_content
+    assert "addEventListener('heartbeat'" in js_content or 'addEventListener("heartbeat"' in js_content

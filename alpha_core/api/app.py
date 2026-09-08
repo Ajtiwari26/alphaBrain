@@ -2569,10 +2569,19 @@ async def portal_stream_generator(max_duration_seconds: int = 3600):
         pass
 
 
-@app.get("/api/portal/stream", response_class=StreamingResponse)
-async def stream_portal_events(
+@app.post("/api/portal/stream/token")
+async def get_portal_stream_token(
     principal: AuthPrincipal = Depends(require_api_principal),
 ):
     require_permission(principal, "audit:read")
+    return {"token": create_scoped_stream_token("portal-stream", ttl_seconds=3600)}
+
+
+@app.get("/api/portal/stream", response_class=StreamingResponse)
+async def stream_portal_events(
+    token: str = Query(...),
+):
+    if not verify_scoped_stream_token(token, "portal-stream"):
+        raise HTTPException(status_code=401, detail="Invalid or expired stream token")
     return StreamingResponse(portal_stream_generator(), media_type="text/event-stream")
 

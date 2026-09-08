@@ -86,18 +86,25 @@ def test_portal_overview_unauthorized():
 @pytest.mark.asyncio
 async def test_portal_stream(mock_queue):
     from alpha_core.api.app import app, get_triage_queue
-    from alpha_core.security import AuthPrincipal, PrincipalRole, require_api_principal
+    from alpha_core.security import (
+        AuthPrincipal,
+        PrincipalRole,
+        create_scoped_stream_token,
+        require_api_principal,
+    )
 
     app.dependency_overrides[TaskTriageQueue] = lambda: mock_queue
     app.dependency_overrides[get_triage_queue] = lambda: mock_queue
     app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(subject="test_admin", role=PrincipalRole.ADMIN)
+
+    token = create_scoped_stream_token("portal-stream", ttl_seconds=3600)
 
     async def mock_generator():
         yield "event: heartbeat\ndata: {}\n\n"
 
     with patch("alpha_core.api.app.portal_stream_generator", side_effect=mock_generator):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            async with ac.stream("GET", "/api/portal/stream") as response:
+            async with ac.stream("GET", f"/api/portal/stream?token={token}") as response:
                 assert response.status_code == 200
                 lines = []
                 async for line in response.aiter_lines():

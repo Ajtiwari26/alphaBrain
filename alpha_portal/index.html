@@ -3,51 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AlphaBrain Client Tracking Portal">
     <title>AlphaBrain Portal</title>
+    <!-- Use Tailwind via CDN for layout, but styles/config are external -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        dark: '#121212',
-                        darker: '#0a0a0a',
-                        primary: '#3b82f6',
-                        success: '#22c55e',
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { background-color: theme('colors.darker'); color: #e5e5e5; }
-        .step-line {
-            height: 2px;
-            flex-grow: 1;
-            background-color: #3f3f46;
-            margin: 0 10px;
-            transition: background-color 0.3s;
-        }
-        .step-line.active { background-color: theme('colors.success'); }
-        .step-circle {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            background-color: #3f3f46;
-            color: #a1a1aa;
-            transition: all 0.3s;
-        }
-        .step-circle.active {
-            background-color: theme('colors.success');
-            color: #fff;
-            box-shadow: 0 0 10px theme('colors.success');
-        }
-    </style>
+    <script src="/portal/tailwind-config.js"></script>
+    <link rel="stylesheet" href="/portal/portal.css">
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-6">
 
@@ -63,15 +24,15 @@
             <h2 class="text-xl font-semibold mb-6">Task Progress: <span class="text-primary" id="task-id">#tsk_pending</span></h2>
             
             <!-- Amazon-style milestone tracker -->
-            <div class="flex items-center justify-between w-full">
+            <div class="flex items-center justify-between w-full" id="tracker-container">
                 <div class="flex flex-col items-center">
-                    <div class="step-circle active" id="step-1">✓</div>
+                    <div class="step-circle" id="step-1">1</div>
                     <span class="mt-2 text-sm font-medium">Received</span>
                 </div>
-                <div class="step-line active" id="line-1"></div>
+                <div class="step-line" id="line-1"></div>
                 
                 <div class="flex flex-col items-center">
-                    <div class="step-circle active" id="step-2">2</div>
+                    <div class="step-circle" id="step-2">2</div>
                     <span class="mt-2 text-sm font-medium">In Progress</span>
                 </div>
                 <div class="step-line" id="line-2"></div>
@@ -97,46 +58,7 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const logBox = document.getElementById('telemetry-log');
-            const statusBadge = document.getElementById('sse-status');
-
-            function logEvent(msg) {
-                const div = document.createElement('div');
-                div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-                logBox.appendChild(div);
-                logBox.scrollTop = logBox.scrollHeight;
-            }
-
-            try {
-                // Initialize SSE listener
-                const eventSource = new EventSource('/api/portal/stream');
-                
-                eventSource.onopen = () => {
-                    statusBadge.textContent = 'Live Connected';
-                    statusBadge.className = 'px-3 py-1 bg-green-900/30 text-green-400 text-sm font-semibold rounded-full border border-green-800';
-                    logEvent('Connected to SSE stream.');
-                };
-
-                eventSource.addEventListener('heartbeat', (e) => {
-                    logEvent(`Heartbeat received: ${e.data}`);
-                });
-
-                eventSource.onmessage = (e) => {
-                    logEvent(`Message received: ${e.data}`);
-                };
-
-                eventSource.onerror = (e) => {
-                    statusBadge.textContent = 'Disconnected';
-                    statusBadge.className = 'px-3 py-1 bg-red-900/30 text-red-400 text-sm font-semibold rounded-full border border-red-800';
-                    logEvent('Connection lost or error occurred.');
-                    eventSource.close();
-                };
-            } catch (err) {
-                logEvent(`Failed to initialize EventSource: ${err.message}`);
-            }
-        });
-    </script>
+    <!-- External script to prevent CSP blocking -->
+    <script src="/portal/portal.js"></script>
 </body>
 </html>
