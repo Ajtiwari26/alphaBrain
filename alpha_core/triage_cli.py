@@ -938,7 +938,8 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                         for line in status_res.stdout.splitlines():
                             if len(line) < 3 or line[2] != " ":
                                 continue
-                            if line[3:].startswith(".alphabrain/"):
+                            path = line[3:]
+                            if path == ".alphabrain" or path.startswith(".alphabrain/"):
                                 continue
                             clean_lines.append(line)
 
@@ -1071,7 +1072,8 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
             for line in status_res.stdout.splitlines():
                 if len(line) < 3 or line[2] != " ":
                     continue
-                if line[3:].startswith(".alphabrain/"):
+                path = line[3:]
+                if path == ".alphabrain" or path.startswith(".alphabrain/"):
                     continue
                 clean_lines.append(line)
 

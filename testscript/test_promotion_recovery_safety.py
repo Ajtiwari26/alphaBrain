@@ -92,18 +92,12 @@ def test_newer_commit_protection_recovery(
     mock_rev_parse_res = MagicMock()
     mock_rev_parse_res.stdout = "newer_sha"  # main has advanced!
 
-    # Third call is `git merge-base --is-ancestor result_sha current_main`
-    mock_merge_base_res = MagicMock()
-    mock_merge_base_res.returncode = 0  # It is an ancestor, so main has advanced
-
     # Configure side_effects for subprocess.run
     def run_side_effect(args, **kwargs):
         if "status" in args:
             return mock_status_res
         if "rev-parse" in args and "main" in args:
             return mock_rev_parse_res
-        if "merge-base" in args:
-            return mock_merge_base_res
         return MagicMock()
 
     mock_run.side_effect = run_side_effect
