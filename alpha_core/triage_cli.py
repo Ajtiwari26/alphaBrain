@@ -928,7 +928,11 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                 if state_data.get("state") == "APPLIED":
                     try:
                         status_res = subprocess.run(
-                            ["git", "status", "--porcelain"], cwd=repo_path, capture_output=True, text=True, check=True
+                            ["git", "status", "--porcelain"],
+                            cwd=repo_path,
+                            capture_output=True,
+                            text=True,
+                            check=True,
                         )
                         clean_lines = []
                         for line in status_res.stdout.strip().splitlines():
@@ -939,11 +943,17 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                             clean_lines.append(line)
 
                         if clean_lines:
-                            print("Error: Working tree is not clean. Aborting recovery.", file=sys.stderr)
+                            print(
+                                "Error: Working tree is not clean. Aborting recovery.",
+                                file=sys.stderr,
+                            )
                             return 1
 
                         subprocess.run(
-                            ["git", "checkout", "main"], cwd=repo_path, check=True, capture_output=True
+                            ["git", "checkout", "main"],
+                            cwd=repo_path,
+                            check=True,
+                            capture_output=True,
                         )
                         subprocess.run(
                             ["git", "reset", "--hard", result_sha],
@@ -1035,7 +1045,11 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         # 5. CAS Destination Base Check and Update
         try:
             status_res = subprocess.run(
-                ["git", "status", "--porcelain"], cwd=repo_path, capture_output=True, text=True, check=True
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
             )
             clean_lines = []
             for line in status_res.stdout.strip().splitlines():

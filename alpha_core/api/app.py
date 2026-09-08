@@ -2531,11 +2531,13 @@ async def get_portal_overview(
 
     tasks = queue.list_tasks(limit=100000)
     authorized_tasks = [
-        t for t in tasks
+        t
+        for t in tasks
         if principal.can_access_project(t.get("envelope", {}).get("project_id", ""))
     ]
 
     import statistics
+
     status_counts = {s.value: 0 for s in TriageStatus}
     queue_waits = []
     exec_durations = []
@@ -2590,7 +2592,8 @@ async def get_portal_task_trace(
     project_id = task.get("envelope", {}).get("project_id")
     if not project_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Task missing project ownership"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Task missing project ownership",
         )
     require_project_access(principal, project_id)
 
@@ -2602,9 +2605,15 @@ async def get_portal_task_trace(
     is_founder = principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}
     if not is_founder:
         allowed_keys = {
-            "meeting_id", "speaker_id", "utterance_timestamp",
-            "transcript_excerpt", "extraction_model", "extraction_confidence",
-            "eva_session_id", "created_at", "content_hash"
+            "meeting_id",
+            "speaker_id",
+            "utterance_timestamp",
+            "transcript_excerpt",
+            "extraction_model",
+            "extraction_confidence",
+            "eva_session_id",
+            "created_at",
+            "content_hash",
         }
         provenance = {k: v for k, v in provenance.items() if k in allowed_keys}
 
@@ -2617,7 +2626,9 @@ async def get_portal_task_trace(
     }
 
 
-async def portal_stream_generator(project_id: str, last_event_id: str | None = None, max_duration_seconds: int = 3600):
+async def portal_stream_generator(
+    project_id: str, last_event_id: str | None = None, max_duration_seconds: int = 3600
+):
     """Simple SSE heartbeat generator for live portal stream with a TTL."""
     deadline = asyncio.get_event_loop().time() + max_duration_seconds
     event_id = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
@@ -2652,5 +2663,9 @@ async def stream_portal_events(
 ):
     if not verify_scoped_stream_token(token, f"portal-stream:{project_id}"):
         raise HTTPException(status_code=401, detail="Invalid or expired stream token")
-    last_event_id = request.headers.get("Last-Event-ID") or request.query_params.get("last_event_id")
-    return StreamingResponse(portal_stream_generator(project_id, last_event_id), media_type="text/event-stream")
+    last_event_id = request.headers.get("Last-Event-ID") or request.query_params.get(
+        "last_event_id"
+    )
+    return StreamingResponse(
+        portal_stream_generator(project_id, last_event_id), media_type="text/event-stream"
+    )

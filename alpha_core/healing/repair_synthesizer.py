@@ -21,7 +21,11 @@ class RepairEnvelopeSynthesizer:
             if not f:
                 continue
             norm_f = os.path.normpath(f)
-            if norm_f.startswith("/") or any(c == '..' for c in norm_f.split('/')) or norm_f in ('.', ''):
+            if (
+                norm_f.startswith("/")
+                or any(c == ".." for c in norm_f.split("/"))
+                or norm_f in (".", "")
+            ):
                 continue
             for norm_op in normalized_original:
                 if norm_op == "." or norm_f == norm_op or norm_f.startswith(norm_op + os.sep):

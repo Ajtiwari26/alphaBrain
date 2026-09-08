@@ -182,14 +182,18 @@ class CIHealingDaemon:
             logger.warning("Emergency stop is active. Healing daemon suspended.")
             return
 
-        completed_tasks = self.queue.list_tasks(status=TriageStatus.COMPLETED, limit=100, project_id=self.project_id)
+        completed_tasks = self.queue.list_tasks(
+            status=TriageStatus.COMPLETED, limit=100, project_id=self.project_id
+        )
         for task in completed_tasks:
             try:
                 self.process_completed_task(task)
             except Exception as e:
                 logger.error(f"Failed to process completed task {task.get('id')}: {e}")
 
-        failed_tasks = self.queue.list_tasks(status=TriageStatus.FAILED, limit=100, project_id=self.project_id)
+        failed_tasks = self.queue.list_tasks(
+            status=TriageStatus.FAILED, limit=100, project_id=self.project_id
+        )
         for task in failed_tasks:
             try:
                 self.process_failed_task(task)
