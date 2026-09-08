@@ -25,7 +25,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
@@ -2504,3 +2504,54 @@ async def post_triage_task_result(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid status '{payload.status}'. Must be 'completed' or 'failed'",
         )
+
+
+# ==========================================
+# Portal API Endpoints
+# ==========================================
+
+@app.get("/api/portal/overview")
+async def get_portal_overview(
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+):
+    require_permission(principal, "audit:read")
+    return {"status": "ok", "stats": queue.get_stats()}
+
+
+@app.get("/api/portal/tasks/{task_id}/trace")
+async def get_portal_task_trace(
+    task_id: str,
+    principal: AuthPrincipal = Depends(require_api_principal),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+):
+    require_permission(principal, "task:read")
+    task = queue.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {
+        "status": "ok",
+        "task_id": task_id,
+        "provenance": task.get("provenance", {}),
+        "attestation": task.get("result", {}).get("senior_review", {}) if task.get("result") else None,
+        "telemetry": queue.get_task_telemetry(task_id)
+    }
+
+
+async def portal_stream_generator():
+    """Simple SSE heartbeat generator for live portal stream."""
+    try:
+        while True:
+            yield "event: heartbeat\ndata: {}\n\n"
+            await asyncio.sleep(15)
+    except asyncio.CancelledError:
+        pass
+
+
+@app.get("/api/portal/stream")
+async def stream_portal_events(
+    principal: AuthPrincipal = Depends(require_api_principal),
+):
+    require_permission(principal, "audit:read")
+    return StreamingResponse(portal_stream_generator(), media_type="text/event-stream")
