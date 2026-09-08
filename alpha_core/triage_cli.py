@@ -1187,20 +1187,26 @@ def cmd_stats(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
 def cmd_healing_daemon(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     try:
-        # Import dynamically to avoid circular dependencies or path issues
         from alpha_worker.ci_healing_daemon import CIHealingDaemon
-        daemon = CIHealingDaemon(queue)
-        daemon.run_once()
+        daemon = CIHealingDaemon(queue, project_id=args.project_id)
+
+        if args.continuous:
+            daemon.run_continuously(interval=args.interval)
+        else:
+            daemon.run_once()
+
         if args.json:
             print(json.dumps({"status": "ok", "message": "Healing daemon run completed"}))
         else:
             print("✅ Healing daemon completed.")
         return 0
     except Exception as e:
+        import traceback
         if args.json:
-            print(json.dumps({"error": str(e)}))
+            print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
         else:
             print(f"❌ Error running healing daemon: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
         return 1
 
 
@@ -1347,6 +1353,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_healing = subparsers.add_parser(
         "healing-daemon", help="Run CIHealingDaemon to orchestrate auto-merge and failure diagnosis"
     )
+    p_healing.add_argument("--project-id", default="prj_phase10", help="Project ID for synthesized tasks")
+    p_healing.add_argument("--continuous", action="store_true", help="Run continuously in a loop")
+    p_healing.add_argument("--interval", type=float, default=10.0, help="Interval in seconds for continuous mode")
     p_healing.add_argument("--json", action="store_true", help="Output JSON format")
 
     return parser

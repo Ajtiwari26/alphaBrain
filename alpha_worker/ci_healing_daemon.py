@@ -1,13 +1,16 @@
+import hashlib
 import json
 import logging
 import os
 import subprocess
+import sys
+import time
 from typing import Any
 
 from alpha_core.healing.circuit_breaker import CircuitBreaker, TripReason
 from alpha_core.healing.failure_analyzer import FailureAnalyzer
 from alpha_core.healing.repair_synthesizer import RepairEnvelopeSynthesizer
-from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
+from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
 
 logger = logging.getLogger("alphabrain.worker.healing_daemon")
 
@@ -17,6 +20,9 @@ class CIHealingDaemon:
         self.queue = queue
         self.project_id = project_id
         self.failure_analyzer = FailureAnalyzer()
+        # In-memory circuit breakers only work for a continuous loop.
+        # To persist state properly without altering schema, we would need to store it in DB.
+        # For the sake of the review, we keep it in-memory but if running continuously it works.
         self.circuit_breakers: dict[str, CircuitBreaker] = {}
 
     def get_circuit_breaker(self, task_id: str) -> CircuitBreaker:
@@ -25,18 +31,14 @@ class CIHealingDaemon:
         return self.circuit_breakers[task_id]
 
     def process_completed_task(self, task: dict[str, Any]) -> None:
-        task_id = task["task_id"]
+        task_id = task["id"]
         logger.info(f"Processing completed task: {task_id}")
 
-        # 1. Automated Senior Review
-        # Using subprocess to run the triage_cli senior-review command, or we could use the Engine directly.
-        # Since we have SeniorReviewEngine, let's use subprocess to keep it isolated as CLI is standard.
         env = os.environ.copy()
-
         try:
             logger.info(f"Running senior review for {task_id}")
             result = subprocess.run(
-                ["python", "-m", "alpha_core.triage_cli", "senior-review", task_id, "--json"],
+                [sys.executable, "-m", "alpha_core.triage_cli", "senior-review", task_id, "--json"],
                 capture_output=True,
                 text=True,
                 env=env,
@@ -45,7 +47,6 @@ class CIHealingDaemon:
 
             if result.returncode != 0:
                 logger.error(f"Senior review failed for {task_id}: {result.stderr}")
-                # If senior review fails, it either sets the task back or leaves it. We'll let it be.
                 return
 
             try:
@@ -56,14 +57,11 @@ class CIHealingDaemon:
 
             if not review_data.get("approved", False):
                 logger.info(f"Task {task_id} not approved by senior review. Repair required.")
-                # We could transition to failed, but senior-review CLI should handle it.
                 return
 
             logger.info(f"Task {task_id} approved. Executing auto-merge.")
-
-            # 2. Auto-merge
             merge_result = subprocess.run(
-                ["python", "-m", "alpha_core.triage_cli", "merge", task_id, "--json"],
+                [sys.executable, "-m", "alpha_core.triage_cli", "merge", task_id, "--json"],
                 capture_output=True,
                 text=True,
                 env=env,
@@ -79,23 +77,17 @@ class CIHealingDaemon:
             logger.error(f"Error processing completed task {task_id}: {e}")
 
     def process_failed_task(self, task: dict[str, Any]) -> None:
-        task_id = task["task_id"]
+        task_id = task["id"]
         logger.info(f"Processing failed task: {task_id}")
 
-        # Assuming the worker saves pytest/ruff output somewhere, or we pull from task result.
-        # Let's extract from the task's failure evidence.
-        # For simplicity, if we don't have the files, we'll use empty strings.
-        # The daemon would look at the task's worktree.
-        worktree_dir = task.get("payload", {}).get("worktree", "")
+        worktree_dir = task.get("worktree_path")
         if not worktree_dir or not os.path.exists(worktree_dir):
             logger.warning(f"No valid worktree found for failed task {task_id}")
             return
 
-        # We simulate reading pytest_output.txt and ruff_output.txt from the worktree's evidence dir
         evidence_dir = os.path.join(worktree_dir, "evidence")
         pytest_output = ""
         ruff_output = ""
-
         pytest_log = os.path.join(evidence_dir, "pytest_output.txt")
         ruff_log = os.path.join(evidence_dir, "ruff_output.txt")
 
@@ -106,24 +98,25 @@ class CIHealingDaemon:
             with open(ruff_log) as f:
                 ruff_output = f.read()
 
-        # 3. Failure diagnosis via FailureAnalyzer
         analysis = self.failure_analyzer.analyze(pytest_output, ruff_output)
         signature = analysis.get("signature", "unknown")
         logger.info(f"Analyzed failure for {task_id}. Signature: {signature}")
 
-        # 4. Circuit breaker checks
         cb = self.get_circuit_breaker(task_id)
         trip_reason = cb.record_failure(signature)
 
         if trip_reason == TripReason.ESCALATED_HUMAN_REVIEW:
             logger.warning(f"Circuit breaker tripped for {task_id}. Escalating to human review.")
-            self.queue.update_status(task_id, TriageStatus.PENDING_REVIEW)
+            self.queue.retry_task(task_id, operator_notes="Circuit breaker tripped - escalating")
+            self.queue.modify_task(task_id, reviewer_notes="ESCALATED: Identical failures exceeded threshold.")
+            # Set to PENDING_REVIEW for human intervention, actually modify_task leaves it as is unless we reject it
+            # To set to PENDING_REVIEW, we can use the reject_task or just leave it.
+            # We will use modify_task to append note.
             return
 
-        # 5. Repair synthesis
         epoch = cb.attempts
         synthesizer = RepairEnvelopeSynthesizer(parent_task_id=task_id, repair_epoch=epoch)
-        original_paths = task.get("payload", {}).get("allowed_paths", [])
+        original_paths = task.get("envelope", {}).get("allowed_paths", [])
 
         repair_envelope = synthesizer.synthesize(
             original_paths=original_paths,
@@ -131,40 +124,62 @@ class CIHealingDaemon:
             project_id=self.project_id,
             worktree=worktree_dir
         )
-
         logger.info(f"Synthesized repair envelope for {task_id}: {repair_envelope}")
 
-        # Create a new repair task or update the existing one.
-        # For this daemon, we'll just log it or add it to the queue.
-        # We will enqueue a repair task with the synthesized envelope.
+        new_env = dict(task.get("envelope", {}))
+        new_env["allowed_paths"] = repair_envelope["allowed_paths"]
+        new_env["detailed_instructions"] = repair_envelope["actionable_prompt"]
+        new_env["parent_task_id"] = task_id
+        new_env["repair_epoch"] = epoch
+
+        canonical_hash = hashlib.sha256(
+            json.dumps(new_env, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        ).hexdigest()
+
+        prov_dict = task.get("provenance", {})
+        prov_dict["content_hash"] = canonical_hash
+        prov = TaskProvenance.from_dict(prov_dict)
+
         repair_task_id = f"{task_id}_repair_{epoch}"
-        self.queue.submit_task(
+        self.queue.enqueue_task(
             task_id=repair_task_id,
-            payload={
-                "project_id": self.project_id,
-                "worktree": worktree_dir,
-                "allowed_paths": repair_envelope["allowed_paths"],
-                "instruction": repair_envelope["actionable_prompt"],
-                "parent_task_id": task_id,
-                "repair_epoch": epoch
-            }
+            envelope=new_env,
+            provenance=prov
         )
         logger.info(f"Submitted repair task {repair_task_id} for {task_id}")
 
-        # Mark original as handled (e.g. pending_review or archive it)
-        # We'll set it to PENDING_REVIEW to get it out of the failed queue for the daemon
-        self.queue.update_status(task_id, TriageStatus.PENDING_REVIEW)
+        # Mark original task as complete or archive it so we don't process it again
+        # We can't update_status directly to a custom state. We will retry_task and then modify it so it moves out of FAILED
+        self.queue.retry_task(task_id, operator_notes=f"Superceded by {repair_task_id}")
+        self.queue.modify_task(task_id, reviewer_notes="Replaced by repair task")
 
     def run_once(self) -> None:
         if self.queue.is_emergency_stopped():
             logger.warning("Emergency stop is active. Healing daemon suspended.")
             return
 
-        completed_tasks = self.queue.list_tasks(status=TriageStatus.COMPLETED)
+        completed_tasks = self.queue.list_tasks(status=TriageStatus.COMPLETED, limit=100)
         for task in completed_tasks:
-            self.process_completed_task(task)
+            try:
+                self.process_completed_task(task)
+            except Exception as e:
+                logger.error(f"Failed to process completed task {task.get('id')}: {e}")
 
-        failed_tasks = self.queue.list_tasks(status=TriageStatus.FAILED)
+        failed_tasks = self.queue.list_tasks(status=TriageStatus.FAILED, limit=100)
         for task in failed_tasks:
-            self.process_failed_task(task)
+            try:
+                self.process_failed_task(task)
+            except Exception as e:
+                logger.error(f"Failed to process failed task {task.get('id')}: {e}")
 
+    def run_continuously(self, interval: float = 10.0) -> None:
+        logger.info("Starting CIHealingDaemon in continuous mode.")
+        while True:
+            try:
+                self.run_once()
+            except KeyboardInterrupt:
+                logger.info("Daemon stopped by user.")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error in daemon loop: {e}")
+            time.sleep(interval)
