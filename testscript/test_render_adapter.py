@@ -91,11 +91,15 @@ async def test_get_service_url_missing(adapter):
 
 @pytest.mark.asyncio
 async def test_deploy_preview_success(adapter):
+    sha = "a" * 40
+
     def mock_make_request(method, endpoint, data=None):
         if method == "GET" and endpoint == "/services/srv_123":
             return {"service": {"env": "preview"}}
         if method == "POST" and endpoint == "/services/srv_123/deploys":
             return {"id": "dep_123"}
+        if method == "GET" and endpoint == "/services/srv_123/deploys/dep_123":
+            return {"commit": {"id": sha}}
         return {}
 
     with patch.object(adapter, "_make_request", side_effect=mock_make_request) as mock_make:
@@ -104,7 +108,7 @@ async def test_deploy_preview_success(adapter):
                 adapter, "_get_service_url", return_value="https://test-app.onrender.com"
             ):
                 with patch.object(adapter, "check_health", return_value=True):
-                    result = await adapter.deploy_preview()
+                    result = await adapter.deploy_preview(commit_id=sha)
 
                     assert result.url == "https://test-app.onrender.com"
                     assert result.status == "LIVE"
@@ -114,6 +118,8 @@ async def test_deploy_preview_success(adapter):
 
 @pytest.mark.asyncio
 async def test_deploy_preview_missing_id(adapter):
+    sha = "a" * 40
+
     def mock_make_request(method, endpoint, data=None):
         if method == "GET" and endpoint == "/services/srv_123":
             return {"service": {"env": "preview"}}
@@ -121,7 +127,7 @@ async def test_deploy_preview_missing_id(adapter):
 
     with patch.object(adapter, "_make_request", side_effect=mock_make_request):
         with pytest.raises(RuntimeError, match="Failed to extract deploy ID"):
-            await adapter.deploy_preview()
+            await adapter.deploy_preview(commit_id=sha)
 
 
 @pytest.mark.asyncio
@@ -165,6 +171,8 @@ async def test_check_health_exception(adapter):
 
 @pytest.mark.asyncio
 async def test_deploy_preview_with_commit_id(adapter):
+    sha = "b" * 40
+
     def mock_make_request(method, endpoint, data=None):
         if method == "GET" and endpoint == "/services/srv_123":
             return {"service": {"env": "preview"}}
@@ -173,10 +181,10 @@ async def test_deploy_preview_with_commit_id(adapter):
 
             if data:
                 parsed = json.loads(data)
-                assert parsed.get("commitId") == "abc1234"
+                assert parsed.get("commitId") == sha
             return {"id": "dep_123"}
         if method == "GET" and endpoint == "/services/srv_123/deploys/dep_123":
-            return {"commitId": "abc123456"}
+            return {"commitId": sha}
         return {}
 
     with patch.object(adapter, "_make_request", side_effect=mock_make_request):
@@ -185,13 +193,15 @@ async def test_deploy_preview_with_commit_id(adapter):
                 adapter, "_get_service_url", return_value="https://test-app.onrender.com"
             ):
                 with patch.object(adapter, "check_health", return_value=True):
-                    result = await adapter.deploy_preview(commit_id="abc1234")
+                    result = await adapter.deploy_preview(commit_id=sha)
                     assert result.url == "https://test-app.onrender.com"
                     assert result.status == "LIVE"
 
 
 @pytest.mark.asyncio
 async def test_deploy_preview_rejects_production(adapter):
+    sha = "c" * 40
+
     def mock_make_request(method, endpoint, data=None):
         if method == "GET" and endpoint == "/services/srv_123":
             return {"service": {"environment": "production"}}
@@ -199,6 +209,28 @@ async def test_deploy_preview_rejects_production(adapter):
 
     with patch.object(adapter, "_make_request", side_effect=mock_make_request):
         with pytest.raises(
-            RuntimeError, match="Cannot deploy to production targets in preview mode"
+            RuntimeError, match="invalid or production in preview mode"
         ):
-            await adapter.deploy_preview()
+            await adapter.deploy_preview(commit_id=sha)
+
+
+@pytest.mark.asyncio
+async def test_deploy_preview_mandatory_sha(adapter):
+    with pytest.raises(ValueError, match="Mandatory explicit 40-character commit SHA"):
+        await adapter.deploy_preview(commit_id=None)
+    with pytest.raises(ValueError, match="Mandatory explicit 40-character commit SHA"):
+        await adapter.deploy_preview(commit_id="short_sha")
+
+
+@pytest.mark.asyncio
+async def test_deploy_preview_fail_closed_env(adapter):
+    sha = "d" * 40
+
+    def mock_make_request(method, endpoint, data=None):
+        if method == "GET" and endpoint == "/services/srv_123":
+            return {"service": {"env": "unknown_env"}}
+        return {}
+
+    with patch.object(adapter, "_make_request", side_effect=mock_make_request):
+        with pytest.raises(RuntimeError, match="invalid or production in preview mode"):
+            await adapter.deploy_preview(commit_id=sha)

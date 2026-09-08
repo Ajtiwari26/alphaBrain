@@ -112,6 +112,9 @@ class SupabaseAdapter:
         }
 
     async def rollback_migration(self, version: str) -> bool:
-        """Rollback safety."""
-        logger.info("Rolling back migration %s", version)
-        return True
+        """Rollback safety: automated Supabase rollback is unsupported and fails closed."""
+        logger.warning(
+            "Automated Supabase rollback is unsupported for migration %s; manual reversal required",
+            version,
+        )
+        return False

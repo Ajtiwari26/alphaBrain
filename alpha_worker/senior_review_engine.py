@@ -107,35 +107,7 @@ class SeniorReviewEngine:
                 if res.returncode == 0 and res.stdout.strip():
                     stat_str = stat_res.stdout.strip() if stat_res.returncode == 0 else ""
                     diff_str = res.stdout.strip()
-                    full_content_str = ""
-
-                    # Also append full file contents of modified files
-                    files_res = subprocess.run(
-                        ["git", "diff", "--name-only", f"main..{branch_name}"],
-                        cwd=repo_path,
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                    )
-                    if files_res.returncode == 0:
-                        for f in files_res.stdout.strip().splitlines():
-                            f = f.strip()
-                            if f:
-                                try:
-                                    # Use git show to get the file content at the branch_name
-                                    content_res = subprocess.run(
-                                        ["git", "show", f"{branch_name}:{f}"],
-                                        cwd=repo_path,
-                                        capture_output=True,
-                                        text=True,
-                                        timeout=10,
-                                    )
-                                    if content_res.returncode == 0:
-                                        full_content_str += f"\n\n=== FULL FILE CONTENT: {f} ===\n```\n{content_res.stdout}\n```\n"
-                                except Exception:
-                                    pass
-
-                    return f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{diff_str}\n{full_content_str}"
+                    return f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{diff_str}"
             except Exception:
                 pass
         result = task.get("result") or {}
@@ -167,8 +139,11 @@ class SeniorReviewEngine:
                 "--model",
                 model,
                 "--disable-slash-commands",
+                "--dangerously-skip-permissions",
                 "--output-format",
                 "json",
+                "--input-format",
+                "text",
                 "--json-schema",
                 schema_path,
                 "--print-timeout",
@@ -176,12 +151,17 @@ class SeniorReviewEngine:
             ]
             if "claude" not in model.lower() and effort:
                 cmd.extend(["--effort", effort])
-            cmd.extend(["--print", prompt])
 
             env = {k: v for k, v in os.environ.items() if not k.startswith("ALPHA_SIGNING_SECRET")}
 
             res = subprocess.run(
-                cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_seconds + 30, env=env
+                cmd,
+                input=prompt,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds + 30,
+                env=env,
             )
             if res.returncode != 0:
                 logger.warning(
@@ -403,7 +383,7 @@ Git Diff:
 
 Instructions:
 1. Verify overall system design and AlphaBrain Invariant compliance.
-2. CRITICAL: Do NOT invoke external tools or inspect files on disk. The repository on disk is at base_commit; all pending changes are provided in the 'Git Diff' above. Base your architectural evaluation strictly on the provided Git Diff.
+2. You may inspect the candidate worktree and verify runtime correctness as needed.
 3. Render your authoritative final ruling explicitly by outputting a strict JSON verdict.
 """
         opus_res = self._invoke_agy(

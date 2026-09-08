@@ -177,4 +177,4 @@ async def test_plan_migration_destructive(adapter):
 @pytest.mark.asyncio
 async def test_rollback_migration(adapter):
     result = await adapter.rollback_migration("20230101")
-    assert result is True
+    assert result is False
