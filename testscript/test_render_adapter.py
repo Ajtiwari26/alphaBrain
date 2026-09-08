@@ -208,9 +208,7 @@ async def test_deploy_preview_rejects_production(adapter):
         return {}
 
     with patch.object(adapter, "_make_request", side_effect=mock_make_request):
-        with pytest.raises(
-            RuntimeError, match="invalid or production in preview mode"
-        ):
+        with pytest.raises(RuntimeError, match="invalid or production in preview mode"):
             await adapter.deploy_preview(commit_id=sha)
 
 

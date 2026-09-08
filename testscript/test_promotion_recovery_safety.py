@@ -21,16 +21,12 @@ def mock_queue():
             "result_sha": "result_sha",
             "attempt_id": "attempt_1",
             "worker_id": "worker_1",
-            "evidence": {}
+            "evidence": {},
         },
-        "provenance": {
-            "lease_metadata": {
-                "attempt_id": "attempt_1",
-                "worker_id": "worker_1"
-            }
-        }
+        "provenance": {"lease_metadata": {"attempt_id": "attempt_1", "worker_id": "worker_1"}},
     }
     return queue
+
 
 def setup_attestation(mock_ReviewAttestation):
     att_mock = MagicMock()
@@ -53,6 +49,7 @@ def setup_attestation(mock_ReviewAttestation):
     mock_ReviewAttestation.compute_evidence_digest.return_value = "evidence_digest"
     return att_mock
 
+
 @patch("alpha_protocol.task.ReviewAttestation")
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.os.environ.get")
@@ -62,7 +59,15 @@ def setup_attestation(mock_ReviewAttestation):
 @patch("alpha_core.triage_cli._atomic_write_json")
 @patch("alpha_core.triage_cli.json.load")
 def test_newer_commit_protection_recovery(
-    mock_json_load, mock_atomic_write, mock_flock, mock_open, mock_path, mock_env, mock_run, mock_ReviewAttestation, mock_queue
+    mock_json_load,
+    mock_atomic_write,
+    mock_flock,
+    mock_open,
+    mock_path,
+    mock_env,
+    mock_run,
+    mock_ReviewAttestation,
+    mock_queue,
 ):
     mock_env.return_value = "fake_secret"
     setup_attestation(mock_ReviewAttestation)
@@ -76,7 +81,7 @@ def test_newer_commit_protection_recovery(
         "base_commit": "base_sha",
         "evidence_digest": "evidence_digest",
         "tree_digest": "tree_sha",
-        "state": "APPLIED"
+        "state": "APPLIED",
     }
 
     # First call in APPLIED is `git status --porcelain`
@@ -108,6 +113,7 @@ def test_newer_commit_protection_recovery(
     exit_code = cmd_merge(args, mock_queue)
     assert exit_code == 1  # Should abort due to newer commits
 
+
 @patch("alpha_protocol.task.ReviewAttestation")
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.os.environ.get")
@@ -117,7 +123,15 @@ def test_newer_commit_protection_recovery(
 @patch("alpha_core.triage_cli._atomic_write_json")
 @patch("alpha_core.triage_cli.json.load")
 def test_single_unstaged_modification_detected(
-    mock_json_load, mock_atomic_write, mock_flock, mock_open, mock_path, mock_env, mock_run, mock_ReviewAttestation, mock_queue
+    mock_json_load,
+    mock_atomic_write,
+    mock_flock,
+    mock_open,
+    mock_path,
+    mock_env,
+    mock_run,
+    mock_ReviewAttestation,
+    mock_queue,
 ):
     mock_env.return_value = "fake_secret"
     setup_attestation(mock_ReviewAttestation)
@@ -131,7 +145,7 @@ def test_single_unstaged_modification_detected(
         "base_commit": "base_sha",
         "evidence_digest": "evidence_digest",
         "tree_digest": "tree_sha",
-        "state": "APPLIED"
+        "state": "APPLIED",
     }
 
     # Simulate dirty tree with single unstaged file
@@ -150,6 +164,7 @@ def test_single_unstaged_modification_detected(
     exit_code = cmd_merge(args, mock_queue)
     assert exit_code == 1  # Should abort due to dirty tree
 
+
 @patch("alpha_protocol.task.ReviewAttestation")
 @patch("alpha_core.triage_cli.subprocess.run")
 @patch("alpha_core.triage_cli.os.environ.get")
@@ -159,7 +174,15 @@ def test_single_unstaged_modification_detected(
 @patch("alpha_core.triage_cli._atomic_write_json")
 @patch("alpha_core.triage_cli.json.load")
 def test_non_exemption_alphabrain_in_path(
-    mock_json_load, mock_atomic_write, mock_flock, mock_open, mock_path, mock_env, mock_run, mock_ReviewAttestation, mock_queue
+    mock_json_load,
+    mock_atomic_write,
+    mock_flock,
+    mock_open,
+    mock_path,
+    mock_env,
+    mock_run,
+    mock_ReviewAttestation,
+    mock_queue,
 ):
     mock_env.return_value = "fake_secret"
     setup_attestation(mock_ReviewAttestation)
@@ -173,7 +196,7 @@ def test_non_exemption_alphabrain_in_path(
         "base_commit": "base_sha",
         "evidence_digest": "evidence_digest",
         "tree_digest": "tree_sha",
-        "state": "APPLIED"
+        "state": "APPLIED",
     }
 
     # Simulate dirty tree with a file containing alphabrain but not in .alphabrain/

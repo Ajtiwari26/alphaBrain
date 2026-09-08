@@ -958,13 +958,9 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                         ).stdout.strip()
 
                         if current_main != result_sha:
-                            is_ancestor = subprocess.run(
-                                ["git", "merge-base", "--is-ancestor", result_sha, current_main],
-                                cwd=repo_path,
-                            ).returncode == 0
-                            if is_ancestor:
+                            if current_main != expected_base_commit:
                                 print(
-                                    "Error: main has advanced beyond result_sha. Aborting recovery.",
+                                    f"Error: main has advanced unexpectedly or diverged from {expected_base_commit}. Aborting recovery.",
                                     file=sys.stderr,
                                 )
                                 return 1
@@ -976,7 +972,7 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                             capture_output=True,
                         )
                         subprocess.run(
-                            ["git", "reset", "--hard", result_sha],
+                            ["git", "merge", "--ff-only", result_sha],
                             cwd=repo_path,
                             check=True,
                             capture_output=True,
@@ -1118,7 +1114,7 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                 text=True,
             )
             subprocess.run(
-                ["git", "reset", "--hard", result_sha],
+                ["git", "merge", "--ff-only", result_sha],
                 cwd=repo_path,
                 check=True,
                 capture_output=True,

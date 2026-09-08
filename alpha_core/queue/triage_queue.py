@@ -937,7 +937,9 @@ class TaskTriageQueue:
                         project_id = env.get("project_id", "default")
                         event_state = "completed" if approved else "review"
                         event_name = (
-                            "senior_review_approved" if approved else "senior_review_repair_required"
+                            "senior_review_approved"
+                            if approved
+                            else "senior_review_repair_required"
                         )
                         conn.execute(
                             """
