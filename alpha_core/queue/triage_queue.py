@@ -21,7 +21,7 @@ from collections.abc import Callable
 from contextlib import closing
 from enum import Enum
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -1553,7 +1553,7 @@ class TaskTriageQueue:
             )
             row = cursor.fetchone()
             if row:
-                return json.loads(row["state_json"])
+                return cast(dict[str, Any], json.loads(row["state_json"]))
             return None
 
     def record_project_event(

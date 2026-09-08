@@ -1,5 +1,6 @@
 import enum
 import time
+from typing import Any
 
 
 class CircuitBreakerState(enum.Enum):
@@ -125,7 +126,7 @@ class CircuitBreaker:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "CircuitBreaker":
+    def from_dict(cls, data: dict[str, Any]) -> "CircuitBreaker":
         """Reconstructs a CircuitBreaker from a serialized dictionary."""
         cb = cls(
             max_identical_signatures=int(data.get("max_identical_signatures", 3)),
