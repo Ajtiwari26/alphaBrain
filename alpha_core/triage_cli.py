@@ -935,10 +935,10 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                             check=True,
                         )
                         clean_lines = []
-                        for line in status_res.stdout.strip().splitlines():
+                        for line in status_res.stdout.splitlines():
                             if len(line) < 3 or line[2] != " ":
                                 continue
-                            if ".alphabrain" in line:
+                            if line[3:].startswith(".alphabrain/"):
                                 continue
                             clean_lines.append(line)
 
@@ -948,6 +948,26 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                                 file=sys.stderr,
                             )
                             return 1
+
+                        current_main = subprocess.run(
+                            ["git", "rev-parse", "main"],
+                            cwd=repo_path,
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        ).stdout.strip()
+
+                        if current_main != result_sha:
+                            is_ancestor = subprocess.run(
+                                ["git", "merge-base", "--is-ancestor", result_sha, current_main],
+                                cwd=repo_path,
+                            ).returncode == 0
+                            if is_ancestor:
+                                print(
+                                    "Error: main has advanced beyond result_sha. Aborting recovery.",
+                                    file=sys.stderr,
+                                )
+                                return 1
 
                         subprocess.run(
                             ["git", "checkout", "main"],
@@ -1052,10 +1072,10 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                 check=True,
             )
             clean_lines = []
-            for line in status_res.stdout.strip().splitlines():
+            for line in status_res.stdout.splitlines():
                 if len(line) < 3 or line[2] != " ":
                     continue
-                if ".alphabrain" in line:
+                if line[3:].startswith(".alphabrain/"):
                     continue
                 clean_lines.append(line)
 
