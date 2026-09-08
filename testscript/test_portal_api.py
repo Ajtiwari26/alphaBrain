@@ -102,14 +102,14 @@ async def test_portal_stream(mock_queue):
         subject="test_admin", role=PrincipalRole.ADMIN
     )
 
-    token = create_scoped_stream_token("portal-stream", ttl_seconds=3600)
+    token = create_scoped_stream_token("portal-stream:prj_test", ttl_seconds=3600)
 
-    async def mock_generator():
+    async def mock_generator(project_id, last_event_id):
         yield "event: heartbeat\ndata: {}\n\n"
 
     with patch("alpha_core.api.app.portal_stream_generator", side_effect=mock_generator):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            async with ac.stream("GET", f"/api/portal/stream?token={token}") as response:
+            async with ac.stream("GET", f"/api/portal/projects/prj_test/stream?token={token}") as response:
                 assert response.status_code == 200
                 lines = []
                 async for line in response.aiter_lines():

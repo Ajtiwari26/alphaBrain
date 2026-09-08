@@ -3,9 +3,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statusBadge = document.getElementById('sse-status');
     const taskIdSpan = document.getElementById('task-id');
     
-    // Get task ID from URL or default
     const urlParams = new URLSearchParams(window.location.search);
     const taskId = urlParams.get('task_id') || 'tsk_pending';
+    const projectId = urlParams.get('project_id') || 'prj_default';
     taskIdSpan.textContent = '#' + taskId;
 
     function logEvent(msg) {
@@ -58,34 +58,70 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Fetch stream token and initialize SSE
-    try {
-        const tokenRes = await fetch('/api/portal/stream/token', { method: 'POST', headers });
-        if (!tokenRes.ok) throw new Error(`Token fetch failed: ${tokenRes.status}`);
-        
-        const { token } = await tokenRes.json();
-        const eventSource = new EventSource(`/api/portal/stream?token=${encodeURIComponent(token)}`);
-        
-        eventSource.onopen = () => {
-            statusBadge.textContent = 'Live Connected';
-            statusBadge.className = 'px-3 py-1 bg-green-900/30 text-green-400 text-sm font-semibold rounded-full border border-green-800';
-            logEvent('Connected to SSE stream.');
-        };
+    let eventSource = null;
+    let reconnectTimeout = null;
+    let lastEventId = null;
 
-        eventSource.addEventListener('heartbeat', (e) => {
-            logEvent(`Heartbeat received: ${e.data}`);
-        });
+    async function connectSSE() {
+        try {
+            const tokenRes = await fetch(`/api/portal/projects/${projectId}/stream/token`, { method: 'POST', headers });
+            if (!tokenRes.ok) throw new Error(`Token fetch failed: ${tokenRes.status}`);
+            
+            const { token } = await tokenRes.json();
+            let url = `/api/portal/projects/${projectId}/stream?token=${encodeURIComponent(token)}`;
+            if (lastEventId) {
+                url += `&last_event_id=${encodeURIComponent(lastEventId)}`;
+            }
+            eventSource = new EventSource(url);
+            
+            eventSource.onopen = () => {
+                statusBadge.textContent = 'Live Connected';
+                statusBadge.className = 'px-3 py-1 bg-green-900/30 text-green-400 text-sm font-semibold rounded-full border border-green-800';
+                logEvent('Connected to SSE stream.');
+            };
 
-        eventSource.onmessage = (e) => {
-            logEvent(`Message received: ${e.data}`);
-        };
+            const handleEvent = (e) => {
+                if (e.lastEventId) lastEventId = e.lastEventId;
+            };
 
-        eventSource.onerror = (e) => {
-            statusBadge.textContent = 'Disconnected';
-            statusBadge.className = 'px-3 py-1 bg-red-900/30 text-red-400 text-sm font-semibold rounded-full border border-red-800';
-            logEvent('Connection lost or error occurred.');
-            eventSource.close();
-        };
-    } catch (err) {
-        logEvent(`Failed to initialize EventSource: ${err.message}`);
+            eventSource.addEventListener('heartbeat', (e) => {
+                handleEvent(e);
+                logEvent(`Heartbeat received: ${e.data}`);
+            });
+
+            eventSource.addEventListener('task_update', (e) => {
+                handleEvent(e);
+                logEvent(`Task update received: ${e.data}`);
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.state) {
+                        updateMilestones(data.state);
+                    }
+                } catch (err) {}
+            });
+
+            eventSource.onmessage = (e) => {
+                handleEvent(e);
+                logEvent(`Message received: ${e.data}`);
+            };
+
+            eventSource.onerror = (e) => {
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    statusBadge.textContent = 'Disconnected';
+                    statusBadge.className = 'px-3 py-1 bg-red-900/30 text-red-400 text-sm font-semibold rounded-full border border-red-800';
+                    logEvent('Connection closed, attempting to re-authenticate...');
+                    clearTimeout(reconnectTimeout);
+                    reconnectTimeout = setTimeout(connectSSE, 3000);
+                } else {
+                    logEvent('Connection lost, browser is reconnecting natively...');
+                }
+            };
+        } catch (err) {
+            logEvent(`Failed to initialize EventSource: ${err.message}`);
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(connectSSE, 3000);
+        }
     }
+
+    connectSSE();
 });

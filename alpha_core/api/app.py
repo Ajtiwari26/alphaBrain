@@ -2617,29 +2617,40 @@ async def get_portal_task_trace(
     }
 
 
-async def portal_stream_generator(max_duration_seconds: int = 3600):
+async def portal_stream_generator(project_id: str, last_event_id: str | None = None, max_duration_seconds: int = 3600):
     """Simple SSE heartbeat generator for live portal stream with a TTL."""
     deadline = asyncio.get_event_loop().time() + max_duration_seconds
+    event_id = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
     try:
         while asyncio.get_event_loop().time() < deadline:
-            yield "event: heartbeat\ndata: {}\n\n"
+            event_id += 1
+            yield f"id: {event_id}\nevent: heartbeat\ndata: {{}}\n\n"
+
+            event_id += 1
+            yield f"id: {event_id}\nevent: task_update\ndata: {json.dumps({'project_id': project_id, 'live': True})}\n\n"
+
             await asyncio.sleep(15)
     except asyncio.CancelledError:
         pass
 
 
-@app.post("/api/portal/stream/token")
+@app.post("/api/portal/projects/{project_id}/stream/token")
 async def get_portal_stream_token(
+    project_id: str,
     principal: AuthPrincipal = Depends(require_api_principal),
 ):
     require_permission(principal, "audit:read")
-    return {"token": create_scoped_stream_token("portal-stream", ttl_seconds=3600)}
+    require_project_access(principal, project_id)
+    return {"token": create_scoped_stream_token(f"portal-stream:{project_id}", ttl_seconds=3600)}
 
 
-@app.get("/api/portal/stream", response_class=StreamingResponse)
+@app.get("/api/portal/projects/{project_id}/stream", response_class=StreamingResponse)
 async def stream_portal_events(
+    project_id: str,
+    request: Request,
     token: str = Query(...),
 ):
-    if not verify_scoped_stream_token(token, "portal-stream"):
+    if not verify_scoped_stream_token(token, f"portal-stream:{project_id}"):
         raise HTTPException(status_code=401, detail="Invalid or expired stream token")
-    return StreamingResponse(portal_stream_generator(), media_type="text/event-stream")
+    last_event_id = request.headers.get("Last-Event-ID") or request.query_params.get("last_event_id")
+    return StreamingResponse(portal_stream_generator(project_id, last_event_id), media_type="text/event-stream")
