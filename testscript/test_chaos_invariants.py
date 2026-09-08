@@ -6,6 +6,7 @@ lease epoch fencing, and secret redaction.
 """
 
 import hashlib
+import hmac
 import json
 import time
 from pathlib import Path
@@ -19,19 +20,33 @@ from alpha_protocol import TaskEnvelope
 
 
 def test_blast_radius_enforcement():
-    """Verify that the SafetyGate rejects tasks requesting too many files."""
-    gate = SafetyGate()
-    env = TaskEnvelope(
-        task_id="test_blast",
+    """Verify that the SafetyGate enforces the exact blast radius boundary."""
+    gate = SafetyGate(max_allowed_files=10)
+
+    # 10 files should pass
+    env_pass = TaskEnvelope(
+        task_id="test_blast_pass",
         project_id="prj_test",
         objective="test",
         repo="local",
         base_commit="a" * 40,
-        allowed_paths=tuple([f"file_{i}.py" for i in range(12)])
+        allowed_paths=tuple([f"file_{i}.py" for i in range(10)])
     )
-    verdict = gate.evaluate_envelope(env)
-    assert not verdict.passed
-    assert "Blast radius violation" in verdict.reason
+    verdict_pass = gate.evaluate_envelope(env_pass)
+    assert verdict_pass.passed
+
+    # 11 files should fail
+    env_fail = TaskEnvelope(
+        task_id="test_blast_fail",
+        project_id="prj_test",
+        objective="test",
+        repo="local",
+        base_commit="a" * 40,
+        allowed_paths=tuple([f"file_{i}.py" for i in range(11)])
+    )
+    verdict_fail = gate.evaluate_envelope(env_fail)
+    assert not verdict_fail.passed
+    assert "Blast radius violation" in verdict_fail.reason
 
 
 def test_tamper_detection():
@@ -52,20 +67,35 @@ def test_tamper_detection():
     tampered_json = json.dumps(tampered_env, sort_keys=True, separators=(",", ":"), default=str)
     tampered_hash = hashlib.sha256(tampered_json.encode("utf-8")).hexdigest()
 
-    import hmac
     assert not hmac.compare_digest(content_hash, tampered_hash), "Tampering was not detected"
 
 
 def test_circuit_breaker_trips():
-    """Verify that the circuit breaker trips after repeated identical failures."""
-    cb = CircuitBreaker(max_identical_signatures=2)
-    reason1 = cb.record_failure("error_signature_1")
-    assert cb.state == CircuitBreakerState.CLOSED
-    assert reason1 == TripReason.NONE
+    """Verify that the circuit breaker trips and resets appropriately."""
+    cb = CircuitBreaker(max_identical_signatures=2, reset_timeout_sec=0.1)
 
-    reason2 = cb.record_failure("error_signature_1")
+    # 1. Different signatures remain CLOSED
+    cb.record_failure("error_signature_1")
+    assert cb.state == CircuitBreakerState.CLOSED
+    cb.record_failure("error_signature_2")
+    assert cb.state == CircuitBreakerState.CLOSED
+
+    # 2. Repeated identical failures trip to OPEN
+    cb.record_failure("error_signature_2")
     assert cb.state == CircuitBreakerState.OPEN
-    assert reason2 == TripReason.ESCALATED_HUMAN_REVIEW
+    assert cb.trip_reason == TripReason.ESCALATED_HUMAN_REVIEW
+
+    # 3. Time passage transitions to HALF_OPEN
+    time.sleep(0.15)
+    cb.record_failure("error_signature_3")
+    # A failure in HALF_OPEN trips immediately back to OPEN
+    assert cb.state == CircuitBreakerState.OPEN
+
+    # 4. Success transitions to CLOSED
+    time.sleep(0.15)
+    assert cb.can_attempt()  # triggers internal _update_state to HALF_OPEN
+    cb.record_success()
+    assert cb.state == CircuitBreakerState.CLOSED
 
 
 def test_secret_redaction():
@@ -74,7 +104,7 @@ def test_secret_redaction():
     redacted = redact_secrets(raw_log)
     assert "sk-live-12345" not in redacted
     assert "my-super-secret" not in redacted
-    assert "[REDACTED]" in redacted or "REDACTED" in redacted
+    assert "[REDACTED]" in redacted
 
 
 def test_lease_epoch_fencing():
