@@ -38,8 +38,13 @@ def test_daemon_handles_completed_task(mock_queue):
         assert mock_run.call_count == 2
         calls = mock_run.call_args_list
         assert "senior-review" in calls[0][0][0]
+        assert calls[0][1].get("timeout") == 300
         assert "merge" in calls[1][0][0]
+        assert calls[1][1].get("timeout") == 300
         assert "task_1" in daemon.processed_tasks
+
+        mock_queue.list_tasks.assert_any_call(status=TriageStatus.COMPLETED, limit=100, project_id=daemon.project_id)
+        mock_queue.list_tasks.assert_any_call(status=TriageStatus.FAILED, limit=100, project_id=daemon.project_id)
 
 
 def test_daemon_handles_completed_task_not_approved(mock_queue):
@@ -123,6 +128,15 @@ def test_daemon_circuit_breaker_trips(mock_queue, tmp_path):
             reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.",
         )
         assert "task_3" in daemon.processed_tasks
+
+
+def test_daemon_circuit_breaker_shared_lineage(mock_queue):
+    daemon = CIHealingDaemon(mock_queue)
+    cb1 = daemon.get_circuit_breaker("task_4")
+    cb2 = daemon.get_circuit_breaker("task_4_repair_1")
+    cb3 = daemon.get_circuit_breaker("task_4_repair_2_repair_1")
+    assert cb1 is cb2
+    assert cb2 is cb3
 
 
 def test_emergency_stop_aborts(mock_queue):

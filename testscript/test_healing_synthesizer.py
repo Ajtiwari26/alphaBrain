@@ -6,7 +6,7 @@ def test_synthesizer_bounds_allowed_paths():
     # I-37 ensures repo-wide paths like '.' and '/' are removed
     bounded = synth.bound_allowed_paths(["alpha_core/healing/", "."], ["test_file.py"])
     assert "." not in bounded
-    assert "alpha_core/healing/" in bounded
+    assert "alpha_core/healing" in bounded
     assert "test_file.py" in bounded
 
 def test_synthesizer_rejects_unsafe_paths():
@@ -18,6 +18,14 @@ def test_synthesizer_rejects_unsafe_paths():
     assert "../../etc/passwd" not in bounded
     assert "/etc/shadow" not in bounded
     assert "alpha_core/malicious.py" not in bounded
+
+def test_synthesizer_normalizes_paths():
+    synth = RepairEnvelopeSynthesizer("tsk_123", 1)
+    bounded = synth.bound_allowed_paths(
+        ["alpha_core//healing/../healing"],
+        ["alpha_core/healing/./test.py"]
+    )
+    assert "alpha_core/healing/test.py" in bounded
 
 
 def test_synthesizer_links_parent_and_epoch():
@@ -39,7 +47,7 @@ def test_synthesizer_formats_actionable_prompt():
     assert result["repair_epoch"] == 1
     assert "test_file.py" in result["allowed_paths"]
     assert "other.py" in result["allowed_paths"]
-    assert "alpha_core/" in result["allowed_paths"]
+    assert "alpha_core" in result["allowed_paths"]
 
     prompt = result["actionable_prompt"]
     assert "tsk_123" in prompt

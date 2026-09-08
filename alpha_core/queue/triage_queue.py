@@ -1265,10 +1265,21 @@ class TaskTriageQueue:
         self,
         status: TriageStatus | None = None,
         limit: int = 50,
+        project_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Lists tasks with optional status filtering."""
+        """Lists tasks with optional status and project_id filtering."""
         with closing(self._get_connection()) as conn:
-            if status:
+            if status and project_id:
+                cursor = conn.execute(
+                    """
+                    SELECT * FROM task_triage_queue
+                    WHERE status = ? AND json_extract(envelope_json, '$.project_id') = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?;
+                    """,
+                    (status.value, project_id, limit),
+                )
+            elif status:
                 cursor = conn.execute(
                     """
                     SELECT * FROM task_triage_queue
@@ -1277,6 +1288,16 @@ class TaskTriageQueue:
                     LIMIT ?;
                     """,
                     (status.value, limit),
+                )
+            elif project_id:
+                cursor = conn.execute(
+                    """
+                    SELECT * FROM task_triage_queue
+                    WHERE json_extract(envelope_json, '$.project_id') = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?;
+                    """,
+                    (project_id, limit),
                 )
             else:
                 cursor = conn.execute(

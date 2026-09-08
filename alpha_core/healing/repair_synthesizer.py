@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 
@@ -7,13 +8,24 @@ class RepairEnvelopeSynthesizer:
         self.repair_epoch = repair_epoch
 
     def bound_allowed_paths(self, original_paths: list[str], failed_files: list[str]) -> list[str]:
-        paths = set(original_paths)
-        for f in failed_files:
-            if not f or any(c == '..' for c in f.split('/')) or f.startswith("/"):
+        paths = set()
+        normalized_original = []
+        for op in original_paths:
+            if not op:
                 continue
-            for op in original_paths:
-                if op == "." or f == op or f.startswith(op if op.endswith("/") else op + "/"):
-                    paths.add(f)
+            norm_op = os.path.normpath(op)
+            normalized_original.append(norm_op)
+            paths.add(norm_op)
+
+        for f in failed_files:
+            if not f:
+                continue
+            norm_f = os.path.normpath(f)
+            if norm_f.startswith("/") or any(c == '..' for c in norm_f.split('/')) or norm_f in ('.', ''):
+                continue
+            for norm_op in normalized_original:
+                if norm_op == "." or norm_f == norm_op or norm_f.startswith(norm_op + os.sep):
+                    paths.add(norm_f)
                     break
         paths.discard(".")
         paths.discard("/")
