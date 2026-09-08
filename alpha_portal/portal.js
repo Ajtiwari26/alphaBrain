@@ -20,9 +20,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Function to update milestone UI
     function updateMilestones(state) {
-        const states = ['received', 'in_progress', 'review', 'completed'];
-        let currentIndex = states.indexOf(state.toLowerCase());
-        if (currentIndex === -1) currentIndex = 0; // default to received
+        const stateMap = {
+            'received': 0,
+            'pending_review': 0,
+            'approved': 0,
+            'in_progress': 1,
+            'in-progress': 1,
+            'executing': 1,
+            'review': 2,
+            'senior_review': 2,
+            'completed': 3,
+            'done': 3
+        };
+        const normalized = (state || '').toLowerCase();
+        let currentIndex = Object.prototype.hasOwnProperty.call(stateMap, normalized) ? stateMap[normalized] : 0;
 
         for (let i = 1; i <= 4; i++) {
             const circle = document.getElementById(`step-${i}`);

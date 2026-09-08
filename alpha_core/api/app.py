@@ -2641,11 +2641,12 @@ async def portal_stream_generator(
     deadline = asyncio.get_event_loop().time() + max_duration_seconds
     current_seq = int(last_event_id) if last_event_id and str(last_event_id).isdigit() else 0
     iterations = 0
+    last_heartbeat_time = 0.0
 
     try:
         while asyncio.get_event_loop().time() < deadline:
             iterations += 1
-            events = queue.get_project_events(project_id, after_seq=current_seq, limit=50)
+            events = await asyncio.to_thread(queue.get_project_events, project_id, current_seq, 50)
             if events:
                 for ev in events:
                     current_seq = ev["seq"]
@@ -2660,7 +2661,10 @@ async def portal_stream_generator(
                     }
                     yield f"id: {current_seq}\nevent: task_update\ndata: {json.dumps(data)}\n\n"
             else:
-                yield f"id: {current_seq}\nevent: heartbeat\ndata: {{}}\n\n"
+                now = asyncio.get_event_loop().time()
+                if (now - last_heartbeat_time) >= 15.0 or last_heartbeat_time == 0.0:
+                    last_heartbeat_time = now
+                    yield f"id: {current_seq}\nevent: heartbeat\ndata: {{}}\n\n"
 
             if max_iterations is not None and iterations >= max_iterations:
                 break
