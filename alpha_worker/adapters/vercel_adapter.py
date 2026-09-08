@@ -117,9 +117,10 @@ class VercelAdapter:
             def fetch() -> bool:
                 req = urllib.request.Request(url)
                 with urllib.request.urlopen(req, timeout=10) as response:
-                    return response.getcode() == 200
+                    return bool(response.getcode() == 200)
 
-            return await asyncio.to_thread(fetch)
+            res = await asyncio.to_thread(fetch)
+            return bool(res)
         except Exception as e:
             logger.debug(f"Health check failed for {url}: {e}")
             return False

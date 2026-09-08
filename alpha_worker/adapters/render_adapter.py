@@ -5,7 +5,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class RenderAdapter:
                 response_data = response.read()
                 if not response_data:
                     return {}
-                return json.loads(response_data.decode())
+                return cast(dict[str, Any], json.loads(response_data.decode()))
         except urllib.error.HTTPError as e:
             error_body = e.read().decode()
             error_msg = self._mask_secrets(error_body)
@@ -68,7 +68,7 @@ class RenderAdapter:
         service_url = service.get("url")
         if not service_url:
             raise RuntimeError("Could not determine service URL")
-        return service_url
+        return str(service_url)
 
     async def deploy_preview(self, worktree_path: Path | None = None) -> DeploymentResult:
         """Triggers a deployment via Render API."""
@@ -105,9 +105,9 @@ class RenderAdapter:
             status = data.get("status", "")
 
             if status in ("live", "deactivated"):
-                return status.upper()
+                return str(status).upper()
             if status in ("build_failed", "update_failed", "canceled"):
-                return status.upper()
+                return str(status).upper()
 
             await asyncio.sleep(5)
 
@@ -120,9 +120,10 @@ class RenderAdapter:
             def fetch() -> bool:
                 req = urllib.request.Request(url)
                 with urllib.request.urlopen(req, timeout=10) as response:
-                    return response.getcode() == 200
+                    return bool(response.getcode() == 200)
 
-            return await asyncio.to_thread(fetch)
+            res = await asyncio.to_thread(fetch)
+            return bool(res)
         except Exception as e:
             logger.debug(f"Health check failed for {url}: {e}")
             return False
