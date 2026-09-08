@@ -139,6 +139,7 @@ class SeniorReviewEngine:
                 "--model",
                 model,
                 "--disable-slash-commands",
+                "--dangerously-skip-permissions",
                 "--output-format",
                 "json",
                 "--input-format",
