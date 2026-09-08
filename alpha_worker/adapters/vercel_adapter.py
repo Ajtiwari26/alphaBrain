@@ -1,8 +1,12 @@
 import asyncio
+import logging
+import os
 import re
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -14,6 +18,8 @@ class DeploymentResult:
 
 class VercelAdapter:
     def __init__(self, token: str, project_id: str | None = None):
+        if not token:
+            raise ValueError("Vercel token cannot be empty")
         self.token = token
         self.project_id = project_id
 
@@ -24,15 +30,19 @@ class VercelAdapter:
 
     async def deploy_preview(self, worktree_path: Path) -> DeploymentResult:
         """Triggers a preview deployment using Vercel CLI."""
-        cmd = ["vercel", "--token", self.token, "--yes", "--cwd", str(worktree_path)]
+        cmd = ["vercel", "--yes", "--cwd", str(worktree_path)]
         if self.project_id:
             cmd.extend(["--project", self.project_id])
+
+        env = os.environ.copy()
+        env["VERCEL_TOKEN"] = self.token
 
         # Execute deployment command
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         stdout, stderr = await process.communicate()
 
@@ -49,11 +59,10 @@ class VercelAdapter:
             url_match = re.search(r'(https://[a-zA-Z0-9-]+\.vercel\.app)', err_output)
 
         if not url_match:
-            lines = [line.strip() for line in output.split("\n") if line.strip()]
-            if lines:
-                url = lines[-1]
-            else:
-                raise RuntimeError("Failed to extract deployment URL from Vercel output.")
+            raise RuntimeError(
+                f"Failed to extract deployment URL from Vercel output: "
+                f"{self._mask_secrets(output[:200])}"
+            )
         else:
             url = url_match.group(1)
 
@@ -69,14 +78,19 @@ class VercelAdapter:
 
     async def poll_status(self, url: str, timeout_seconds: int = 300) -> str:
         """Polls the deployment status using Vercel CLI."""
-        cmd = ["vercel", "inspect", url, "--token", self.token]
+        cmd = ["vercel", "inspect", url]
 
-        start_time = asyncio.get_event_loop().time()
-        while asyncio.get_event_loop().time() - start_time < timeout_seconds:
+        env = os.environ.copy()
+        env["VERCEL_TOKEN"] = self.token
+
+        loop = asyncio.get_running_loop()
+        start_time = loop.time()
+        while loop.time() - start_time < timeout_seconds:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
             stdout, stderr = await process.communicate()
 
@@ -105,5 +119,6 @@ class VercelAdapter:
                     return response.getcode() == 200
 
             return await asyncio.to_thread(fetch)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Health check failed for {url}: {e}")
             return False
