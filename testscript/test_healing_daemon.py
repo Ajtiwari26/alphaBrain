@@ -100,9 +100,7 @@ def test_daemon_handles_failed_task(mock_queue, tmp_path):
         assert isinstance(submitted_args["provenance"], TaskProvenance)
         assert submitted_args["initial_status"] == TriageStatus.PENDING_REVIEW
 
-        mock_queue.retry_task.assert_called_once_with(
-            "task_2", operator_notes="Superseded by task_2_repair_1"
-        )
+        mock_queue.retry_task.assert_not_called()
         mock_queue.reject_task.assert_called_once_with(
             "task_2", reason="Superseded by task_2_repair_1"
         )
@@ -119,9 +117,7 @@ def test_daemon_circuit_breaker_trips(mock_queue, tmp_path):
         daemon.run_once()
 
         mock_queue.enqueue_task.assert_not_called()
-        mock_queue.retry_task.assert_called_once_with(
-            "task_3", operator_notes="Circuit breaker tripped - escalating"
-        )
+        mock_queue.retry_task.assert_not_called()
         mock_queue.reject_task.assert_called_once_with(
             "task_3",
             reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.",

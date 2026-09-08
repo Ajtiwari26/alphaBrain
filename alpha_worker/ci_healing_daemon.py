@@ -26,9 +26,10 @@ class CIHealingDaemon:
         self._shutdown = False
 
     def get_circuit_breaker(self, task_id: str) -> CircuitBreaker:
-        if task_id not in self.circuit_breakers:
-            self.circuit_breakers[task_id] = CircuitBreaker()
-        return self.circuit_breakers[task_id]
+        root_id = task_id.split("_repair_")[0]
+        if root_id not in self.circuit_breakers:
+            self.circuit_breakers[root_id] = CircuitBreaker()
+        return self.circuit_breakers[root_id]
 
     def process_completed_task(self, task: dict[str, Any]) -> None:
         task_id = task["id"]
@@ -46,6 +47,7 @@ class CIHealingDaemon:
                 text=True,
                 env=env,
                 check=False,
+                timeout=300,
             )
 
             if result.returncode != 0:
@@ -72,6 +74,7 @@ class CIHealingDaemon:
                 text=True,
                 env=env,
                 check=False,
+                timeout=300,
             )
 
             if merge_result.returncode == 0:
@@ -119,7 +122,6 @@ class CIHealingDaemon:
 
         if trip_reason == TripReason.ESCALATED_HUMAN_REVIEW:
             logger.warning(f"Circuit breaker tripped for {task_id}. Escalating to human review.")
-            self.queue.retry_task(task_id, operator_notes="Circuit breaker tripped - escalating")
             self.queue.reject_task(
                 task_id,
                 reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.",
@@ -172,7 +174,6 @@ class CIHealingDaemon:
         logger.info(f"Submitted repair task {repair_task_id} for {task_id}")
 
         # Supersede the old task safely to prevent re-execution
-        self.queue.retry_task(task_id, operator_notes=f"Superseded by {repair_task_id}")
         self.queue.reject_task(task_id, reason=f"Superseded by {repair_task_id}")
         self.processed_tasks.add(task_id)
 
@@ -181,14 +182,16 @@ class CIHealingDaemon:
             logger.warning("Emergency stop is active. Healing daemon suspended.")
             return
 
-        completed_tasks = self.queue.list_tasks(status=TriageStatus.COMPLETED, limit=100)
+        tasks = self.queue.list_tasks(status=TriageStatus.COMPLETED, limit=100)
+        completed_tasks = [t for t in tasks if t.get("envelope", {}).get("project_id", self.project_id) == self.project_id]
         for task in completed_tasks:
             try:
                 self.process_completed_task(task)
             except Exception as e:
                 logger.error(f"Failed to process completed task {task.get('id')}: {e}")
 
-        failed_tasks = self.queue.list_tasks(status=TriageStatus.FAILED, limit=100)
+        tasks = self.queue.list_tasks(status=TriageStatus.FAILED, limit=100)
+        failed_tasks = [t for t in tasks if t.get("envelope", {}).get("project_id", self.project_id) == self.project_id]
         for task in failed_tasks:
             try:
                 self.process_failed_task(task)

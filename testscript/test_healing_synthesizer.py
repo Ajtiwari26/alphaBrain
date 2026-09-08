@@ -23,7 +23,7 @@ def test_synthesizer_formats_actionable_prompt():
         "ruff_violations": [{"file": "other.py"}],
         "signature": "abc123hash",
     }
-    result = synth.synthesize(["alpha_core/"], failures, "prj_1", "/worktree")
+    result = synth.synthesize(["alpha_core/", "test_file.py", "other.py"], failures, "prj_1", "/worktree")
 
     assert result["parent_task_id"] == "tsk_123"
     assert result["repair_epoch"] == 1
