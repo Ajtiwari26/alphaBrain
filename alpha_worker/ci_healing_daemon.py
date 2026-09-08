@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -20,10 +21,9 @@ class CIHealingDaemon:
         self.queue = queue
         self.project_id = project_id
         self.failure_analyzer = FailureAnalyzer()
-        # In-memory circuit breakers only work for a continuous loop.
-        # To persist state properly without altering schema, we would need to store it in DB.
-        # For the sake of the review, we keep it in-memory but if running continuously it works.
         self.circuit_breakers: dict[str, CircuitBreaker] = {}
+        self.processed_tasks: set[str] = set()
+        self._shutdown = False
 
     def get_circuit_breaker(self, task_id: str) -> CircuitBreaker:
         if task_id not in self.circuit_breakers:
@@ -32,6 +32,9 @@ class CIHealingDaemon:
 
     def process_completed_task(self, task: dict[str, Any]) -> None:
         task_id = task["id"]
+        if task_id in self.processed_tasks:
+            return
+
         logger.info(f"Processing completed task: {task_id}")
 
         env = os.environ.copy()
@@ -47,16 +50,19 @@ class CIHealingDaemon:
 
             if result.returncode != 0:
                 logger.error(f"Senior review failed for {task_id}: {result.stderr}")
+                self.processed_tasks.add(task_id)
                 return
 
             try:
                 review_data = json.loads(result.stdout)
             except json.JSONDecodeError:
                 logger.error(f"Failed to parse senior review output: {result.stdout}")
+                self.processed_tasks.add(task_id)
                 return
 
             if not review_data.get("approved", False):
                 logger.info(f"Task {task_id} not approved by senior review. Repair required.")
+                self.processed_tasks.add(task_id)
                 return
 
             logger.info(f"Task {task_id} approved. Executing auto-merge.")
@@ -73,16 +79,22 @@ class CIHealingDaemon:
             else:
                 logger.error(f"Auto-merge failed for {task_id}: {merge_result.stderr}")
 
+            self.processed_tasks.add(task_id)
+
         except Exception as e:
             logger.error(f"Error processing completed task {task_id}: {e}")
 
     def process_failed_task(self, task: dict[str, Any]) -> None:
         task_id = task["id"]
+        if task_id in self.processed_tasks:
+            return
+
         logger.info(f"Processing failed task: {task_id}")
 
         worktree_dir = task.get("worktree_path")
         if not worktree_dir or not os.path.exists(worktree_dir):
             logger.warning(f"No valid worktree found for failed task {task_id}")
+            self.processed_tasks.add(task_id)
             return
 
         evidence_dir = os.path.join(worktree_dir, "evidence")
@@ -108,10 +120,8 @@ class CIHealingDaemon:
         if trip_reason == TripReason.ESCALATED_HUMAN_REVIEW:
             logger.warning(f"Circuit breaker tripped for {task_id}. Escalating to human review.")
             self.queue.retry_task(task_id, operator_notes="Circuit breaker tripped - escalating")
-            self.queue.modify_task(task_id, reviewer_notes="ESCALATED: Identical failures exceeded threshold.")
-            # Set to PENDING_REVIEW for human intervention, actually modify_task leaves it as is unless we reject it
-            # To set to PENDING_REVIEW, we can use the reject_task or just leave it.
-            # We will use modify_task to append note.
+            self.queue.reject_task(task_id, reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.")
+            self.processed_tasks.add(task_id)
             return
 
         epoch = cb.attempts
@@ -124,6 +134,13 @@ class CIHealingDaemon:
             project_id=self.project_id,
             worktree=worktree_dir
         )
+
+        # S2: Validate synthesizer return
+        if not all(k in repair_envelope for k in ("allowed_paths", "actionable_prompt")):
+            logger.error("Synthesizer returned invalid envelope shape")
+            self.processed_tasks.add(task_id)
+            return
+
         logger.info(f"Synthesized repair envelope for {task_id}: {repair_envelope}")
 
         new_env = dict(task.get("envelope", {}))
@@ -141,17 +158,20 @@ class CIHealingDaemon:
         prov = TaskProvenance.from_dict(prov_dict)
 
         repair_task_id = f"{task_id}_repair_{epoch}"
+
+        # S1: Explicit initial_status
         self.queue.enqueue_task(
             task_id=repair_task_id,
             envelope=new_env,
-            provenance=prov
+            provenance=prov,
+            initial_status=TriageStatus.PENDING_REVIEW
         )
         logger.info(f"Submitted repair task {repair_task_id} for {task_id}")
 
-        # Mark original task as complete or archive it so we don't process it again
-        # We can't update_status directly to a custom state. We will retry_task and then modify it so it moves out of FAILED
-        self.queue.retry_task(task_id, operator_notes=f"Superceded by {repair_task_id}")
-        self.queue.modify_task(task_id, reviewer_notes="Replaced by repair task")
+        # Supersede the old task safely to prevent re-execution
+        self.queue.retry_task(task_id, operator_notes=f"Superseded by {repair_task_id}")
+        self.queue.reject_task(task_id, reason=f"Superseded by {repair_task_id}")
+        self.processed_tasks.add(task_id)
 
     def run_once(self) -> None:
         if self.queue.is_emergency_stopped():
@@ -174,12 +194,21 @@ class CIHealingDaemon:
 
     def run_continuously(self, interval: float = 10.0) -> None:
         logger.info("Starting CIHealingDaemon in continuous mode.")
-        while True:
+
+        def handle_sigterm(signum, frame):
+            logger.info("Received signal, shutting down daemon...")
+            self._shutdown = True
+
+        signal.signal(signal.SIGTERM, handle_sigterm)
+        signal.signal(signal.SIGINT, handle_sigterm)
+
+        while not self._shutdown:
             try:
                 self.run_once()
-            except KeyboardInterrupt:
-                logger.info("Daemon stopped by user.")
-                break
             except Exception as e:
                 logger.error(f"Unexpected error in daemon loop: {e}")
-            time.sleep(interval)
+
+            if not self._shutdown:
+                time.sleep(interval)
+
+        logger.info("Daemon stopped gracefully.")
