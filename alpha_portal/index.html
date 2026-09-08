@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlphaBrain Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#121212',
+                        darker: '#0a0a0a',
+                        primary: '#3b82f6',
+                        success: '#22c55e',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: theme('colors.darker'); color: #e5e5e5; }
+        .step-line {
+            height: 2px;
+            flex-grow: 1;
+            background-color: #3f3f46;
+            margin: 0 10px;
+            transition: background-color 0.3s;
+        }
+        .step-line.active { background-color: theme('colors.success'); }
+        .step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            background-color: #3f3f46;
+            color: #a1a1aa;
+            transition: all 0.3s;
+        }
+        .step-circle.active {
+            background-color: theme('colors.success');
+            color: #fff;
+            box-shadow: 0 0 10px theme('colors.success');
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6">
+
+    <div class="max-w-4xl w-full bg-dark p-8 rounded-2xl shadow-xl border border-gray-800">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-white tracking-wide">Client Tracking Portal</h1>
+            <span id="sse-status" class="px-3 py-1 bg-red-900/30 text-red-400 text-sm font-semibold rounded-full border border-red-800">
+                Disconnected
+            </span>
+        </div>
+
+        <div class="mb-12">
+            <h2 class="text-xl font-semibold mb-6">Task Progress: <span class="text-primary" id="task-id">#tsk_pending</span></h2>
+            
+            <!-- Amazon-style milestone tracker -->
+            <div class="flex items-center justify-between w-full">
+                <div class="flex flex-col items-center">
+                    <div class="step-circle active" id="step-1">✓</div>
+                    <span class="mt-2 text-sm font-medium">Received</span>
+                </div>
+                <div class="step-line active" id="line-1"></div>
+                
+                <div class="flex flex-col items-center">
+                    <div class="step-circle active" id="step-2">2</div>
+                    <span class="mt-2 text-sm font-medium">In Progress</span>
+                </div>
+                <div class="step-line" id="line-2"></div>
+                
+                <div class="flex flex-col items-center">
+                    <div class="step-circle" id="step-3">3</div>
+                    <span class="mt-2 text-sm text-gray-500 font-medium">Review</span>
+                </div>
+                <div class="step-line" id="line-3"></div>
+                
+                <div class="flex flex-col items-center">
+                    <div class="step-circle" id="step-4">4</div>
+                    <span class="mt-2 text-sm text-gray-500 font-medium">Completed</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-darker p-4 rounded-lg border border-gray-800">
+            <h3 class="text-lg font-semibold mb-3 text-gray-300">Live Telemetry (SSE Listener)</h3>
+            <div id="telemetry-log" class="h-40 overflow-y-auto text-sm font-mono text-gray-400 space-y-1">
+                <div>Waiting for events...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const logBox = document.getElementById('telemetry-log');
+            const statusBadge = document.getElementById('sse-status');
+
+            function logEvent(msg) {
+                const div = document.createElement('div');
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                logBox.appendChild(div);
+                logBox.scrollTop = logBox.scrollHeight;
+            }
+
+            try {
+                // Initialize SSE listener
+                const eventSource = new EventSource('/api/portal/stream');
+                
+                eventSource.onopen = () => {
+                    statusBadge.textContent = 'Live Connected';
+                    statusBadge.className = 'px-3 py-1 bg-green-900/30 text-green-400 text-sm font-semibold rounded-full border border-green-800';
+                    logEvent('Connected to SSE stream.');
+                };
+
+                eventSource.addEventListener('heartbeat', (e) => {
+                    logEvent(`Heartbeat received: ${e.data}`);
+                });
+
+                eventSource.onmessage = (e) => {
+                    logEvent(`Message received: ${e.data}`);
+                };
+
+                eventSource.onerror = (e) => {
+                    statusBadge.textContent = 'Disconnected';
+                    statusBadge.className = 'px-3 py-1 bg-red-900/30 text-red-400 text-sm font-semibold rounded-full border border-red-800';
+                    logEvent('Connection lost or error occurred.');
+                    eventSource.close();
+                };
+            } catch (err) {
+                logEvent(`Failed to initialize EventSource: ${err.message}`);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -95,6 +95,7 @@ from alpha_voice.extractor import SpecExtractor
 from alpha_voice.plivo_bridge import PlivoVoiceBridge
 
 MEET_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "alpha_meet" / "frontend"
+PORTAL_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "alpha_portal"
 eva_meet_agent = EvaMeetingAgent()
 logger = logging.getLogger("alpha_core.api")
 SAFE_EXTERNAL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -241,6 +242,9 @@ async def add_security_headers(request: Request, call_next):
 
 if MEET_FRONTEND_DIR.exists():
     app.mount("/static/meet", StaticFiles(directory=str(MEET_FRONTEND_DIR)), name="static_meet")
+
+if PORTAL_FRONTEND_DIR.exists():
+    app.mount("/portal", StaticFiles(directory=str(PORTAL_FRONTEND_DIR), html=True), name="static_portal")
 
 
 @app.get("/health")
