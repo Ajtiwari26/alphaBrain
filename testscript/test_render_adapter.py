@@ -162,6 +162,7 @@ async def test_check_health_exception(adapter):
         health_ok = await adapter.check_health("https://test-app.onrender.com")
         assert health_ok is False
 
+
 @pytest.mark.asyncio
 async def test_deploy_preview_with_commit_id(adapter):
     def mock_make_request(method, endpoint, data=None):
@@ -169,6 +170,7 @@ async def test_deploy_preview_with_commit_id(adapter):
             return {"service": {"env": "preview"}}
         if method == "POST" and endpoint == "/services/srv_123/deploys":
             import json
+
             if data:
                 parsed = json.loads(data)
                 assert parsed.get("commitId") == "abc1234"
@@ -187,6 +189,7 @@ async def test_deploy_preview_with_commit_id(adapter):
                     assert result.url == "https://test-app.onrender.com"
                     assert result.status == "LIVE"
 
+
 @pytest.mark.asyncio
 async def test_deploy_preview_rejects_production(adapter):
     def mock_make_request(method, endpoint, data=None):
@@ -195,5 +198,7 @@ async def test_deploy_preview_rejects_production(adapter):
         return {}
 
     with patch.object(adapter, "_make_request", side_effect=mock_make_request):
-        with pytest.raises(RuntimeError, match="Cannot deploy to production targets in preview mode"):
+        with pytest.raises(
+            RuntimeError, match="Cannot deploy to production targets in preview mode"
+        ):
             await adapter.deploy_preview()

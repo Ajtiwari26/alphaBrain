@@ -20,7 +20,6 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
     queue, tmp_path = temp_env
     daemon = CIHealingDaemon(queue, project_id="prj_repair")
 
-
     worktree = tmp_path / "worktree_e2e"
     worktree.mkdir()
     evidence_dir = worktree / "evidence"
@@ -66,7 +65,7 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
 
     envelope_0 = json.loads(repair_task_0["envelope_json"])
     assert "tests/test_dummy.py" in envelope_0["allowed_paths"]
-    assert any(p in ('src', 'src/') for p in envelope_0["allowed_paths"])
+    assert any(p in ("src", "src/") for p in envelope_0["allowed_paths"])
 
     with sqlite3.connect(queue.db_path) as conn:
         conn.execute(

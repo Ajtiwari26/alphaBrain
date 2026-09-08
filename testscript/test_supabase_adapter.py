@@ -159,6 +159,7 @@ async def test_get_migration_status_error(mock_make_request, adapter):
     with pytest.raises(RuntimeError, match=r"Failed to inspect migration status: failed \*\*\*"):
         await adapter.get_migration_status()
 
+
 @pytest.mark.asyncio
 async def test_plan_migration_success(adapter):
     plan = await adapter.plan_migration("CREATE TABLE new_table (id int);")
@@ -166,10 +167,12 @@ async def test_plan_migration_success(adapter):
     assert plan["requires_approval"] is True
     assert plan["sql"] == "CREATE TABLE new_table (id int);"
 
+
 @pytest.mark.asyncio
 async def test_plan_migration_destructive(adapter):
     with pytest.raises(DestructiveDDLError):
         await adapter.plan_migration("DROP TABLE users;")
+
 
 @pytest.mark.asyncio
 async def test_rollback_migration(adapter):

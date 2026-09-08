@@ -109,7 +109,9 @@ async def test_portal_stream(mock_queue):
 
     with patch("alpha_core.api.app.portal_stream_generator", side_effect=mock_generator):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            async with ac.stream("GET", f"/api/portal/projects/prj_test/stream?token={token}") as response:
+            async with ac.stream(
+                "GET", f"/api/portal/projects/prj_test/stream?token={token}"
+            ) as response:
                 assert response.status_code == 200
                 lines = []
                 async for line in response.aiter_lines():

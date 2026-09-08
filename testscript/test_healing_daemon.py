@@ -43,8 +43,12 @@ def test_daemon_handles_completed_task(mock_queue):
         assert calls[1][1].get("timeout") == 300
         assert "task_1" in daemon.processed_tasks
 
-        mock_queue.list_tasks.assert_any_call(status=TriageStatus.COMPLETED, limit=100, project_id=daemon.project_id)
-        mock_queue.list_tasks.assert_any_call(status=TriageStatus.FAILED, limit=100, project_id=daemon.project_id)
+        mock_queue.list_tasks.assert_any_call(
+            status=TriageStatus.COMPLETED, limit=100, project_id=daemon.project_id
+        )
+        mock_queue.list_tasks.assert_any_call(
+            status=TriageStatus.FAILED, limit=100, project_id=daemon.project_id
+        )
 
 
 def test_daemon_handles_completed_task_not_approved(mock_queue):

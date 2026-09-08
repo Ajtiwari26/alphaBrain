@@ -9,21 +9,21 @@ def test_synthesizer_bounds_allowed_paths():
     assert "alpha_core/healing" in bounded
     assert "test_file.py" in bounded
 
+
 def test_synthesizer_rejects_unsafe_paths():
     synth = RepairEnvelopeSynthesizer("tsk_123", 1)
     bounded = synth.bound_allowed_paths(
-        ["alpha_core/healing/"],
-        ["../../etc/passwd", "/etc/shadow", "alpha_core/malicious.py"]
+        ["alpha_core/healing/"], ["../../etc/passwd", "/etc/shadow", "alpha_core/malicious.py"]
     )
     assert "../../etc/passwd" not in bounded
     assert "/etc/shadow" not in bounded
     assert "alpha_core/malicious.py" not in bounded
 
+
 def test_synthesizer_normalizes_paths():
     synth = RepairEnvelopeSynthesizer("tsk_123", 1)
     bounded = synth.bound_allowed_paths(
-        ["alpha_core//healing/../healing"],
-        ["alpha_core/healing/./test.py"]
+        ["alpha_core//healing/../healing"], ["alpha_core/healing/./test.py"]
     )
     assert "alpha_core/healing/test.py" in bounded
 
@@ -41,7 +41,9 @@ def test_synthesizer_formats_actionable_prompt():
         "ruff_violations": [{"file": "other.py"}],
         "signature": "abc123hash",
     }
-    result = synth.synthesize(["alpha_core/", "test_file.py", "other.py"], failures, "prj_1", "/worktree")
+    result = synth.synthesize(
+        ["alpha_core/", "test_file.py", "other.py"], failures, "prj_1", "/worktree"
+    )
 
     assert result["parent_task_id"] == "tsk_123"
     assert result["repair_epoch"] == 1
