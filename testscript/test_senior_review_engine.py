@@ -61,7 +61,7 @@ def test_invoke_agy_command_flags(tmp_path):
         cmd = call_args[0]
 
         # Verify critical flags
-        assert "--dangerously-skip-permissions" in cmd
+        assert "--dangerously-skip-permissions" not in cmd
         assert "--input-format" in cmd
         assert "text" in cmd
         assert call_kwargs.get("input") == "Test prompt"
