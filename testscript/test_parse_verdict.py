@@ -10,6 +10,7 @@ def parse_verdict_line(output: str, valid_enums: list[str], default_verdict: str
         return default_verdict
 
     try:
+
         def reject_duplicates(ordered_pairs):
             d = {}
             for k, v in ordered_pairs:
@@ -47,7 +48,17 @@ def parse_verdict_line(output: str, valid_enums: list[str], default_verdict: str
     except Exception:
         return default_verdict
 
+
 print("1.", parse_verdict_line('{"verdict": "APPROVE"}', ["APPROVE"], "REJECT") == "APPROVE")
-print("2.", parse_verdict_line('{"verdict": "APPROVE"}\n{"verdict": "APPROVE"}', ["APPROVE"], "REJECT") == "REJECT")
-print("3.", parse_verdict_line('{"verdict": "APPROVE"}\nsome text', ["APPROVE"], "REJECT") == "REJECT")
-print("4.", parse_verdict_line('some text\n{"verdict": "APPROVE"}', ["APPROVE"], "REJECT") == "APPROVE")
+print(
+    "2.",
+    parse_verdict_line('{"verdict": "APPROVE"}\n{"verdict": "APPROVE"}', ["APPROVE"], "REJECT")
+    == "REJECT",
+)
+print(
+    "3.", parse_verdict_line('{"verdict": "APPROVE"}\nsome text', ["APPROVE"], "REJECT") == "REJECT"
+)
+print(
+    "4.",
+    parse_verdict_line('some text\n{"verdict": "APPROVE"}', ["APPROVE"], "REJECT") == "APPROVE",
+)

@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class DestructiveDDLError(Exception):
     """Raised when destructive DDL is detected."""
+
     pass
 
 
@@ -46,7 +47,7 @@ class SupabaseAdapter:
                 "apikey": self.api_key,
                 "Authorization": f"Bearer {self.api_key}",
                 "Accept": "application/json",
-            }
+            },
         )
         if data:
             req.add_header("Content-Type", "application/json")
@@ -84,7 +85,7 @@ class SupabaseAdapter:
         destructive_patterns = [
             r"\bDROP\s+(TABLE|DATABASE|SCHEMA|VIEW|ROLE|USER|INDEX|FUNCTION|TRIGGER|SEQUENCE|EXTENSION)\b",
             r"\bTRUNCATE\b",
-            r"\bALTER\s+TABLE\s+.*?\bDROP\s+COLUMN\b"
+            r"\bALTER\s+TABLE\s+.*?\bDROP\s+COLUMN\b",
         ]
         for pattern in destructive_patterns:
             if re.search(pattern, sql_upper, flags=re.DOTALL):
@@ -95,10 +96,8 @@ class SupabaseAdapter:
         try:
             data = await asyncio.to_thread(self._make_request, "GET", "/rest/v1/schema_migrations")
             applied_count = len(data) if isinstance(data, list) else 0
-            return MigrationStatus(
-                applied_count=applied_count,
-                pending_count=None,
-                is_healthy=True
-            )
+            return MigrationStatus(applied_count=applied_count, pending_count=None, is_healthy=True)
         except Exception as e:
-            raise RuntimeError(f"Failed to inspect migration status: {self._mask_secrets(str(e))}") from None
+            raise RuntimeError(
+                f"Failed to inspect migration status: {self._mask_secrets(str(e))}"
+            ) from None

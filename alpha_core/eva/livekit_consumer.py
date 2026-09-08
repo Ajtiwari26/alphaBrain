@@ -48,6 +48,7 @@ class EvaLiveKitConsumer:
         self.room = rtc.Room()
         self._is_running = False
         self._loop_task: asyncio.Task[None] | None = None
+        self._monitor_connection_task: asyncio.Task[None] | None = None
         self.proposed_tasks: list[TaskEnvelope] = []
         self._active_tasks: set[asyncio.Task[Any]] = set()
 

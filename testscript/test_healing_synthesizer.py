@@ -9,17 +9,19 @@ def test_synthesizer_bounds_allowed_paths():
     assert "alpha_core/healing/" in bounded
     assert "test_file.py" in bounded
 
+
 def test_synthesizer_links_parent_and_epoch():
     synth = RepairEnvelopeSynthesizer("tsk_123", 1)
     assert synth.parent_task_id == "tsk_123"
     assert synth.repair_epoch == 1
+
 
 def test_synthesizer_formats_actionable_prompt():
     synth = RepairEnvelopeSynthesizer("tsk_123", 1)
     failures = {
         "pytest_failures": [{"file": "test_file.py"}],
         "ruff_violations": [{"file": "other.py"}],
-        "signature": "abc123hash"
+        "signature": "abc123hash",
     }
     result = synth.synthesize(["alpha_core/"], failures, "prj_1", "/worktree")
 

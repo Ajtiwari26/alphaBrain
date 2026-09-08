@@ -1188,6 +1188,7 @@ def cmd_stats(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 def cmd_healing_daemon(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     try:
         from alpha_worker.ci_healing_daemon import CIHealingDaemon
+
         daemon = CIHealingDaemon(queue, project_id=args.project_id)
 
         if args.continuous:
@@ -1202,6 +1203,7 @@ def cmd_healing_daemon(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         return 0
     except Exception as e:
         import traceback
+
         if args.json:
             print(json.dumps({"error": str(e), "traceback": traceback.format_exc()}))
         else:
@@ -1353,9 +1355,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_healing = subparsers.add_parser(
         "healing-daemon", help="Run CIHealingDaemon to orchestrate auto-merge and failure diagnosis"
     )
-    p_healing.add_argument("--project-id", default="prj_phase10", help="Project ID for synthesized tasks")
+    p_healing.add_argument(
+        "--project-id", default="prj_phase10", help="Project ID for synthesized tasks"
+    )
     p_healing.add_argument("--continuous", action="store_true", help="Run continuously in a loop")
-    p_healing.add_argument("--interval", type=float, default=10.0, help="Interval in seconds for continuous mode")
+    p_healing.add_argument(
+        "--interval", type=float, default=10.0, help="Interval in seconds for continuous mode"
+    )
     p_healing.add_argument("--json", action="store_true", help="Output JSON format")
 
     return parser

@@ -45,7 +45,7 @@ class CIHealingDaemon:
                 capture_output=True,
                 text=True,
                 env=env,
-                check=False
+                check=False,
             )
 
             if result.returncode != 0:
@@ -71,7 +71,7 @@ class CIHealingDaemon:
                 capture_output=True,
                 text=True,
                 env=env,
-                check=False
+                check=False,
             )
 
             if merge_result.returncode == 0:
@@ -120,7 +120,10 @@ class CIHealingDaemon:
         if trip_reason == TripReason.ESCALATED_HUMAN_REVIEW:
             logger.warning(f"Circuit breaker tripped for {task_id}. Escalating to human review.")
             self.queue.retry_task(task_id, operator_notes="Circuit breaker tripped - escalating")
-            self.queue.reject_task(task_id, reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.")
+            self.queue.reject_task(
+                task_id,
+                reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.",
+            )
             self.processed_tasks.add(task_id)
             return
 
@@ -132,7 +135,7 @@ class CIHealingDaemon:
             original_paths=original_paths,
             failures=analysis,
             project_id=self.project_id,
-            worktree=worktree_dir
+            worktree=worktree_dir,
         )
 
         # S2: Validate synthesizer return
@@ -164,7 +167,7 @@ class CIHealingDaemon:
             task_id=repair_task_id,
             envelope=new_env,
             provenance=prov,
-            initial_status=TriageStatus.PENDING_REVIEW
+            initial_status=TriageStatus.PENDING_REVIEW,
         )
         logger.info(f"Submitted repair task {repair_task_id} for {task_id}")
 

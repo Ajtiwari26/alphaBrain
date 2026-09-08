@@ -10,6 +10,7 @@ def test_circuit_breaker_initial_state():
     assert cb.get_backoff_delay() == 0.0
     assert cb.can_attempt() is True
 
+
 def test_circuit_breaker_exponential_backoff():
     cb = CircuitBreaker(base_delay_sec=1.0)
 
@@ -24,6 +25,7 @@ def test_circuit_breaker_exponential_backoff():
     cb.record_failure("sig3")
     assert cb.attempts == 3
     assert cb.get_backoff_delay() == 4.0
+
 
 def test_circuit_breaker_trips_on_identical_signatures():
     # Invariant I-38
@@ -41,6 +43,7 @@ def test_circuit_breaker_trips_on_identical_signatures():
     reason3 = cb.record_failure("sig_A")
     assert reason3 == TripReason.ESCALATED_HUMAN_REVIEW
     assert cb.state == CircuitBreakerState.OPEN
+
 
 def test_circuit_breaker_half_open_transition():
     cb = CircuitBreaker(max_attempts=3, reset_timeout_sec=60.0)
@@ -64,6 +67,7 @@ def test_circuit_breaker_half_open_transition():
     reason = cb.record_failure("sig4", current_time=future_time)
     assert reason == TripReason.ESCALATED_HUMAN_REVIEW
     assert cb.state == CircuitBreakerState.OPEN
+
 
 def test_circuit_breaker_record_success():
     cb = CircuitBreaker()

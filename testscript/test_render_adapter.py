@@ -46,11 +46,7 @@ async def test_make_request_success(adapter):
 @pytest.mark.asyncio
 async def test_make_request_http_error(adapter):
     mock_error = urllib.error.HTTPError(
-        url="http://test",
-        code=401,
-        msg="Unauthorized",
-        hdrs={},
-        fp=MagicMock()
+        url="http://test", code=401, msg="Unauthorized", hdrs={}, fp=MagicMock()
     )
     mock_error.read = MagicMock(return_value=b'{"message": "Invalid token test_secret_key"}')
 
@@ -65,17 +61,23 @@ async def test_make_request_http_error(adapter):
 @pytest.mark.asyncio
 async def test_make_request_general_exception(adapter):
     with patch("urllib.request.urlopen", side_effect=Exception("General error test_secret_key")):
-        with pytest.raises(RuntimeError, match="Render API request failed: General error \\*\\*\\*"):
+        with pytest.raises(
+            RuntimeError, match="Render API request failed: General error \\*\\*\\*"
+        ):
             adapter._make_request("GET", "/test")
 
 
 @pytest.mark.asyncio
 async def test_get_service_url_success(adapter):
-    with patch.object(adapter, "_make_request", return_value={"service": {"url": "https://test-app.onrender.com"}}):
+    with patch.object(
+        adapter, "_make_request", return_value={"service": {"url": "https://test-app.onrender.com"}}
+    ):
         url = await adapter._get_service_url()
         assert url == "https://test-app.onrender.com"
 
-    with patch.object(adapter, "_make_request", return_value={"url": "https://test-app2.onrender.com"}):
+    with patch.object(
+        adapter, "_make_request", return_value={"url": "https://test-app2.onrender.com"}
+    ):
         url = await adapter._get_service_url()
         assert url == "https://test-app2.onrender.com"
 
@@ -91,7 +93,9 @@ async def test_get_service_url_missing(adapter):
 async def test_deploy_preview_success(adapter):
     with patch.object(adapter, "_make_request", return_value={"id": "dep_123"}) as mock_make:
         with patch.object(adapter, "poll_status", return_value="LIVE"):
-            with patch.object(adapter, "_get_service_url", return_value="https://test-app.onrender.com"):
+            with patch.object(
+                adapter, "_get_service_url", return_value="https://test-app.onrender.com"
+            ):
                 with patch.object(adapter, "check_health", return_value=True):
                     result = await adapter.deploy_preview()
 

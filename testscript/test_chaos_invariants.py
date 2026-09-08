@@ -29,7 +29,7 @@ def test_blast_radius_enforcement():
         objective="test",
         repo="local",
         base_commit="a" * 40,
-        allowed_paths=tuple([f"file_{i}.py" for i in range(10)])
+        allowed_paths=tuple([f"file_{i}.py" for i in range(10)]),
     )
     verdict_pass = gate.evaluate_envelope(env_pass)
     assert verdict_pass.passed
@@ -41,7 +41,7 @@ def test_blast_radius_enforcement():
         objective="test",
         repo="local",
         base_commit="a" * 40,
-        allowed_paths=tuple([f"file_{i}.py" for i in range(11)])
+        allowed_paths=tuple([f"file_{i}.py" for i in range(11)]),
     )
     verdict_fail = gate.evaluate_envelope(env_fail)
     assert not verdict_fail.passed
@@ -81,6 +81,7 @@ def test_tamper_detection():
         queue = TaskTriageQueue(db_path=str(db_path))
 
         import pytest
+
         with pytest.raises(ValueError, match="Content hash mismatch"):
             # Enqueueing with the original provenance hash but a tampered envelope
             # should trigger the application-level tamper rejection.

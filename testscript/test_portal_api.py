@@ -20,7 +20,7 @@ def mock_queue():
         "id": "tsk_123",
         "envelope": {"project_id": "prj_alpha"},
         "provenance": {"meeting_id": "meet_123"},
-        "result": {"senior_review": {"approved": True}}
+        "result": {"senior_review": {"approved": True}},
     }
 
     # mock get_task_telemetry
@@ -33,12 +33,14 @@ def mock_queue():
 def client(mock_queue):
     app.dependency_overrides[TaskTriageQueue] = lambda: mock_queue
     from alpha_core.api.app import get_triage_queue
+
     app.dependency_overrides[get_triage_queue] = lambda: mock_queue
 
     def override_require_api_principal():
         return AuthPrincipal(subject="test_admin", role=PrincipalRole.ADMIN)
 
     from alpha_core.security import require_api_principal
+
     app.dependency_overrides[require_api_principal] = override_require_api_principal
 
     with TestClient(app) as test_client:
@@ -83,6 +85,7 @@ def test_portal_overview_unauthorized():
         response = unauth_client.get("/api/portal/overview")
         assert response.status_code == 401
 
+
 @pytest.mark.asyncio
 async def test_portal_stream(mock_queue):
     from alpha_core.api.app import app, get_triage_queue
@@ -95,7 +98,9 @@ async def test_portal_stream(mock_queue):
 
     app.dependency_overrides[TaskTriageQueue] = lambda: mock_queue
     app.dependency_overrides[get_triage_queue] = lambda: mock_queue
-    app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(subject="test_admin", role=PrincipalRole.ADMIN)
+    app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+        subject="test_admin", role=PrincipalRole.ADMIN
+    )
 
     token = create_scoped_stream_token("portal-stream", ttl_seconds=3600)
 

@@ -5,6 +5,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,9 @@ class RenderAdapter:
             return text
         return text.replace(self.api_key, "***")
 
-    def _make_request(self, method: str, endpoint: str, data: bytes | None = None) -> dict:
+    def _make_request(
+        self, method: str, endpoint: str, data: bytes | None = None
+    ) -> dict[str, Any]:
         url = f"{self.base_url}{endpoint}"
         req = urllib.request.Request(
             url,
@@ -40,7 +43,7 @@ class RenderAdapter:
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Accept": "application/json",
-            }
+            },
         )
         if data:
             req.add_header("Content-Type", "application/json")
@@ -70,14 +73,14 @@ class RenderAdapter:
     async def deploy_preview(self, worktree_path: Path | None = None) -> DeploymentResult:
         """Triggers a deployment via Render API."""
         data = await asyncio.to_thread(
-            self._make_request,
-            "POST",
-            f"/services/{self.service_id}/deploys"
+            self._make_request, "POST", f"/services/{self.service_id}/deploys"
         )
 
         deploy_id = data.get("id")
         if not deploy_id:
-            raise RuntimeError(f"Failed to extract deploy ID: {self._mask_secrets(json.dumps(data))}")
+            raise RuntimeError(
+                f"Failed to extract deploy ID: {self._mask_secrets(json.dumps(data))}"
+            )
 
         status = await self.poll_status(deploy_id)
 
@@ -96,9 +99,7 @@ class RenderAdapter:
 
         while loop.time() - start_time < timeout_seconds:
             data = await asyncio.to_thread(
-                self._make_request,
-                "GET",
-                f"/services/{self.service_id}/deploys/{deploy_id}"
+                self._make_request, "GET", f"/services/{self.service_id}/deploys/{deploy_id}"
             )
 
             status = data.get("status", "")
@@ -115,6 +116,7 @@ class RenderAdapter:
     async def check_health(self, url: str) -> bool:
         """Validates that the deployed URL is reachable and returns HTTP 200."""
         try:
+
             def fetch() -> bool:
                 req = urllib.request.Request(url)
                 with urllib.request.urlopen(req, timeout=10) as response:

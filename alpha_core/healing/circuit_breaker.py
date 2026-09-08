@@ -25,7 +25,7 @@ class CircuitBreaker:
         max_identical_signatures: int = 3,
         max_attempts: int = 5,
         base_delay_sec: float = 1.0,
-        reset_timeout_sec: float = 60.0
+        reset_timeout_sec: float = 60.0,
     ):
         self.state = CircuitBreakerState.CLOSED
         self.max_identical_signatures = max_identical_signatures
@@ -35,7 +35,7 @@ class CircuitBreaker:
 
         self.attempts = 0
         self.identical_count = 0
-        self.last_signature = None
+        self.last_signature: str | None = None
         self.opened_at = 0.0
         self.trip_reason = TripReason.NONE
 
@@ -70,7 +70,10 @@ class CircuitBreaker:
             self.identical_count = 1
 
         # Invariant I-38: Trip to ESCALATED_HUMAN_REVIEW on repeated identical failures
-        if self.identical_count >= self.max_identical_signatures or self.attempts >= self.max_attempts:
+        if (
+            self.identical_count >= self.max_identical_signatures
+            or self.attempts >= self.max_attempts
+        ):
             self.state = CircuitBreakerState.OPEN
             self.opened_at = current_time
             self.trip_reason = TripReason.ESCALATED_HUMAN_REVIEW

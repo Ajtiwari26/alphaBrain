@@ -42,7 +42,7 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
         extraction_confidence=1.0,
         eva_session_id="session1",
         created_at=1.0,
-        content_hash="hash-123"
+        content_hash="hash-123",
     )
 
     root_task_id = "tsk_e2e"
@@ -50,13 +50,13 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
         task_id=root_task_id,
         envelope={"allowed_paths": ["src/"]},
         provenance=prov,
-        initial_status=TriageStatus.FAILED
+        initial_status=TriageStatus.FAILED,
     )
 
     with sqlite3.connect(queue.db_path) as conn:
         conn.execute(
             "UPDATE task_triage_queue SET worktree_path = ? WHERE id = ?",
-            (str(worktree), root_task_id)
+            (str(worktree), root_task_id),
         )
         conn.commit()
 
@@ -78,7 +78,7 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
         with sqlite3.connect(queue.db_path) as conn:
             conn.execute(
                 "UPDATE task_triage_queue SET status = ?, worktree_path = ? WHERE id = ?",
-                (TriageStatus.FAILED.value, str(worktree), repair_task_0["id"])
+                (TriageStatus.FAILED.value, str(worktree), repair_task_0["id"]),
             )
             conn.commit()
 
@@ -88,7 +88,7 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
         with sqlite3.connect(queue.db_path) as conn:
             conn.execute(
                 "UPDATE task_triage_queue SET status = ?, worktree_path = ? WHERE id = ?",
-                (TriageStatus.FAILED.value, str(worktree), repair_task_1_id)
+                (TriageStatus.FAILED.value, str(worktree), repair_task_1_id),
             )
             conn.commit()
 
@@ -107,13 +107,13 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
             task_id=completed_task_id,
             envelope={"allowed_paths": []},
             provenance=prov,
-            initial_status=TriageStatus.COMPLETED
+            initial_status=TriageStatus.COMPLETED,
         )
 
         with patch("alpha_worker.ci_healing_daemon.subprocess.run") as mock_run:
             mock_run.side_effect = [
                 MagicMock(returncode=0, stdout=json.dumps({"approved": True})),
-                MagicMock(returncode=0, stdout="")
+                MagicMock(returncode=0, stdout=""),
             ]
 
             daemon.run_once()

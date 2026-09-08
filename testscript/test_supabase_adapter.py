@@ -50,21 +50,25 @@ def test_make_request_http_error(mock_urlopen, adapter):
     mock_error.read = MagicMock(return_value=b'{"error": "bad key secret-key"}')
     mock_urlopen.side_effect = mock_error
 
-    with pytest.raises(RuntimeError, match=r"Supabase API error 403: {\"error\": \"bad key \*\*\*\"}"):
+    with pytest.raises(
+        RuntimeError, match=r"Supabase API error 403: {\"error\": \"bad key \*\*\*\"}"
+    ):
         adapter._make_request("GET", "/test")
 
 
 @patch("urllib.request.urlopen")
 def test_make_request_general_exception(mock_urlopen, adapter):
     mock_urlopen.side_effect = Exception("connection failed with secret-key")
-    with pytest.raises(RuntimeError, match=r"Supabase API request failed: connection failed with \*\*\*"):
+    with pytest.raises(
+        RuntimeError, match=r"Supabase API request failed: connection failed with \*\*\*"
+    ):
         adapter._make_request("GET", "/test")
 
 
 @patch("urllib.request.urlopen")
 def test_make_request_empty_response(mock_urlopen, adapter):
     mock_response = MagicMock()
-    mock_response.read.return_value = b''
+    mock_response.read.return_value = b""
     mock_urlopen.return_value.__enter__.return_value = mock_response
 
     result = adapter._make_request("GET", "/test")

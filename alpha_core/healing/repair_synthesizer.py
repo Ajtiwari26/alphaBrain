@@ -16,7 +16,9 @@ class RepairEnvelopeSynthesizer:
         paths.discard("")
         return sorted(paths)
 
-    def synthesize(self, original_paths: list[str], failures: dict[str, Any], project_id: str, worktree: str) -> dict[str, Any]:
+    def synthesize(
+        self, original_paths: list[str], failures: dict[str, Any], project_id: str, worktree: str
+    ) -> dict[str, Any]:
         failed_files = []
         for pf in failures.get("pytest_failures", []):
             if pf.get("file"):
@@ -40,5 +42,5 @@ class RepairEnvelopeSynthesizer:
             "parent_task_id": self.parent_task_id,
             "repair_epoch": self.repair_epoch,
             "allowed_paths": bounded_paths,
-            "actionable_prompt": prompt
+            "actionable_prompt": prompt,
         }

@@ -53,10 +53,10 @@ class VercelAdapter:
         output = stdout.decode()
 
         # Deployment URL extraction
-        url_match = re.search(r'(https://[a-zA-Z0-9-]+\.vercel\.app)', output)
+        url_match = re.search(r"(https://[a-zA-Z0-9-]+\.vercel\.app)", output)
         if not url_match:
             err_output = stderr.decode()
-            url_match = re.search(r'(https://[a-zA-Z0-9-]+\.vercel\.app)', err_output)
+            url_match = re.search(r"(https://[a-zA-Z0-9-]+\.vercel\.app)", err_output)
 
         if not url_match:
             raise RuntimeError(
@@ -113,6 +113,7 @@ class VercelAdapter:
     async def check_health(self, url: str) -> bool:
         """Validates that the deployed URL is reachable and returns HTTP 200."""
         try:
+
             def fetch() -> bool:
                 req = urllib.request.Request(url)
                 with urllib.request.urlopen(req, timeout=10) as response:

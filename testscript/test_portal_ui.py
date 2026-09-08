@@ -8,6 +8,7 @@ from alpha_core.api.app import PORTAL_FRONTEND_DIR, app
 def client():
     return TestClient(app)
 
+
 def test_portal_static_mount(client):
     """Test that the portal static directory is correctly mounted."""
     assert PORTAL_FRONTEND_DIR.exists(), "alpha_portal directory does not exist"
@@ -37,4 +38,6 @@ def test_portal_static_mount(client):
 
     # Check for SSE telemetry listener
     assert "EventSource(" in js_content
-    assert "addEventListener('heartbeat'" in js_content or 'addEventListener("heartbeat"' in js_content
+    assert (
+        "addEventListener('heartbeat'" in js_content or 'addEventListener("heartbeat"' in js_content
+    )

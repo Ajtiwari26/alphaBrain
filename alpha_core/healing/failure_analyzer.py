@@ -12,7 +12,7 @@ def parse_pytest_output(output: str) -> list[dict[str, str]]:
             "file": file_path,
             "test_name": test_name.strip(),
             "message": message.strip(),
-            "traceback": ""
+            "traceback": "",
         }
 
     failures_start = output.find("FAILURES ")
@@ -29,7 +29,7 @@ def parse_pytest_output(output: str) -> list[dict[str, str]]:
         blocks = re.split(r"_{10,}\s+(\S+)\s+_{10,}", failures_block)
         for i in range(1, len(blocks), 2):
             test_name = blocks[i].strip()
-            traceback = blocks[i+1].strip()
+            traceback = blocks[i + 1].strip()
             traceback = re.sub(r"\n=+$", "", traceback).strip()
             if test_name in summaries:
                 summaries[test_name]["traceback"] = traceback
@@ -38,7 +38,7 @@ def parse_pytest_output(output: str) -> list[dict[str, str]]:
                     "file": "",
                     "test_name": test_name,
                     "message": "",
-                    "traceback": traceback
+                    "traceback": traceback,
                 }
 
     return list(summaries.values())
@@ -57,26 +57,30 @@ def parse_ruff_output(output: str) -> list[dict[str, str]]:
     # Match lines like "file.py:line:col: CODE message"
     pattern = re.compile(r"^\s*([^:]+):\d+:\d+:\s+([A-Z0-9]+)\s+(.*)$", re.MULTILINE)
     for match in pattern.finditer(output):
-        violations.append({
-            "file": match.group(1).strip(),
-            "code": match.group(2),
-            "message": match.group(3).strip()
-        })
+        violations.append(
+            {
+                "file": match.group(1).strip(),
+                "code": match.group(2),
+                "message": match.group(3).strip(),
+            }
+        )
     return violations
 
 
 class FailureAnalyzer:
-    def compute_signature(self, pytest_failures: list[dict[str, str]], ruff_violations: list[dict[str, str]]) -> str:
+    def compute_signature(
+        self, pytest_failures: list[dict[str, str]], ruff_violations: list[dict[str, str]]
+    ) -> str:
         # Create a stable string representation
         components = []
-        for f in sorted(pytest_failures, key=lambda x: x.get('test_name', '')):
-            tb = normalize_traceback(f.get('traceback', ''))
+        for f in sorted(pytest_failures, key=lambda x: x.get("test_name", "")):
+            tb = normalize_traceback(f.get("traceback", ""))
             components.append(f"pytest:{f.get('test_name', '')}:{f.get('message', '')}:{tb}")
-        for v in sorted(ruff_violations, key=lambda x: (x.get('file', ''), x.get('code', ''))):
+        for v in sorted(ruff_violations, key=lambda x: (x.get("file", ""), x.get("code", ""))):
             components.append(f"ruff:{v.get('file')}:{v.get('code')}")
 
         signature_input = "|".join(components)
-        return hashlib.sha256(signature_input.encode('utf-8')).hexdigest()
+        return hashlib.sha256(signature_input.encode("utf-8")).hexdigest()
 
     def analyze(self, pytest_output: str, ruff_output: str) -> dict[str, Any]:
         pytest_failures = parse_pytest_output(pytest_output)
@@ -85,5 +89,5 @@ class FailureAnalyzer:
         return {
             "pytest_failures": pytest_failures,
             "ruff_violations": ruff_violations,
-            "signature": self.compute_signature(pytest_failures, ruff_violations)
+            "signature": self.compute_signature(pytest_failures, ruff_violations),
         }

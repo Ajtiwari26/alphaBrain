@@ -244,7 +244,9 @@ if MEET_FRONTEND_DIR.exists():
     app.mount("/static/meet", StaticFiles(directory=str(MEET_FRONTEND_DIR)), name="static_meet")
 
 if PORTAL_FRONTEND_DIR.exists():
-    app.mount("/portal", StaticFiles(directory=str(PORTAL_FRONTEND_DIR), html=True), name="static_portal")
+    app.mount(
+        "/portal", StaticFiles(directory=str(PORTAL_FRONTEND_DIR), html=True), name="static_portal"
+    )
 
 
 @app.get("/health")
@@ -2514,6 +2516,7 @@ async def post_triage_task_result(
 # Portal API Endpoints
 # ==========================================
 
+
 @app.get("/api/portal/overview", response_model=dict[str, Any])
 async def get_portal_overview(
     principal: AuthPrincipal = Depends(require_api_principal),
@@ -2534,7 +2537,9 @@ async def get_portal_task_trace(
     require_permission(principal, "task:read")
 
     if not SAFE_EXTERNAL_ID.fullmatch(task_id):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid task ID")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid task ID"
+        )
 
     task = queue.get_task(task_id)
     if not task:
@@ -2554,7 +2559,7 @@ async def get_portal_task_trace(
         "task_id": task_id,
         "provenance": task.get("provenance", {}),
         "attestation": redacted_attestation,
-        "telemetry": queue.get_task_telemetry(task_id)
+        "telemetry": queue.get_task_telemetry(task_id),
     }
 
 
@@ -2584,4 +2589,3 @@ async def stream_portal_events(
     if not verify_scoped_stream_token(token, "portal-stream"):
         raise HTTPException(status_code=401, detail="Invalid or expired stream token")
     return StreamingResponse(portal_stream_generator(), media_type="text/event-stream")
-
