@@ -926,15 +926,34 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                         pass
 
                 if state_data.get("state") == "APPLIED":
-                    subprocess.run(
-                        ["git", "checkout", "main"], cwd=repo_path, check=True, capture_output=True
-                    )
-                    subprocess.run(
-                        ["git", "reset", "--hard", result_sha],
-                        cwd=repo_path,
-                        check=True,
-                        capture_output=True,
-                    )
+                    try:
+                        status_res = subprocess.run(
+                            ["git", "status", "--porcelain"], cwd=repo_path, capture_output=True, text=True, check=True
+                        )
+                        clean_lines = []
+                        for line in status_res.stdout.strip().splitlines():
+                            if len(line) < 3 or line[2] != " ":
+                                continue
+                            if ".alphabrain" in line:
+                                continue
+                            clean_lines.append(line)
+
+                        if clean_lines:
+                            print("Error: Working tree is not clean. Aborting recovery.", file=sys.stderr)
+                            return 1
+
+                        subprocess.run(
+                            ["git", "checkout", "main"], cwd=repo_path, check=True, capture_output=True
+                        )
+                        subprocess.run(
+                            ["git", "reset", "--hard", result_sha],
+                            cwd=repo_path,
+                            check=True,
+                            capture_output=True,
+                        )
+                    except subprocess.CalledProcessError as e:
+                        print(f"Error: Recovery failed.\n{e.stderr}", file=sys.stderr)
+                        return 1
 
                     state_data["state"] = "FINALIZED"
                     _atomic_write_json(nonce_state_file, state_data)
@@ -1015,6 +1034,21 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
         # 5. CAS Destination Base Check and Update
         try:
+            status_res = subprocess.run(
+                ["git", "status", "--porcelain"], cwd=repo_path, capture_output=True, text=True, check=True
+            )
+            clean_lines = []
+            for line in status_res.stdout.strip().splitlines():
+                if len(line) < 3 or line[2] != " ":
+                    continue
+                if ".alphabrain" in line:
+                    continue
+                clean_lines.append(line)
+
+            if clean_lines:
+                print("Error: Working tree is not clean. Aborting promotion.", file=sys.stderr)
+                return 1
+
             # Atomic compare and swap of refs/heads/main
             update_res = subprocess.run(
                 [
