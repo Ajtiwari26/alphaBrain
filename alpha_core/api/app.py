@@ -2524,7 +2524,48 @@ async def get_portal_overview(
 ):
     """Returns portal overview stats and metrics."""
     require_permission(principal, "audit:read")
-    return {"status": "ok", "stats": queue.get_stats()}
+
+    is_founder = principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}
+    if is_founder:
+        return {"status": "ok", "stats": queue.get_stats()}
+
+    tasks = queue.list_tasks(limit=100000)
+    authorized_tasks = [
+        t for t in tasks
+        if principal.can_access_project(t.get("envelope", {}).get("project_id", ""))
+    ]
+
+    import statistics
+    status_counts = {s.value: 0 for s in TriageStatus}
+    queue_waits = []
+    exec_durations = []
+
+    for t in authorized_tasks:
+        status_val = t.get("status")
+        if status_val in status_counts:
+            status_counts[status_val] += 1
+
+        telemetry = queue.get_task_telemetry(t["id"])
+        qw = telemetry.get("queue_wait_seconds")
+        if qw is not None:
+            queue_waits.append(qw)
+        ed = telemetry.get("execution_duration_seconds")
+        if ed is not None:
+            exec_durations.append(ed)
+
+    stats = {
+        "total_tasks": len(authorized_tasks),
+        "by_status": status_counts,
+        "queue_wait_seconds": {
+            "average": float(statistics.mean(queue_waits)) if queue_waits else 0.0,
+            "median": float(statistics.median(queue_waits)) if queue_waits else 0.0,
+        },
+        "execution_duration_seconds": {
+            "average": float(statistics.mean(exec_durations)) if exec_durations else 0.0,
+            "median": float(statistics.median(exec_durations)) if exec_durations else 0.0,
+        },
+    }
+    return {"status": "ok", "stats": stats}
 
 
 @app.get("/api/portal/tasks/{task_id}/trace", response_model=dict[str, Any])
@@ -2547,17 +2588,30 @@ async def get_portal_task_trace(
 
     # Enforce tenant isolation (Invariant I-33)
     project_id = task.get("envelope", {}).get("project_id")
-    if project_id:
-        require_project_access(principal, project_id)
+    if not project_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Task missing project ownership"
+        )
+    require_project_access(principal, project_id)
 
     # Redact attestation to prevent raw data exposure
     senior_review = task.get("result", {}).get("senior_review", {}) if task.get("result") else None
     redacted_attestation = redact_dict(senior_review) if senior_review else None
 
+    provenance = task.get("provenance", {})
+    is_founder = principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}
+    if not is_founder:
+        allowed_keys = {
+            "meeting_id", "speaker_id", "utterance_timestamp",
+            "transcript_excerpt", "extraction_model", "extraction_confidence",
+            "eva_session_id", "created_at", "content_hash"
+        }
+        provenance = {k: v for k, v in provenance.items() if k in allowed_keys}
+
     return {
         "status": "ok",
         "task_id": task_id,
-        "provenance": task.get("provenance", {}),
+        "provenance": provenance,
         "attestation": redacted_attestation,
         "telemetry": queue.get_task_telemetry(task_id),
     }
