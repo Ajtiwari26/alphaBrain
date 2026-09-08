@@ -9,7 +9,7 @@ class RepairEnvelopeSynthesizer:
     def bound_allowed_paths(self, original_paths: list[str], failed_files: list[str]) -> list[str]:
         paths = set(original_paths)
         for f in failed_files:
-            if not f or ".." in f or f.startswith("/"):
+            if not f or any(c == '..' for c in f.split('/')) or f.startswith("/"):
                 continue
             for op in original_paths:
                 if op == "." or f == op or f.startswith(op if op.endswith("/") else op + "/"):

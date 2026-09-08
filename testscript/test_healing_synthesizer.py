@@ -9,6 +9,16 @@ def test_synthesizer_bounds_allowed_paths():
     assert "alpha_core/healing/" in bounded
     assert "test_file.py" in bounded
 
+def test_synthesizer_rejects_unsafe_paths():
+    synth = RepairEnvelopeSynthesizer("tsk_123", 1)
+    bounded = synth.bound_allowed_paths(
+        ["alpha_core/healing/"],
+        ["../../etc/passwd", "/etc/shadow", "alpha_core/malicious.py"]
+    )
+    assert "../../etc/passwd" not in bounded
+    assert "/etc/shadow" not in bounded
+    assert "alpha_core/malicious.py" not in bounded
+
 
 def test_synthesizer_links_parent_and_epoch():
     synth = RepairEnvelopeSynthesizer("tsk_123", 1)

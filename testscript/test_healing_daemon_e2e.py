@@ -56,8 +56,8 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
 
     daemon.run_once()
 
-    failed = queue.list_tasks(status=TriageStatus.FAILED)
-    assert any(t["id"] == root_task_id for t in failed)
+    rejected = queue.list_tasks(status=TriageStatus.REJECTED)
+    assert any(t["id"] == root_task_id for t in rejected)
 
     pending = queue.list_tasks(status=TriageStatus.PENDING_REVIEW)
     assert len(pending) == 1
@@ -85,16 +85,12 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
         )
         conn.commit()
 
-    with patch.object(queue, 'reject_task', wraps=queue.reject_task) as mock_reject:
-        daemon.run_once()
-        mock_reject.assert_any_call(
-            repair_task_1_id,
-            reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention."
-        )
+    daemon.run_once()
 
-    failed = queue.list_tasks(status=TriageStatus.FAILED)
-    tripped_task = next((t for t in failed if t["id"] == repair_task_1_id), None)
+    rejected = queue.list_tasks(status=TriageStatus.REJECTED)
+    tripped_task = next((t for t in rejected if t["id"] == repair_task_1_id), None)
     assert tripped_task is not None
+    assert "ESCALATED" in tripped_task.get("safety_reason", "")
 
     pending = queue.list_tasks(status=TriageStatus.PENDING_REVIEW)
     assert not any(t["id"] == f"{repair_task_1_id}_repair_3" for t in pending)

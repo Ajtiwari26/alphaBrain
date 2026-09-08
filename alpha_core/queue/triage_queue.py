@@ -398,7 +398,7 @@ class TaskTriageQueue:
                 """
                 UPDATE task_triage_queue
                 SET status = ?, safety_reason = ?, updated_at = ?
-                WHERE id = ? AND status IN (?, ?);
+                WHERE id = ? AND status IN (?, ?, ?);
                 """,
                 (
                     TriageStatus.REJECTED.value,
@@ -407,6 +407,7 @@ class TaskTriageQueue:
                     task_id,
                     TriageStatus.PENDING_REVIEW.value,
                     TriageStatus.APPROVED.value,
+                    TriageStatus.FAILED.value,
                 ),
             )
             return cursor.rowcount > 0
