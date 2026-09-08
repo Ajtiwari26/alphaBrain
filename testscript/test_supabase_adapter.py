@@ -61,6 +61,30 @@ def test_make_request_general_exception(mock_urlopen, adapter):
         adapter._make_request("GET", "/test")
 
 
+@patch("urllib.request.urlopen")
+def test_make_request_empty_response(mock_urlopen, adapter):
+    mock_response = MagicMock()
+    mock_response.read.return_value = b''
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    result = adapter._make_request("GET", "/test")
+    assert result == {}
+
+
+@patch("urllib.request.urlopen")
+def test_make_request_with_data(mock_urlopen, adapter):
+    mock_response = MagicMock()
+    mock_response.read.return_value = b'{"status": "ok"}'
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    result = adapter._make_request("POST", "/test", data=b'{"key": "value"}')
+    assert result == {"status": "ok"}
+
+    # Verify Content-Type header was added
+    call_args = mock_urlopen.call_args[0][0]
+    assert call_args.get_header("Content-type") == "application/json"
+
+
 @pytest.mark.asyncio
 @patch("alpha_worker.adapters.supabase_adapter.SupabaseAdapter._make_request")
 async def test_check_health_success(mock_make_request, adapter):
@@ -100,6 +124,18 @@ def test_validate_ddl_destructive(adapter):
     with pytest.raises(DestructiveDDLError, match="Destructive DDL detected"):
         adapter.validate_ddl('ALTER TABLE "users" DROP COLUMN age;')
 
+    with pytest.raises(DestructiveDDLError, match="Destructive DDL detected"):
+        adapter.validate_ddl("ALTER TABLE users\nDROP COLUMN age;")
+
+    with pytest.raises(DestructiveDDLError, match="Destructive DDL detected"):
+        adapter.validate_ddl("DROP INDEX my_idx;")
+
+    with pytest.raises(DestructiveDDLError, match="Destructive DDL detected"):
+        adapter.validate_ddl("DROP FUNCTION my_func;")
+
+    with pytest.raises(DestructiveDDLError, match="Destructive DDL detected"):
+        adapter.validate_ddl("DROP TRIGGER my_trig;")
+
 
 @pytest.mark.asyncio
 @patch("alpha_worker.adapters.supabase_adapter.SupabaseAdapter._make_request")
@@ -108,7 +144,7 @@ async def test_get_migration_status_success(mock_make_request, adapter):
     status = await adapter.get_migration_status()
     assert isinstance(status, MigrationStatus)
     assert status.applied_count == 2
-    assert status.pending_count == 0
+    assert status.pending_count is None
     assert status.is_healthy is True
 
 

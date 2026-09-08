@@ -18,7 +18,7 @@ class DestructiveDDLError(Exception):
 @dataclass
 class MigrationStatus:
     applied_count: int
-    pending_count: int
+    pending_count: int | None
     is_healthy: bool
 
 
@@ -58,19 +58,22 @@ class SupabaseAdapter:
                     return {}
                 return json.loads(response_data.decode())
         except urllib.error.HTTPError as e:
-            error_body = e.read().decode()
+            try:
+                error_body = e.read().decode()
+            except Exception:
+                error_body = "Failed to read error body"
             error_msg = self._mask_secrets(error_body)
-            raise RuntimeError(f"Supabase API error {e.code}: {error_msg}") from e
+            raise RuntimeError(f"Supabase API error {e.code}: {error_msg}") from None
         except Exception as e:
             error_msg = self._mask_secrets(str(e))
-            raise RuntimeError(f"Supabase API request failed: {error_msg}") from e
+            raise RuntimeError(f"Supabase API request failed: {error_msg}") from None
 
     async def check_health(self) -> bool:
         """Database health probe."""
         try:
             # A simple REST API call to check if the instance is up
             data = await asyncio.to_thread(self._make_request, "GET", "/rest/v1/")
-            return isinstance(data, dict)
+            return data is not None
         except Exception as e:
             logger.debug(f"Health probe failed: {e}")
             return False
@@ -79,12 +82,12 @@ class SupabaseAdapter:
         """Destructive DDL guardrails."""
         sql_upper = sql.upper()
         destructive_patterns = [
-            r"\bDROP\s+(TABLE|DATABASE|SCHEMA|VIEW|ROLE|USER)\b",
+            r"\bDROP\s+(TABLE|DATABASE|SCHEMA|VIEW|ROLE|USER|INDEX|FUNCTION|TRIGGER|SEQUENCE|EXTENSION)\b",
             r"\bTRUNCATE\b",
             r"\bALTER\s+TABLE\s+.*?\bDROP\s+COLUMN\b"
         ]
         for pattern in destructive_patterns:
-            if re.search(pattern, sql_upper):
+            if re.search(pattern, sql_upper, flags=re.DOTALL):
                 raise DestructiveDDLError(f"Destructive DDL detected: {pattern}")
 
     async def get_migration_status(self) -> MigrationStatus:
@@ -94,8 +97,8 @@ class SupabaseAdapter:
             applied_count = len(data) if isinstance(data, list) else 0
             return MigrationStatus(
                 applied_count=applied_count,
-                pending_count=0,
+                pending_count=None,
                 is_healthy=True
             )
         except Exception as e:
-            raise RuntimeError(f"Failed to inspect migration status: {self._mask_secrets(str(e))}") from e
+            raise RuntimeError(f"Failed to inspect migration status: {self._mask_secrets(str(e))}") from None
