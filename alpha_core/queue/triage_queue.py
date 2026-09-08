@@ -185,6 +185,23 @@ class TaskTriageQueue:
                 "updated_at REAL NOT NULL"
                 ");"
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS project_task_events (
+                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                );
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_proj_events_proj_seq ON project_task_events(project_id, seq);"
+            )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_triage_queue(status);")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_content_hash ON task_triage_queue(content_hash);"
@@ -347,6 +364,22 @@ class TaskTriageQueue:
                     now,
                 ),
             )
+            project_id = envelope.get("project_id", "default")
+            conn.execute(
+                """
+                INSERT INTO project_task_events (project_id, task_id, state, status, event_type, payload_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    project_id,
+                    task_id,
+                    "received",
+                    initial_status.value,
+                    "task_admitted",
+                    json.dumps({"title": envelope.get("title", "")}),
+                    now,
+                ),
+            )
             logger.info("Enqueued task %s with status %s", task_id, initial_status.value)
             return task_id
 
@@ -392,6 +425,23 @@ class TaskTriageQueue:
                     TriageStatus.PENDING_REVIEW.value,
                 ),
             )
+            if cursor.rowcount > 0:
+                project_id = env.get("project_id", "default")
+                conn.execute(
+                    """
+                    INSERT INTO project_task_events (project_id, task_id, state, status, event_type, payload_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        project_id,
+                        task_id,
+                        "received",
+                        TriageStatus.APPROVED.value,
+                        "task_approved",
+                        json.dumps({}),
+                        now,
+                    ),
+                )
             return cursor.rowcount > 0
 
         return bool(self._execute_write_with_retry(_approve))
@@ -612,6 +662,26 @@ class TaskTriageQueue:
                     TriageStatus.APPROVED.value,
                 ),
             )
+            try:
+                env = json.loads(selected_row["envelope_json"])
+                project_id = env.get("project_id", "default")
+                conn.execute(
+                    """
+                    INSERT INTO project_task_events (project_id, task_id, state, status, event_type, payload_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        project_id,
+                        task_id,
+                        "in_progress",
+                        TriageStatus.EXECUTING.value,
+                        "task_leased",
+                        json.dumps({"worker_id": worker_id}),
+                        now,
+                    ),
+                )
+            except Exception:
+                pass
             data = dict(selected_row)
             data["provenance"] = provenance_dict
             data["worker_id"] = provenance_dict["lease_metadata"]["worker_id"]
@@ -775,6 +845,32 @@ class TaskTriageQueue:
                 """,
                 tuple(params),
             )
+            if update_cursor.rowcount > 0:
+                try:
+                    env_row = conn.execute(
+                        "SELECT envelope_json FROM task_triage_queue WHERE id = ?;",
+                        (task_id,),
+                    ).fetchone()
+                    if env_row:
+                        env = json.loads(env_row["envelope_json"])
+                        project_id = env.get("project_id", "default")
+                        conn.execute(
+                            """
+                            INSERT INTO project_task_events (project_id, task_id, state, status, event_type, payload_json, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?);
+                            """,
+                            (
+                                project_id,
+                                task_id,
+                                "review",
+                                TriageStatus.COMPLETED.value,
+                                "task_completed",
+                                json.dumps({}),
+                                now,
+                            ),
+                        )
+                except Exception:
+                    pass
             return update_cursor.rowcount > 0
 
         return bool(self._execute_write_with_retry(_complete, allow_during_emergency=True))
@@ -830,6 +926,42 @@ class TaskTriageQueue:
                 """,
                 (json.dumps(result_data), now, task_id),
             )
+            if cursor.rowcount > 0:
+                try:
+                    env_row = conn.execute(
+                        "SELECT envelope_json FROM task_triage_queue WHERE id = ?;",
+                        (task_id,),
+                    ).fetchone()
+                    if env_row:
+                        env = json.loads(env_row["envelope_json"])
+                        project_id = env.get("project_id", "default")
+                        event_state = "completed" if approved else "review"
+                        event_name = (
+                            "senior_review_approved" if approved else "senior_review_repair_required"
+                        )
+                        conn.execute(
+                            """
+                            INSERT INTO project_task_events (project_id, task_id, state, status, event_type, payload_json, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?);
+                            """,
+                            (
+                                project_id,
+                                task_id,
+                                event_state,
+                                TriageStatus.COMPLETED.value,
+                                event_name,
+                                json.dumps(
+                                    {
+                                        "approved": approved,
+                                        "pro_verdict": pro_verdict,
+                                        "opus_verdict": opus_verdict,
+                                    }
+                                ),
+                                now,
+                            ),
+                        )
+                except Exception:
+                    pass
             return cursor.rowcount > 0
 
         return bool(self._execute_write_with_retry(_record, allow_during_emergency=True))
@@ -1423,3 +1555,53 @@ class TaskTriageQueue:
             if row:
                 return json.loads(row["state_json"])
             return None
+
+    def record_project_event(
+        self,
+        project_id: str,
+        task_id: str,
+        state: str,
+        status: str,
+        event_type: str,
+        payload: dict[str, Any] | None = None,
+    ) -> int:
+        """Records a durable task event with monotonic autoincrementing seq."""
+        now = time.time()
+        payload_json = json.dumps(payload or {})
+
+        def _write(conn: sqlite3.Connection) -> int:
+            cursor = conn.execute(
+                """
+                INSERT INTO project_task_events (project_id, task_id, state, status, event_type, payload_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                (project_id, task_id, state, status, event_type, payload_json, now),
+            )
+            return int(cursor.lastrowid or 0)
+
+        return int(self._execute_write_with_retry(_write))
+
+    def get_project_events(
+        self,
+        project_id: str,
+        after_seq: int = 0,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Retrieves durable project events occurring strictly after after_seq, ordered by seq ascending."""
+        with closing(self._get_connection()) as conn:
+            cursor = conn.execute(
+                """
+                SELECT seq, project_id, task_id, state, status, event_type, payload_json, created_at
+                FROM project_task_events
+                WHERE project_id = ? AND seq > ?
+                ORDER BY seq ASC
+                LIMIT ?;
+                """,
+                (project_id, after_seq, limit),
+            )
+            events = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                d["payload"] = json.loads(d["payload_json"])
+                events.append(d)
+            return events

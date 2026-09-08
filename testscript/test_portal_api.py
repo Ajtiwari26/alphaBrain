@@ -104,7 +104,7 @@ async def test_portal_stream(mock_queue):
 
     token = create_scoped_stream_token("portal-stream:prj_test", ttl_seconds=3600)
 
-    async def mock_generator(project_id, last_event_id):
+    async def mock_generator(project_id, last_event_id, **kwargs):
         yield "event: heartbeat\ndata: {}\n\n"
 
     with patch("alpha_core.api.app.portal_stream_generator", side_effect=mock_generator):

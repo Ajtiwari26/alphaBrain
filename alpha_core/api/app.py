@@ -2627,20 +2627,45 @@ async def get_portal_task_trace(
 
 
 async def portal_stream_generator(
-    project_id: str, last_event_id: str | None = None, max_duration_seconds: int = 3600
+    project_id: str,
+    last_event_id: str | None = None,
+    max_duration_seconds: int = 3600,
+    poll_interval_seconds: float = 1.0,
+    max_iterations: int | None = None,
+    queue: TaskTriageQueue | None = None,
 ):
-    """Simple SSE heartbeat generator for live portal stream with a TTL."""
+    """SSE generator streaming genuine task events with durable monotonic replay and heartbeat."""
+    if queue is None:
+        queue = get_triage_queue()
+
     deadline = asyncio.get_event_loop().time() + max_duration_seconds
-    event_id = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
+    current_seq = int(last_event_id) if last_event_id and str(last_event_id).isdigit() else 0
+    iterations = 0
+
     try:
         while asyncio.get_event_loop().time() < deadline:
-            event_id += 1
-            yield f"id: {event_id}\nevent: heartbeat\ndata: {{}}\n\n"
+            iterations += 1
+            events = queue.get_project_events(project_id, after_seq=current_seq, limit=50)
+            if events:
+                for ev in events:
+                    current_seq = ev["seq"]
+                    data = {
+                        "project_id": ev["project_id"],
+                        "task_id": ev["task_id"],
+                        "state": ev["state"],
+                        "status": ev["status"],
+                        "event_type": ev["event_type"],
+                        "created_at": ev["created_at"],
+                        "live": True,
+                    }
+                    yield f"id: {current_seq}\nevent: task_update\ndata: {json.dumps(data)}\n\n"
+            else:
+                yield f"id: {current_seq}\nevent: heartbeat\ndata: {{}}\n\n"
 
-            event_id += 1
-            yield f"id: {event_id}\nevent: task_update\ndata: {json.dumps({'project_id': project_id, 'live': True})}\n\n"
+            if max_iterations is not None and iterations >= max_iterations:
+                break
 
-            await asyncio.sleep(15)
+            await asyncio.sleep(poll_interval_seconds)
     except asyncio.CancelledError:
         pass
 
@@ -2660,6 +2685,8 @@ async def stream_portal_events(
     project_id: str,
     request: Request,
     token: str = Query(...),
+    max_iterations: int | None = Query(default=None),
+    queue: TaskTriageQueue = Depends(get_triage_queue),
 ):
     if not verify_scoped_stream_token(token, f"portal-stream:{project_id}"):
         raise HTTPException(status_code=401, detail="Invalid or expired stream token")
@@ -2667,5 +2694,8 @@ async def stream_portal_events(
         "last_event_id"
     )
     return StreamingResponse(
-        portal_stream_generator(project_id, last_event_id), media_type="text/event-stream"
+        portal_stream_generator(
+            project_id, last_event_id, max_iterations=max_iterations, queue=queue
+        ),
+        media_type="text/event-stream",
     )
