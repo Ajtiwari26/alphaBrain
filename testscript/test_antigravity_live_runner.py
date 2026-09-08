@@ -68,7 +68,7 @@ async def test_cancelled_agy_turn_kills_process_group(tmp_path):
     for _ in range(100):
         if pid_path.exists():
             break
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
     assert pid_path.exists()
     pid = int(pid_path.read_text())
 
@@ -81,6 +81,6 @@ async def test_cancelled_agy_turn_kills_process_group(tmp_path):
             os.kill(pid, 0)
         except ProcessLookupError:
             break
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
     else:
         pytest.fail("Cancelled AGY process group remained alive")

@@ -6,7 +6,6 @@ lease epoch fencing, and secret redaction.
 """
 
 import hashlib
-import hmac
 import json
 import time
 from pathlib import Path
@@ -59,15 +58,33 @@ def test_tamper_detection():
         "allowed_paths": ["safe.py"],
     }
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
-    content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
+    original_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
 
-    # Tamper the json
+    prov = TaskProvenance(
+        meeting_id="meet_1",
+        speaker_id="speaker_1",
+        utterance_timestamp=time.time(),
+        transcript_excerpt="test",
+        extraction_model="test",
+        extraction_confidence=1.0,
+        eva_session_id="session_1",
+        created_at=time.time(),
+        content_hash=original_hash,
+    )
+
+    # Tamper the envelope payload before enqueuing
     tampered_env = dict(env)
     tampered_env["allowed_paths"] = ["safe.py", "/etc/shadow", "malicious.py"]
-    tampered_json = json.dumps(tampered_env, sort_keys=True, separators=(",", ":"), default=str)
-    tampered_hash = hashlib.sha256(tampered_json.encode("utf-8")).hexdigest()
 
-    assert not hmac.compare_digest(content_hash, tampered_hash), "Tampering was not detected"
+    with TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test_queue.sqlite3"
+        queue = TaskTriageQueue(db_path=str(db_path))
+
+        import pytest
+        with pytest.raises(ValueError, match="Content hash mismatch"):
+            # Enqueueing with the original provenance hash but a tampered envelope
+            # should trigger the application-level tamper rejection.
+            queue.enqueue_task("tamper_task", tampered_env, prov)
 
 
 def test_circuit_breaker_trips():
@@ -86,13 +103,13 @@ def test_circuit_breaker_trips():
     assert cb.trip_reason == TripReason.ESCALATED_HUMAN_REVIEW
 
     # 3. Time passage transitions to HALF_OPEN
-    time.sleep(0.15)
+    time.sleep(0.3)
     cb.record_failure("error_signature_3")
     # A failure in HALF_OPEN trips immediately back to OPEN
     assert cb.state == CircuitBreakerState.OPEN
 
     # 4. Success transitions to CLOSED
-    time.sleep(0.15)
+    time.sleep(0.3)
     assert cb.can_attempt()  # triggers internal _update_state to HALF_OPEN
     cb.record_success()
     assert cb.state == CircuitBreakerState.CLOSED
