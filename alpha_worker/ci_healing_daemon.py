@@ -21,34 +21,40 @@ class CIHealingDaemon:
         self.queue = queue
         self.project_id = project_id
         self.failure_analyzer = FailureAnalyzer()
-        self.circuit_breakers: dict[str, CircuitBreaker] = {}
-        self.processed_tasks: set[str] = set()
         self._shutdown = False
+        self._init_db()
 
-    def get_circuit_breaker(self, task_id: str) -> CircuitBreaker:
-        root_id = task_id.split("_repair_")[0]
-        if root_id not in self.circuit_breakers:
-            persisted = None
-            try:
-                persisted = self.queue.get_circuit_breaker(root_id)
-            except Exception:
-                pass
-            if isinstance(persisted, dict):
-                self.circuit_breakers[root_id] = CircuitBreaker.from_dict(persisted)
-            else:
-                self.circuit_breakers[root_id] = CircuitBreaker()
-        return self.circuit_breakers[root_id]
-
-    def _save_circuit_breaker(self, task_id: str, cb: CircuitBreaker) -> None:
-        root_id = task_id.split("_repair_")[0]
+    def _init_db(self) -> None:
+        def _create(conn):
+            conn.execute("CREATE TABLE IF NOT EXISTS daemon_processed_tasks (task_id TEXT PRIMARY KEY, processed_at REAL NOT NULL);")
         try:
-            self.queue.save_circuit_breaker(root_id, cb.to_dict())
+            self.queue._execute_write_with_retry(_create, allow_during_emergency=True)
         except Exception as e:
-            logger.warning(f"Could not persist circuit breaker for {root_id}: {e}")
+            logger.warning(f"Failed to initialize daemon_processed_tasks: {e}")
+
+    def is_task_processed(self, task_id: str) -> bool:
+        from contextlib import closing
+        try:
+            with closing(self.queue._get_connection()) as conn:
+                cursor = conn.execute("SELECT 1 FROM daemon_processed_tasks WHERE task_id = ?;", (task_id,))
+                return cursor.fetchone() is not None
+        except Exception:
+            return False
+
+    def mark_task_processed(self, task_id: str) -> None:
+        import time
+        def _insert(conn):
+            conn.execute("INSERT OR IGNORE INTO daemon_processed_tasks (task_id, processed_at) VALUES (?, ?);", (task_id, time.time()))
+        try:
+            self.queue._execute_write_with_retry(_insert, allow_during_emergency=True)
+        except Exception as e:
+            logger.warning(f"Failed to mark task processed {task_id}: {e}")
+
+
 
     def process_completed_task(self, task: dict[str, Any]) -> None:
         task_id = task["id"]
-        if task_id in self.processed_tasks:
+        if self.is_task_processed(task_id):
             return
 
         logger.info(f"Processing completed task: {task_id}")
@@ -94,10 +100,9 @@ class CIHealingDaemon:
 
             if merge_result.returncode == 0:
                 logger.info(f"Successfully auto-merged {task_id}")
-                cb = self.get_circuit_breaker(task_id)
-                cb.record_success()
-                self._save_circuit_breaker(task_id, cb)
-                self.processed_tasks.add(task_id)
+                root_id = task_id.split("_repair_")[0]
+                CircuitBreaker.execute_transactionally(self.queue, root_id, lambda cb: cb.record_success())
+                self.mark_task_processed(task_id)
             else:
                 logger.error(f"Auto-merge failed for {task_id}: {merge_result.stderr}")
                 # Do NOT add to processed_tasks so merge can be retried
@@ -107,7 +112,7 @@ class CIHealingDaemon:
 
     def process_failed_task(self, task: dict[str, Any]) -> None:
         task_id = task["id"]
-        if task_id in self.processed_tasks:
+        if self.is_task_processed(task_id):
             return
 
         logger.info(f"Processing failed task: {task_id}")
@@ -115,7 +120,7 @@ class CIHealingDaemon:
         worktree_dir = task.get("worktree_path")
         if not worktree_dir or not os.path.exists(worktree_dir):
             logger.warning(f"No valid worktree found for failed task {task_id}")
-            self.processed_tasks.add(task_id)
+            self.queue.reject_task(task_id, reason="No valid worktree found")
             return
 
         evidence_dir = os.path.join(worktree_dir, "evidence")
@@ -135,9 +140,8 @@ class CIHealingDaemon:
         signature = analysis.get("signature", "unknown")
         logger.info(f"Analyzed failure for {task_id}. Signature: {signature}")
 
-        cb = self.get_circuit_breaker(task_id)
-        trip_reason = cb.record_failure(signature)
-        self._save_circuit_breaker(task_id, cb)
+        root_id = task_id.split("_repair_")[0]
+        trip_reason, cb = CircuitBreaker.execute_transactionally(self.queue, root_id, lambda _cb: _cb.record_failure(signature))
 
         if trip_reason == TripReason.ESCALATED_HUMAN_REVIEW:
             logger.warning(f"Circuit breaker tripped for {task_id}. Escalating to human review.")
@@ -145,7 +149,6 @@ class CIHealingDaemon:
                 task_id,
                 reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.",
             )
-            self.processed_tasks.add(task_id)
             return
 
         epoch = cb.attempts
@@ -162,7 +165,7 @@ class CIHealingDaemon:
         # S2: Validate synthesizer return
         if not all(k in repair_envelope for k in ("allowed_paths", "actionable_prompt")):
             logger.error("Synthesizer returned invalid envelope shape")
-            self.processed_tasks.add(task_id)
+            self.queue.reject_task(task_id, reason="Synthesizer returned invalid envelope shape")
             return
 
         logger.info(f"Synthesized repair envelope for {task_id}: {repair_envelope}")
@@ -194,7 +197,6 @@ class CIHealingDaemon:
 
         # Supersede the old task safely to prevent re-execution
         self.queue.reject_task(task_id, reason=f"Superseded by {repair_task_id}")
-        self.processed_tasks.add(task_id)
 
     def run_once(self) -> None:
         if self.queue.is_emergency_stopped():

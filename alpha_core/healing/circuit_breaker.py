@@ -144,3 +144,23 @@ class CircuitBreaker:
         reason_str = str(data.get("trip_reason", TripReason.NONE.value))
         cb.trip_reason = TripReason(reason_str)
         return cb
+
+    @staticmethod
+    def execute_transactionally(queue, root_id: str, action_fn):
+        import fcntl
+        lock_file = str(queue.db_path) + f".cb_{root_id}.lock"
+        with open(lock_file, "w") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                state_dict = queue.get_circuit_breaker(root_id)
+                if state_dict:
+                    cb = CircuitBreaker.from_dict(state_dict)
+                else:
+                    cb = CircuitBreaker()
+
+                result = action_fn(cb)
+
+                queue.save_circuit_breaker(root_id, cb.to_dict())
+                return result, cb
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)

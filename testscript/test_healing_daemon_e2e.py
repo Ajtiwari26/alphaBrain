@@ -115,4 +115,4 @@ def test_healing_daemon_e2e_lifecycle(temp_env):
         assert "senior-review" in calls[0][0][0]
         assert "merge" in calls[1][0][0]
 
-        assert completed_task_id in daemon.processed_tasks
+        assert daemon.is_task_processed(completed_task_id)
