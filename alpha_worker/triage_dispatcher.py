@@ -434,7 +434,7 @@ class TriageTaskDispatcher:
                         getattr(dispatch_res, "changed_files", []),
                     )
                     if not getattr(dispatch_res, "completed", False):
-                        err_msg = f"AGY dispatcher returned completed=False for task {task_id}"
+                        err_msg = getattr(dispatch_res, "error_msg", None) or getattr(dispatch_res, "blocked_reason", None) or f"AGY dispatcher returned completed=False for task {task_id}"
                         self.queue.fail_task(
                             task_id, error_details={"error": err_msg}, allow_retry=True
                         )
