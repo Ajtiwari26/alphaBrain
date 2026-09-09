@@ -14,6 +14,7 @@ def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
     conversation_id = "00000000-0000-0000-0000-000000000003"
     fake_agy.write_text(
         "#!/bin/sh\n"
+        'for arg in "$@"; do [ "$arg" != "--dangerously-skip-permissions" ] || exit 97; done\n'
         f"printf '%s\\n' '{json.dumps({'event': 'init', 'conversation_id': conversation_id})}'\n"
         "(sleep 20) &\n"
         f"printf '%s\\n' '{json.dumps({'event': 'result', 'result': {'conversation_id': conversation_id, 'status': 'SUCCESS', 'response': 'done'}})}'\n"
@@ -34,6 +35,11 @@ def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
     )
 
     assert result["returncode"] == 0
+    permissions = json.loads((tmp_path / ".agents/settings.json").read_text())["permissions"][
+        "allow"
+    ]
+    assert "mcp_*(*)" not in permissions
+    assert "call_mcp_tool(*)" not in permissions
     assert result["events"][0]["conversation_id"] == conversation_id
     assert "SUCCESS" in (tmp_path / "agy.json").read_text()
 

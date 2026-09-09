@@ -277,11 +277,18 @@ def cmd_approve(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         return 2
 
     notes = args.notes or "Operator approved via CLI"
-    success = queue.approve_task(
-        args.task_id,
-        safety_verdict=verdict.verdict,
-        safety_reason=notes,
-    )
+    try:
+        success = queue.approve_task(
+            args.task_id,
+            safety_verdict=verdict.verdict,
+            safety_reason=notes,
+        )
+    except ValueError:
+        print(
+            "Error: Valid senior planning evidence required. Run senior-plan with a matching research snapshot; do not edit queue records.",
+            file=sys.stderr,
+        )
+        return 2
     if not success:
         print(
             f"Error: Failed to approve task '{args.task_id}'. Ensure status is 'pending_review'.",
@@ -595,6 +602,43 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print(f"  1. Review Safety:  .venv/bin/python -m alpha_core.triage_cli review {task_id}")
         print(f"  2. Founder Approve:.venv/bin/python -m alpha_core.triage_cli approve {task_id}")
         print("  3. Worker Cycle:   .venv/bin/python -m alpha_core.triage_cli worker-cycle")
+    return 0
+
+
+def cmd_senior_plan(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    """Plan a pending task without granting execution or modifying its request."""
+    from alpha_core.planning.research_broker import ResearchBroker
+    from alpha_core.planning.senior_planning_engine import SeniorPlanningEngine
+    from alpha_protocol.planning import ResearchSnapshot
+
+    task = queue.get_task(args.task_id)
+    if not task or task["status"] != "pending_review" or queue.is_emergency_stopped():
+        print("Error: Planning requires a pending task and no emergency stop.", file=sys.stderr)
+        return 2
+    try:
+        snapshot = ResearchSnapshot.model_validate_json(Path(args.snapshot).read_text())
+        engine = SeniorPlanningEngine(queue, ResearchBroker(), key_id=args.key_id)
+        attestation, blueprint = engine.execute_planning_phase(args.task_id, snapshot)
+        if not queue.attach_plan(
+            args.task_id, attestation.model_dump(mode="json"), blueprint.model_dump(mode="json")
+        ):
+            raise ValueError("Task changed state before plan attachment")
+    except Exception as exc:
+        # Do not echo model output, signed evidence or credentials into CLI logs.
+        print(
+            f"Error: Senior planning failed ({type(exc).__name__}); task not approved.",
+            file=sys.stderr,
+        )
+        return 2
+    print(
+        json.dumps(
+            {
+                "task_id": args.task_id,
+                "status": "planned_pending_approval",
+                "blueprint_digest": blueprint.compute_digest(),
+            }
+        )
+    )
     return 0
 
 
@@ -1283,6 +1327,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
     p_admit.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # senior-plan: never edits the envelope or grants execution approval.
+    p_plan = subparsers.add_parser(
+        "senior-plan", help="Draft and critique a plan from a task-bound research snapshot"
+    )
+    p_plan.add_argument("task_id")
+    p_plan.add_argument("--snapshot", required=True, help="ResearchSnapshot JSON path")
+    p_plan.add_argument("--key-id", default="alpha_production_v1")
+
     # senior-review
     p_senior = subparsers.add_parser(
         "senior-review", help="Execute 2-round senior engineering review (Pro + Opus)"
@@ -1357,6 +1409,7 @@ def main(argv: list[str] | None = None) -> int:
         "emergency-status": cmd_emergency_status,
         "worker-cycle": cmd_worker_cycle,
         "senior-review": cmd_senior_review,
+        "senior-plan": cmd_senior_plan,
         "merge": cmd_merge,
         "export-audit": cmd_export_audit,
         "dag": cmd_dag,

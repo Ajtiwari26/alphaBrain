@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from alpha_core.api.app import app, get_triage_queue, require_api_principal
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
 from alpha_core.security import AuthPrincipal
+from testscript.planning_fixtures import approve_with_plan
 
 
 @pytest.fixture
@@ -41,7 +42,7 @@ def test_happy_path(queue):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     # Lease
     task = queue.lease_next_approved_task(worker_id="worker_1")
@@ -86,7 +87,7 @@ def test_cross_worker_denial(queue):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
     lease_meta = task["provenance"]["lease_metadata"]
@@ -119,7 +120,7 @@ def test_stale_reassignment_race(queue):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
     lease_meta1 = task["provenance"]["lease_metadata"]
@@ -178,7 +179,7 @@ def test_expired_lease_denial(queue):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     queue.lease_next_approved_task(worker_id="worker_1")
     queue.reap_stale_executing_tasks(timeout_seconds=-1)  # Force reap
@@ -204,7 +205,7 @@ def test_fail_task_fencing(queue):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
     lease_meta = task["provenance"]["lease_metadata"]
@@ -247,7 +248,7 @@ def test_release_lease_happy_path(queue):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
     assert task is not None
@@ -292,7 +293,7 @@ def test_release_lease_stale_fencing_denial(queue):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
     lease_meta = task["provenance"]["lease_metadata"]
@@ -343,7 +344,7 @@ def test_api_result_fencing_tamper_matrix(queue, api_client):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     task = queue.lease_next_approved_task(worker_id="worker_1")
     lease_meta = task["provenance"]["lease_metadata"]
@@ -463,7 +464,7 @@ def test_api_lease_tenant_access_denial_compensating_tx(queue, api_client):
     queue.enqueue_task(
         task_id, {"project_id": "prj_alphabrain_dogfood", "base_commit": "a" * 40}, prov
     )
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     # Poll lease 5 times; all must return 403 and release lease without burning retries
     for _ in range(5):

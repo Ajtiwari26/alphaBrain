@@ -5,6 +5,7 @@ import time
 import pytest
 
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
+from testscript.planning_fixtures import approve_with_plan
 
 
 @pytest.fixture
@@ -60,7 +61,7 @@ def test_valid_40_char_sha_approval(queue):
     # enqueue successfully
     queue.enqueue_task("task3", envelope, prov)
     # verify it can be approved
-    assert queue.approve_task("task3") is True
+    assert approve_with_plan(queue, "task3") is True
 
 
 def test_content_hash_mismatch(queue):
@@ -87,7 +88,7 @@ def test_cumulative_repair_budget(queue):
     envelope = {"max_cumulative_retries": 2, "base_commit": valid_sha}
     prov = make_provenance(envelope)
     queue.enqueue_task("task5", envelope, prov)
-    queue.approve_task("task5")
+    approve_with_plan(queue, "task5")
 
     # Lease
     task = queue.lease_next_approved_task("worker1")
@@ -140,7 +141,7 @@ def test_parent_dag_senior_review_check(queue):
     valid_sha = "b" * 40
     env_parent = {"job": "parent", "base_commit": valid_sha}
     queue.enqueue_task("parent_t", env_parent, make_provenance(env_parent))
-    queue.approve_task("parent_t")
+    approve_with_plan(queue, "parent_t")
 
     env_child = {
         "job": "child",
@@ -148,7 +149,7 @@ def test_parent_dag_senior_review_check(queue):
         "dependencies": [{"task_id": "parent_t"}],
     }
     queue.enqueue_task("child_t", env_child, make_provenance(env_child))
-    queue.approve_task("child_t")
+    approve_with_plan(queue, "child_t")
 
     # Parent is not completed, child cannot lease
     parent_task = queue.lease_next_approved_task("worker1")

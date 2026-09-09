@@ -14,6 +14,7 @@ from alpha_core.triage_cli import cmd_approve, cmd_merge, cmd_retry
 from alpha_protocol.task import ReviewAttestation
 from alpha_worker.triage_dispatcher import TriageTaskDispatcher
 from alpha_worker.worktree import WorktreeManager
+from testscript.planning_fixtures import approve_with_plan, attach_test_plan
 
 
 def get_head_sha(repo_path):
@@ -120,6 +121,7 @@ def test_full_happy_path_lifecycle(e2e_setup, monkeypatch):
     queue.enqueue_task(task_id, envelope, make_task_provenance(task_id, envelope))
 
     args = argparse.Namespace(task_id=task_id, force=True, notes=None, json=False)
+    attach_test_plan(queue, task_id)
     assert cmd_approve(args, queue) == 0
 
     class DummyBridge:
@@ -221,7 +223,7 @@ def test_stale_fencing_rejection(e2e_setup):
         "allowed_paths": ["allowed.py"],
     }
     queue.enqueue_task(task_id, envelope, make_task_provenance(task_id, envelope))
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     task1 = queue.lease_next_approved_task()
     assert task1 is not None
@@ -317,8 +319,8 @@ def test_dag_dependency_block(e2e_setup):
         ),
     )
 
-    queue.approve_task(parent_id)
-    queue.approve_task(child_id)
+    approve_with_plan(queue, parent_id)
+    approve_with_plan(queue, child_id)
 
     t1 = queue.lease_next_approved_task()
     assert t1["id"] == parent_id

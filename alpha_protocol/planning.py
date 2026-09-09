@@ -7,11 +7,30 @@ Versioned schemas for the upfront Senior Planning Gate.
 import hashlib
 import hmac
 import json
+import math
+import os
 import time
 import uuid
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
+
+
+def request_digest(envelope: dict[str, Any]) -> str:
+    """Bind planning to the complete admitted request, not its mutable provenance."""
+    return hashlib.sha256(
+        json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+
+
+def planning_secret(key_id: str) -> str:
+    """Resolve a configured key; never accept a caller-supplied fallback key."""
+    secret = os.environ.get(f"ALPHA_SIGNING_SECRET_{key_id}")
+    if not secret and key_id == "alpha_production_v1":
+        secret = os.environ.get("ALPHA_SIGNING_SECRET")
+    if not secret:
+        raise ValueError("Configured planning signing key is unavailable")
+    return secret
 
 
 class SourceEvidence(BaseModel):
@@ -49,7 +68,7 @@ class PlanBlueprint(BaseModel):
     base_sha: str = Field(pattern=r"^[a-f0-9]{40}$")
     input_request_digest: str
     research_snapshot_digest: str
-    
+
     requirements: list[str]
     alternatives_considered: list[str]
     chosen_design: str
@@ -71,7 +90,9 @@ class PlanBlueprint(BaseModel):
 class PlanAssessment(BaseModel):
     """Assessment of a PlanBlueprint by a reviewer (Pro or Opus)."""
 
-    reviewer_principal: str = Field(description="e.g. gemini-3.1-pro-high, claude-opus-4-6-thinking")
+    reviewer_principal: str = Field(
+        description="e.g. gemini-3.1-pro-high, claude-opus-4-6-thinking"
+    )
     role: Literal["drafting", "critique"]
     plan_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
     verdict: Literal["APPROVE", "REPAIR_REQUIRED", "BLOCKED"]
@@ -89,7 +110,7 @@ class PlanningAttestation(BaseModel):
     base_sha: str = Field(pattern=r"^[a-f0-9]{40}$")
     blueprint_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
     policy_version: str = "v1"
-    
+
     pro_assessment: PlanAssessment
     opus_assessment: PlanAssessment
 
@@ -114,35 +135,19 @@ class PlanningAttestation(BaseModel):
         key_id: str,
         ttl_seconds: int = 86400 * 7,  # 7 days default expiry
     ) -> "PlanningAttestation":
-        if pro_assessment.plan_digest != blueprint_digest or opus_assessment.plan_digest != blueprint_digest:
+        if (
+            pro_assessment.plan_digest != blueprint_digest
+            or opus_assessment.plan_digest != blueprint_digest
+        ):
             raise ValueError("Assessments must match the blueprint digest")
-            
+
         if pro_assessment.verdict != "APPROVE" or opus_assessment.verdict != "APPROVE":
             raise ValueError("Planning Attestation requires unanimous APPROVE verdicts")
 
         now = time.time()
         nonce = uuid.uuid4().hex
-        
-        payload = {
-            "purpose": "planning",
-            "schema_version": "1.0",
-            "task_id": task_id,
-            "project_id": project_id,
-            "repository_identity": repository_identity,
-            "base_sha": base_sha,
-            "blueprint_digest": blueprint_digest,
-            "pro_verdict": pro_assessment.verdict,
-            "opus_verdict": opus_assessment.verdict,
-            "issued_at": now,
-            "expires_at": now + ttl_seconds,
-            "nonce": nonce,
-            "key_id": key_id,
-        }
-        
-        encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
-        signature = hmac.new(secret.encode("utf-8"), encoded, hashlib.sha256).hexdigest()
-        
-        return cls(
+
+        attestation = cls(
             task_id=task_id,
             project_id=project_id,
             repository_identity=repository_identity,
@@ -154,28 +159,68 @@ class PlanningAttestation(BaseModel):
             issued_at=now,
             expires_at=now + ttl_seconds,
             nonce=nonce,
-            signature=signature
+            signature="0" * 64,
+        )
+        if not secret or not attestation._valid_consensus():
+            raise ValueError(
+                "Planning requires a signing key and distinct approved reviewers with valid expiry"
+            )
+        attestation.signature = hmac.new(
+            secret.encode(), attestation._signed_bytes(), hashlib.sha256
+        ).hexdigest()
+        return attestation
+
+    def _signed_bytes(self) -> bytes:
+        # Bind every field, including reviewer identities, findings and policy.
+        return json.dumps(
+            self.model_dump(mode="json", exclude={"signature"}), sort_keys=True, allow_nan=False
+        ).encode()
+
+    def _valid_consensus(self) -> bool:
+        return (
+            math.isfinite(self.issued_at)
+            and math.isfinite(self.expires_at)
+            and self.issued_at <= time.time() < self.expires_at
+            and 0 < self.expires_at - self.issued_at <= 86400 * 7
+            and self.pro_assessment.role == "drafting"
+            and self.opus_assessment.role == "critique"
+            and bool(self.pro_assessment.reviewer_principal.strip())
+            and bool(self.opus_assessment.reviewer_principal.strip())
+            and self.pro_assessment.reviewer_principal != self.opus_assessment.reviewer_principal
+            and self.pro_assessment.verdict == self.opus_assessment.verdict == "APPROVE"
+            and self.pro_assessment.plan_digest
+            == self.opus_assessment.plan_digest
+            == self.blueprint_digest
         )
 
     def verify(self, secret: str) -> bool:
-        if time.time() > self.expires_at:
+        if not secret or not self._valid_consensus():
             return False
-            
-        payload = {
-            "purpose": self.purpose,
-            "schema_version": self.schema_version,
-            "task_id": self.task_id,
-            "project_id": self.project_id,
-            "repository_identity": self.repository_identity,
-            "base_sha": self.base_sha,
-            "blueprint_digest": self.blueprint_digest,
-            "pro_verdict": self.pro_assessment.verdict,
-            "opus_verdict": self.opus_assessment.verdict,
-            "issued_at": self.issued_at,
-            "expires_at": self.expires_at,
-            "nonce": self.nonce,
-            "key_id": self.key_id,
-        }
-        encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
-        expected = hmac.new(secret.encode("utf-8"), encoded, hashlib.sha256).hexdigest()
+        expected = hmac.new(secret.encode(), self._signed_bytes(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(self.signature, expected)
+
+
+def validate_task_plan(
+    task_id: str, envelope: dict[str, Any], attestation: dict[str, Any], blueprint: dict[str, Any]
+) -> None:
+    """Shared fail-closed boundary for attach, approval and each lease attempt."""
+    att = PlanningAttestation.model_validate(attestation)
+    bp = PlanBlueprint.model_validate(blueprint)
+    if not att.verify(planning_secret(att.key_id)):
+        raise ValueError("Invalid or expired PlanningAttestation signature/consensus")
+    if att.task_id != task_id or bp.task_id != task_id:
+        raise ValueError("Planning task identity mismatch")
+    if att.project_id != envelope.get(
+        "project_id", "default"
+    ) or att.repository_identity != envelope.get("repo", "local"):
+        raise ValueError("Planning project/repository identity mismatch")
+    if bp.base_sha != att.base_sha or (
+        "base_commit" in envelope and envelope["base_commit"] != att.base_sha
+    ):
+        raise ValueError("Stale plan: task base_commit does not match planning base_sha")
+    if bp.compute_digest() != att.blueprint_digest:
+        raise ValueError("Planning attestation digest does not match the blueprint")
+    if bp.input_request_digest != request_digest(envelope):
+        raise ValueError("Planning request digest mismatch; replan the changed request")
+    if bp.file_scope != envelope.get("allowed_paths", []):
+        raise ValueError("Planning file scope must match approved task scope")

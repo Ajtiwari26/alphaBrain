@@ -829,7 +829,6 @@ class AntigravityLiveBridge:
         """Run one headless AGY turn with structured stdout events."""
         args = [
             str(self.agy_bin),
-            "--dangerously-skip-permissions",
             "--output-format",
             "stream-json",
             "--print-timeout",
@@ -888,13 +887,6 @@ class AntigravityLiveBridge:
                     "list_dir(*)",
                     "view_file(*)",
                     "grep_search(*)",
-                    "invoke_subagent(*)",
-                    "manage_task(*)",
-                    "schedule(*)",
-                    "call_mcp_tool(*)",
-                    "mcp_*(*)",
-                    "read_resource(*)",
-                    "list_resources(*)",
                 ]
             }
         }
@@ -913,7 +905,6 @@ class AntigravityLiveBridge:
             stdout_path = Path(log_dir) / "stdout.ndjson"
             stderr_path = Path(log_dir) / "stderr.log"
             with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-                print("DEBUG AGY ARGS:", args, file=sys.stderr)
                 process = subprocess.Popen(
                     args,
                     cwd=str(worktree_path),

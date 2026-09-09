@@ -333,6 +333,7 @@ class SeniorReviewEngine:
         description = task.get("envelope", {}).get("detailed_instructions", "")
 
         from alpha_worker.code_review_graph import extract_code_review_graph
+
         graph_md = extract_code_review_graph(worktree_path, diff_content)
         graph_artifact_path = Path(worktree_path) / "code_review_graph.md"
         graph_artifact_path.write_text(graph_md, encoding="utf-8")

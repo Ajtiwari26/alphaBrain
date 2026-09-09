@@ -38,6 +38,7 @@ from alpha_core.safety.gate import SafetyGate
 from alpha_core.triage_cli import main as cli_main
 from alpha_worker.triage_dispatcher import PRProposal, TriageTaskDispatcher
 from alpha_worker.worktree import WorktreeManager
+from testscript.planning_fixtures import approve_with_plan, attach_test_plan
 
 
 def create_fixture_git_repo(repo_dir: Path) -> Path:
@@ -170,6 +171,7 @@ def test_full_end_to_end_autonomous_lifecycle(
     assert idle_poll is None
 
     # Step 3: Human-in-the-Loop Operator approves via CLI
+    attach_test_plan(isolated_queue, task_id)
     db_arg = str(isolated_queue.db_path)
     lock_arg = str(isolated_queue.emergency_lock_path)
     ret = cli_main(["--db-path", db_arg, "--emergency-lock", lock_arg, "approve", task_id])
@@ -247,7 +249,7 @@ def test_chaos_worker_sudden_crash_and_watchdog_reclamation(
     prov = make_test_provenance("chaos_crash_task", content_hash)
 
     isolated_queue.enqueue_task("chaos_crash_task", env, prov)
-    isolated_queue.approve_task("chaos_crash_task")
+    approve_with_plan(isolated_queue, "chaos_crash_task")
 
     # Worker leases task
     leased = isolated_queue.lease_next_approved_task()
@@ -303,7 +305,7 @@ def test_chaos_concurrent_multi_worker_lease_race(
         content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
         prov = make_test_provenance(tid, content_hash)
         isolated_queue.enqueue_task(tid, env, prov)
-        isolated_queue.approve_task(tid)
+        approve_with_plan(isolated_queue, tid)
 
     # 10 workers race to lease tasks concurrently
     def worker_poll() -> str | None:
@@ -345,7 +347,7 @@ def test_chaos_emergency_stop_interruption_and_resumption(
     env_a = {"task_id": "task_a", "objective": "Task A", "repo": str(fixture_repo)}
     prov_a = make_test_provenance("task_a", "hash_a")
     isolated_queue.enqueue_task("task_a", env_a, prov_a)
-    isolated_queue.approve_task("task_a")
+    approve_with_plan(isolated_queue, "task_a")
 
     # Worker leases task A (now EXECUTING)
     leased_a = isolated_queue.lease_next_approved_task()
@@ -356,7 +358,7 @@ def test_chaos_emergency_stop_interruption_and_resumption(
     env_b = {"task_id": "task_b", "objective": "Task B", "repo": str(fixture_repo)}
     prov_b = make_test_provenance("task_b", "hash_b")
     isolated_queue.enqueue_task("task_b", env_b, prov_b)
-    isolated_queue.approve_task("task_b")
+    approve_with_plan(isolated_queue, "task_b")
 
     # 2. ACTIVATE EMERGENCY STOP
     isolated_queue.emergency_stop("Security drill - containment trip")
@@ -367,7 +369,7 @@ def test_chaos_emergency_stop_interruption_and_resumption(
         isolated_queue.enqueue_task("task_c", {}, prov_a)
 
     with pytest.raises(EmergencyStopActiveError):
-        isolated_queue.approve_task("task_b")
+        approve_with_plan(isolated_queue, "task_b")
 
     with pytest.raises(EmergencyStopActiveError):
         isolated_queue.modify_task("task_b", title="New Title")
@@ -430,7 +432,7 @@ def test_chaos_cryptographic_tamper_detection(
     prov = make_test_provenance("tamper_task", content_hash)
 
     isolated_queue.enqueue_task("tamper_task", env, prov)
-    isolated_queue.approve_task("tamper_task")
+    approve_with_plan(isolated_queue, "tamper_task")
 
     # Direct database tampering: modify allowed_paths in SQL without updating content_hash
     tampered_env = dict(env)
@@ -442,15 +444,15 @@ def test_chaos_cryptographic_tamper_detection(
         )
         conn.commit()
 
-    # Worker attempts execution cycle
-    proposal = dispatcher.execute_next_cycle()
-    assert proposal is None
+    # Planning integrity now rejects tampering before a worker acquires a lease.
+    with pytest.raises(ValueError, match="Planning request digest mismatch"):
+        dispatcher.execute_next_cycle()
 
-    # Task must be permanently failed with security violation
+    # No execution lease or retry is granted for the corrupted request.
     task = isolated_queue.get_task("tamper_task")
     assert task is not None
-    assert task["status"] == TriageStatus.FAILED.value
-    assert "Security Violation: Content hash mismatch" in str(task["result_json"])
+    assert task["status"] == TriageStatus.APPROVED.value
+    assert "lease_metadata" not in task["provenance"]
     # Zero retries allowed on cryptographic violation
     assert task["retry_count"] == 0
 
@@ -488,7 +490,7 @@ def test_chaos_sandbox_escape_and_blast_radius_violations(
     prov = make_test_provenance("escape_task", content_hash)
 
     isolated_queue.enqueue_task("escape_task", env, prov)
-    isolated_queue.approve_task("escape_task")
+    approve_with_plan(isolated_queue, "escape_task")
 
     # Provision worktree
     wt_path = wt_mgr.create_or_resume_worktree(

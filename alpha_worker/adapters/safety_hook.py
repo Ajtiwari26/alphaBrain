@@ -32,7 +32,7 @@ def sandbox_profile(worktree: Path) -> str:
         return f"(subpath {json.dumps(str(path), ensure_ascii=False)})"
 
     # Read-only runtimes; no broad home, /var or /tmp grants.
-    runtime = ["/System", "/usr", "/bin", "/sbin", "/Library/Apple", "/opt/homebrew", "/etc", "/private/etc"]
+    runtime = ["/System", "/usr", "/bin", "/sbin", "/Library/Apple", "/opt/homebrew"]
     runtime.append(str(Path(sys.prefix).resolve()))
     return "\n".join(
         [
@@ -44,6 +44,8 @@ def sandbox_profile(worktree: Path) -> str:
             '(allow file-read-data (literal "/"))',
             f"(allow file-read-data {subpath(worktree)})",
             *(f"(allow file-read-data {subpath(path)})" for path in runtime),
+            # Python's mimetypes module checks this one public database.
+            '(allow file-read-data (literal "/etc/mime.types") (literal "/private/etc/mime.types"))',
             '(allow file-read-data (literal "/dev/null") (literal "/dev/urandom") (literal "/dev/random"))',
             f"(allow file-write* {subpath(worktree)})",
             '(allow file-write-data (literal "/dev/null"))',

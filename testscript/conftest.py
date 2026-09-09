@@ -18,6 +18,7 @@ os.environ["MEMORY_GRAPH_PATH"] = str(TEST_STATE_DIR / "memory_graph")
 os.environ["ALPHA_API_TOKEN"] = "test-api-token-with-at-least-32-characters"
 os.environ["ALPHA_WORKER_TOKEN"] = "test-worker-token-with-at-least-32-characters"
 os.environ["ALPHA_SIGNING_SECRET"] = "test-signing-secret-with-at-least-32-chars"
+os.environ["ALPHA_SIGNING_SECRET_alpha_production_v1"] = os.environ["ALPHA_SIGNING_SECRET"]
 os.environ["PLIVO_AUTH_TOKEN"] = "test-plivo-auth-token"
 os.environ["LIVEKIT_API_KEY"] = "test-livekit-key"
 os.environ["LIVEKIT_API_SECRET"] = "test-livekit-secret-with-at-least-32-chars"

@@ -13,7 +13,6 @@ import logging
 import socket
 import time
 from pathlib import Path
-from typing import Any, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -25,11 +24,13 @@ logger = logging.getLogger("alphabrain.planning.research_broker")
 
 class SSRFViolationError(Exception):
     """Raised when a research request attempts to access an unsafe or internal network."""
+
     pass
 
 
 class StaleGraphError(Exception):
     """Raised when the code review graph does not match the target base commit."""
+
     pass
 
 
@@ -83,10 +84,10 @@ class ResearchBroker:
             # Bound redirects by using Session with max_redirects (requests default is 30)
             session = requests.Session()
             session.max_redirects = 5
-            
+
             response = session.get(url, timeout=self.timeout_seconds)
             response.raise_for_status()
-            
+
             # Post-redirect SSRF check
             if not self._is_safe_url(response.url):
                 raise SSRFViolationError("Redirected to an unsafe or internal URL.")
@@ -100,7 +101,7 @@ class ResearchBroker:
                 publisher=urlparse(response.url).hostname or "unknown",
                 retrieval_time=time.time(),
                 content_digest=content_digest,
-                excerpts=[content[:2000]]  # Provide bounded excerpt
+                excerpts=[content[:2000]],  # Provide bounded excerpt
             )
 
             cache_path.write_text(json.dumps(evidence.model_dump()))
@@ -119,16 +120,19 @@ class ResearchBroker:
         # For SP2, we shell out to git to verify the commit exists in the repo
         try:
             import subprocess
+
             res = subprocess.run(
-                ["git", "rev-parse", "HEAD"], 
-                cwd=str(repo_path), 
-                capture_output=True, 
-                text=True, 
-                check=True
+                ["git", "rev-parse", "HEAD"],
+                cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                check=True,
             )
             head_commit = res.stdout.strip()
             if head_commit != expected_commit:
-                logger.warning("Graph stale: Repo HEAD %s != expected %s", head_commit, expected_commit)
+                logger.warning(
+                    "Graph stale: Repo HEAD %s != expected %s", head_commit, expected_commit
+                )
                 return False
             return True
         except Exception:

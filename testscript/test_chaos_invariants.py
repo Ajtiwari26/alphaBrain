@@ -16,6 +16,7 @@ from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue
 from alpha_core.safety.gate import SafetyGate
 from alpha_core.security import redact_secrets
 from alpha_protocol import TaskEnvelope
+from testscript.planning_fixtures import approve_with_plan
 
 
 def test_blast_radius_enforcement():
@@ -153,7 +154,7 @@ def test_lease_epoch_fencing():
         )
 
         queue.enqueue_task("lease_task", env, prov)
-        queue.approve_task("lease_task")
+        approve_with_plan(queue, "lease_task")
 
         leased = queue.lease_next_approved_task()
         assert leased is not None

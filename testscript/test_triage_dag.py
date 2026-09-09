@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue
+from testscript.planning_fixtures import approve_with_plan
 
 
 def make_dummy_envelope(task_id: str, depends_on: list[str] | None = None):
@@ -78,8 +79,8 @@ def test_dag_leasing_blocked(queue: TaskTriageQueue):
         make_dummy_provenance("task_1", depends_on=["task_2"]),
     )
     queue.enqueue_task("task_2", make_dummy_envelope("task_2"), make_dummy_provenance("task_2"))
-    queue.approve_task("task_1")
-    queue.approve_task("task_2")
+    approve_with_plan(queue, "task_1")
+    approve_with_plan(queue, "task_2")
     task = queue.lease_next_approved_task()
     assert task is not None
     assert task["id"] == "task_2"

@@ -695,7 +695,9 @@ class TriageTaskDispatcher:
                 plan_md = blueprint.get("plan_markdown")
                 if plan_md:
                     old_inst = env_dict.get("detailed_instructions") or ""
-                    env_dict["detailed_instructions"] = f"## 📋 SENIOR ENGINEERING PLAN\n\n{plan_md}\n\n---\n{old_inst}"
+                    env_dict["detailed_instructions"] = (
+                        f"## 📋 SENIOR ENGINEERING PLAN\n\n{plan_md}\n\n---\n{old_inst}"
+                    )
             except Exception:
                 pass
 

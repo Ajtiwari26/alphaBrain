@@ -1,6 +1,7 @@
 import time
 
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
+from testscript.planning_fixtures import approve_with_plan
 
 
 def test_telemetry_recording(tmp_path):
@@ -33,7 +34,7 @@ def test_telemetry_recording(tmp_path):
     time.sleep(0.01)
 
     # Approve task
-    queue.approve_task(task_id)
+    approve_with_plan(queue, task_id)
 
     # 2. Lease task (should record task_leased)
     leased = queue.lease_next_approved_task(worker_id="worker_99")
@@ -72,9 +73,10 @@ def test_telemetry_recording(tmp_path):
         task_id=task_id_2,
         envelope={"foo": "baz"},
         provenance=provenance_2,
-        initial_status=TriageStatus.APPROVED,
+        initial_status=TriageStatus.PENDING_REVIEW,
     )
 
+    assert approve_with_plan(queue, task_id_2)
     leased_2 = queue.lease_next_approved_task(worker_id="worker_100")
     assert leased_2 is not None
 

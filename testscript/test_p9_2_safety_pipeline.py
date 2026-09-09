@@ -22,6 +22,7 @@ from alpha_core.eva.queue_producer import EvaQueueProducer
 from alpha_core.eva.spec_extractor import ExtractedSpecification
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
 from alpha_core.safety.gate import SafetyGate
+from testscript.planning_fixtures import attach_test_plan
 
 
 @pytest.fixture
@@ -144,6 +145,7 @@ def test_safety_gate_avoids_substring_false_positives(
         meeting_id="m1",
         transcript_excerpt="Legitimate work on environment and evaluate tools",
     )
+    attach_test_plan(temp_queue, t)
     v = safety_gate.review_task(t, temp_queue)
     assert v.passed is True, f"Legitimate files were falsely rejected: {v.reason}"
     assert temp_queue.get_task(t)["status"] == TriageStatus.APPROVED.value
@@ -269,6 +271,7 @@ def test_safety_gate_permits_safe_quoted_and_argument_commands(
             meeting_id="room_1",
             transcript_excerpt=f"Run safe command {cmd}",
         )
+        attach_test_plan(temp_queue, task_id)
         verdict = safety_gate.review_task(task_id, temp_queue)
         assert verdict.passed is True, (
             f"Safe command '{cmd}' was falsely rejected: {verdict.reason}"
@@ -325,6 +328,7 @@ def test_safety_gate_approves_clean_task(
         transcript_excerpt="Ajay: Let's create the user profile endpoint.",
     )
 
+    attach_test_plan(temp_queue, task_id)
     verdict = safety_gate.review_task(task_id, temp_queue)
     assert verdict.passed is True
     assert verdict.verdict == "PASS"
@@ -361,6 +365,7 @@ def test_sweep_and_review_pending_batch(
         transcript_excerpt="delete all files",
     )
 
+    attach_test_plan(temp_queue, t1)
     results = safety_gate.sweep_and_review_pending(temp_queue, max_batch_size=10)
     assert len(results) == 3
 

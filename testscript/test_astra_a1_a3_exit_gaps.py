@@ -8,6 +8,7 @@ from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue
 from alpha_core.security import AuthPrincipal
 from alpha_worker.senior_review_engine import SeniorReviewEngine
 from alpha_worker.triage_dispatcher import TriageTaskDispatcher
+from testscript.planning_fixtures import approve_with_plan
 
 
 def mock_auth():
@@ -49,7 +50,7 @@ def test_api_result_ownership_proof(isolated_queue: TaskTriageQueue):
             content_hash="c0fd89b027ee6da2820eb7f6a2da074f9716b143e90d9058c08ee7c5e761cbb8",
         ),
     )
-    isolated_queue.approve_task("sec_task")
+    approve_with_plan(isolated_queue, "sec_task")
     leased = isolated_queue.lease_next_approved_task()
 
     # Try with wrong attempt_id
@@ -109,7 +110,7 @@ def test_merge_rejects_missing_result_sha(isolated_queue: TaskTriageQueue):
             content_hash="5738110c53adb65ebf764ca89521d35781019c9d5d24c54f09433c635cf48531",
         ),
     )
-    isolated_queue.approve_task("tsk_merge")
+    approve_with_plan(isolated_queue, "tsk_merge")
     isolated_queue.lease_next_approved_task()
     isolated_queue.complete_task("tsk_merge", {"gates_passed": True}, branch_name="test_branch")
 

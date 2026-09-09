@@ -15,6 +15,7 @@ from alpha_core.config import settings
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue
 from alpha_worker.adapters.antigravity_live import AGYAttemptStatus, AntigravityDispatch
 from alpha_worker.triage_dispatcher import TriageTaskDispatcher
+from testscript.planning_fixtures import approve_with_plan
 
 
 def create_test_git_repo(path: Path) -> Path:
@@ -93,7 +94,7 @@ def test_triage_dispatcher_invokes_agy_live_bridge(
     )
 
     queue.enqueue_task("task_agy_1", env, prov)
-    queue.approve_task("task_agy_1")
+    approve_with_plan(queue, "task_agy_1")
 
     proposal = dispatcher.execute_next_cycle()
 
@@ -175,7 +176,7 @@ def test_triage_dispatcher_eva_hash_fallback(
             (eva_hash, "task_eva_hash_1"),
         )
         conn.commit()
-    queue.approve_task("task_eva_hash_1")
+    approve_with_plan(queue, "task_eva_hash_1")
 
     # Manually stage file in worktree for this test (since agent execution is False)
     branch_name = "alpha/task_eva_hash_1"

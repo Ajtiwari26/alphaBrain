@@ -386,11 +386,19 @@ class SafetyGate:
         verdict = self.evaluate_envelope(envelope)
 
         if verdict.passed:
-            queue.approve_task(
-                task_id=task_id,
-                safety_verdict=verdict.verdict,
-                safety_reason=verdict.reason,
-            )
+            try:
+                queue.approve_task(
+                    task_id=task_id,
+                    safety_verdict=verdict.verdict,
+                    safety_reason=verdict.reason,
+                )
+            except ValueError:
+                return SafetyVerdict(
+                    passed=False,
+                    verdict="ESCALATE",
+                    reason="Valid senior planning evidence required before approval",
+                    violations=["PLANNING_REQUIRED"],
+                )
         else:
             queue.reject_task(
                 task_id=task_id,

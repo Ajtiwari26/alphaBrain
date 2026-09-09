@@ -8,6 +8,7 @@ import pytest
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
 from alpha_core.triage_cli import cmd_retry
 from alpha_worker.triage_dispatcher import TriageTaskDispatcher
+from testscript.planning_fixtures import approve_with_plan
 
 
 @pytest.fixture
@@ -44,7 +45,7 @@ def test_retry_task_resets_count_and_transitions_failed_to_approved(temp_queue: 
     )
     task_id = "task_failing"
     temp_queue.enqueue_task(task_id, envelope, provenance)
-    temp_queue.approve_task(task_id)
+    approve_with_plan(temp_queue, task_id)
 
     # First attempt: lease and fail
     leased = temp_queue.lease_next_approved_task()
@@ -113,7 +114,7 @@ def test_retry_non_failed_task_rejected(temp_queue: TaskTriageQueue):
     # Task is in PENDING_REVIEW, not FAILED
     assert temp_queue.retry_task(task_id) is False
 
-    temp_queue.approve_task(task_id)
+    approve_with_plan(temp_queue, task_id)
     # Task is in APPROVED, not FAILED
     assert temp_queue.retry_task(task_id) is False
 
@@ -125,7 +126,7 @@ def test_cli_retry_command(temp_queue: TaskTriageQueue, capsys):
     )
     task_id = "task_cli"
     temp_queue.enqueue_task(task_id, envelope, provenance)
-    temp_queue.approve_task(task_id)
+    approve_with_plan(temp_queue, task_id)
     temp_queue.lease_next_approved_task()
     temp_queue.fail_task(task_id, error_details="Permanent failure", allow_retry=False)
 

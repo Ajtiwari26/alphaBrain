@@ -1139,9 +1139,10 @@ class TaskEngine:
             if candidate.planning_attestation_json and candidate.plan_blueprint_json:
                 try:
                     from alpha_protocol.planning import PlanBlueprint
+
                     blueprint_dict = ensure_dict(candidate.plan_blueprint_json)
                     attestation_dict = ensure_dict(candidate.planning_attestation_json)
-                    
+
                     bp = PlanBlueprint(**blueprint_dict)
                     if attestation_dict.get("blueprint_digest") != bp.compute_digest():
                         raise ValueError("Blueprint digest mismatch")
@@ -1154,9 +1155,7 @@ class TaskEngine:
                             project_id=candidate.project_id,
                             task_id=candidate.id,
                             actor="system",
-                            details_json={
-                                "reason": f"Planning attestation invalid: {e}"
-                            },
+                            details_json={"reason": f"Planning attestation invalid: {e}"},
                         )
                     )
                     await session.flush()

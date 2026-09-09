@@ -98,4 +98,6 @@ def test_policy_denies_network_and_has_no_shared_temp_write_grants(tmp_path):
     assert "(deny network*)" in profile
     assert '(allow file-write* (subpath "/tmp"))' not in profile
     assert '(allow file-write* (subpath "/var"))' not in profile
+    assert '(subpath "/etc")' not in profile
+    assert '(subpath "/private/etc")' not in profile
     assert Path("/usr/bin/sandbox-exec").is_absolute()

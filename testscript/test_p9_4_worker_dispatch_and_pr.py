@@ -16,6 +16,7 @@ Authoritative Reference:
 docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md (Section 6.5 & Section 6.6)
 """
 
+import hashlib
 import json
 import subprocess
 import time
@@ -33,10 +34,9 @@ from alpha_core.queue.triage_queue import (
 )
 from alpha_core.security import AuthPrincipal, PrincipalRole, require_api_principal
 from alpha_core.triage_cli import main as cli_main
-from alpha_protocol import PlanningAttestation, PlanAssessment
-import hashlib
 from alpha_worker.triage_dispatcher import PRProposal, TriageTaskDispatcher
 from alpha_worker.worktree import WorktreeManager
+from testscript.planning_fixtures import approve_with_plan
 
 
 def create_fixture_git_repo(repo_dir: Path) -> Path:
@@ -71,48 +71,6 @@ def fixture_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(settings, "ALLOWED_REPO_ROOTS", [tmp_path])
     monkeypatch.setattr(settings, "WORKTREE_BASE_DIR", tmp_path / "worktrees")
     return repo
-
-
-
-def attach_fake_plan(queue, task_id, base_sha):
-    bp_dict = {
-        "task_id": task_id,
-        "base_sha": base_sha,
-        "plan_markdown": "Test plan",
-        "modified_files": [],
-        "created_at": 0.0
-    }
-    bp_json = json.dumps(bp_dict)
-    bp_digest = hashlib.sha256(bp_json.encode("utf-8")).hexdigest()
-
-    att = PlanningAttestation(
-        task_id=task_id,
-        project_id="default",
-        repository_identity="local",
-        base_sha=base_sha,
-        blueprint_digest=bp_digest,
-        pro_assessment=PlanAssessment(
-            reviewer_principal="pro",
-            role="drafting",
-            plan_digest=bp_digest,
-            verdict="APPROVE",
-            findings="ok"
-        ),
-        opus_assessment=PlanAssessment(
-            reviewer_principal="opus",
-            role="critique",
-            plan_digest=bp_digest,
-            verdict="APPROVE",
-            findings="ok"
-        ),
-        key_id="test",
-        issued_at=0.0,
-        expires_at=0.0,
-        signature="a" * 64
-    )
-    
-    att_dict = json.loads(att.model_dump_json())
-    queue.attach_plan(task_id, att_dict, bp_dict)
 
 
 def make_test_provenance(task_id: str, content_hash: str) -> TaskProvenance:
@@ -186,8 +144,7 @@ def test_emergency_stop_halts_worker_leasing(
     }
     prov = make_test_provenance("task_appr_1", "hash_appr_1")
     isolated_queue.enqueue_task("task_appr_1", env, prov)
-    attach_fake_plan(isolated_queue, "task_appr_1", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_appr_1")
+    approve_with_plan(isolated_queue, "task_appr_1")
 
     # Activate emergency stop
     isolated_queue.emergency_stop("Security incident underway")
@@ -230,8 +187,7 @@ def test_content_hash_mismatch_fails_closed(
     with pytest.raises(ValueError, match="Content hash mismatch"):
         isolated_queue.enqueue_task("task_tampered_1", env, prov)
     return  # The rest of the test is obsolete since it is blocked at the queue level
-    attach_fake_plan(isolated_queue, "task_tampered_1", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_tampered_1")
+    approve_with_plan(isolated_queue, "task_tampered_1")
 
     # Dispatcher runs cycle
     proposal = dispatcher.execute_next_cycle()
@@ -273,14 +229,12 @@ def test_end_to_end_worker_dispatch_and_pr_generation(
     }
     # Deterministic content hash
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
-    import hashlib
 
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_valid_e2e", content_hash)
 
     isolated_queue.enqueue_task("task_valid_e2e", env, prov)
-    attach_fake_plan(isolated_queue, "task_valid_e2e", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_valid_e2e")
+    approve_with_plan(isolated_queue, "task_valid_e2e")
 
     # Simulate agent writing the file inside worktree prior to commit
     # We can pre-create or let execute_task create worktree
@@ -340,15 +294,13 @@ def test_worker_disallowed_path_fails_closed(
             ]
         },
     }
-    import hashlib
 
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_disallowed_paths", content_hash)
 
     isolated_queue.enqueue_task("task_disallowed_paths", env, prov)
-    attach_fake_plan(isolated_queue, "task_disallowed_paths", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_disallowed_paths")
+    approve_with_plan(isolated_queue, "task_disallowed_paths")
 
     # Pre-create worktree and write to disallowed file outside allowed_paths
     wt_path = wt_mgr.create_or_resume_worktree(
@@ -396,15 +348,13 @@ def test_worker_acceptance_gate_failure(
             ]
         },
     }
-    import hashlib
 
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_gate_fail", content_hash)
 
     isolated_queue.enqueue_task("task_gate_fail", env, prov)
-    attach_fake_plan(isolated_queue, "task_gate_fail", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_gate_fail")
+    approve_with_plan(isolated_queue, "task_gate_fail")
 
     proposal = dispatcher.execute_next_cycle()
     assert proposal is None
@@ -456,13 +406,11 @@ def test_api_worker_endpoints_and_rbac(
         "project_id": "proj_1",
     }
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
-    import hashlib
 
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("api_worker_task_1", content_hash)
     isolated_queue.enqueue_task("api_worker_task_1", env, prov)
-    attach_fake_plan(isolated_queue, "api_worker_task_1", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("api_worker_task_1")
+    approve_with_plan(isolated_queue, "api_worker_task_1")
 
     # 5. Worker leases task
     res = client.post("/api/triage/tasks/lease")
@@ -534,14 +482,12 @@ def test_cli_worker_cycle_command(
             ]
         },
     }
-    import hashlib
 
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("cli_worker_task_1", content_hash)
     isolated_queue.enqueue_task("cli_worker_task_1", env, prov)
-    attach_fake_plan(isolated_queue, "cli_worker_task_1", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("cli_worker_task_1")
+    approve_with_plan(isolated_queue, "cli_worker_task_1")
 
     # 3. Simulate worktree modification prior to worker-cycle
     wt_mgr = WorktreeManager()
@@ -579,15 +525,13 @@ def test_empty_allowed_paths_strictly_blocks_any_file_modification(
         .strip(),
         "allowed_paths": [],  # STRICTLY NO FILES ALLOWED
     }
-    import hashlib
 
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_empty_allowed", content_hash)
 
     isolated_queue.enqueue_task("task_empty_allowed", env, prov)
-    attach_fake_plan(isolated_queue, "task_empty_allowed", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_empty_allowed")
+    approve_with_plan(isolated_queue, "task_empty_allowed")
 
     # Modify a file in worktree
     wt_path = wt_mgr.create_or_resume_worktree(
@@ -616,8 +560,7 @@ def test_in_flight_task_completion_and_failure_survive_emergency_stop(
     env = {"task_id": "task_in_flight", "objective": "In flight task"}
     prov = make_test_provenance("task_in_flight", "hash_in_flight")
     isolated_queue.enqueue_task("task_in_flight", env, prov)
-    attach_fake_plan(isolated_queue, "task_in_flight", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_in_flight")
+    approve_with_plan(isolated_queue, "task_in_flight")
 
     # Worker leases task (moves to EXECUTING)
     leased = isolated_queue.lease_next_approved_task()
@@ -650,8 +593,7 @@ def test_reap_stale_executing_tasks_recovers_orphaned_tasks(
     env = {"task_id": "task_orphaned", "objective": "Orphaned worker task"}
     prov = make_test_provenance("task_orphaned", "hash_orphaned")
     isolated_queue.enqueue_task("task_orphaned", env, prov)
-    attach_fake_plan(isolated_queue, "task_orphaned", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_orphaned")
+    approve_with_plan(isolated_queue, "task_orphaned")
 
     leased = isolated_queue.lease_next_approved_task()
     assert leased is not None
@@ -695,15 +637,13 @@ def test_zero_diff_worktree_fails_closed(
             ]
         },
     }
-    import hashlib
 
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_zero_diff", content_hash)
 
     isolated_queue.enqueue_task("task_zero_diff", env, prov)
-    attach_fake_plan(isolated_queue, "task_zero_diff", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_zero_diff")
+    approve_with_plan(isolated_queue, "task_zero_diff")
 
     # Do not modify any files in the worktree
     proposal = dispatcher.execute_next_cycle()
@@ -737,15 +677,13 @@ def test_failure_evidence_injected_on_retry(
             ]
         },
     }
-    import hashlib
 
     env_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
     content_hash = hashlib.sha256(env_json.encode("utf-8")).hexdigest()
     prov = make_test_provenance("task_retry_loop", content_hash)
 
     isolated_queue.enqueue_task("task_retry_loop", env, prov)
-    attach_fake_plan(isolated_queue, "task_retry_loop", env.get("base_commit", "a" * 40))
-    isolated_queue.approve_task("task_retry_loop")
+    approve_with_plan(isolated_queue, "task_retry_loop")
 
     # Cycle 1: Modifies file but gate fails (exit 1)
     wt_path = wt_mgr.create_or_resume_worktree(

@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
+from testscript.planning_fixtures import approve_with_plan
 
 
 def test_real_portal_javascript_filters_task_events():
@@ -21,7 +22,8 @@ def test_real_portal_javascript_filters_task_events():
 def completed_queue(tmp_path):
     queue = TaskTriageQueue(tmp_path / "queue.db", tmp_path / "stop")
     provenance = TaskProvenance("meeting", "speaker", 0, "test", "test", 1, "session", 0, "")
-    queue.enqueue_task("task", {"project_id": "project"}, provenance, TriageStatus.APPROVED)
+    queue.enqueue_task("task", {"project_id": "project"}, provenance, TriageStatus.PENDING_REVIEW)
+    assert approve_with_plan(queue, "task")
     leased = queue.lease_next_approved_task("worker")
     assert leased is not None
     meta = leased["provenance"]["lease_metadata"]

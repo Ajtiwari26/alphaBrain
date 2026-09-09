@@ -137,6 +137,9 @@ def test_cli_review_and_approve(
         transcript_excerpt="Run pytest",
     )
 
+    from testscript.planning_fixtures import attach_test_plan
+
+    attach_test_plan(temp_queue, task_id)
     # Run review from CLI
     ret = cli_main(["--db-path", db, "--emergency-lock", lock, "review", task_id])
     assert ret == 0
@@ -358,6 +361,10 @@ async def test_api_triage_crud_and_lifecycle(temp_queue: TaskTriageQueue) -> Non
         assert mod["status"] == "ok"
         assert mod["safety_passed"] is True
 
+        # Changed request requires a fresh signed test plan before approval.
+        from testscript.planning_fixtures import attach_test_plan
+
+        attach_test_plan(temp_queue, task_id)
         # 5. Approve task via API
         res = await ac.post(
             f"/api/triage/tasks/{task_id}/approve",

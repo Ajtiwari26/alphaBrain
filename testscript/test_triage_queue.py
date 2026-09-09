@@ -20,6 +20,7 @@ from alpha_core.queue.triage_queue import (
     TaskTriageQueue,
     TriageStatus,
 )
+from testscript.planning_fixtures import approve_with_plan
 
 
 @pytest.fixture
@@ -95,7 +96,9 @@ def test_approval_and_atomic_lease(temp_queue: TaskTriageQueue) -> None:
     temp_queue.enqueue_task(task_id, envelope, prov)
 
     # Approve task
-    ok = temp_queue.approve_task(task_id, safety_verdict="PASS", safety_reason="Passed 5 Laws")
+    ok = approve_with_plan(
+        temp_queue, task_id, safety_verdict="PASS", safety_reason="Passed 5 Laws"
+    )
     assert ok is True
 
     # Check status
@@ -137,7 +140,7 @@ def test_retry_and_circuit_breaker(temp_queue: TaskTriageQueue) -> None:
     prov = create_sample_provenance(envelope, seed="flaky")
 
     temp_queue.enqueue_task(task_id, envelope, prov)
-    temp_queue.approve_task(task_id)
+    approve_with_plan(temp_queue, task_id)
 
     # First execution attempt
     leased = temp_queue.lease_next_approved_task()
@@ -185,7 +188,7 @@ def test_completion_lifecycle(temp_queue: TaskTriageQueue) -> None:
     prov = create_sample_provenance(envelope, seed="success")
 
     temp_queue.enqueue_task(task_id, envelope, prov)
-    temp_queue.approve_task(task_id)
+    approve_with_plan(temp_queue, task_id)
     temp_queue.lease_next_approved_task()
 
     result_payload = {"pr_url": "https://github.com/org/repo/pull/1", "gates_passed": True}
