@@ -16,6 +16,10 @@ def main() -> None:
     tool_name = tool_call.get("name", "")
     args = tool_call.get("args", {})
     
+    wait_ms = args.get("WaitMsBeforeAsync")
+    if isinstance(wait_ms, str) and wait_ms.isdigit():
+        args["WaitMsBeforeAsync"] = int(wait_ms)
+    
     worktree_path = os.environ.get("ALPHA_WORKTREE_PATH")
     if not worktree_path:
         print(json.dumps({"decision": "deny", "reason": "Missing ALPHA_WORKTREE_PATH environment variable."}))
@@ -39,7 +43,7 @@ def main() -> None:
             cwd = cwd.strip('"\'')
             if not str(Path(cwd).resolve()).startswith(str(wt_path)):
                 print(json.dumps({"decision": "deny", "reason": f"Security Exception: Command CWD '{cwd}' is outside the assigned worktree '{wt_path}'"}))
-            sys.exit(0)
+                sys.exit(0)
             
     # If no checks failed, we programmatically allow the execution
     print(json.dumps({"decision": "allow", "reason": "Worktree containment verified by programmatic hook."}))
