@@ -69,3 +69,5 @@ testscript/delete_task.py
 testscript/reset_task_fix.py
 test*.html
 .alphabrain/
+.agents/
+.agents/

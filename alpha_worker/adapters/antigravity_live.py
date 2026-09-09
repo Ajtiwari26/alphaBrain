@@ -337,6 +337,25 @@ def evaluate_agy_execution_outcome(
             valid_markers.append((i, marker, msg))
 
     if valid_markers:
+        unique_markers = {m for _, m, _ in valid_markers}
+        if len(unique_markers) > 1:
+            error_msg = f"Contradictory markers found: both {COMPLETION_TOKEN} and {BLOCKED_TOKEN} emitted"
+            return AntigravityAttemptOutcome(
+                conversation_id=parsed_conversation_id,
+                model=model,
+                pid=pid,
+                exit_code=exit_code,
+                status=AGYAttemptStatus.FAILED,
+                changed_files=changed_files,
+                diff_summary=diff_summary,
+                artifacts=artifacts,
+                blockers=(error_msg,),
+                tool_names=tools_tuple,
+                final_message=response,
+                transcript_path=transcript_path,
+                blocked_reason=error_msg,
+            )
+
         marker_idx, marker, msg = valid_markers[-1]
         if marker_idx == len(lines) - 1:
             final_marker = marker
@@ -844,13 +863,32 @@ class AntigravityLiveBridge:
             }
         }
         hooks_file.write_text(json.dumps(hooks_config))
+
+        settings_file = hooks_dir / "settings.json"
+        settings_config = {
+            "permissions": {
+                "allow": [
+                    "run_command(*)",
+                    "write_to_file(*)",
+                    "replace_file_content(*)",
+                    "multi_replace_file_content(*)",
+                    "delete_file(*)",
+                    "list_dir(*)",
+                    "view_file(*)",
+                    "grep_search(*)",
+                    "invoke_subagent(*)",
+                    "manage_task(*)",
+                    "schedule(*)"
+                ]
+            }
+        }
+        settings_file.write_text(json.dumps(settings_config))
+
         if is_new_project:
             args.insert(1, "--new-project")
         else:
             assert conversation_id is not None
             args[1:1] = ["--conversation", conversation_id]
-
-        args.append("--dangerously-skip-permissions")
         # Do not use asyncio subprocess pipes here. AGY may spawn descendants
         # which inherit pipe descriptors; then communicate()/wait() can hang
         # after AGY itself has exited. File-backed logs plus poll() give this

@@ -42,6 +42,7 @@ def main() -> None:
     worktree_path = os.environ.get("ALPHA_WORKTREE_PATH")
     if not worktree_path:
         respond({"decision": "deny", "reason": "Missing ALPHA_WORKTREE_PATH environment variable."})
+        sys.exit(0)
 
     wt_path = Path(worktree_path).resolve()
 
@@ -50,11 +51,19 @@ def main() -> None:
         path = args.get("TargetFile") or args.get("AbsolutePath")
         if path:
             path = path.strip("\"'")
-            if not str(Path(path).resolve()).startswith(str(wt_path)):
+            resolved_path = Path(path).resolve()
+            if not resolved_path.is_relative_to(wt_path):
                 respond(
                     {
                         "decision": "deny",
                         "reason": f"Security Exception: File write path '{path}' is outside the assigned worktree '{wt_path}'",
+                    }
+                )
+            if resolved_path.is_relative_to(wt_path / ".agents"):
+                respond(
+                    {
+                        "decision": "deny",
+                        "reason": f"Security Exception: Modifying the hook configuration file '{path}' is strictly prohibited",
                     }
                 )
 
@@ -63,7 +72,8 @@ def main() -> None:
         cwd = args.get("Cwd")
         if cwd:
             cwd = cwd.strip("\"'")
-            if not str(Path(cwd).resolve()).startswith(str(wt_path)):
+            resolved_cwd = Path(cwd).resolve()
+            if not resolved_cwd.is_relative_to(wt_path):
                 respond(
                     {
                         "decision": "deny",

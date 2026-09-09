@@ -384,11 +384,8 @@ Title: {title}
 
 CANDIDATE WORKTREE (where the patched files live): {worktree_path}
 CRITICAL CONTEXT: This is a PRE-MERGE review. The changes shown in the diff below exist ONLY in
-the candidate worktree at the path above. The main branch and the base repository workspace do NOT
-contain these changes yet — merging into main happens exclusively AFTER your approval. When you
-need to inspect or read source files, you MUST read them from the candidate worktree path above,
-not from the base repository. If you read files from the base repo, you will see the OLD pre-patch
-code and incorrectly conclude the diff was not applied.
+the candidate worktree. The main branch does NOT contain these changes yet.
+Please evaluate the provided Git Diff. Do not attempt to use tools to read the source files, as tool execution is restricted in this review environment. Rely entirely on the diff provided below.
 
 Git Diff:
 ```diff

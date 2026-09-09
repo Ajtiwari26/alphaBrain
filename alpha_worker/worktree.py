@@ -95,6 +95,7 @@ class WorktreeManager:
         for changed_file in changed_files:
             changed_path = PurePath(changed_file)
             if changed_path.parts and changed_path.parts[0] == ".agents":
+                violations.append(changed_file)
                 continue
             if changed_path.is_absolute() or ".." in changed_path.parts:
                 violations.append(changed_file)
