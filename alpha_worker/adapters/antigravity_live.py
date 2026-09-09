@@ -836,7 +836,7 @@ class AntigravityLiveBridge:
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": f"ALPHA_WORKTREE_PATH={str(worktree_path)} {sys.executable} {str(hook_script)}",
+                                "command": f"ALPHA_WORKTREE_PATH='{str(worktree_path)}' '{sys.executable}' '{str(hook_script)}'",
                                 "timeout": 5
                             }
                         ]
