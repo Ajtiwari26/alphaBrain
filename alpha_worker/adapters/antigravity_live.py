@@ -1106,6 +1106,7 @@ Emit a single-line JSON manifest before termination exactly matching this format
 8. TERMINAL PROTOCOL:
 - SUCCESS: ONLY after every gate passes (exit code 0), emit exactly {COMPLETION_TOKEN} on its own line. If resuming an existing conversation where gates have already passed, you MUST still emit {QA_EVIDENCE_TOKEN}<json> and {COMPLETION_TOKEN} on their own lines in this response.
 - FAILURE: On blocked or failing gate, emit exactly {BLOCKED_TOKEN}: <exact reason>. NEVER emit {COMPLETION_TOKEN}.
+- If you receive a stray background task completion message AFTER you have already emitted {COMPLETION_TOKEN}, you MUST respond and re-emit {COMPLETION_TOKEN} on its own line so it remains the final output of the conversation.
 
 9. EXPLICIT ANTI-PATTERNS (Will cause immediate contract termination):
 - No claiming tests pass without actual captured command output.
@@ -1183,6 +1184,7 @@ Before success emit one {QA_EVIDENCE_TOKEN} JSON line matching SDLC schema plus:
                 "defects_fixed": <integer>, "browser_evidence": ["relative/path"]}}
 Only then end exactly {COMPLETION_TOKEN}. If genuine blocker remains, end
 {BLOCKED_TOKEN}: <specific reason>.
+If you receive a stray background task completion message AFTER emitting {COMPLETION_TOKEN}, you MUST respond and re-emit {COMPLETION_TOKEN} on its own line.
 """
 
     def _build_compliance_repair_prompt(
