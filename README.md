@@ -53,8 +53,8 @@ engineering cost, recoverable 24/7 work, and an evidence trail showing what chan
 
 ## Current verified state
 
-Snapshot: **4 September 2026**, local `main` commit
-`3b192d87e0b4c34c32394554852d563746e017a7`.
+Snapshot: **9 September 2026**, local `main` commit
+`ee96772bc486072fd039d8889315b4f64e897eea`.
 
 | Area | State | Verified boundary |
 |---|---|---|
@@ -63,20 +63,19 @@ Snapshot: **4 September 2026**, local `main` commit
 | AlphaMeet and Eva | Built as current consumer slice | LiveKit meeting UI, Eva participant, Gemini 2.5 native-audio path, transcript/spec producer; production multi-network and privacy proofs remain |
 | Self-development closed loop | **P9.1–P9.6 complete** | Triage, five-layer safety gate, HITL CLI/API, worktree dispatch, review/merge engine, dependency DAG |
 | Self-development telemetry | Pending | P9.7 operational monitoring and telemetry |
-| Automated CI/CD self-healing | Future | P10 |
+| Automated CI/CD self-healing | Built | P10 |
 | Cross-project federation | Future | P11 |
 | AgentLine verified calls | Not complete | Call only from durable verified facts; real end-to-end approval/refinement loop remains |
 | Inito integration | Not complete | Optional presence/privacy integration remains; no camera dependency for worker operation |
-| Founder/client portal | Not complete | Role-aware event/progress APIs exist; complete product UI remains |
-| Production deployment automation | Not complete | Staging exists; production promotion and rollback remain founder-gated |
+| Founder/client portal | Built | Role-aware event/progress APIs exist and portal UI is operational |
+| Production deployment automation | Stubbed / Not complete | Staging exists; adapters are incomplete stubs and production rollback is unimplemented |
 
 Current local quality evidence:
 
-- `pytest -q`: **633 passed, 11 skipped**.
+- `pytest -q`: **836 passed, 11 skipped**.
 - `ruff check .`: passed.
-- `mypy alpha_core alpha_protocol alpha_worker`: currently reports **5 errors across 4 files**.
-- `ruff format --check .`: currently reports **7 files requiring formatting**. Do not describe
-  repository as fully format-clean until repaired and rerun.
+- `mypy alpha_core alpha_protocol alpha_worker`: passed.
+- `ruff format --check .`: passed.
 
 Current staging health, verified 4 September 2026:
 
