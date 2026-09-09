@@ -65,7 +65,7 @@ JSON SCHEMA:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gemini-3.8-flash-high",
+        model: str = "gemini-3.1-pro-high",
     ) -> None:
         self.api_key = api_key or settings.GEMINI_API_KEY
         self.model = model

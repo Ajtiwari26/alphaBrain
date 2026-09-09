@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -339,7 +340,9 @@ def evaluate_agy_execution_outcome(
     if valid_markers:
         unique_markers = {m for _, m, _ in valid_markers}
         if len(unique_markers) > 1:
-            error_msg = f"Contradictory markers found: both {COMPLETION_TOKEN} and {BLOCKED_TOKEN} emitted"
+            error_msg = (
+                f"Contradictory markers found: both {COMPLETION_TOKEN} and {BLOCKED_TOKEN} emitted"
+            )
             return AntigravityAttemptOutcome(
                 conversation_id=parsed_conversation_id,
                 model=model,
@@ -854,7 +857,14 @@ class AntigravityLiveBridge:
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": f"ALPHA_WORKTREE_PATH='{worktree_path!s}' '{sys.executable}' '{hook_script!s}'",
+                                "command": shlex.join(
+                                    [
+                                        "/usr/bin/env",
+                                        f"ALPHA_WORKTREE_PATH={worktree_path!s}",
+                                        sys.executable,
+                                        str(hook_script),
+                                    ]
+                                ),
                                 "timeout": 5,
                             }
                         ],
@@ -878,7 +888,7 @@ class AntigravityLiveBridge:
                     "grep_search(*)",
                     "invoke_subagent(*)",
                     "manage_task(*)",
-                    "schedule(*)"
+                    "schedule(*)",
                 ]
             }
         }
