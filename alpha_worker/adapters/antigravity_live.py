@@ -879,6 +879,7 @@ class AntigravityLiveBridge:
             "permissions": {
                 "allow": [
                     "run_command(*)",
+                    "command(*)",
                     "write_to_file(*)",
                     "replace_file_content(*)",
                     "multi_replace_file_content(*)",
@@ -889,6 +890,10 @@ class AntigravityLiveBridge:
                     "invoke_subagent(*)",
                     "manage_task(*)",
                     "schedule(*)",
+                    "call_mcp_tool(*)",
+                    "mcp_*(*)",
+                    "read_resource(*)",
+                    "list_resources(*)",
                 ]
             }
         }
