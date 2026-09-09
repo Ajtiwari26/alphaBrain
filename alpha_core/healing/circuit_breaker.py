@@ -150,6 +150,7 @@ class CircuitBreaker:
         # Note: fcntl is a POSIX-only module (Linux/macOS).
         # We use a single global lock file to prevent filesystem inode bloat.
         import fcntl
+
         lock_file = str(queue.db_path) + ".cb.lock"
         with open(lock_file, "w") as f:
             fcntl.flock(f, fcntl.LOCK_EX)

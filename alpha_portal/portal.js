@@ -30,9 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'review': 2,
             'senior_review': 2,
             'completed': 3,
-            'done': 3,
-            'failed': 3,
-            'error': 3
+            'done': 3
         };
         const normalized = (state || '').toLowerCase();
         let currentIndex = Object.prototype.hasOwnProperty.call(stateMap, normalized) ? stateMap[normalized] : 0;
@@ -48,32 +46,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (circle) circle.classList.remove('active');
                 if (line) line.classList.remove('active');
             }
-            // Clear any previous failure styling
-            if (circle) {
-                circle.classList.remove('failed');
-                circle.style.backgroundColor = '';
-                circle.style.borderColor = '';
-            }
-        }
-        
-        if (normalized === 'failed' || normalized === 'error') {
-            const finalCircle = document.getElementById('step-4');
-            if (finalCircle) {
-                finalCircle.classList.add('failed');
-                finalCircle.style.backgroundColor = 'rgba(220, 38, 38, 0.8)';
-                finalCircle.style.borderColor = 'rgba(153, 27, 27, 0.8)';
-            }
-            const statusText = document.getElementById('step-4-text');
-            if (statusText) {
-                statusText.textContent = 'Failed';
-                statusText.style.color = 'rgba(248, 113, 113, 1)';
-            }
-        } else if (normalized === 'completed' || normalized === 'done') {
-            const statusText = document.getElementById('step-4-text');
-            if (statusText) {
-                statusText.textContent = 'Completed';
-                statusText.style.color = '';
-            }
         }
     }
 
@@ -83,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const traceRes = await fetch(`/api/portal/tasks/${taskId}/trace`, { headers });
             if (traceRes.ok) {
                 const traceData = await traceRes.json();
-                const state = traceData.task_state || traceData.provenance?.state || 'in_progress';
+                const state = traceData.provenance?.state || 'in_progress';
                 updateMilestones(state);
                 logEvent(`Loaded trace for ${taskId}, state: ${state}`);
             } else {
@@ -133,8 +105,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 logEvent(`Task update received: ${e.data}`);
                 try {
                     const data = JSON.parse(e.data);
-                    if (data.status || data.state) {
-                        updateMilestones(data.status || data.state);
+                    if (data.state) {
+                        updateMilestones(data.state);
                     }
                 } catch (err) {}
             });

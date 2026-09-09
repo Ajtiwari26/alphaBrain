@@ -15,19 +15,22 @@ def patch_daemon_processed_tasks(monkeypatch):
     monkeypatch.setattr(CIHealingDaemon, "_test_processed_tasks", set(), raising=False)
 
     original_init = CIHealingDaemon.__init__
+
     def new_init(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
         self._test_processed_tasks = set()
+
     monkeypatch.setattr(CIHealingDaemon, "__init__", new_init)
 
     def mock_is_processed(self, task_id):
         return task_id in self._test_processed_tasks
+
     monkeypatch.setattr(CIHealingDaemon, "is_task_processed", mock_is_processed)
 
     def mock_mark_processed(self, task_id):
         self._test_processed_tasks.add(task_id)
-    monkeypatch.setattr(CIHealingDaemon, "mark_task_processed", mock_mark_processed)
 
+    monkeypatch.setattr(CIHealingDaemon, "mark_task_processed", mock_mark_processed)
 
 
 @pytest.fixture
@@ -40,6 +43,7 @@ def mock_queue(tmp_path):
 
     def mock_get(root_id):
         return queue._cb_store.get(root_id, None)
+
     def mock_save(root_id, cb_dict):
         queue._cb_store[root_id] = cb_dict
 
@@ -153,13 +157,14 @@ def test_daemon_handles_failed_task(mock_queue, tmp_path):
         )
 
 
-
 def test_daemon_circuit_breaker_trips(mock_queue, tmp_path):
     mock_queue.list_tasks.side_effect = [[], [{"id": "task_3", "worktree_path": str(tmp_path)}]]
 
     daemon = CIHealingDaemon(mock_queue)
 
-    with patch("alpha_worker.ci_healing_daemon.CircuitBreaker.execute_transactionally") as mock_exec:
+    with patch(
+        "alpha_worker.ci_healing_daemon.CircuitBreaker.execute_transactionally"
+    ) as mock_exec:
         cb_mock = MagicMock()
         cb_mock.attempts = 5
         mock_exec.return_value = (TripReason.ESCALATED_HUMAN_REVIEW, cb_mock)
@@ -173,16 +178,24 @@ def test_daemon_circuit_breaker_trips(mock_queue, tmp_path):
         )
 
 
-
 def test_daemon_circuit_breaker_shared_lineage(mock_queue, tmp_path):
-    mock_queue.list_tasks.side_effect = [[], [{"id": "task_4_repair_1", "worktree_path": str(tmp_path)}]]
+    mock_queue.list_tasks.side_effect = [
+        [],
+        [{"id": "task_4_repair_1", "worktree_path": str(tmp_path)}],
+    ]
     daemon = CIHealingDaemon(mock_queue)
-    with patch("alpha_worker.ci_healing_daemon.CircuitBreaker.execute_transactionally") as mock_exec:
+    with patch(
+        "alpha_worker.ci_healing_daemon.CircuitBreaker.execute_transactionally"
+    ) as mock_exec:
         cb_mock = MagicMock()
         cb_mock.attempts = 1
         mock_exec.return_value = (TripReason.NONE, cb_mock)
-        with patch.object(daemon.failure_analyzer, "analyze") as mock_analyze, \
-             patch("alpha_worker.ci_healing_daemon.RepairEnvelopeSynthesizer.synthesize") as mock_synth:
+        with (
+            patch.object(daemon.failure_analyzer, "analyze") as mock_analyze,
+            patch(
+                "alpha_worker.ci_healing_daemon.RepairEnvelopeSynthesizer.synthesize"
+            ) as mock_synth,
+        ):
             mock_analyze.return_value = {"signature": "sig1", "pytest_failures": []}
             mock_synth.return_value = {"allowed_paths": [], "actionable_prompt": "do it"}
             daemon.run_once()
@@ -203,7 +216,9 @@ def test_no_worktree_silent_abort(mock_queue):
     daemon = CIHealingDaemon(mock_queue)
     daemon.run_once()
     mock_queue.enqueue_task.assert_not_called()
-    mock_queue.reject_task.assert_called_once_with("task_no_worktree", reason="No valid worktree found")
+    mock_queue.reject_task.assert_called_once_with(
+        "task_no_worktree", reason="No valid worktree found"
+    )
 
 
 def test_senior_review_non_zero_exit(mock_queue):
@@ -302,5 +317,6 @@ def test_synthesizer_return_contract_validation(mock_queue, tmp_path):
             mock_synth.return_value = {"bad_key": "val"}  # Invalid return
             daemon.run_once()
             mock_queue.enqueue_task.assert_not_called()
-            mock_queue.reject_task.assert_called_once_with("task_2", reason="Synthesizer returned invalid envelope shape")
-
+            mock_queue.reject_task.assert_called_once_with(
+                "task_2", reason="Synthesizer returned invalid envelope shape"
+            )

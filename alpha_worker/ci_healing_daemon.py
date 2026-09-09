@@ -26,7 +26,10 @@ class CIHealingDaemon:
 
     def _init_db(self) -> None:
         def _create(conn):
-            conn.execute("CREATE TABLE IF NOT EXISTS daemon_processed_tasks (task_id TEXT PRIMARY KEY, processed_at REAL NOT NULL);")
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS daemon_processed_tasks (task_id TEXT PRIMARY KEY, processed_at REAL NOT NULL);"
+            )
+
         try:
             self.queue._execute_write_with_retry(_create, allow_during_emergency=True)
         except Exception as e:
@@ -34,23 +37,29 @@ class CIHealingDaemon:
 
     def is_task_processed(self, task_id: str) -> bool:
         from contextlib import closing
+
         try:
             with closing(self.queue._get_connection()) as conn:
-                cursor = conn.execute("SELECT 1 FROM daemon_processed_tasks WHERE task_id = ?;", (task_id,))
+                cursor = conn.execute(
+                    "SELECT 1 FROM daemon_processed_tasks WHERE task_id = ?;", (task_id,)
+                )
                 return cursor.fetchone() is not None
         except Exception:
             return False
 
     def mark_task_processed(self, task_id: str) -> None:
         import time
+
         def _insert(conn):
-            conn.execute("INSERT OR IGNORE INTO daemon_processed_tasks (task_id, processed_at) VALUES (?, ?);", (task_id, time.time()))
+            conn.execute(
+                "INSERT OR IGNORE INTO daemon_processed_tasks (task_id, processed_at) VALUES (?, ?);",
+                (task_id, time.time()),
+            )
+
         try:
             self.queue._execute_write_with_retry(_insert, allow_during_emergency=True)
         except Exception as e:
             logger.warning(f"Failed to mark task processed {task_id}: {e}")
-
-
 
     def process_completed_task(self, task: dict[str, Any]) -> None:
         task_id = task["id"]
@@ -101,7 +110,9 @@ class CIHealingDaemon:
             if merge_result.returncode == 0:
                 logger.info(f"Successfully auto-merged {task_id}")
                 root_id = task_id.split("_repair_")[0]
-                CircuitBreaker.execute_transactionally(self.queue, root_id, lambda cb: cb.record_success())
+                CircuitBreaker.execute_transactionally(
+                    self.queue, root_id, lambda cb: cb.record_success()
+                )
                 self.mark_task_processed(task_id)
             else:
                 logger.error(f"Auto-merge failed for {task_id}: {merge_result.stderr}")
@@ -141,7 +152,9 @@ class CIHealingDaemon:
         logger.info(f"Analyzed failure for {task_id}. Signature: {signature}")
 
         root_id = task_id.split("_repair_")[0]
-        trip_reason, cb = CircuitBreaker.execute_transactionally(self.queue, root_id, lambda _cb: _cb.record_failure(signature))
+        trip_reason, cb = CircuitBreaker.execute_transactionally(
+            self.queue, root_id, lambda _cb: _cb.record_failure(signature)
+        )
 
         if trip_reason == TripReason.ESCALATED_HUMAN_REVIEW:
             logger.warning(f"Circuit breaker tripped for {task_id}. Escalating to human review.")
