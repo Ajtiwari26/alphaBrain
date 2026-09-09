@@ -337,6 +337,11 @@ class SeniorReviewEngine:
 Title: {title}
 Description: {description}
 
+CANDIDATE WORKTREE (where the patched files live): {worktree_path}
+IMPORTANT: This is a PRE-MERGE review. The diff below has been applied ONLY in the candidate
+worktree above. The main branch does NOT contain these changes yet — merging happens only AFTER
+your approval. When inspecting files, read them from the candidate worktree, not the base repository.
+
 Git Diff:
 ```diff
 {diff_content}
@@ -376,6 +381,14 @@ Review Instructions:
 You are conducting an independent Round 2 Senior Engineering Review for task {task_id}.
 Title: {title}
 
+CANDIDATE WORKTREE (where the patched files live): {worktree_path}
+CRITICAL CONTEXT: This is a PRE-MERGE review. The changes shown in the diff below exist ONLY in
+the candidate worktree at the path above. The main branch and the base repository workspace do NOT
+contain these changes yet — merging into main happens exclusively AFTER your approval. When you
+need to inspect or read source files, you MUST read them from the candidate worktree path above,
+not from the base repository. If you read files from the base repo, you will see the OLD pre-patch
+code and incorrectly conclude the diff was not applied.
+
 Git Diff:
 ```diff
 {diff_content}
@@ -383,7 +396,7 @@ Git Diff:
 
 Instructions:
 1. Verify overall system design and AlphaBrain Invariant compliance.
-2. You may inspect the candidate worktree and verify runtime correctness as needed.
+2. Inspect source files in the candidate worktree at {worktree_path} to verify runtime correctness.
 3. Render your authoritative final ruling explicitly by outputting a strict JSON verdict.
 """
         opus_res = self._invoke_agy(
