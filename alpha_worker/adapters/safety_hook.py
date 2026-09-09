@@ -32,7 +32,7 @@ def sandbox_profile(worktree: Path) -> str:
         return f"(subpath {json.dumps(str(path), ensure_ascii=False)})"
 
     # Read-only runtimes; no broad home, /var or /tmp grants.
-    runtime = ["/System", "/usr", "/bin", "/sbin", "/Library/Apple", "/opt/homebrew"]
+    runtime = ["/System", "/usr", "/bin", "/sbin", "/Library/Apple", "/opt/homebrew", "/etc", "/private/etc"]
     runtime.append(str(Path(sys.prefix).resolve()))
     return "\n".join(
         [
