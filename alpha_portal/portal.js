@@ -15,7 +15,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         logBox.scrollTop = logBox.scrollHeight;
     }
 
-    const accessToken = localStorage.getItem('access_token') || 'test-token';
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+        statusBadge.textContent = 'Sign in required';
+        return;
+    }
     const headers = { 'Authorization': `Bearer ${accessToken}` };
 
     // Function to update milestone UI
@@ -55,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const traceRes = await fetch(`/api/portal/tasks/${taskId}/trace`, { headers });
             if (traceRes.ok) {
                 const traceData = await traceRes.json();
-                const state = traceData.provenance?.state || 'in_progress';
+                const state = traceData.task_state || 'received';
                 updateMilestones(state);
                 logEvent(`Loaded trace for ${taskId}, state: ${state}`);
             } else {
@@ -105,8 +109,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 logEvent(`Task update received: ${e.data}`);
                 try {
                     const data = JSON.parse(e.data);
-                    if (data.state) {
-                        updateMilestones(data.state);
+                    if (data.task_id === taskId && data.project_id === projectId && data.state) {
+                        // Legacy approval events must never imply successful promotion.
+                        const state = data.state === 'completed' && data.event_type !== 'task_promoted'
+                            ? 'review' : data.state;
+                        updateMilestones(state);
                     }
                 } catch (err) {}
             });

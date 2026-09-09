@@ -153,31 +153,16 @@ def test_merge_successful_with_senior_review_approved(
     mock_run.side_effect = mock_run_side_effect
 
     args = MagicMock(task_id="task_success", json=False, skip_senior_review=False)
-    ret = cmd_merge(args, queue)
+    with patch("alpha_core.triage_cli.advance_checkout") as advance:
+        ret = cmd_merge(args, queue)
+        advance.assert_called_once_with(
+            str(tmp_path), "b" * 40, "abc1234567890abcdef1234567890abcdef12345"
+        )
     assert ret == 0
 
-    # Verify execution sequence: checkout main -> ff merge -> prune worktree -> delete branch
-    mock_run.assert_any_call(
-        ["git", "checkout", "main"],
-        cwd=str(tmp_path),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    mock_run.assert_any_call(
-        [
-            "git",
-            "update-ref",
-            "-m",
-            "Atomic promotion",
-            "refs/heads/main",
-            "abc1234567890abcdef1234567890abcdef12345",
-            "b" * 40,
-        ],
-        cwd=str(tmp_path),
-        capture_output=True,
-        text=True,
-    )
+    # Git checkout correctness is covered by real-repository helper tests.
+    assert not any(call.args[0][:2] == ["git", "update-ref"] for call in mock_run.call_args_list)
+    queue.record_task_promotion.assert_called_once()
 
 
 @patch("alpha_core.triage_cli.subprocess.run")

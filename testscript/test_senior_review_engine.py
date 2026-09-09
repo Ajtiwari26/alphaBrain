@@ -61,7 +61,11 @@ def test_invoke_agy_command_flags(tmp_path):
         cmd = call_args[0]
 
         # Verify critical flags
-        assert "--dangerously-skip-permissions" in cmd
+        assert "--dangerously-skip-permissions" not in cmd
+        assert "--sandbox" in cmd
+        # AGY disables plan mode when slash command expansion is disabled.
+        assert "--disable-slash-commands" not in cmd
+        assert cmd[cmd.index("--mode") + 1] == "plan"
         assert "--input-format" in cmd
         assert "text" in cmd
         assert call_kwargs.get("input") == "Test prompt"

@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 from typing import cast
 
+from alpha_core.promotion_checkout import advance_checkout
 from alpha_core.queue.triage_queue import (
     DEFAULT_DB_PATH,
     DEFAULT_EMERGENCY_LOCK,
@@ -900,6 +901,12 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                 return 1
 
             if state_data.get("state") == "FINALIZED":
+                try:
+                    advance_checkout(repo_path, expected_base_commit, result_sha)
+                    queue.record_task_promotion(args.task_id, result_sha)
+                except Exception as e:
+                    print(f"Error: Finalized promotion cannot be verified: {e}", file=sys.stderr)
+                    return 1
                 if getattr(args, "json", False):
                     print(json.dumps({"task_id": args.task_id, "status": "merged"}))
                 else:
@@ -927,59 +934,10 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
                 if state_data.get("state") == "APPLIED":
                     try:
-                        status_res = subprocess.run(
-                            ["git", "status", "--porcelain"],
-                            cwd=repo_path,
-                            capture_output=True,
-                            text=True,
-                            check=True,
-                        )
-                        clean_lines = []
-                        for line in status_res.stdout.splitlines():
-                            if len(line) < 3 or line[2] != " ":
-                                continue
-                            path = line[3:]
-                            if path == ".alphabrain" or path.startswith(".alphabrain/"):
-                                continue
-                            clean_lines.append(line)
-
-                        if clean_lines:
-                            print(
-                                "Error: Working tree is not clean. Aborting recovery.",
-                                file=sys.stderr,
-                            )
-                            return 1
-
-                        current_main = subprocess.run(
-                            ["git", "rev-parse", "main"],
-                            cwd=repo_path,
-                            check=True,
-                            capture_output=True,
-                            text=True,
-                        ).stdout.strip()
-
-                        if current_main != result_sha:
-                            if current_main != expected_base_commit:
-                                print(
-                                    f"Error: main has advanced unexpectedly or diverged from {expected_base_commit}. Aborting recovery.",
-                                    file=sys.stderr,
-                                )
-                                return 1
-
-                        subprocess.run(
-                            ["git", "checkout", "main"],
-                            cwd=repo_path,
-                            check=True,
-                            capture_output=True,
-                        )
-                        subprocess.run(
-                            ["git", "merge", "--ff-only", result_sha],
-                            cwd=repo_path,
-                            check=True,
-                            capture_output=True,
-                        )
-                    except subprocess.CalledProcessError as e:
-                        print(f"Error: Recovery failed.\n{e.stderr}", file=sys.stderr)
+                        advance_checkout(repo_path, expected_base_commit, result_sha)
+                        queue.record_task_promotion(args.task_id, result_sha)
+                    except Exception as e:
+                        print(f"Error: Recovery refused: {e}", file=sys.stderr)
                         return 1
 
                     state_data["state"] = "FINALIZED"
@@ -1059,71 +1017,14 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
             print(f"Error: Git ancestry check failed.\n{e.stderr}", file=sys.stderr)
             return 1
 
-        # 5. CAS Destination Base Check and Update
+        # Advance branch and checkout together before recording success.
         try:
-            status_res = subprocess.run(
-                ["git", "status", "--porcelain"],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            clean_lines = []
-            for line in status_res.stdout.splitlines():
-                if len(line) < 3 or line[2] != " ":
-                    continue
-                path = line[3:]
-                if path == ".alphabrain" or path.startswith(".alphabrain/"):
-                    continue
-                clean_lines.append(line)
-
-            if clean_lines:
-                print("Error: Working tree is not clean. Aborting promotion.", file=sys.stderr)
-                return 1
-
-            # Atomic compare and swap of refs/heads/main
-            update_res = subprocess.run(
-                [
-                    "git",
-                    "update-ref",
-                    "-m",
-                    "Atomic promotion",
-                    "refs/heads/main",
-                    result_sha,
-                    expected_base_commit,
-                ],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-            )
-            if update_res.returncode != 0:
-                print(
-                    f"Error: Destination base has advanced or update failed. {update_res.stderr}",
-                    file=sys.stderr,
-                )
-                return 1
-
-            # Transition to APPLIED state
+            advance_checkout(repo_path, expected_base_commit, result_sha)
             state_data["state"] = "APPLIED"
             _atomic_write_json(nonce_state_file, state_data)
-
-            # Checkout main and reset to ensure index/working tree are in sync with the new HEAD
-            subprocess.run(
-                ["git", "checkout", "main"],
-                cwd=repo_path,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                ["git", "merge", "--ff-only", result_sha],
-                cwd=repo_path,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"Error: Git operations failed.\n{e.stderr}", file=sys.stderr)
+            queue.record_task_promotion(args.task_id, result_sha)
+        except Exception as e:
+            print(f"Error: Promotion refused: {e}", file=sys.stderr)
             return 1
 
         # 6. Finalize state

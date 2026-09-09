@@ -453,8 +453,9 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att()
-            with patch("fcntl.flock"):
+            with patch("fcntl.flock"), patch("alpha_core.triage_cli.advance_checkout") as advance:
                 assert cmd_merge(args, q) == 0, "Valid attestation must pass"
+                advance.assert_called_once()
 
 
 def make_standalone_task_and_att(
@@ -1396,10 +1397,14 @@ def test_authoritative_lease_provenance_boundaries_in_review_merge_and_dispatche
     q_valid_merge = MagicMock()
     q_valid_merge.get_task.return_value = valid_merge_task
 
-    with patch("subprocess.run") as mock_sub_run:
+    with (
+        patch("subprocess.run") as mock_sub_run,
+        patch("alpha_core.triage_cli.advance_checkout") as advance,
+    ):
         mock_sub_run.side_effect = fake_git_for_tests
         code = cmd_merge(args, q_valid_merge)
         assert code == 0
+        advance.assert_called_once()
 
     # 3. DISPATCHER PATH BOUNDARIES (execute_task)
     invalid_dispatcher_cases = [

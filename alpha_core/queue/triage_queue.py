@@ -935,7 +935,8 @@ class TaskTriageQueue:
                     if env_row:
                         env = json.loads(env_row["envelope_json"])
                         project_id = env.get("project_id", "default")
-                        event_state = "completed" if approved else "review"
+                        # Review approval is not a successful Git promotion.
+                        event_state = "review"
                         event_name = (
                             "senior_review_approved"
                             if approved
@@ -1557,6 +1558,51 @@ class TaskTriageQueue:
             if row:
                 return cast(dict[str, Any], json.loads(row["state_json"]))
             return None
+
+    def record_task_promotion(self, task_id: str, result_sha: str) -> None:
+        """Atomically publish verified promotion once, including replay recovery."""
+        now = time.time()
+
+        def _write(conn: sqlite3.Connection) -> None:
+            row = conn.execute(
+                "SELECT envelope_json, result_json, status FROM task_triage_queue WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if not row or row["status"] != TriageStatus.COMPLETED.value:
+                raise ValueError("Promotion requires a completed execution")
+            envelope = json.loads(row["envelope_json"])
+            result = json.loads(row["result_json"] or "{}")
+            expected = (
+                result.get("result_sha") or result.get("head_commit") or result.get("result_commit")
+            )
+            if not envelope.get("project_id") or expected != result_sha:
+                raise ValueError("Promotion project or result binding is invalid")
+            previous = result.get("promotion", {}).get("result_sha")
+            if previous:
+                if previous != result_sha:
+                    raise ValueError("Conflicting promotion result")
+                return
+            result["promotion"] = {"result_sha": result_sha, "promoted_at": now}
+            conn.execute(
+                "UPDATE task_triage_queue SET result_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(result), now, task_id),
+            )
+            conn.execute(
+                "INSERT INTO project_task_events "
+                "(project_id, task_id, state, status, event_type, payload_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    envelope["project_id"],
+                    task_id,
+                    "completed",
+                    "promoted",
+                    "task_promoted",
+                    json.dumps({"result_sha": result_sha}),
+                    now,
+                ),
+            )
+
+        self._execute_write_with_retry(_write)
 
     def record_project_event(
         self,

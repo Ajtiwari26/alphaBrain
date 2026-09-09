@@ -187,13 +187,13 @@ def test_crash_recovery_from_applied(base_task):
     def crash_after_applied(filepath, data):
         original_write(filepath, data)
         if data.get("state") == "APPLIED":
-            raise RuntimeError("CRASH!")
+            raise SystemExit("CRASH!")
 
     with patch.dict(
         os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
     ):
         with patch("alpha_core.triage_cli._atomic_write_json", side_effect=crash_after_applied):
-            with pytest.raises(RuntimeError, match="CRASH!"):
+            with pytest.raises(SystemExit, match="CRASH!"):
                 cmd_merge(args, queue)
 
     # Verify we are in APPLIED state and main HAS advanced (because update-ref happened before write APPLIED)
@@ -202,8 +202,15 @@ def test_crash_recovery_from_applied(base_task):
         assert state["state"] == "APPLIED"
     assert run_git(repo_path, "rev-parse", "main") == base_task["result"]["result_sha"]
 
-    # We mess up the working tree to ensure recovery fixes it
+    # Recovery must not switch an unrelated/detached checkout silently.
     run_git(repo_path, "checkout", base_task["envelope"]["base_commit"])
+
+    with patch.dict(
+        os.environ, {"ALPHA_SIGNING_SECRET_alpha_test_key": "test_promotion_signing_secret_123"}
+    ):
+        assert cmd_merge(args, queue) == 1
+    assert run_git(repo_path, "rev-parse", "HEAD") == base_task["envelope"]["base_commit"]
+    run_git(repo_path, "checkout", "main")
 
     # 2. Recover
     with patch.dict(

@@ -200,14 +200,13 @@ def test_full_happy_path_lifecycle(e2e_setup, monkeypatch):
 
         mock_run.side_effect = side_effect
 
-        assert cmd_merge(args, queue) == 0
-
-        # Verify git update-ref was called
-        merge_called = False
-        for call in mock_run.call_args_list:
-            if call[0][0][:3] == ["git", "update-ref", "-m"]:
-                merge_called = True
-        assert merge_called, "Exact result_sha should be updated"
+        with patch("alpha_core.triage_cli.advance_checkout") as advance:
+            assert cmd_merge(args, queue) == 0
+            advance.assert_called_once_with(str(repo_path), base_commit, result_sha)
+        assert not any(
+            call.args[0][:2] == ["git", "update-ref"] for call in mock_run.call_args_list
+        )
+        assert queue.get_task(task_id)["result"]["promotion"]["result_sha"] == result_sha
 
 
 def test_stale_fencing_rejection(e2e_setup):
