@@ -1135,6 +1135,33 @@ class TaskEngine:
                     await session.flush()
                     continue
 
+            # SP4: Planning enforcement
+            if candidate.planning_attestation_json and candidate.plan_blueprint_json:
+                try:
+                    from alpha_protocol.planning import PlanBlueprint
+                    blueprint_dict = ensure_dict(candidate.plan_blueprint_json)
+                    attestation_dict = ensure_dict(candidate.planning_attestation_json)
+                    
+                    bp = PlanBlueprint(**blueprint_dict)
+                    if attestation_dict.get("blueprint_digest") != bp.compute_digest():
+                        raise ValueError("Blueprint digest mismatch")
+                except Exception as e:
+                    TaskEngine._transition(candidate, TaskStatus.BLOCKED)
+                    session.add(
+                        AuditEventRecord(
+                            id=f"evt_{uuid.uuid4().hex[:12]}",
+                            event_type="task_blocked_planning_mismatch",
+                            project_id=candidate.project_id,
+                            task_id=candidate.id,
+                            actor="system",
+                            details_json={
+                                "reason": f"Planning attestation invalid: {e}"
+                            },
+                        )
+                    )
+                    await session.flush()
+                    continue
+
             lease_token = f"lease_{uuid.uuid4().hex}"
             TaskEngine._transition(candidate, TaskStatus.LEASED)
             candidate.lease_token = lease_token

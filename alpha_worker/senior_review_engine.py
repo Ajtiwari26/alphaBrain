@@ -332,6 +332,11 @@ class SeniorReviewEngine:
         title = task.get("envelope", {}).get("title", "Autonomous Task")
         description = task.get("envelope", {}).get("detailed_instructions", "")
 
+        from alpha_worker.code_review_graph import extract_code_review_graph
+        graph_md = extract_code_review_graph(worktree_path, diff_content)
+        graph_artifact_path = Path(worktree_path) / "code_review_graph.md"
+        graph_artifact_path.write_text(graph_md, encoding="utf-8")
+
         # --- Round 1 Step 1: Gemini 3.1 Pro High ---
         logger.info("Executing Senior Review Round 1 (Gemini 3.1 Pro High) for %s...", task_id)
         pro_prompt = f"""You are Gemini 3.1 Pro High (gemini-3.1-pro-high), conducting Round 1 Senior Engineering Code Review for task {task_id}.
@@ -347,6 +352,9 @@ Git Diff:
 ```diff
 {diff_content}
 ```
+
+Code Review Graph (Dependency Impacts):
+{graph_md}
 
 Review Instructions:
 1. Verify correct implementation of the objective.
@@ -391,6 +399,9 @@ Git Diff:
 ```diff
 {diff_content}
 ```
+
+Code Review Graph (Dependency Impacts):
+{graph_md}
 
 Instructions:
 1. Verify overall system design and AlphaBrain Invariant compliance.

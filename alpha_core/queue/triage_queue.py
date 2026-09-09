@@ -178,6 +178,15 @@ class TaskTriageQueue:
                 )
             except sqlite3.OperationalError:
                 pass
+            try:
+                conn.execute("ALTER TABLE task_triage_queue ADD COLUMN planning_attestation_json TEXT;")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE task_triage_queue ADD COLUMN plan_blueprint_json TEXT;")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS circuit_breaker_state ("
                 "root_id TEXT PRIMARY KEY, "
@@ -396,12 +405,18 @@ class TaskTriageQueue:
 
         def _approve(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
-                "SELECT envelope_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                "SELECT envelope_json, planning_attestation_json FROM task_triage_queue WHERE id = ? AND status = ?;",
                 (task_id, TriageStatus.PENDING_REVIEW.value),
             )
             row = cursor.fetchone()
             if not row:
                 return False
+
+            attestation_json = row["planning_attestation_json"]
+            if not attestation_json:
+                raise ValueError(f"Task {task_id} cannot be approved without a valid PlanningAttestation.")
+
+            attestation = json.loads(attestation_json)
             env = json.loads(row["envelope_json"])
             if "base_commit" in env:
                 base_commit = env["base_commit"]
@@ -409,6 +424,8 @@ class TaskTriageQueue:
                     raise ValueError(
                         "Task base_commit must be a fully resolved 40-character hexadecimal SHA"
                     )
+                if attestation.get("base_sha") != base_commit:
+                    raise ValueError(f"Stale plan: task base_commit {base_commit} does not match attestation base_sha {attestation.get('base_sha')}")
 
             cursor = conn.execute(
                 """
@@ -445,6 +462,27 @@ class TaskTriageQueue:
             return cursor.rowcount > 0
 
         return bool(self._execute_write_with_retry(_approve))
+
+    
+    def attach_plan(
+        self,
+        task_id: str,
+        attestation: dict[str, Any],
+        blueprint: dict[str, Any]
+    ) -> bool:
+        """Attaches a senior planning attestation and blueprint to a task."""
+        now = time.time()
+
+        def _write(conn: sqlite3.Connection) -> bool:
+            import hashlib
+            blueprint_json = json.dumps(blueprint, sort_keys=True)
+            conn.execute(
+                "UPDATE task_triage_queue SET planning_attestation_json = ?, plan_blueprint_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(attestation), blueprint_json, now, task_id)
+            )
+            return True
+
+        return bool(self._execute_write_with_retry(_write))
 
     def reject_task(self, task_id: str, reason: str) -> bool:
         """Rejects a task, ensuring it is permanently excluded from execution."""
@@ -615,6 +653,16 @@ class TaskTriageQueue:
                 return None
 
             task_id = selected_row["id"]
+            
+            attestation_json = selected_row["planning_attestation_json"]
+            blueprint_json = selected_row["plan_blueprint_json"]
+            if attestation_json and blueprint_json:
+                attestation = json.loads(attestation_json)
+                import hashlib
+                blueprint_digest = hashlib.sha256(blueprint_json.encode("utf-8")).hexdigest()
+                if attestation.get("blueprint_digest") != blueprint_digest:
+                    raise ValueError(f"Task {task_id} planning attestation digest does not match the blueprint!")
+
             created_at = selected_row["created_at"]
 
             provenance_dict = json.loads(selected_row["provenance_json"])

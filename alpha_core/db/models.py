@@ -346,6 +346,8 @@ class TaskRecord(Base):
     next_eligible_at = Column(DateTime(timezone=True), nullable=True)
     worker_id = Column(String(128), nullable=True)
     depends_on_json = Column(JSON, default=list)  # JSON array of dependency task IDs
+    planning_attestation_json = Column(JSON, nullable=True)
+    plan_blueprint_json = Column(JSON, nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

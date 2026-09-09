@@ -57,6 +57,7 @@ class PRProposal:
     created_at: float
     attempt_id: str
     worker_id: str
+    plan_digest: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -578,6 +579,11 @@ class TriageTaskDispatcher:
                     )
                     return None
 
+            plan_digest = None
+            blueprint_json = leased_task.get("plan_blueprint_json")
+            if blueprint_json:
+                plan_digest = hashlib.sha256(blueprint_json.encode("utf-8")).hexdigest()
+
             # 6. Generate PR Proposal Artifact
             pr_proposal = PRProposal(
                 task_id=task_id,
@@ -596,6 +602,7 @@ class TriageTaskDispatcher:
                 created_at=time.time(),
                 attempt_id=attempt_id,
                 worker_id=worker_id,
+                plan_digest=plan_digest,
             )
 
             # 7. Complete task in queue with lease ownership verification
@@ -680,6 +687,17 @@ class TriageTaskDispatcher:
 
             old_inst = env_dict.get("detailed_instructions") or ""
             env_dict["detailed_instructions"] = old_inst + repair_block
+
+        blueprint_json = leased_task.get("plan_blueprint_json")
+        if blueprint_json:
+            try:
+                blueprint = json.loads(blueprint_json)
+                plan_md = blueprint.get("plan_markdown")
+                if plan_md:
+                    old_inst = env_dict.get("detailed_instructions") or ""
+                    env_dict["detailed_instructions"] = f"## 📋 SENIOR ENGINEERING PLAN\n\n{plan_md}\n\n---\n{old_inst}"
+            except Exception:
+                pass
 
         acc_plan = env_dict.get("acceptance_plan")
         if isinstance(acc_plan, dict):

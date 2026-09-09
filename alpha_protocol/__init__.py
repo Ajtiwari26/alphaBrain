@@ -56,6 +56,13 @@ from .task import (
     compute_review_digest,
 )
 from .worker import WorkerCapability, WorkerHealthReport, WorkerRegistration
+from .planning import (
+    SourceEvidence,
+    ResearchSnapshot,
+    PlanBlueprint,
+    PlanAssessment,
+    PlanningAttestation,
+)
 
 __all__ = [
     "LEGAL_TRANSITIONS",
@@ -120,4 +127,9 @@ __all__ = [
     "compute_promotion_digest",
     "compute_review_digest",
     "is_legal_transition",
+    "SourceEvidence",
+    "ResearchSnapshot",
+    "PlanBlueprint",
+    "PlanAssessment",
+    "PlanningAttestation",
 ]
