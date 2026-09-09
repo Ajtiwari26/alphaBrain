@@ -392,51 +392,13 @@ async def test_run_agy_includes_model_and_effort(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_run_agy_includes_dangerously_skip_permissions_when_configured(monkeypatch, tmp_path):
-    import subprocess
-
-    from alpha_core.config import settings
-    from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
-
-    monkeypatch.setattr(settings, "ANTIGRAVITY_UNATTENDED_COMMANDS", True)
-
-    mock_process = MagicMock()
-    mock_process.poll.return_value = 0
-    captured_args = []
-
-    def fake_popen(args, **kwargs):
-        captured_args.extend(args)
-        return mock_process
-
-    monkeypatch.setattr(subprocess, "Popen", fake_popen)
-
-    bridge = AntigravityLiveBridge()
-    bridge.session_store_dir = tmp_path
-
-    try:
-        await bridge._run_agy(
-            prompt="Hello",
-            worktree_path=tmp_path,
-            conversation_id="conv-1",
-            is_new_project=False,
-            timeout_seconds=30,
-        )
-    except Exception:
-        pass
-
-    assert "--dangerously-skip-permissions" in captured_args
-
-
-@pytest.mark.asyncio
-async def test_run_agy_omits_dangerously_skip_permissions_when_not_configured(
+async def test_run_agy_injects_safety_hook(
     monkeypatch, tmp_path
 ):
     import subprocess
-
+    import json
     from alpha_core.config import settings
     from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
-
-    monkeypatch.setattr(settings, "ANTIGRAVITY_UNATTENDED_COMMANDS", False)
 
     mock_process = MagicMock()
     mock_process.poll.return_value = 0
@@ -462,7 +424,14 @@ async def test_run_agy_omits_dangerously_skip_permissions_when_not_configured(
     except Exception:
         pass
 
-    assert "--dangerously-skip-permissions" not in captured_args
+    # Verify the hook was injected
+    hooks_file = tmp_path / ".agents" / "hooks.json"
+    assert hooks_file.exists()
+    
+    hooks_config = json.loads(hooks_file.read_text())
+    hook_cmd = hooks_config["worktree-safety-gate"]["PreToolUse"][0]["hooks"][0]["command"]
+    assert "ALPHA_WORKTREE_PATH=" in hook_cmd
+    assert "safety_hook.py" in hook_cmd
 
 
 def test_valid_version_1_manifest_is_accepted():

@@ -820,8 +820,31 @@ class AntigravityLiveBridge:
         if "claude" not in (model or "").lower():
             args.extend(["--effort", effort or settings.ANTIGRAVITY_EFFORT])
         args.extend(["--print", prompt])
-        if settings.ANTIGRAVITY_UNATTENDED_COMMANDS:
-            args.append("--dangerously-skip-permissions")
+        
+        # Inject the programmatic safety hook instead of the dangerous flag
+        hooks_dir = worktree_path / ".agents"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        hooks_file = hooks_dir / "hooks.json"
+        
+        hook_script = Path(__file__).parent / "safety_hook.py"
+        import sys
+        hooks_config = {
+            "worktree-safety-gate": {
+                "PreToolUse": [
+                    {
+                        "matcher": "*",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": f"ALPHA_WORKTREE_PATH={str(worktree_path)} {sys.executable} {str(hook_script)}",
+                                "timeout": 5
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        hooks_file.write_text(json.dumps(hooks_config))
         if is_new_project:
             args.insert(1, "--new-project")
         else:

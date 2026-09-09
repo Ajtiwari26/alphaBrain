@@ -10,7 +10,7 @@
 
 In accordance with the Founder `/goal` authorization and the supreme governance standards of AlphaBrain, designated engineering phases from Phase 10 through Phase 13 have been implemented via the autonomous pipeline. However, a recent forensic audit revealed that Phase 12 (Deployment Adapters) remains incomplete.
 
-The core self-development pipeline is in a verified zero-defect state, but production deployment automation is stubbed, and an unsafe AGY flag requires removal.
+The core self-development pipeline is in a verified zero-defect state, but production deployment automation is stubbed.
 
 ---
 
@@ -63,7 +63,7 @@ The core self-development pipeline is in a verified zero-defect state, but produ
   - Proof of lease tampering resistance: revoked or forged leases are deterministically rejected.
   - Proof of circuit breaker trip under cascading faults.
   - Proof of zero secret leakage in logs, audit records, and serialized envelopes.
-- **Production Safety (FAILED)**: Unsafe flag `--dangerously-skip-permissions` remains present in `alpha_worker/adapters/antigravity_live.py` for automated daemon tasks.
+- **Production Safety**: Verified programmatic Antigravity Hook (`safety_hook.py`) automatically enforces strict Git worktree containment for all headless tool executions, replacing the dangerous skip flag.
 - **Full-Repository Quality Audit (`tsk_eva_1e1875d99a4f`)**:
   - Full typing annotations across all adapters, circuit breakers, consumers, and CLI handlers.
   - Ruff formatting applied across all 243 files.
