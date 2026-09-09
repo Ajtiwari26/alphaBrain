@@ -147,8 +147,10 @@ class CircuitBreaker:
 
     @staticmethod
     def execute_transactionally(queue, root_id: str, action_fn):
+        # Note: fcntl is a POSIX-only module (Linux/macOS).
+        # We use a single global lock file to prevent filesystem inode bloat.
         import fcntl
-        lock_file = str(queue.db_path) + f".cb_{root_id}.lock"
+        lock_file = str(queue.db_path) + ".cb.lock"
         with open(lock_file, "w") as f:
             fcntl.flock(f, fcntl.LOCK_EX)
             try:

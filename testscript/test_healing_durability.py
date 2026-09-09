@@ -53,7 +53,7 @@ def test_daemon_restart_preserves_failure_attempts(tmp_path):
 
     # Simulate failure handling in daemon 1
     cb_dict = daemon1.queue.get_circuit_breaker("tsk_abc_123")
-    cb1 = __import__("alpha_core.healing.circuit_breaker", fromlist=["CircuitBreaker"]).CircuitBreaker.from_dict(cb_dict) if cb_dict else __import__("alpha_core.healing.circuit_breaker", fromlist=["CircuitBreaker"]).CircuitBreaker()
+    cb1 = CircuitBreaker.from_dict(cb_dict) if cb_dict else CircuitBreaker()
     cb1.record_failure("SIG_TIMEOUT_ERR")
     queue.save_circuit_breaker("tsk_abc_123", cb1.to_dict())
 
@@ -64,7 +64,7 @@ def test_daemon_restart_preserves_failure_attempts(tmp_path):
 
     # Probe should NOT reset 1 -> 0; child repair should look up root_id and resume at 1
     cb_dict2 = daemon2.queue.get_circuit_breaker("tsk_abc_123")
-    cb2 = __import__("alpha_core.healing.circuit_breaker", fromlist=["CircuitBreaker"]).CircuitBreaker.from_dict(cb_dict2) if cb_dict2 else __import__("alpha_core.healing.circuit_breaker", fromlist=["CircuitBreaker"]).CircuitBreaker()
+    cb2 = CircuitBreaker.from_dict(cb_dict2) if cb_dict2 else CircuitBreaker()
     assert cb2.attempts == 1
     assert cb2.last_signature == "SIG_TIMEOUT_ERR"
 
@@ -130,7 +130,7 @@ def test_successful_merge_enters_processed_tasks_and_resets_cb(mock_run, tmp_pat
 
     # Pre-record a failure attempt on this root task
     cb_dict3 = daemon.queue.get_circuit_breaker("tsk_completed_003")
-    cb = __import__("alpha_core.healing.circuit_breaker", fromlist=["CircuitBreaker"]).CircuitBreaker.from_dict(cb_dict3) if cb_dict3 else __import__("alpha_core.healing.circuit_breaker", fromlist=["CircuitBreaker"]).CircuitBreaker()
+    cb = CircuitBreaker.from_dict(cb_dict3) if cb_dict3 else CircuitBreaker()
     cb.record_failure("SIG_PREV_ERR")
     queue.save_circuit_breaker("tsk_completed_003", cb.to_dict())
     assert cb.attempts == 1

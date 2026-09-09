@@ -174,9 +174,21 @@ def test_daemon_circuit_breaker_trips(mock_queue, tmp_path):
 
 
 
-def test_daemon_circuit_breaker_shared_lineage(mock_queue):
-    # This test is no longer applicable because we don't hold cb objects in memory.
-    pass
+def test_daemon_circuit_breaker_shared_lineage(mock_queue, tmp_path):
+    mock_queue.list_tasks.side_effect = [[], [{"id": "task_4_repair_1", "worktree_path": str(tmp_path)}]]
+    daemon = CIHealingDaemon(mock_queue)
+    with patch("alpha_worker.ci_healing_daemon.CircuitBreaker.execute_transactionally") as mock_exec:
+        cb_mock = MagicMock()
+        cb_mock.attempts = 1
+        mock_exec.return_value = (TripReason.NONE, cb_mock)
+        with patch.object(daemon.failure_analyzer, "analyze") as mock_analyze, \
+             patch("alpha_worker.ci_healing_daemon.RepairEnvelopeSynthesizer.synthesize") as mock_synth:
+            mock_analyze.return_value = {"signature": "sig1", "pytest_failures": []}
+            mock_synth.return_value = {"allowed_paths": [], "actionable_prompt": "do it"}
+            daemon.run_once()
+            mock_exec.assert_called_once()
+            called_root_id = mock_exec.call_args[0][1]
+            assert called_root_id == "task_4"
 
 
 def test_emergency_stop_aborts(mock_queue):
@@ -290,4 +302,5 @@ def test_synthesizer_return_contract_validation(mock_queue, tmp_path):
             mock_synth.return_value = {"bad_key": "val"}  # Invalid return
             daemon.run_once()
             mock_queue.enqueue_task.assert_not_called()
+            mock_queue.reject_task.assert_called_once_with("task_2", reason="Synthesizer returned invalid envelope shape")
 
