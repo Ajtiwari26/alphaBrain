@@ -2620,6 +2620,7 @@ async def get_portal_task_trace(
     return {
         "status": "ok",
         "task_id": task_id,
+        "task_state": task.get("status"),
         "provenance": provenance,
         "attestation": redacted_attestation,
         "telemetry": queue.get_task_telemetry(task_id),
