@@ -67,6 +67,7 @@ exclude = [
     "testscript/scratch",
     "testscript/dev_artifacts",
     "testscript/archive",
+    "pytest-of-*",
 ]
 
 [tool.ruff.lint]

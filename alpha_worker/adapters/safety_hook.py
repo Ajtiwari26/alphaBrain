@@ -11,6 +11,7 @@ from typing import Any
 FILE_TOOLS = {"write_to_file", "replace_file_content", "multi_replace_file_content", "delete_file"}
 READ_TOOLS = {"view_file", "list_dir", "grep_search", "find_by_name"}
 PROTECTED = (".agents", ".gemini", ".git")
+AGY_BRAIN_RELATIVE = Path(".gemini/antigravity-ide/brain")
 
 
 def deny(reason: str) -> dict[str, Any]:
@@ -27,13 +28,83 @@ def scoped_path(value: Any, worktree: Path) -> Path:
     return path
 
 
-def sandbox_profile(worktree: Path) -> str:
-    def subpath(path: Path | str) -> str:
-        return f"(subpath {json.dumps(str(path), ensure_ascii=False)})"
+def _git_read_paths(worktree: Path) -> tuple[list[Path], list[Path]]:
+    """Trust only Git's standard linked-worktree metadata layout, read-only."""
+    marker = worktree / ".git"
+    if not marker.is_file():
+        return [], []
+    text = marker.read_text().strip()
+    if not text.startswith("gitdir: "):
+        raise ValueError("Invalid Git worktree metadata")
+    raw = Path(text[len("gitdir: ") :])
+    git_dir = (raw if raw.is_absolute() else worktree / raw).resolve(strict=True)
+    if git_dir.parent.name != "worktrees":
+        raise ValueError("Unsupported Git worktree metadata layout")
+    common = git_dir.parent.parent
+    if (git_dir / "commondir").read_text().strip() != "../..":
+        raise ValueError("Unexpected Git common directory")
+    backlink = Path((git_dir / "gitdir").read_text().strip()).resolve()
+    if backlink != marker.resolve():
+        raise ValueError("Git worktree identity mismatch")
+    return [git_dir, common / "objects", common / "refs"], [
+        common / name for name in ("config", "HEAD", "packed-refs", "shallow")
+    ]
 
-    # Read-only runtimes; no broad home, /var or /tmp grants.
-    runtime = ["/System", "/usr", "/bin", "/sbin", "/Library/Apple", "/opt/homebrew"]
-    runtime.append(str(Path(sys.prefix).resolve()))
+
+def _is_protected_execution_path(path: Path, worktree: Path) -> bool:
+    """Reserve agent/runtime configuration from every model-issued tool call."""
+    return any(
+        path == worktree / name or path.is_relative_to(worktree / name) for name in PROTECTED
+    )
+
+
+def sandbox_profile(worktree: Path) -> str:
+    """Allow code/runtime reads and task-local writes, never shared state."""
+    import mimetypes
+
+    worktree = worktree.resolve()
+    runtime = [
+        Path(p)
+        for p in (
+            "/System",
+            "/usr",
+            "/bin",
+            "/sbin",
+            "/Library/Apple",
+            "/Library/Developer/CommandLineTools",
+            "/opt/homebrew",
+        )
+    ]
+    runtime.append(Path(sys.prefix).resolve())
+    git_roots, git_files = _git_read_paths(worktree)
+    read_roots = [*runtime, *git_roots]
+    # getcwd traverses parent directories on macOS. Directory literals do not
+    # authorize reading files beneath those parents.
+    directory_literals = {Path("/")}
+    for root in [worktree, *read_roots, *git_files]:
+        directory_literals.update(root.parents)
+    file_literals = [
+        worktree / ".git",
+        *git_files,
+        *(Path(p).resolve() for p in mimetypes.knownfiles),
+        Path("/dev/null"),
+        Path("/dev/urandom"),
+        Path("/dev/random"),
+    ]
+
+    def rule(action: str, operation: str, selector: str, path: Path) -> str:
+        return f"({action} {operation} ({selector} {json.dumps(str(path), ensure_ascii=False)}))"
+
+    def task_scope(operation: str) -> str:
+        exclusions = " ".join(
+            f"(require-not (subpath {json.dumps(str(worktree / name), ensure_ascii=False)}))"
+            for name in PROTECTED
+        )
+        return (
+            f"(allow {operation} (require-all (subpath "
+            f"{json.dumps(str(worktree), ensure_ascii=False)}) {exclusions}))"
+        )
+
     return "\n".join(
         [
             "(version 1)",
@@ -41,16 +112,12 @@ def sandbox_profile(worktree: Path) -> str:
             "(deny network*)",
             "(deny file-read-data)",
             "(deny file-write*)",
-            '(allow file-read-data (literal "/"))',
-            f"(allow file-read-data {subpath(worktree)})",
-            *(f"(allow file-read-data {subpath(path)})" for path in runtime),
-            # Python's mimetypes module checks this one public database.
-            '(allow file-read-data (literal "/etc/mime.types") (literal "/private/etc/mime.types"))',
-            '(allow file-read-data (literal "/dev/null") (literal "/dev/urandom") (literal "/dev/random"))',
-            f"(allow file-write* {subpath(worktree)})",
-            '(allow file-write-data (literal "/dev/null"))',
-            f"(deny file-write-unlink (literal {json.dumps(str(worktree))}))",
-            *(f"(deny file-write* {subpath(worktree / name)})" for name in PROTECTED),
+            task_scope("file-read-data"),
+            *(rule("allow", "file-read-data", "subpath", p) for p in read_roots),
+            *(rule("allow", "file-read-data", "literal", p) for p in sorted(directory_literals)),
+            *(rule("allow", "file-read-data", "literal", p) for p in file_literals),
+            task_scope("file-write*"),
+            rule("allow", "file-write-data", "literal", Path("/dev/null")),
         ]
     )
 
@@ -69,10 +136,10 @@ def decide(payload: Any, worktree: Path) -> dict[str, Any]:
     try:
         if name in FILE_TOOLS:
             path = scoped_path(args.get("TargetFile") or args.get("AbsolutePath"), worktree)
-            if path == worktree or any(path.is_relative_to(worktree / p) for p in PROTECTED):
+            if path == worktree or _is_protected_execution_path(path, worktree):
                 return deny("Protected execution configuration")
         elif name in READ_TOOLS:
-            scoped_path(
+            path = scoped_path(
                 args.get("AbsolutePath")
                 or args.get("TargetFile")
                 or args.get("DirectoryPath")
@@ -80,6 +147,8 @@ def decide(payload: Any, worktree: Path) -> dict[str, Any]:
                 or args.get("SearchDirectory"),
                 worktree,
             )
+            if _is_protected_execution_path(path, worktree):
+                return deny("Protected execution configuration")
         elif name == "run_command":
             cwd = scoped_path(args.get("Cwd"), worktree)
             command = args.get("CommandLine")
@@ -92,6 +161,13 @@ def decide(payload: Any, worktree: Path) -> dict[str, Any]:
                 return deny("Missing or invalid command/CWD")
             if sys.platform != "darwin" or not Path("/usr/bin/sandbox-exec").is_file():
                 return deny("Required macOS sandbox unavailable")
+            # Writable SDK/cache state belongs to this task, not host credentials
+            # or the protected project-level agent configuration.
+            state = scoped_path(".alphabrain-sandbox", worktree)
+            home = scoped_path(str(state / "home"), worktree)
+            temp = scoped_path(str(state / "tmp"), worktree)
+            for directory in (home, temp):
+                directory.mkdir(parents=True, exist_ok=True)
             # Clear inherited credentials and shell startup overrides.
             argv = [
                 "/usr/bin/sandbox-exec",
@@ -99,9 +175,14 @@ def decide(payload: Any, worktree: Path) -> dict[str, Any]:
                 sandbox_profile(worktree),
                 "/usr/bin/env",
                 "-i",
-                "PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
-                f"HOME={worktree}",
-                f"TMPDIR={worktree}",
+                f"PATH={Path(sys.prefix) / 'bin'}:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
+                f"HOME={home}",
+                f"TMPDIR={temp}",
+                f"TEMP={temp}",
+                f"TMP={temp}",
+                f"XDG_CACHE_HOME={home / '.cache'}",
+                f"XDG_CONFIG_HOME={home / '.config'}",
+                "GIT_OPTIONAL_LOCKS=0",
                 "PYTHONDONTWRITEBYTECODE=1",
                 "/bin/sh",
                 "-c",
@@ -115,7 +196,7 @@ def decide(payload: Any, worktree: Path) -> dict[str, Any]:
         return deny("Invalid or out-of-scope tool path")
     result: dict[str, Any] = {"decision": "allow", "overwrite": args}
     if name == "run_command":
-        result["permissionOverrides"] = [f"command({args['CommandLine']})"]
+        result["permissionOverrides"] = [f"command({original['CommandLine']})"]
     return result
 
 

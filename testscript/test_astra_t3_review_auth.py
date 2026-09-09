@@ -939,7 +939,9 @@ def test_senior_review_engine_purges_all_signing_secrets_from_agy_subprocess(mon
     schema_file = tmp_path / "schema.json"
     schema_file.write_text("{}")
 
-    engine = SeniorReviewEngine(queue=MagicMock())
+    fake_agy = tmp_path / "agy"
+    fake_agy.touch()
+    engine = SeniorReviewEngine(queue=MagicMock(), agy_bin=fake_agy)
     captured_env = None
 
     def fake_subprocess_run(cmd, **kwargs):

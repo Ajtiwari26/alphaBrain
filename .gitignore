@@ -71,3 +71,4 @@ test*.html
 .alphabrain/
 .agents/
 .agents/
+.alphabrain-sandbox/

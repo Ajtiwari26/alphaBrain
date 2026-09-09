@@ -15,6 +15,9 @@ def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
     fake_agy.write_text(
         "#!/bin/sh\n"
         'for arg in "$@"; do [ "$arg" != "--dangerously-skip-permissions" ] || exit 97; done\n'
+        'found_sandbox=false; for arg in "$@"; do [ "$arg" != "--sandbox" ] || found_sandbox=true; done; $found_sandbox || exit 98\n'
+        "[ -d .gemini/antigravity-ide/brain ] || exit 99\n"
+        "printf transient > .gemini/antigravity-ide/brain/turn-state\n"
         f"printf '%s\\n' '{json.dumps({'event': 'init', 'conversation_id': conversation_id})}'\n"
         "(sleep 20) &\n"
         f"printf '%s\\n' '{json.dumps({'event': 'result', 'result': {'conversation_id': conversation_id, 'status': 'SUCCESS', 'response': 'done'}})}'\n"
@@ -40,8 +43,26 @@ def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
     ]
     assert "mcp_*(*)" not in permissions
     assert "call_mcp_tool(*)" not in permissions
+    assert not (tmp_path / ".gemini/antigravity-ide/brain").exists()
     assert result["events"][0]["conversation_id"] == conversation_id
     assert "SUCCESS" in (tmp_path / "agy.json").read_text()
+
+
+def test_agy_turn_rejects_stale_task_brain(tmp_path):
+    brain = tmp_path / ".gemini/antigravity-ide/brain"
+    brain.mkdir(parents=True)
+    bridge = AntigravityLiveBridge()
+
+    with pytest.raises(RuntimeError, match="stale AGY brain"):
+        asyncio.run(
+            bridge._run_agy(
+                prompt="test",
+                worktree_path=tmp_path,
+                conversation_id=None,
+                is_new_project=True,
+                timeout_seconds=60,
+            )
+        )
 
 
 @pytest.mark.asyncio

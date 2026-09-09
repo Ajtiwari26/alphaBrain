@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -826,6 +827,58 @@ class AntigravityLiveBridge:
         model: str | None = None,
         effort: str | None = None,
     ) -> dict[str, Any]:
+        """Run a turn with AGY's task-local brain state removed afterward."""
+        brain = self._prepare_task_brain(worktree_path)
+        try:
+            return await self._run_agy_with_task_brain(
+                prompt=prompt,
+                worktree_path=worktree_path,
+                conversation_id=conversation_id,
+                is_new_project=is_new_project,
+                timeout_seconds=timeout_seconds,
+                log_path=log_path,
+                model=model,
+                effort=effort,
+            )
+        finally:
+            self._cleanup_task_brain(worktree_path, brain)
+
+    @staticmethod
+    def _prepare_task_brain(worktree_path: Path) -> Path:
+        """Create only AGY's required transient brain path inside this worktree."""
+        worktree = worktree_path.resolve(strict=True)
+        brain = worktree / ".gemini" / "antigravity-ide" / "brain"
+        if brain.exists():
+            raise RuntimeError("Refusing stale AGY brain state in task worktree")
+        brain.mkdir(parents=True)
+        return brain
+
+    @staticmethod
+    def _cleanup_task_brain(worktree_path: Path, brain: Path) -> None:
+        """Remove only bridge-created transient state; never project configuration."""
+        worktree = worktree_path.resolve(strict=True)
+        expected = worktree / ".gemini" / "antigravity-ide" / "brain"
+        if brain.resolve() != expected or not brain.is_relative_to(worktree):
+            raise RuntimeError("Refusing unsafe AGY brain cleanup path")
+        shutil.rmtree(brain, ignore_errors=False)
+        for parent in (expected.parent, expected.parent.parent):
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+
+    async def _run_agy_with_task_brain(
+        self,
+        *,
+        prompt: str,
+        worktree_path: Path,
+        conversation_id: str | None,
+        is_new_project: bool,
+        timeout_seconds: int,
+        log_path: Path | None = None,
+        model: str | None = None,
+        effort: str | None = None,
+    ) -> dict[str, Any]:
         """Run one headless AGY turn with structured stdout events."""
         args = [
             str(self.agy_bin),
@@ -835,6 +888,8 @@ class AntigravityLiveBridge:
             f"{max(60, timeout_seconds)}s",
             "--mode",
             "accept-edits",
+            "--sandbox",
+            "--dangerously-skip-permissions",
             "--model",
             model or settings.ANTIGRAVITY_MODEL,
         ]
@@ -939,11 +994,6 @@ class AntigravityLiveBridge:
             stdout = stdout_path.read_bytes()
             stderr = stderr_path.read_bytes()
 
-            with open("/tmp/agy_real_crash.log", "ab") as f:
-                f.write(b"--- AGY STDERR ---\n")
-                f.write(stderr)
-                f.write(b"\n")
-
         if log_path:
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text(
@@ -1003,15 +1053,7 @@ class AntigravityLiveBridge:
     def _is_rate_limited(raw: dict[str, Any]) -> bool:
         if raw.get("returncode") == 429:
             return True
-        raw_output = (
-            raw.get("stdout", "").decode("utf-8", errors="replace")
-            if isinstance(raw.get("stdout"), bytes)
-            else str(raw.get("stdout", ""))
-        )
         raw_err = raw.get("stderr", "")
-
-        with open("/tmp/agy_crash.log", "a") as f:
-            f.write(f"--- RUN ---\nSTDOUT:\n{raw_output}\nSTDERR:\n{raw_err}\n")
 
         response_text = ""
         for event in raw.get("events", []):

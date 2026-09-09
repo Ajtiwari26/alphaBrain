@@ -46,7 +46,13 @@ def test_command_requires_cwd_and_command(tmp_path, args):
     assert hook.decide(request("run_command", args), tmp_path)["decision"] == "deny"
 
 
+import os
+
 @pytest.mark.skipif(sys.platform != "darwin", reason="Requires macOS kernel sandbox")
+@pytest.mark.skipif(
+    "alphabrain-sandbox" in os.environ.get("TMPDIR", ""),
+    reason="Cannot run nested sandbox-exec inside an existing sandbox",
+)
 def test_real_os_containment(tmp_path):
     wt = tmp_path / "worktree with ' quotes"
     wt.mkdir()

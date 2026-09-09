@@ -8,6 +8,18 @@ from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
 from testscript.test_antigravity_live_bridge import make_task
 
 
+@pytest.fixture(autouse=True)
+def isolated_routing_settings(monkeypatch):
+    # These are routing unit tests with mocked AGY calls, not a live CLI/login
+    # readiness proof. Restore settings so later tests cannot invoke routing.
+    monkeypatch.setattr(settings, "MODEL_ROUTING_ENABLED", False)
+    monkeypatch.setattr(settings, "ANTIGRAVITY_EXECUTION_ENABLED", True)
+    monkeypatch.setattr(settings, "MAX_ELIGIBLE_ATTEMPTS", 2)
+    monkeypatch.setattr(
+        AntigravityLiveBridge, "check_readiness", lambda self: (True, "test double")
+    )
+
+
 @pytest.fixture
 def mock_router():
     with patch("alpha_worker.adapters.antigravity_live.call_model_router") as mock:

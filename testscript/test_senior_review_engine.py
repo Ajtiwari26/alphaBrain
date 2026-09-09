@@ -41,7 +41,9 @@ def test_parse_verdict_line_variations(tmp_path):
 
 def test_invoke_agy_command_flags(tmp_path):
     queue = MagicMock(spec=TaskTriageQueue)
-    engine = SeniorReviewEngine(queue=queue)
+    dummy_agy = tmp_path / "agy"
+    dummy_agy.touch()
+    engine = SeniorReviewEngine(queue=queue, agy_bin=dummy_agy)
 
     with patch("subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0

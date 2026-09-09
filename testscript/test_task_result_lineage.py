@@ -720,6 +720,8 @@ def test_inspection_failure(
     git_file = wt_path / ".git"
     git_file.unlink()
 
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+
     with pytest.raises(RuntimeError):
         wm.get_uncommitted_files(wt_path)
 

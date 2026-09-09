@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -15,6 +16,9 @@ os.environ["ENV"] = "test"
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_STATE_DIR / 'test.db'}"
 os.environ["WORKTREE_BASE_DIR"] = str(TEST_STATE_DIR / "worktrees")
 os.environ["MEMORY_GRAPH_PATH"] = str(TEST_STATE_DIR / "memory_graph")
+os.environ["WORKER_STATE_DIR"] = str(TEST_STATE_DIR / "worker")
+os.environ["WORKER_USE_KEYCHAIN"] = "false"
+os.environ["WORKER_SPOOL_FERNET_KEY"] = Fernet.generate_key().decode()
 os.environ["ALPHA_API_TOKEN"] = "test-api-token-with-at-least-32-characters"
 os.environ["ALPHA_WORKER_TOKEN"] = "test-worker-token-with-at-least-32-characters"
 os.environ["ALPHA_SIGNING_SECRET"] = "test-signing-secret-with-at-least-32-chars"
