@@ -850,6 +850,8 @@ class AntigravityLiveBridge:
         else:
             assert conversation_id is not None
             args[1:1] = ["--conversation", conversation_id]
+            
+        args.append("--dangerously-skip-permissions")
         # Do not use asyncio subprocess pipes here. AGY may spawn descendants
         # which inherit pipe descriptors; then communicate()/wait() can hang
         # after AGY itself has exited. File-backed logs plus poll() give this
@@ -892,6 +894,11 @@ class AntigravityLiveBridge:
 
             stdout = stdout_path.read_bytes()
             stderr = stderr_path.read_bytes()
+            
+            with open("/tmp/agy_real_crash.log", "ab") as f:
+                f.write(b"--- AGY STDERR ---\n")
+                f.write(stderr)
+                f.write(b"\n")
 
         if log_path:
             log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -952,14 +959,19 @@ class AntigravityLiveBridge:
     def _is_rate_limited(raw: dict[str, Any]) -> bool:
         if raw.get("returncode") == 429:
             return True
-        stderr = raw.get("stderr", "")
-        lower_stderr = stderr.lower()
+        raw_output = raw.get("stdout", "").decode("utf-8", errors="replace") if isinstance(raw.get("stdout"), bytes) else str(raw.get("stdout", ""))
+        raw_err = raw.get("stderr", "")
+        
+        with open("/tmp/agy_crash.log", "a") as f:
+            f.write(f"--- RUN ---\nSTDOUT:\n{raw_output}\nSTDERR:\n{raw_err}\n")
+
         response_text = ""
         for event in raw.get("events", []):
             if event.get("event") == "result":
                 res = event.get("result", {})
                 if res.get("status") == "SUCCESS":
                     response_text = res.get("response", "")
+        lower_stderr = raw_err.lower()
         lower_resp = response_text.lower()
         return (
             "rate limit" in lower_stderr
@@ -1104,7 +1116,10 @@ Emit a single-line JSON manifest before termination exactly matching this format
 - When calling tools, NEVER wrap arguments in double quotes. Pass them as raw strings.
 - All integer parameters in tool calls MUST be passed as JSON integers, NEVER as strings.
 
-11. RETRY RULE:
+11. CONCURRENCY CONSTRAINT (CRITICAL):
+- NEVER call multiple run_command tools concurrently. You MUST wait for the result of the first command before calling another command.
+
+12. RETRY RULE:
 The supervisor controls retries. The junior never reruns uncontrolled loops internally. Fail immediately upon unrecoverable state so the supervisor can send a narrow repair task with persisted evidence.
 """
 

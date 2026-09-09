@@ -1,0 +1,11 @@
+{
+    "hooks": [
+        {
+            "match": {
+                "event": "PreToolUse",
+                "toolName": "*"
+            },
+            "script": "alpha_worker/adapters/safety_hook.py"
+        }
+    ]
+}
