@@ -1100,7 +1100,11 @@ Emit a single-line JSON manifest before termination exactly matching this format
 - No roadmap changes or broader refactoring beyond task objective.{dependency_rule}
 - No invented fallback models or identity shifting.
 
-10. RETRY RULE:
+10. TOOL CALL CONSTRAINTS (CRITICAL):
+- When calling tools, NEVER wrap arguments in double quotes. Pass them as raw strings.
+- All integer parameters in tool calls MUST be passed as JSON integers, NEVER as strings.
+
+11. RETRY RULE:
 The supervisor controls retries. The junior never reruns uncontrolled loops internally. Fail immediately upon unrecoverable state so the supervisor can send a narrow repair task with persisted evidence.
 """
 
