@@ -47,25 +47,28 @@ def main() -> None:
     wt_path = Path(worktree_path).resolve()
 
     # Strictly enforce containment for file modifications
-    if tool_name in ["write_to_file", "replace_file_content", "multi_replace_file_content"]:
+    if tool_name in ["write_to_file", "replace_file_content", "multi_replace_file_content", "delete_file"]:
         path = args.get("TargetFile") or args.get("AbsolutePath")
-        if path:
-            path = path.strip("\"'")
-            resolved_path = Path(path).resolve()
-            if not resolved_path.is_relative_to(wt_path):
-                respond(
-                    {
-                        "decision": "deny",
-                        "reason": f"Security Exception: File write path '{path}' is outside the assigned worktree '{wt_path}'",
-                    }
-                )
-            if resolved_path.is_relative_to(wt_path / ".agents"):
-                respond(
-                    {
-                        "decision": "deny",
-                        "reason": f"Security Exception: Modifying the hook configuration file '{path}' is strictly prohibited",
-                    }
-                )
+        if not path:
+            respond({"decision": "deny", "reason": "Missing TargetFile or AbsolutePath argument"})
+            sys.exit(0)
+            
+        path = path.strip("\"'")
+        resolved_path = Path(path).resolve()
+        if not resolved_path.is_relative_to(wt_path):
+            respond(
+                {
+                    "decision": "deny",
+                    "reason": f"Security Exception: File write path '{path}' is outside the assigned worktree '{wt_path}'",
+                }
+            )
+        if resolved_path.is_relative_to(wt_path / ".agents"):
+            respond(
+                {
+                    "decision": "deny",
+                    "reason": f"Security Exception: Modifying the hook configuration file '{path}' is strictly prohibited",
+                }
+            )
 
     # Strictly enforce containment for command execution environments
     if tool_name == "run_command":
@@ -80,6 +83,27 @@ def main() -> None:
                         "reason": f"Security Exception: Command CWD '{cwd}' is outside the assigned worktree '{wt_path}'",
                     }
                 )
+                
+        # OS-level Sandbox Hardening via macOS sandbox-exec
+        cmd = args.get("CommandLine", "")
+        if cmd:
+            import tempfile
+            
+            profile = f"""(version 1)
+(allow default)
+(deny file-write* (subpath "/"))
+(allow file-write* (subpath "{wt_path!s}"))
+(allow file-write* (subpath "/private/tmp"))
+(allow file-write* (subpath "/tmp"))
+(allow file-write* (subpath "/var"))
+(allow file-write* (subpath "/dev"))
+"""
+            fd, profile_path = tempfile.mkstemp(prefix="alpha_sandbox_", suffix=".sb")
+            with os.fdopen(fd, 'w') as f:
+                f.write(profile)
+            
+            escaped_cmd = json.dumps(cmd)
+            args["CommandLine"] = f"sandbox-exec -f {profile_path} /bin/sh -c {escaped_cmd}"
 
     # If no checks failed, we programmatically allow the execution and overwrite the args to fix model formatting errors
     respond(
