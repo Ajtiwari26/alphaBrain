@@ -26,15 +26,19 @@ def main() -> None:
     # Strictly enforce containment for file modifications
     if tool_name in ["write_to_file", "replace_file_content", "multi_replace_file_content"]:
         path = args.get("TargetFile") or args.get("AbsolutePath")
-        if path and not str(Path(path).resolve()).startswith(str(wt_path)):
-            print(json.dumps({"decision": "deny", "reason": f"Security Exception: File write path '{path}' is outside the assigned worktree '{wt_path}'"}))
-            sys.exit(0)
+        if path:
+            path = path.strip('"\'')
+            if not str(Path(path).resolve()).startswith(str(wt_path)):
+                print(json.dumps({"decision": "deny", "reason": f"Security Exception: File write path '{path}' is outside the assigned worktree '{wt_path}'"}))
+                sys.exit(0)
             
     # Strictly enforce containment for command execution environments
     if tool_name == "run_command":
         cwd = args.get("Cwd")
-        if cwd and not str(Path(cwd).resolve()).startswith(str(wt_path)):
-            print(json.dumps({"decision": "deny", "reason": f"Security Exception: Command CWD '{cwd}' is outside the assigned worktree '{wt_path}'"}))
+        if cwd:
+            cwd = cwd.strip('"\'')
+            if not str(Path(cwd).resolve()).startswith(str(wt_path)):
+                print(json.dumps({"decision": "deny", "reason": f"Security Exception: Command CWD '{cwd}' is outside the assigned worktree '{wt_path}'"}))
             sys.exit(0)
             
     # If no checks failed, we programmatically allow the execution
