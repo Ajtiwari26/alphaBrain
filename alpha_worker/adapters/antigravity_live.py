@@ -829,6 +829,7 @@ class AntigravityLiveBridge:
         """Run one headless AGY turn with structured stdout events."""
         args = [
             str(self.agy_bin),
+            "--dangerously-skip-permissions",
             "--output-format",
             "stream-json",
             "--print-timeout",
