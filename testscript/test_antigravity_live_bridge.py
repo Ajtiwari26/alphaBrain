@@ -392,12 +392,10 @@ async def test_run_agy_includes_model_and_effort(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_run_agy_injects_safety_hook(
-    monkeypatch, tmp_path
-):
-    import subprocess
+async def test_run_agy_injects_safety_hook(monkeypatch, tmp_path):
     import json
-    from alpha_core.config import settings
+    import subprocess
+
     from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
 
     mock_process = MagicMock()
@@ -427,7 +425,7 @@ async def test_run_agy_injects_safety_hook(
     # Verify the hook was injected
     hooks_file = tmp_path / ".agents" / "hooks.json"
     assert hooks_file.exists()
-    
+
     hooks_config = json.loads(hooks_file.read_text())
     hook_cmd = hooks_config["worktree-safety-gate"]["PreToolUse"][0]["hooks"][0]["command"]
     assert "ALPHA_WORKTREE_PATH=" in hook_cmd

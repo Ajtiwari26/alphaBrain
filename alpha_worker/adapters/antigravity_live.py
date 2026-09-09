@@ -451,7 +451,6 @@ def evaluate_agy_execution_outcome(
 class AntigravityLiveBridge:
     @staticmethod
     def _resolve_executable(exe: str) -> str:
-        import sys
         from pathlib import Path
 
         bin_dir = Path(sys.executable).parent
@@ -820,14 +819,14 @@ class AntigravityLiveBridge:
         if "claude" not in (model or "").lower():
             args.extend(["--effort", effort or settings.ANTIGRAVITY_EFFORT])
         args.extend(["--print", prompt])
-        
+
         # Inject the programmatic safety hook instead of the dangerous flag
         hooks_dir = worktree_path / ".agents"
         hooks_dir.mkdir(parents=True, exist_ok=True)
         hooks_file = hooks_dir / "hooks.json"
-        
+
         hook_script = Path(__file__).parent / "safety_hook.py"
-        import sys
+
         hooks_config = {
             "worktree-safety-gate": {
                 "PreToolUse": [
@@ -836,10 +835,10 @@ class AntigravityLiveBridge:
                         "hooks": [
                             {
                                 "type": "command",
-                                "command": f"ALPHA_WORKTREE_PATH='{str(worktree_path)}' '{sys.executable}' '{str(hook_script)}'",
-                                "timeout": 5
+                                "command": f"ALPHA_WORKTREE_PATH='{worktree_path!s}' '{sys.executable}' '{hook_script!s}'",
+                                "timeout": 5,
                             }
-                        ]
+                        ],
                     }
                 ]
             }
@@ -850,7 +849,7 @@ class AntigravityLiveBridge:
         else:
             assert conversation_id is not None
             args[1:1] = ["--conversation", conversation_id]
-            
+
         args.append("--dangerously-skip-permissions")
         # Do not use asyncio subprocess pipes here. AGY may spawn descendants
         # which inherit pipe descriptors; then communicate()/wait() can hang
@@ -894,7 +893,7 @@ class AntigravityLiveBridge:
 
             stdout = stdout_path.read_bytes()
             stderr = stderr_path.read_bytes()
-            
+
             with open("/tmp/agy_real_crash.log", "ab") as f:
                 f.write(b"--- AGY STDERR ---\n")
                 f.write(stderr)
@@ -959,9 +958,13 @@ class AntigravityLiveBridge:
     def _is_rate_limited(raw: dict[str, Any]) -> bool:
         if raw.get("returncode") == 429:
             return True
-        raw_output = raw.get("stdout", "").decode("utf-8", errors="replace") if isinstance(raw.get("stdout"), bytes) else str(raw.get("stdout", ""))
+        raw_output = (
+            raw.get("stdout", "").decode("utf-8", errors="replace")
+            if isinstance(raw.get("stdout"), bytes)
+            else str(raw.get("stdout", ""))
+        )
         raw_err = raw.get("stderr", "")
-        
+
         with open("/tmp/agy_crash.log", "a") as f:
             f.write(f"--- RUN ---\nSTDOUT:\n{raw_output}\nSTDERR:\n{raw_err}\n")
 
