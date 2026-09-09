@@ -336,8 +336,8 @@ def evaluate_agy_execution_outcome(
         if marker:
             valid_markers.append((i, marker, msg))
 
-    if len(valid_markers) == 1:
-        marker_idx, marker, msg = valid_markers[0]
+    if valid_markers:
+        marker_idx, marker, msg = valid_markers[-1]
         if marker_idx == len(lines) - 1:
             final_marker = marker
             blocked_msg = msg
