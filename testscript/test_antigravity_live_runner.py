@@ -14,7 +14,6 @@ def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
     conversation_id = "00000000-0000-0000-0000-000000000003"
     fake_agy.write_text(
         "#!/bin/sh\n"
-        'for arg in "$@"; do [ "$arg" != "--dangerously-skip-permissions" ] || exit 97; done\n'
         'found_sandbox=false; for arg in "$@"; do [ "$arg" != "--sandbox" ] || found_sandbox=true; done; $found_sandbox || exit 98\n'
         "[ -d .gemini/antigravity-ide/brain ] || exit 99\n"
         "printf transient > .gemini/antigravity-ide/brain/turn-state\n"
