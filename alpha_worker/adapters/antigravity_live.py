@@ -849,7 +849,7 @@ class AntigravityLiveBridge:
         worktree = worktree_path.resolve(strict=True)
         brain = worktree / ".gemini" / "antigravity-ide" / "brain"
         if brain.exists():
-            shutil.rmtree(brain, ignore_errors=True)
+            raise RuntimeError("stale AGY brain")
         brain.mkdir(parents=True, exist_ok=True)
         return brain
 
