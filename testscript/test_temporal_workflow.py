@@ -1,4 +1,5 @@
 import uuid
+from contextlib import asynccontextmanager
 
 import pytest
 from temporalio.testing import WorkflowEnvironment
@@ -12,10 +13,22 @@ from alpha_core.queue.temporal_workflow import (
 )
 
 
+@asynccontextmanager
+async def start_temporal_env():
+    try:
+        env = await WorkflowEnvironment.start_local()
+    except RuntimeError as exc:
+        if "Failed starting Temporal dev server" in str(exc) or "error sending request" in str(exc):
+            pytest.skip(f"Temporal dev server unavailable in current environment: {exc}")
+        raise
+    async with env:
+        yield env
+
+
 @pytest.mark.asyncio
 async def test_task_lifecycle_workflow():
-    # Use start_local to test workflow in real Temporal runtime
-    async with await WorkflowEnvironment.start_local() as env:
+    # Use start_temporal_env to test workflow in real Temporal runtime
+    async with start_temporal_env() as env:
         async with Worker(
             env.client,
             task_queue="task-lifecycle-queue",
@@ -48,7 +61,7 @@ async def test_task_lifecycle_workflow():
 
 @pytest.mark.asyncio
 async def test_task_lifecycle_workflow_cancellation():
-    async with await WorkflowEnvironment.start_local() as env:
+    async with start_temporal_env() as env:
         async with Worker(
             env.client,
             task_queue="task-lifecycle-queue",
@@ -72,7 +85,7 @@ async def test_task_lifecycle_workflow_cancellation():
 
 @pytest.mark.asyncio
 async def test_task_lifecycle_workflow_fail():
-    async with await WorkflowEnvironment.start_local() as env:
+    async with start_temporal_env() as env:
         async with Worker(
             env.client,
             task_queue="task-lifecycle-queue",
@@ -97,7 +110,7 @@ async def test_task_lifecycle_workflow_fail():
 
 @pytest.mark.asyncio
 async def test_task_lifecycle_workflow_missing_id():
-    async with await WorkflowEnvironment.start_local() as env:
+    async with start_temporal_env() as env:
         async with Worker(
             env.client,
             task_queue="task-lifecycle-queue",
