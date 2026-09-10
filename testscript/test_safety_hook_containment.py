@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -46,7 +47,6 @@ def test_command_requires_cwd_and_command(tmp_path, args):
     assert hook.decide(request("run_command", args), tmp_path)["decision"] == "deny"
 
 
-import os
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="Requires macOS kernel sandbox")
 @pytest.mark.skipif(

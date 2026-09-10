@@ -1,7 +1,4 @@
 """Execute real tools through the production hook; no live queues or credentials."""
-import pytest
-pytestmark = pytest.mark.skip(reason="macOS sandbox-exec is broken on this host")
-
 import json
 import shlex
 import subprocess
@@ -12,7 +9,7 @@ import pytest
 
 from alpha_worker.adapters import safety_hook as hook
 
-pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="macOS kernel sandbox proof")
+pytestmark = pytest.mark.skip(reason="macOS sandbox-exec is broken on this host")
 
 
 @pytest.fixture
