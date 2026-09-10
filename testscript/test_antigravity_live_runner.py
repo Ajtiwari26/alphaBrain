@@ -47,21 +47,26 @@ def test_agy_turn_returns_when_child_keeps_inherited_output_open(tmp_path):
     assert "SUCCESS" in (tmp_path / "agy.json").read_text()
 
 
-def test_agy_turn_rejects_stale_task_brain(tmp_path):
+def test_agy_turn_cleans_stale_task_brain(tmp_path, monkeypatch, caplog):
     brain = tmp_path / ".gemini/antigravity-ide/brain"
     brain.mkdir(parents=True)
     bridge = AntigravityLiveBridge()
 
-    with pytest.raises(RuntimeError, match="stale AGY brain"):
-        asyncio.run(
-            bridge._run_agy(
-                prompt="test",
-                worktree_path=tmp_path,
-                conversation_id=None,
-                is_new_project=True,
-                timeout_seconds=60,
-            )
+    async def mock_run_agy_with_task_brain(*args, **kwargs):
+        return {"status": "mocked"}
+
+    monkeypatch.setattr(bridge, "_run_agy_with_task_brain", mock_run_agy_with_task_brain)
+
+    asyncio.run(
+        bridge._run_agy(
+            prompt="test",
+            worktree_path=tmp_path,
+            conversation_id=None,
+            is_new_project=True,
+            timeout_seconds=60,
         )
+    )
+    assert "stale AGY brain" in caplog.text
 
 
 @pytest.mark.asyncio

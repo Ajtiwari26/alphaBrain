@@ -846,10 +846,13 @@ class AntigravityLiveBridge:
     @staticmethod
     def _prepare_task_brain(worktree_path: Path) -> Path:
         """Create only AGY's required transient brain path inside this worktree."""
+        import logging
+        logger = logging.getLogger(__name__)
         worktree = worktree_path.resolve(strict=True)
         brain = worktree / ".gemini" / "antigravity-ide" / "brain"
         if brain.exists():
-            raise RuntimeError("stale AGY brain")
+            logger.warning("stale AGY brain")
+            shutil.rmtree(brain, ignore_errors=True)
         brain.mkdir(parents=True, exist_ok=True)
         return brain
 
