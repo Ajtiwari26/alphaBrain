@@ -1,8 +1,10 @@
+import asyncio
 import logging
 from datetime import timedelta
 
 from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ApplicationError
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ async def complete_task(task_id: str, result: dict) -> dict:
     return {"status": "completed", "task_id": task_id, "result": result}
 
 
-@workflow.defn
+@workflow.defn(sandboxed=False)
 class TaskLifecycleWorkflow:
     def __init__(self) -> None:
         self._status = "pending"
@@ -41,7 +43,7 @@ class TaskLifecycleWorkflow:
     async def run(self, payload: dict) -> dict:
         task_id = payload.get("task_id")
         if not task_id:
-            raise ValueError("task_id is required in payload")
+            raise ApplicationError("task_id is required in payload", non_retryable=True)
 
         # 1. Admit
         await workflow.execute_activity(
@@ -58,7 +60,7 @@ class TaskLifecycleWorkflow:
                 lambda: self._leased or self._failed or self._cancelled,
                 timeout=timedelta(hours=24)
             )
-        except TimeoutError:
+        except (TimeoutError, asyncio.TimeoutError):  # noqa: UP041
             self._status = "failed"
             self._error = "timeout waiting for lease"
             return {"task_id": task_id, "final_status": self._status, "error": self._error}
@@ -85,7 +87,7 @@ class TaskLifecycleWorkflow:
                 lambda: self._completed or self._failed or self._cancelled,
                 timeout=timedelta(hours=24)
             )
-        except TimeoutError:
+        except (TimeoutError, asyncio.TimeoutError):  # noqa: UP041
             self._status = "failed"
             self._error = "timeout waiting for completion"
             return {"task_id": task_id, "final_status": self._status, "error": self._error}

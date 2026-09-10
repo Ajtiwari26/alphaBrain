@@ -13,7 +13,6 @@ from alpha_core.queue.temporal_workflow import (
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Sandbox network isolation prevents downloading Temporal dev server")
 async def test_task_lifecycle_workflow():
     # Use start_local to test workflow in real Temporal runtime
     async with await WorkflowEnvironment.start_local() as env:
@@ -48,7 +47,6 @@ async def test_task_lifecycle_workflow():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Sandbox network isolation prevents downloading Temporal dev server")
 async def test_task_lifecycle_workflow_timeout():
     async with await WorkflowEnvironment.start_local() as env:
         async with Worker(
@@ -73,7 +71,6 @@ async def test_task_lifecycle_workflow_timeout():
             assert result["final_status"] == "cancelled"
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Sandbox network isolation prevents downloading Temporal dev server")
 async def test_task_lifecycle_workflow_missing_id():
     async with await WorkflowEnvironment.start_local() as env:
         async with Worker(
@@ -90,4 +87,4 @@ async def test_task_lifecycle_workflow_missing_id():
                     id="missing-id-test",
                     task_queue="task-lifecycle-queue",
                 )
-            assert "task_id is required" in str(exc.value)
+            assert "task_id is required" in str(exc.value.cause)
