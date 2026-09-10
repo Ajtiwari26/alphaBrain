@@ -688,6 +688,20 @@ class TriageTaskDispatcher:
             old_inst = env_dict.get("detailed_instructions") or ""
             env_dict["detailed_instructions"] = old_inst + repair_block
 
+        senior_review = leased_task.get("result", {}).get("senior_review", {})
+        if not senior_review.get("approved", True):
+            details = senior_review.get("details", {})
+            pro_findings = details.get("pro_review_text", "")
+            opus_findings = details.get("opus_review_text", "")
+            if pro_findings or opus_findings:
+                repair_block = (
+                    f"\n\n## 🚨 SENIOR ENGINEERING REVIEW REPAIR DIRECTIVES\n"
+                    f"### Gemini 3.1 Pro High:\n{pro_findings}\n\n"
+                    f"### Claude Opus 4.6 Thinking:\n{opus_findings}\n"
+                )
+                old_inst = env_dict.get("detailed_instructions") or ""
+                env_dict["detailed_instructions"] = old_inst + repair_block
+
         blueprint_json = leased_task.get("plan_blueprint_json")
         if blueprint_json:
             try:

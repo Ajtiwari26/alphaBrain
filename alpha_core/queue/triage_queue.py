@@ -1034,35 +1034,40 @@ class TaskTriageQueue:
     ) -> bool:
         """
         Transitions a COMPLETED task that failed Senior Review back to APPROVED,
-        appending the senior repair directives to its instructions so the worker agent
-        can resume the worktree and execute the repairs autonomously.
+        recording the senior repair directives in provenance so the worker agent
+        can resume the worktree and execute the repairs autonomously without breaking
+        the cryptographic planning request digest.
         """
         now = time.time()
 
         def _reopen_repair(conn: sqlite3.Connection) -> bool:
             cursor = conn.execute(
-                "SELECT envelope_json FROM task_triage_queue WHERE id = ? AND status = ?;",
+                "SELECT provenance_json FROM task_triage_queue WHERE id = ? AND status = ?;",
                 (task_id, TriageStatus.COMPLETED.value),
             )
             row = cursor.fetchone()
             if not row:
                 return False
-            env = json.loads(row[0]) if row[0] else {}
-            old_inst = env.get("detailed_instructions", "")
-            env["detailed_instructions"] = (
-                f"{old_inst}\n\n## 🚨 Senior Engineering Review Repair Directives\n{repair_directives}"
-            )
 
-            new_envelope_json = json.dumps(env, sort_keys=True, separators=(",", ":"), default=str)
-            new_content_hash = hashlib.sha256(new_envelope_json.encode("utf-8")).hexdigest()
+            provenance_dict = json.loads(row[0]) if row[0] else {}
+            if "audit_history" not in provenance_dict:
+                provenance_dict["audit_history"] = []
+            provenance_dict["audit_history"].append(
+                {
+                    "action": "senior_repair_queued",
+                    "timestamp": now,
+                    "repair_directives": repair_directives,
+                }
+            )
+            new_provenance_json = json.dumps(provenance_dict, default=str)
 
             cursor.execute(
                 """
                 UPDATE task_triage_queue
-                SET status = ?, envelope_json = ?, content_hash = ?, updated_at = ?
+                SET status = ?, provenance_json = ?, updated_at = ?
                 WHERE id = ?;
                 """,
-                (TriageStatus.APPROVED.value, new_envelope_json, new_content_hash, now, task_id),
+                (TriageStatus.APPROVED.value, new_provenance_json, now, task_id),
             )
             return cursor.rowcount > 0
 
