@@ -32,11 +32,16 @@ class TaskLifecycleWorkflow:
         self._status = "pending"
         self._leased = False
         self._completed = False
+        self._failed = False
+        self._cancelled = False
         self._result: dict | None = None
+        self._error: str | None = None
 
     @workflow.run
     async def run(self, payload: dict) -> dict:
-        task_id = payload.get("task_id", "unknown")
+        task_id = payload.get("task_id")
+        if not task_id:
+            raise ValueError("task_id is required in payload")
 
         # 1. Admit
         await workflow.execute_activity(
@@ -47,8 +52,23 @@ class TaskLifecycleWorkflow:
         )
         self._status = "admitted"
 
-        # Wait for lease signal
-        await workflow.wait_condition(lambda: self._leased)
+        # Wait for lease signal, failure, or cancellation
+        try:
+            await workflow.wait_condition(
+                lambda: self._leased or self._failed or self._cancelled,
+                timeout=timedelta(hours=24)
+            )
+        except TimeoutError:
+            self._status = "failed"
+            self._error = "timeout waiting for lease"
+            return {"task_id": task_id, "final_status": self._status, "error": self._error}
+
+        if self._cancelled:
+            self._status = "cancelled"
+            return {"task_id": task_id, "final_status": self._status}
+        if self._failed:
+            self._status = "failed"
+            return {"task_id": task_id, "final_status": self._status, "error": self._error}
 
         # 2. Lease
         await workflow.execute_activity(
@@ -59,8 +79,23 @@ class TaskLifecycleWorkflow:
         )
         self._status = "executing"
 
-        # Wait for complete signal
-        await workflow.wait_condition(lambda: self._completed)
+        # Wait for complete signal, failure, or cancellation
+        try:
+            await workflow.wait_condition(
+                lambda: self._completed or self._failed or self._cancelled,
+                timeout=timedelta(hours=24)
+            )
+        except TimeoutError:
+            self._status = "failed"
+            self._error = "timeout waiting for completion"
+            return {"task_id": task_id, "final_status": self._status, "error": self._error}
+
+        if self._cancelled:
+            self._status = "cancelled"
+            return {"task_id": task_id, "final_status": self._status}
+        if self._failed:
+            self._status = "failed"
+            return {"task_id": task_id, "final_status": self._status, "error": self._error}
 
         # 3. Complete
         await workflow.execute_activity(
@@ -71,7 +106,7 @@ class TaskLifecycleWorkflow:
         )
         self._status = "completed"
 
-        return {"task_id": task_id, "final_status": self._status}
+        return {"task_id": task_id, "final_status": self._status, "result": self._result}
 
     @workflow.signal
     def signal_lease(self) -> None:
@@ -81,3 +116,12 @@ class TaskLifecycleWorkflow:
     def signal_complete(self, result: dict) -> None:
         self._result = result
         self._completed = True
+
+    @workflow.signal
+    def signal_fail(self, error: str) -> None:
+        self._error = error
+        self._failed = True
+
+    @workflow.signal
+    def signal_cancel(self) -> None:
+        self._cancelled = True
