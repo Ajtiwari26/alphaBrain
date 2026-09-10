@@ -849,8 +849,8 @@ class AntigravityLiveBridge:
         worktree = worktree_path.resolve(strict=True)
         brain = worktree / ".gemini" / "antigravity-ide" / "brain"
         if brain.exists():
-            raise RuntimeError("Refusing stale AGY brain state in task worktree")
-        brain.mkdir(parents=True)
+            shutil.rmtree(brain, ignore_errors=True)
+        brain.mkdir(parents=True, exist_ok=True)
         return brain
 
     @staticmethod
@@ -1189,7 +1189,7 @@ Detailed instructions: {task.detailed_instructions or "None"}
 Validate scope. Output max five-line plan.
 
 3. PRE-EDIT GRAPH CHECKS:
-If `code-review-graph` MCP tools are available, call `build_or_update_graph_tool` then `get_review_context_tool`. If unavailable or denied by containment, proceed directly to Bounded Implementation.
+If `code-review-graph` MCP tools are available, call `build_or_update_graph_tool` then `get_review_context_tool` (pass Arguments: {{"detail_level": "minimal"}}). If output is truncated to an external file, do NOT attempt to read files outside the worktree; proceed directly to Bounded Implementation. If unavailable or denied by containment, proceed directly to Bounded Implementation.
 
 4. BOUNDED IMPLEMENTATION:
 Implement ONLY in allowed paths.
@@ -1199,7 +1199,7 @@ Run exact declared acceptance commands. Capture exit code and output. NEVER subs
 {browser_rule}
 
 6. POST-EDIT GRAPH CHECKS:
-If review graph tools are available, call them again. Otherwise proceed directly to QA Manifest.
+If review graph tools are available, call them again (pass Arguments: {{"detail_level": "minimal"}}). If output is truncated, do NOT attempt to read external files. Otherwise proceed directly to QA Manifest.
 
 7. QA MANIFEST:
 Emit a single-line JSON manifest before termination exactly matching this format (no extra colons or newlines):
@@ -1298,8 +1298,7 @@ Project: {task.project_id}
 Workspace: {worktree_path}
 Exact blocker: {dispatch.blocked_reason}
 
-Do not start another project. First use code-review-graph `get_review_context_tool` now, inspect
-its findings, and repair any material issue yourself. Preserve verified work unless a finding
+Do not start another project. First use code-review-graph `get_review_context_tool` now (pass Arguments: {{"detail_level": "minimal"}}). If output is truncated to an external file, do NOT attempt to read files outside your worktree; proceed directly to gates. Inspect its findings, and repair any material issue yourself. Preserve verified work unless a finding
 requires a change. Rerun every declared gate, then emit updated {QA_EVIDENCE_TOKEN}<JSON> and
 {COMPLETION_TOKEN}. Do not report completion without executing missing tool.
 """

@@ -605,6 +605,36 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     return 0
 
 
+def cmd_senior_research(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    """Execute live LLM research using Web Search and GitHub MCP to compile a ResearchSnapshot."""
+    from alpha_core.planning.research_agent import ResearchAgent
+
+    task = queue.get_task(args.task_id)
+    if not task or task["status"] != "pending_review" or queue.is_emergency_stopped():
+        print("Error: Research requires a pending task and no emergency stop.", file=sys.stderr)
+        return 2
+
+    try:
+        agent = ResearchAgent(queue)
+        snapshot = agent.execute_research_phase(args.task_id)
+
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(snapshot.model_dump_json(indent=2))
+
+        print(f"✅ Live Research complete! Snapshot saved to: {output_path}")
+        print(json.dumps({
+            "task_id": args.task_id,
+            "status": "research_complete",
+            "sources_found": len(snapshot.sources),
+            "snapshot_path": str(output_path)
+        }))
+        return 0
+    except Exception as exc:
+        print(f"Error: Senior research failed ({type(exc).__name__}): {exc}", file=sys.stderr)
+        return 2
+
+
 def cmd_senior_plan(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     """Plan a pending task without granting execution or modifying its request."""
     from alpha_core.planning.research_broker import ResearchBroker
@@ -1327,6 +1357,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
     p_admit.add_argument("--json", action="store_true", help="Output JSON format")
 
+    # senior-research: runs agentic research.
+    p_research = subparsers.add_parser(
+        "senior-research", help="Execute live LLM research using Web Search and GitHub MCP"
+    )
+    p_research.add_argument("task_id")
+    p_research.add_argument("--output", required=True, help="Output path for the generated ResearchSnapshot JSON")
+
     # senior-plan: never edits the envelope or grants execution approval.
     p_plan = subparsers.add_parser(
         "senior-plan", help="Draft and critique a plan from a task-bound research snapshot"
@@ -1409,6 +1446,7 @@ def main(argv: list[str] | None = None) -> int:
         "emergency-status": cmd_emergency_status,
         "worker-cycle": cmd_worker_cycle,
         "senior-review": cmd_senior_review,
+        "senior-research": cmd_senior_research,
         "senior-plan": cmd_senior_plan,
         "merge": cmd_merge,
         "export-audit": cmd_export_audit,

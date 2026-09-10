@@ -214,7 +214,7 @@ class TriageTaskDispatcher:
                 parts = line.strip().split(maxsplit=1)
                 if len(parts) == 2:
                     f = parts[1].strip('"')
-                    if f not in changed_files:
+                    if f not in changed_files and f not in ("code_review_graph.md",):
                         changed_files.append(f)
 
         # 2. Diff stat

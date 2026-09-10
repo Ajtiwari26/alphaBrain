@@ -335,8 +335,6 @@ class SeniorReviewEngine:
         from alpha_worker.code_review_graph import extract_code_review_graph
 
         graph_md = extract_code_review_graph(worktree_path, diff_content)
-        graph_artifact_path = Path(worktree_path) / "code_review_graph.md"
-        graph_artifact_path.write_text(graph_md, encoding="utf-8")
 
         # --- Round 1 Step 1: Gemini 3.1 Pro High ---
         logger.info("Executing Senior Review Round 1 (Gemini 3.1 Pro High) for %s...", task_id)
@@ -358,6 +356,7 @@ Code Review Graph (Dependency Impacts):
 {graph_md}
 
 Review Instructions:
+Please evaluate the provided Git Diff. Do not attempt to use tools to execute commands or read source files, as tool execution is restricted in this review environment. Rely entirely on the diff and dependency graph provided below.
 1. Verify correct implementation of the objective.
 2. Check security, boundary validation, and zero secret leakage.
 3. Check test coverage and acceptance criteria.
