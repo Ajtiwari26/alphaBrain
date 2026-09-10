@@ -403,10 +403,10 @@ Git Diff:
 Code Review Graph (Dependency Impacts):
 {graph_md}
 
-Instructions:
-1. Verify overall system design and AlphaBrain Invariant compliance.
-2. Inspect source files in the candidate worktree at {worktree_path} to verify runtime correctness.
-3. Render your authoritative final ruling explicitly by outputting a strict JSON verdict.
+Review Instructions:
+1. Verify overall system design and AlphaBrain Invariant compliance based on the Git Diff above.
+2. Do not attempt to use tools to read files or execute commands. Rely entirely on the diff provided above.
+3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
         opus_res = self._invoke_agy(
             "claude-opus-4-6-thinking",

@@ -52,7 +52,8 @@ class LiveSwitchRunner:
     """Real implementation that calls agy-switch."""
 
     async def switch_account(self, account_id: str) -> None:
-        cmd = ["agy-switch", "switch", account_id]
+        # Pass --cli explicitly so we strictly mutate the CLI token for Opus without touching the IDE
+        cmd = ["agy-switch", "switch", account_id, "--cli"]
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )

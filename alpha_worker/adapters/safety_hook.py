@@ -110,6 +110,8 @@ def sandbox_profile(worktree: Path) -> str:
             "(version 1)",
             "(allow default)",
             "(deny network*)",
+            '(allow network* (local ip "localhost:*"))',
+            '(allow network* (remote ip "localhost:*"))',
             "(deny file-read-data)",
             "(deny file-write*)",
             task_scope("file-read-data"),
