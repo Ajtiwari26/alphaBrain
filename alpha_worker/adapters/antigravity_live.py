@@ -942,6 +942,7 @@ class AntigravityLiveBridge:
                     "list_dir(*)",
                     "view_file(*)",
                     "grep_search(*)",
+                    "call_mcp_tool(*)",
                 ]
             }
         }
@@ -1174,7 +1175,7 @@ Detailed instructions: {task.detailed_instructions or "None"}
 Validate scope. Output max five-line plan.
 
 3. PRE-EDIT GRAPH CHECKS:
-Call `code-review-graph` MCP tools: `build_or_update_graph_tool` then `get_review_context_tool`. Respect tool schema.
+If `code-review-graph` MCP tools are available, call `build_or_update_graph_tool` then `get_review_context_tool`. If unavailable or denied by containment, proceed directly to Bounded Implementation.
 
 4. BOUNDED IMPLEMENTATION:
 Implement ONLY in allowed paths.
@@ -1184,7 +1185,7 @@ Run exact declared acceptance commands. Capture exit code and output. NEVER subs
 {browser_rule}
 
 6. POST-EDIT GRAPH CHECKS:
-Call review graph tools again. Fix material findings.
+If review graph tools are available, call them again. Otherwise proceed directly to QA Manifest.
 
 7. QA MANIFEST:
 Emit a single-line JSON manifest before termination exactly matching this format (no extra colons or newlines):

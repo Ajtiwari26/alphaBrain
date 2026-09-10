@@ -190,6 +190,11 @@ def decide(payload: Any, worktree: Path) -> dict[str, Any]:
             ]
             args["Cwd"] = str(cwd)
             args["CommandLine"] = shlex.join(argv)
+        elif name == "call_mcp_tool":
+            server = args.get("ServerName")
+            if server == "code-review-graph":
+                return {"decision": "allow", "overwrite": args}
+            return deny("Tool has no containment policy")
         else:
             return deny("Tool has no containment policy")
     except (ValueError, OSError):
