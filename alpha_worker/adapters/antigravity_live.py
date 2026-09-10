@@ -957,72 +957,87 @@ class AntigravityLiveBridge:
         # which inherit pipe descriptors; then communicate()/wait() can hang
         # after AGY itself has exited. File-backed logs plus poll() give this
         # supervisor a bounded, observable lifecycle.
-        with tempfile.TemporaryDirectory(prefix="alpha-agy-") as log_dir:
-            stdout_path = Path(log_dir) / "stdout.ndjson"
-            stderr_path = Path(log_dir) / "stderr.log"
-            with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-                process = subprocess.Popen(
-                    args,
-                    cwd=str(worktree_path),
-                    stdout=stdout_file,
-                    stderr=stderr_file,
-                    start_new_session=True,
-                )
-                deadline = asyncio.get_running_loop().time() + max(90, timeout_seconds + 30)
-                try:
-                    while process.poll() is None:
-                        if asyncio.get_running_loop().time() >= deadline:
-                            self._terminate_process_group(process.pid)
-                            await asyncio.sleep(2)
-                            if process.poll() is None:
-                                self._kill_process_group(process.pid)
-                            return {
-                                "returncode": -1,
-                                "events": [],
-                                "stderr": "AGY CLI timed out",
-                            }
-                        await asyncio.sleep(0.5)
-                except asyncio.CancelledError:
+        try:
+            with tempfile.TemporaryDirectory(prefix="alpha-agy-") as log_dir:
+                stdout_path = Path(log_dir) / "stdout.ndjson"
+                stderr_path = Path(log_dir) / "stderr.log"
+                with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
+                    process = subprocess.Popen(
+                        args,
+                        cwd=str(worktree_path),
+                        stdout=stdout_file,
+                        stderr=stderr_file,
+                        start_new_session=True,
+                    )
+                    deadline = asyncio.get_running_loop().time() + max(90, timeout_seconds + 30)
+                    try:
+                        while process.poll() is None:
+                            if asyncio.get_running_loop().time() >= deadline:
+                                self._terminate_process_group(process.pid)
+                                await asyncio.sleep(2)
+                                if process.poll() is None:
+                                    self._kill_process_group(process.pid)
+                                return {
+                                    "returncode": -1,
+                                    "events": [],
+                                    "stderr": "AGY CLI timed out",
+                                }
+                            await asyncio.sleep(0.5)
+                    except asyncio.CancelledError:
+                        self._terminate_process_group(process.pid)
+                        await asyncio.sleep(0.2)
+                        if process.poll() is None:
+                            self._kill_process_group(process.pid)
+                        raise
+
+                    # Background descendants are never valid post-turn work.
                     self._terminate_process_group(process.pid)
-                    await asyncio.sleep(0.2)
-                    if process.poll() is None:
-                        self._kill_process_group(process.pid)
-                    raise
 
-                # Background descendants are never valid post-turn work.
-                self._terminate_process_group(process.pid)
+                stdout = stdout_path.read_bytes()
+                stderr = stderr_path.read_bytes()
 
-            stdout = stdout_path.read_bytes()
-            stderr = stderr_path.read_bytes()
-
-        if log_path:
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_path.write_text(
-                json.dumps(
-                    {
-                        "recorded_at": datetime.now(UTC).isoformat(),
-                        "returncode": process.returncode,
-                        "stdout": stdout.decode("utf-8", errors="replace"),
-                        "stderr": stderr.decode("utf-8", errors="replace"),
-                    },
-                    indent=2,
+            if log_path:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                log_path.write_text(
+                    json.dumps(
+                        {
+                            "recorded_at": datetime.now(UTC).isoformat(),
+                            "returncode": process.returncode,
+                            "stdout": stdout.decode("utf-8", errors="replace"),
+                            "stderr": stderr.decode("utf-8", errors="replace"),
+                        },
+                        indent=2,
+                    )
                 )
-            )
-            log_path.chmod(0o600)
+                log_path.chmod(0o600)
 
-        events: list[dict[str, Any]] = []
-        for line in stdout.decode("utf-8", errors="replace").splitlines():
+            events: list[dict[str, Any]] = []
+            for line in stdout.decode("utf-8", errors="replace").splitlines():
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(event, dict):
+                    events.append(event)
+            return {
+                "returncode": process.returncode,
+                "events": events,
+                "stderr": stderr.decode("utf-8", errors="replace")[-4000:],
+            }
+        finally:
             try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(event, dict):
-                events.append(event)
-        return {
-            "returncode": process.returncode,
-            "events": events,
-            "stderr": stderr.decode("utf-8", errors="replace")[-4000:],
-        }
+                subprocess.run(
+                    ["git", "checkout", "--", ".agents"],
+                    cwd=str(worktree_path),
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "clean", "-fd", ".agents"],
+                    cwd=str(worktree_path),
+                    capture_output=True,
+                )
+            except Exception:
+                pass
 
     @staticmethod
     def _turn_log_path(session_dir: Path | None, turn: str) -> Path | None:
