@@ -942,7 +942,6 @@ class AntigravityLiveBridge:
                     "list_dir(*)",
                     "view_file(*)",
                     "grep_search(*)",
-                    "call_mcp_tool(*)",
                 ]
             }
         }
