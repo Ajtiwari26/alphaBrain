@@ -1908,3 +1908,314 @@ T2.1 scope: `testscript/test_adapters.py`, `testscript/test_adapter_conformance.
 
 *End of Section 6.10 — Astra T2 Acceptance Gate Scoping & Legacy Test Debt Resolution*
 
+---
+
+### 6.11 Scratch Hygiene, Universal Gate Scoping & Worker Iteration Test Strategy (Ruling 2026-09-10)
+
+**Ruling Authority:** Claude Opus 4.6 (Thinking) — Supreme Lead Architect
+**Date:** 2026-09-10T14:39:52+05:30
+**Prior Assessment:** Gemini 3.1 Pro High — Staff Engineer Assessment (4 proposals, 3 concurred, 1 rejected)
+**Incident Reference:** Task `tsk_eva_f92e9acb25b0` — Worker stall in isolated worktree (>20 minutes)
+**Context:** Resolution of structural Catch-22 between global gate commands, path confinement, and committed scratch debt
+
+---
+
+#### 6.11.1 Incident Root Cause Analysis
+
+During autonomous execution of `tsk_eva_f92e9acb25b0` (Objective: Fix test suite and global ruff lint), the AGY junior worker encountered a **structurally unfixable deadlock**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    THE CATCH-22 (Root Cause)                            │
+│                                                                         │
+│  ┌──────────────────┐     ┌──────────────────┐     ┌────────────────┐  │
+│  │  allowed_paths:   │     │  Acceptance Gate: │     │   scratch/:    │  │
+│  │  alpha_core/      │     │  ruff check .     │     │  3 .py files   │  │
+│  │  alpha_worker/    │ ──▶ │  pytest -q        │ ──▶ │  20 lint errs  │  │
+│  │  alpha_protocol/  │     │  (GLOBAL scope)   │     │  COMMITTED     │  │
+│  │  testscript/      │     │                   │     │  NOT excluded  │  │
+│  └──────────────────┘     └──────────────────┘     └────────────────┘  │
+│                                                                         │
+│  Worker CANNOT fix scratch/ (outside allowed_paths) ← Security Gate    │
+│  Worker CANNOT pass ruff check . (scratch/ has 20 errors) ← Lint Gate  │
+│  Worker loops through 916 tests per turn (~5 min/run) ← Time Drain    │
+│                                                                         │
+│  RESULT: 20+ minute stall → Watchdog reap candidate                    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Three independent failures converged:**
+
+| # | Failure | Category | Responsible Component |
+|---|---------|----------|-----------------------|
+| 1 | `scratch/` is git-tracked with 3 committed `.py` prototype scripts | **Hygiene debt** | Repository maintainer (human) |
+| 2 | `pyproject.toml` excludes `testscript/scratch` but NOT top-level `scratch/` from ruff | **Configuration gap** | `pyproject.toml` author |
+| 3 | Acceptance gate specifies `ruff check .` (global) for a worker with bounded `allowed_paths` | **Gate scoping violation** | Task packet author (I-37 incomplete) |
+
+The worker correctly identified the conflict and halted with `ALPHA_BRAIN_TASK_BLOCKED`. This is the **correct** Junior Execution Contract behavior (§1). The defect is in the infrastructure, not the worker.
+
+---
+
+#### 6.11.2 Scratch & Prototype Hygiene Policy (I-38)
+
+> [!CAUTION]
+> **I-38 (Scratch & Prototype Hygiene Invariant)**
+>
+> The `scratch/` directory at the repository root is a **throwaway workspace** for ad-hoc prototyping, one-off debug scripts, and ephemeral task packets. It MUST satisfy ALL of the following constraints:
+>
+> 1. **Git-ignored:** `scratch/` MUST be listed in `.gitignore`. Any currently tracked files under `scratch/` MUST be removed from the index via `git rm --cached scratch/` (preserving local copies) and committed as part of this remediation.
+> 2. **Excluded from all static analysis:** `scratch/` MUST appear in the `exclude` lists of ALL tooling configurations in `pyproject.toml`:
+>    - `[tool.ruff] exclude` — prevents lint scanning
+>    - `[tool.mypy] exclude` — prevents type checking
+>    - `[tool.pytest.ini_options] norecursedirs` — prevents test discovery
+> 3. **Never in `allowed_paths`:** No task packet shall include `scratch/` or any sub-path thereof in `allowed_paths`. Scratch files are not production code and must never be a worker's responsibility.
+> 4. **No CI/CD integration:** Scratch files MUST NOT appear in any CI pipeline step, pre-commit hook, or automated quality gate.
+> 5. **Periodic pruning:** Contents of `scratch/` may be deleted at any time without warning. No script in `scratch/` may be imported by production code. If a scratch script matures into a permanent utility, it MUST be moved to an appropriate module directory and subjected to full linting/testing.
+>
+> **Violation of any clause is a blocking defect.** Any PR that commits new files to `scratch/` (re-tracking after `.gitignore` addition) will be rejected at Senior Review.
+
+**Scope:** This policy applies to ALL AlphaBrain repositories (alphaBrain, deploymate, and any future federated repos under P11).
+
+**Rationale for REJECTING Gemini Pro Option 2:**
+
+Gemini Pro's Option 2 (add `scratch/` to `allowed_paths` so the worker can fix its lint errors) is **architecturally rejected**. The worker's blast radius should never include throwaway scripts. Adding debug debris to a production task's scope:
+- Violates the principle of minimal blast radius (I-28)
+- Creates precedent for scope creep in task packets
+- Conflates "fix production lint" with "clean up prototyping workspace"
+- Rewards committing scratch files by making workers responsible for them
+
+**The correct remediation is infrastructure-level exclusion (Option 1), not worker-level inclusion.**
+
+---
+
+#### 6.11.3 Universal Acceptance Gate Scoping (I-39 — Extends I-37)
+
+> [!IMPORTANT]
+> **I-39 (Universal Acceptance Gate Scoping)**
+>
+> Invariant I-37 (§6.10.3) established acceptance gate scoping for `pytest`. This invariant **generalizes the principle to ALL acceptance gate tools**: linters, type checkers, formatters, and any future static analysis commands.
+>
+> For ANY task where `allowed_paths ≠ ["."]`:
+>
+> | Tool | ❌ Prohibited (Global) | ✅ Required (Scoped) |
+> |------|----------------------|---------------------|
+> | **pytest** | `pytest -q` | `pytest -q testscript/test_specific.py` or `pytest -q testscript/test_module_*.py` |
+> | **ruff** | `ruff check .` | `ruff check alpha_core/ alpha_worker/` (matching `allowed_paths`) |
+> | **mypy** | `mypy .` | `mypy alpha_core/ alpha_worker/` (matching `allowed_paths`) |
+> | **any linter** | `<tool> .` | `<tool> <allowed_paths>` |
+>
+> **Scoping Rule:** The union of paths passed to acceptance gate commands MUST be a **subset of or equal to** the task's `allowed_paths`. A gate command that scans paths outside `allowed_paths` creates an unfixable Catch-22 for bounded workers.
+>
+> **Enforcement Point:** `cmd_admit` in `triage_cli.py` — MUST validate that acceptance command paths are within `allowed_paths` before admitting the task to the queue. Tasks failing this validation are rejected with reason `GATE_SCOPE_MISMATCH`.
+>
+> **Failure Mode:** Worker correctly halts with `ALPHA_BRAIN_TASK_BLOCKED`; the defect is in the task definition, not the worker.
+
+**Relationship to I-37:** I-37 is subsumed by I-39. I-37 remains valid and is not deprecated — it provides the specific `pytest` scoping tiers (T1/T2/T3 in §6.10.5) which remain authoritative. I-39 extends the same principle to all tools.
+
+---
+
+#### 6.11.4 Worker Iteration Test Execution Strategy (I-40)
+
+> [!IMPORTANT]
+> **I-40 (Two-Tier Test Execution Strategy)**
+>
+> Worker test execution follows a strict two-tier model to prevent the pathological case of running 916+ tests on every iteration cycle:
+>
+> **Tier 1 — Inner Iteration (Worker Turn-by-Turn):**
+> - Runs scoped tests matching the task's `allowed_paths`
+> - Maximum wall-clock budget: 120 seconds per gate command (I-26)
+> - Example: `pytest -q testscript/test_eva_*.py -x --tb=short`
+> - Purpose: Rapid feedback loop for iterative development
+>
+> **Tier 2 — Merge Gate (Full Regression):**
+> - Runs the complete test suite: `pytest -q` (repo-wide)
+> - Runs global linting: `ruff check .`, `mypy .`
+> - Triggered: ONLY at PR merge time via `cmd_merge` (§6.8.4) or CI pipeline
+> - Purpose: Catch cross-module regressions before integration
+>
+> | Property | Tier 1 (Inner) | Tier 2 (Merge Gate) |
+> |----------|----------------|---------------------|
+> | **Scope** | `allowed_paths` only | Entire repository |
+> | **Frequency** | Every worker turn | Once per task completion |
+> | **Budget** | 120s per command | 600s total (P9 Law 4) |
+> | **Runner** | Worker daemon in worktree | CI system or `cmd_merge` |
+> | **Failure** | Task `FAILED` (retryable) | PR blocked, requires repair |
+>
+> **The worker MUST NOT run Tier 2 commands during inner iterations.** This is not a suggestion — it is a hard constraint. A worker running `pytest -q` (916 tests, ~5 min) on every turn will exhaust its 15-minute watchdog timeout (I-28) within 2-3 turns, leaving no time for actual code modification.
+
+---
+
+#### 6.11.5 Resolution Plan for Task `tsk_eva_f92e9acb25b0`
+
+**Status:** BLOCKED → REMEDIATION IN PROGRESS
+
+**Step 1 — Infrastructure Remediation (Immediate, Human-Initiated):**
+
+```bash
+# 1a. Add scratch/ to .gitignore
+echo -e "\n# Scratch workspace — ephemeral prototyping (I-38)\nscratch/" >> .gitignore
+
+# 1b. Untrack committed scratch files (preserves local copies)
+git rm --cached -r scratch/
+
+# 1c. Add scratch/ to ruff exclude in pyproject.toml
+# (Edit [tool.ruff] exclude to include "scratch/")
+
+# 1d. Add scratch/ to mypy exclude in pyproject.toml
+# (Edit [tool.mypy] exclude to include "scratch/")
+
+# 1e. Commit remediation
+git add .gitignore pyproject.toml
+git commit -m "fix(infra): exclude scratch/ from git tracking and all tooling gates
+
+Resolves: tsk_eva_f92e9acb25b0 Catch-22
+Invariant: I-38 (Scratch & Prototype Hygiene)
+Invariant: I-39 (Universal Acceptance Gate Scoping)"
+```
+
+**Step 2 — Task Packet Amendment:**
+
+Re-issue `tsk_eva_f92e9acb25b0` with corrected acceptance gates:
+
+```json
+{
+  "task_id": "tsk_eva_f92e9acb25b0_v2",
+  "title": "Fix test suite and ruff lint for core modules",
+  "allowed_paths": ["alpha_core/", "alpha_worker/", "alpha_protocol/", "testscript/"],
+  "acceptance_commands": [
+    "ruff check alpha_core/ alpha_worker/ alpha_protocol/ testscript/",
+    "pytest -q testscript/ -x --tb=short"
+  ]
+}
+```
+
+Note: `ruff check` and `pytest` now scope to `allowed_paths` only (I-39). The worker is no longer responsible for files it cannot touch.
+
+**Step 3 — Verification:**
+
+After Step 1 merge:
+1. `ruff check .` must pass with zero errors (scratch/ excluded by config)
+2. `pytest -q` must collect only tests under `testscript/` (scratch/ excluded by norecursedirs)
+3. Re-admitted task must execute within the 15-minute watchdog window
+
+---
+
+#### 6.11.6 Invariant Table (I-38 through I-41)
+
+| ID | Invariant | Enforcement Point | Failure Mode | Status |
+|----|-----------|-------------------|--------------|--------|
+| **I-38** | `scratch/` is git-ignored, excluded from all tooling, never in `allowed_paths` | `.gitignore`, `pyproject.toml`, `cmd_admit` packet validation | PR rejected if scratch/ is committed or scanned by gates | ✅ **NEW** |
+| **I-39** | Acceptance gate command scope ⊆ task `allowed_paths` for ALL tools (extends I-37) | `cmd_admit` validation in `triage_cli.py` | Task rejected with `GATE_SCOPE_MISMATCH`; worker halts `ALPHA_BRAIN_TASK_BLOCKED` | ✅ **NEW** |
+| **I-40** | Two-tier test strategy: scoped tests at inner iteration, full regression at merge gate only | Task packet authoring policy; worker execution engine | Worker timeout (I-28) on Tier 2 commands during inner iteration | ✅ **NEW** |
+| **I-41** | `cmd_admit` MUST reject tasks where acceptance command paths are not a subset of `allowed_paths` | `cmd_admit` in `triage_cli.py` — pre-admission validation | Automatic rejection with structured error identifying the scope mismatch | ✅ **NEW** |
+
+---
+
+#### 6.11.7 Gemini Pro Assessment — Debate Resolution
+
+| Proposal | Verdict | Reasoning |
+|----------|---------|-----------|
+| **Scratch Hygiene** (git-ignore + exclude) | ✅ **CONCUR** — adopted as I-38 with additional clauses for periodic pruning and cross-repo applicability | Correct root cause identification. Extended to include all three tooling configs and the "never in allowed_paths" constraint. |
+| **Gate Scoping** (scope to `allowed_paths`) | ✅ **CONCUR** — adopted as I-39 generalizing I-37 to all tools | I-37 was pytest-only. The incident proved the same principle applies to ruff and mypy. I-39 makes this universal. |
+| **Two-Tier Testing** (scoped inner, full at merge) | ✅ **CONCUR** — adopted as I-40 with hard budget constraints | Added the explicit prohibition against Tier 2 commands during inner iterations and the watchdog timeout arithmetic that proves why it's necessary. |
+| **Option 2: Add scratch/ to allowed_paths** | ❌ **REJECT** | Violates minimal blast radius (I-28). Rewards bad hygiene. Creates scope creep precedent. See §6.11.2 rationale. |
+
+---
+
+#### 6.11.8 `cmd_admit` Gate Scope Validation — Implementation Contract (I-41)
+
+The `cmd_admit` function in `triage_cli.py` MUST implement the following pre-admission validation:
+
+```python
+import shlex
+from pathlib import PurePosixPath
+
+
+# Executables that accept path arguments in their standard invocation
+SCOPE_AWARE_TOOLS = {"pytest", "ruff", "mypy", "black", "isort", "flake8", "pylint"}
+
+
+def validate_gate_scope(
+    acceptance_commands: list[str],
+    allowed_paths: list[str],
+) -> list[str]:
+    """
+    Validate that acceptance gate commands do not scan paths outside allowed_paths.
+
+    Returns a list of violation descriptions (empty = valid).
+
+    Invariant: I-41 — cmd_admit MUST reject tasks where acceptance command
+    paths are not a subset of allowed_paths.
+    """
+    violations = []
+
+    for cmd_str in acceptance_commands:
+        argv = shlex.split(cmd_str)
+        if not argv:
+            continue
+
+        # Resolve the tool name (skip env prefixes per §6.4.1 Layer 3)
+        tool_name = PurePosixPath(argv[0]).name
+
+        if tool_name not in SCOPE_AWARE_TOOLS:
+            continue  # Non-scope-aware tools are not validated here
+
+        # Extract path arguments (skip flags starting with -)
+        path_args = [arg for arg in argv[1:] if not arg.startswith("-")]
+
+        if not path_args:
+            # Global invocation (e.g., "ruff check" with no path args → scans ".")
+            if "." not in allowed_paths:
+                violations.append(
+                    f"Command '{cmd_str}' has no path arguments (implies global scope) "
+                    f"but allowed_paths does not include '.'. "
+                    f"Add explicit paths: '{tool_name} {' '.join(allowed_paths)}'"
+                )
+            continue
+
+        # Validate each path argument is within allowed_paths
+        for path_arg in path_args:
+            path_parts = PurePosixPath(path_arg).parts
+            is_allowed = any(
+                PurePosixPath(path_arg).is_relative_to(PurePosixPath(ap.rstrip("/")))
+                for ap in allowed_paths
+            ) or "." in allowed_paths
+            if not is_allowed:
+                violations.append(
+                    f"Command '{cmd_str}' scans path '{path_arg}' which is "
+                    f"outside allowed_paths {allowed_paths}. "
+                    f"This creates an unfixable Catch-22 for bounded workers (I-39)."
+                )
+
+    return violations
+```
+
+> [!WARNING]
+> This validation is **fail-closed**: if `validate_gate_scope` returns any violations, `cmd_admit` MUST reject the task with reason `GATE_SCOPE_MISMATCH` and include the violation descriptions in the rejection detail. No override flag is permitted. To use global gates, the task MUST have `allowed_paths=["."]`.
+
+---
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║           SECTION 6.11 — MILESTONE SIGNED                           ║
+║                                                                      ║
+║  Status:      FINAL RULING — BINDING ON ALL EXECUTORS               ║
+║  Signed:      Claude Opus 4.6 (Thinking) — Supreme Lead Architect   ║
+║  Authority:   Exclusive write access to SENIOR_DIRECTIVE             ║
+║  Date:        2026-09-10T14:39:52+05:30                              ║
+║  Incident:    tsk_eva_f92e9acb25b0 — Worker Catch-22 Resolution     ║
+║  Invariants:  I-1 through I-41 — ALL MAINTAINED OR ESTABLISHED      ║
+║  Prior Gate:  Gemini 3.1 Pro High — Staff Assessment (3/4 CONCUR)   ║
+║                                                                      ║
+║  Section 6.11: ██████████████████████████████████████████████ SEALED ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+*Section 6.11 authored and approved by Claude Opus 4.6 (Thinking) on 2026-09-10. Gemini 3.1 Pro High Staff Assessment: 3/4 proposals concurred, Option 2 (scratch/ in allowed_paths) REJECTED.*
+
+---
+
+*End of Section 6.11 — Scratch Hygiene, Universal Gate Scoping & Worker Iteration Test Strategy*
+

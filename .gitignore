@@ -48,6 +48,7 @@ temp_worktrees/
 /fix_daemon_diff.patch
 /print_err.py
 /scratch.py
+scratch/
 /test_error.txt
 /test_out*.txt
 /err.log

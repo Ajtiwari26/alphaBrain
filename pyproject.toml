@@ -48,7 +48,7 @@ include = ["alpha_core*", "alpha_meet*", "alpha_protocol*", "alpha_voice*", "alp
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["testscript"]
-norecursedirs = ["testscript/dev_artifacts", "testscript/scratch"]
+norecursedirs = ["testscript/dev_artifacts", "testscript/scratch", "scratch"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
@@ -64,6 +64,7 @@ exclude = [
     "__pycache__",
     "build",
     "dist",
+    "scratch",
     "testscript/scratch",
     "testscript/dev_artifacts",
     "testscript/archive",
@@ -97,4 +98,4 @@ warn_unused_configs = true
 ignore_missing_imports = true
 follow_imports = "skip"
 check_untyped_defs = true
-exclude = ["testscript/dev_artifacts/"]
+exclude = ["testscript/dev_artifacts/", "scratch/"]
