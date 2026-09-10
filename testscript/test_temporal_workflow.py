@@ -47,7 +47,7 @@ async def test_task_lifecycle_workflow():
 
 
 @pytest.mark.asyncio
-async def test_task_lifecycle_workflow_timeout():
+async def test_task_lifecycle_workflow_cancellation():
     async with await WorkflowEnvironment.start_local() as env:
         async with Worker(
             env.client,
@@ -69,6 +69,31 @@ async def test_task_lifecycle_workflow_timeout():
 
             result = await handle.result()
             assert result["final_status"] == "cancelled"
+
+@pytest.mark.asyncio
+async def test_task_lifecycle_workflow_fail():
+    async with await WorkflowEnvironment.start_local() as env:
+        async with Worker(
+            env.client,
+            task_queue="task-lifecycle-queue",
+            workflows=[TaskLifecycleWorkflow],
+            activities=[admit_task, lease_task, complete_task],
+        ):
+            task_id = str(uuid.uuid4())
+
+            handle = await env.client.start_workflow(
+                TaskLifecycleWorkflow.run,
+                {"task_id": task_id},
+                id=f"task-lifecycle-fail-{task_id}",
+                task_queue="task-lifecycle-queue",
+            )
+
+            # Send fail signal
+            await handle.signal(TaskLifecycleWorkflow.signal_fail, "some error")
+
+            result = await handle.result()
+            assert result["final_status"] == "failed"
+            assert result["error"] == "some error"
 
 @pytest.mark.asyncio
 async def test_task_lifecycle_workflow_missing_id():

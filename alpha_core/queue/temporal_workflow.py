@@ -11,23 +11,34 @@ logger = logging.getLogger(__name__)
 
 @activity.defn
 async def admit_task(payload: dict) -> dict:
-    """Admit a new task into the system."""
+    """Admit a new task into the system.
+    TODO: Implement real system admission logic.
+    """
     logger.info(f"Admitting task: {payload.get('task_id')}")
     return {"status": "admitted", "task_id": payload.get("task_id")}
 
 @activity.defn
 async def lease_task(task_id: str) -> dict:
-    """Lease a task to a worker."""
+    """Lease a task to a worker.
+    TODO: Implement real worker assignment/leasing logic.
+    """
     logger.info(f"Leasing task: {task_id}")
     return {"status": "leased", "task_id": task_id}
 
 @activity.defn
 async def complete_task(task_id: str, result: dict) -> dict:
-    """Complete a task."""
+    """Complete a task.
+    TODO: Implement actual result storage and completion hooks.
+    """
     logger.info(f"Completing task: {task_id}")
     return {"status": "completed", "task_id": task_id, "result": result}
 
 
+# Temporal Determinism Sandbox Note:
+# sandboxed=False is explicitly required because importing the alpha_core namespace
+# causes alpha_core/__init__.py and alpha_core/config.py to evaluate pathlib.Path(__file__).resolve()
+# at import time, which is restricted by Temporal's default AST sandbox.
+# This exception is documented and approved per Senior Review §2 / §5 directives.
 @workflow.defn(sandboxed=False)
 class TaskLifecycleWorkflow:
     def __init__(self) -> None:
@@ -109,6 +120,10 @@ class TaskLifecycleWorkflow:
         self._status = "completed"
 
         return {"task_id": task_id, "final_status": self._status, "result": self._result}
+
+    @workflow.query
+    def get_status(self) -> str:
+        return self._status
 
     @workflow.signal
     def signal_lease(self) -> None:
