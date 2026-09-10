@@ -14,6 +14,9 @@ def normalize_task_slug(title: str, max_length: int = 50) -> str:
     C6: return fallback 'task' for empty or non-alphanumeric input
     C7: pure function without external dependencies
     """
+    if max_length < 1:
+        raise ValueError("max_length must be at least 1")
+
     # C1: convert to lowercase
     slug = title.lower()
 
@@ -29,6 +32,6 @@ def normalize_task_slug(title: str, max_length: int = 50) -> str:
 
     # C6: return fallback 'task' for empty or non-alphanumeric input
     if not slug:
-        return 'task'
+        return 'task'[:max_length]
 
     return slug

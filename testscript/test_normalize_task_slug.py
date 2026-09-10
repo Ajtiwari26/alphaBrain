@@ -36,3 +36,13 @@ def test_normalize_task_slug():
     assert normalize_task_slug("---") == "task"
 
     # C7: pure function without external dependencies (tested implicitly by execution)
+
+    import pytest
+    with pytest.raises(ValueError, match="at least 1"):
+        normalize_task_slug("test", max_length=0)
+
+    # Hardening tests
+    assert normalize_task_slug("µñîçø∂é") == "task"  # unicode non-ascii strips to empty
+    assert normalize_task_slug("12345") == "12345"
+    assert normalize_task_slug("a") == "a"
+    assert normalize_task_slug("", max_length=2) == "ta"
