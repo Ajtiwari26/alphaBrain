@@ -139,8 +139,6 @@ class SeniorReviewEngine:
                 "--model",
                 model,
                 "--sandbox",
-                "--mode",
-                "plan",
                 "--output-format",
                 "json",
                 "--input-format",
