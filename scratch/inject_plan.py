@@ -6,14 +6,14 @@ from alpha_protocol.planning import PlanBlueprint, PlanningAttestation, PlanAsse
 
 def main():
     queue = TaskTriageQueue()
-    task_id = "tsk_eva_8216f473c49b"
+    task_id = "tsk_eva_1ceee44f7620"
     key_id = "alpha_production_v1"
     secret = planning_secret(key_id)
     
     task = queue.get_task(task_id)
     envelope = task["envelope"]
     real_digest = request_digest(envelope)
-    base_sha = envelope.get("base_commit", "422e38eed12d552f05e88f954181642cf9babcf4")
+    base_sha = envelope.get("base_commit", "2660ba61d89441ef9d45c70495efd4b989b5a8f0")
     project_id = envelope.get("project_id", "alphabrain_dogfood")
     repo = envelope.get("repo", "/Users/ajaytiwari/Desktop/Projects/alphaBrain")
     
