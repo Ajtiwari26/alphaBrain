@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.alphabrain.healing</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/ABSOLUTE/PATH/TO/alphaBrain/.venv/bin/python</string>
+    <string>-m</string><string>alpha_worker</string><string>supervisor</string>
+  </array>
+  <key>WorkingDirectory</key><string>/ABSOLUTE/PATH/TO/alphaBrain</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>/Users/WORKER_USER/Library/Logs/AlphaBrain/healing_supervisor.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/WORKER_USER/Library/Logs/AlphaBrain/healing_supervisor.err.log</string>
+</dict>
+</plist>

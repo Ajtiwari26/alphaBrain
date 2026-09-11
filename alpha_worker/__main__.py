@@ -38,6 +38,34 @@ def main() -> None:
         "credentials", help="store worker secrets in macOS Keychain"
     )
     credentials.add_argument("account", choices=("worker-token", "worker-spool-fernet-key"))
+
+    supervisor_cmd = subcommands.add_parser(
+        "supervisor", help="run persistent CI/CD healing and worker supervisor"
+    )
+    supervisor_cmd.add_argument("--poll-interval", type=float, default=1.0)
+    supervisor_cmd.add_argument("--max-workers", type=int, default=4)
+    supervisor_cmd.add_argument("--project-id", default="alphabrain_dogfood")
+    supervisor_cmd.add_argument("--mode", choices=("thread", "subprocess"), default="thread")
+    supervisor_cmd.add_argument("--max-cycles", type=int, default=None)
+
+    subcommands.add_parser(
+        "supervisor-status", help="inspect persistent supervisor status and health"
+    )
+
+    healing_cmd = subcommands.add_parser(
+        "healing-daemon", help="run standalone CI healing daemon"
+    )
+    healing_cmd.add_argument("--project-id", default="alphabrain_dogfood")
+    healing_cmd.add_argument("--poll-interval", type=float, default=10.0)
+
+    disp_cmd = subcommands.add_parser(
+        "dispatcher", help="run standalone parallel worker dispatcher"
+    )
+    disp_cmd.add_argument("--project-id", default="alphabrain_dogfood")
+    disp_cmd.add_argument("--max-workers", type=int, default=4)
+    disp_cmd.add_argument("--poll-interval", type=float, default=1.0)
+    disp_cmd.add_argument("--max-cycles", type=int, default=None)
+
     args = parser.parse_args()
     store = _control_store()
     if args.command == "run":
@@ -50,9 +78,55 @@ def main() -> None:
         secret = getpass.getpass(f"Secret for {args.account}: ")
         MacOSKeychain(settings.WORKER_KEYCHAIN_SERVICE).set(args.account, secret)
         print(json.dumps({"stored": args.account, "service": settings.WORKER_KEYCHAIN_SERVICE}))
+    elif args.command == "supervisor":
+        from .daemon_supervisor import DaemonSupervisor
+
+        supervisor = DaemonSupervisor.create_healing_supervisor(
+            project_id=args.project_id,
+            max_workers=args.max_workers,
+            poll_interval=args.poll_interval,
+            execution_mode=args.mode,
+        )
+        supervisor.start()
+        supervisor.run_loop(poll_interval=args.poll_interval, max_cycles=args.max_cycles)
+    elif args.command == "supervisor-status":
+        from .daemon_supervisor import DaemonSupervisor, HealingLaunchdInspector
+
+        status_path = settings.WORKER_STATE_DIR / "supervisor_status.json"
+        report = DaemonSupervisor.read_status_file(status_path)
+        inspector = HealingLaunchdInspector()
+        out = {
+            "supervisor": report or {"status": "not_running"},
+            "launchd": inspector.inspect(),
+        }
+        print(json.dumps(out, indent=2))
+    elif args.command == "healing-daemon":
+        from alpha_core.queue.triage_queue import TaskTriageQueue
+
+        from .ci_healing_daemon import CIHealingDaemon
+
+        daemon = CIHealingDaemon(
+            queue=TaskTriageQueue(),
+            project_id=args.project_id,
+            auto_approve_repairs=True,
+        )
+        daemon.run_continuously(interval=args.poll_interval)
+    elif args.command == "dispatcher":
+        from alpha_core.queue.triage_queue import TaskTriageQueue
+
+        from .parallel_dispatcher import ParallelWorkerDispatcher
+
+        dispatcher = ParallelWorkerDispatcher(
+            queue=TaskTriageQueue(),
+            max_workers=args.max_workers,
+            project_id=args.project_id,
+            poll_interval=args.poll_interval,
+        )
+        dispatcher.run_continuously(interval=args.poll_interval, max_cycles=args.max_cycles)
     else:
         import subprocess
 
+        from .daemon_supervisor import DaemonSupervisor, HealingLaunchdInspector
         from .launchd_status import LaunchdInspector
 
         def run_cmd(cmd: list[str]) -> tuple[int, str, str]:
@@ -63,9 +137,13 @@ def main() -> None:
             command_runner=run_cmd,
             status_file=settings.WORKER_STATE_DIR / "node_status.json",
         )
+        healing_inspector = HealingLaunchdInspector(command_runner=run_cmd)
         report = inspector.inspect()
         out = store.read().__dict__
         out["launchd"] = report.__dict__
+        status_file = settings.WORKER_STATE_DIR / "supervisor_status.json"
+        out["supervisor"] = DaemonSupervisor.read_status_file(status_file)
+        out["healing_launchd"] = healing_inspector.inspect()
         print(json.dumps(out))
 
 
