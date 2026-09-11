@@ -52,7 +52,8 @@ Gemini 3.1 Pro High.
 - [x] Real Gemini Live duplex audio through Vertex AI.
 - [x] 506+ deterministic/hermetic tests pass without manual `PYTHONPATH` configuration.
 
-- [x] Integrate CIHealingDaemon with ParallelWorkerDispatcher and TaskTriageQueue (`commit 6899625`, `tsk_eva_c4eb3d7b96bd`).
+- [x] Automated CI/CD Self-Healing Daemon & Auto-Retry Loop integrated with ParallelWorkerDispatcher (`alpha_worker/ci_healing_daemon.py`, `commit 6899625`, `tsk_eva_c4eb3d7b96bd`).
+- [x] P9.7 Operational Monitoring & Live Metrics Telemetry Exporter with Prometheus exposition (`alpha_core/monitoring/`, `commit 15b839f`, `tsk_eva_b5fa5c42cd60`).
 
 ### Active / In-Progress
 
@@ -323,7 +324,7 @@ Goal: run approved tasks safely and recover across restarts/network loss.
 - [x] Low battery drains task safely.
 - [x] Thermal pressure stops new heavy tasks.
 - [x] Worker cannot escape worktree or use undeclared credentials.
-- [x] Eight-hour and overnight soak tests pass. (Durable soak harness with telemetry logging, checkpointing, and Markdown/JSON reporting verified; full 8-hour live overnight soak ready to run via `python testscript/soak_worker_harness.py --duration-hours 8`) (`commit 15b839f`, `tsk_eva_b5fa5c42cd60`).
+- [ ] Eight-hour and overnight soak tests pass. (Durable soak harness with telemetry logging, checkpointing, and Markdown/JSON reporting verified; full 8-hour live overnight soak ready to run via `python testscript/soak_worker_harness.py --duration-hours 8`).
 
 ## P6 — Real coding-agent adapters
 
