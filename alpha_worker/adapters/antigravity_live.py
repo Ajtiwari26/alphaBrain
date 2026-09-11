@@ -191,7 +191,9 @@ def evaluate_agy_execution_outcome(
         or "429" in lower_stderr
         or "quota exceeded" in lower_stderr
         or "resource_exhausted" in lower_stderr
-        or "rate limit" in lower_resp
+        or "rate limit exceeded" in lower_resp
+        or "rate_limit_exceeded" in lower_resp
+        or "quota exceeded" in lower_resp
         or "resource_exhausted" in lower_resp
     ):
         return AntigravityAttemptOutcome(
@@ -1087,7 +1089,9 @@ class AntigravityLiveBridge:
             or "429" in lower_stderr
             or "quota exceeded" in lower_stderr
             or "resource_exhausted" in lower_stderr
-            or "rate limit" in lower_resp
+            or "rate limit exceeded" in lower_resp
+            or "rate_limit_exceeded" in lower_resp
+            or "quota exceeded" in lower_resp
             or "resource_exhausted" in lower_resp
         )
 
