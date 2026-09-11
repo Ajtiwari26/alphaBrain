@@ -897,7 +897,6 @@ async def task_heartbeat(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     require_project_access(principal, task.project_id)
-    require_project_access(principal, task.project_id)
     success = await TaskEngine.record_heartbeat(session, task_id, lease_token, principal.subject)
     if not success:
         task = await session.get(TaskRecord, task_id)
@@ -925,7 +924,6 @@ async def cancel_task_execution(
     task = await session.get(TaskRecord, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    require_project_access(principal, task.project_id)
     require_project_access(principal, task.project_id)
     try:
         cancelled = await TaskEngine.cancel_task(
@@ -2608,7 +2606,6 @@ async def get_portal_task_trace(
     task = queue.get_task(task_id)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
 
     # Enforce tenant isolation (Invariant I-33)
     project_id = task.get("envelope", {}).get("project_id")

@@ -36,3 +36,17 @@ async def test_tenant_isolation():
 
         res2 = await client.get("/api/tasks/task_2", headers={"Authorization": f"Bearer {token1}"})
         assert res2.status_code == 403, f"Expected 403, got {res2.status_code}"
+
+        # Test task_heartbeat (which requires worker principal)
+        worker_token = create_scoped_principal_token("worker1", PrincipalRole.WORKER, ["prj_1"])
+        res_heartbeat = await client.post("/api/tasks/task_2/heartbeat", headers={"Authorization": f"Bearer {worker_token}", "x-alpha-worker-identity": f"{worker_token}"}, json={"lease_token": "token"})
+        assert res_heartbeat.status_code in (401, 403), f"Expected 401 or 403, got {res_heartbeat.status_code}"
+
+        # Test trace endpoint
+        res_trace = await client.get("/api/portal/tasks/task_2/trace", headers={"Authorization": f"Bearer {token1}"})
+        assert res_trace.status_code == 403, f"Expected 403, got {res_trace.status_code}"
+
+        # Triage modify endpoint
+        res_triage_modify = await client.post("/api/triage/tasks/task_2/modify", headers={"Authorization": f"Bearer {token1}"}, json={})
+        assert res_triage_modify.status_code == 403, f"Expected 403, got {res_triage_modify.status_code}"
+
