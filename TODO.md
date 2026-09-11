@@ -54,6 +54,7 @@ Gemini 3.1 Pro High.
 
 - [x] Automated CI/CD Self-Healing Daemon & Auto-Retry Loop integrated with ParallelWorkerDispatcher (`alpha_worker/ci_healing_daemon.py`, `commit 6899625`, `tsk_eva_c4eb3d7b96bd`).
 - [x] P9.7 Operational Monitoring & Live Metrics Telemetry Exporter with Prometheus exposition (`alpha_core/monitoring/`, `commit 15b839f`, `tsk_eva_b5fa5c42cd60`).
+- [x] Persistent Daemon Supervisor via macOS launchd managing CI/CD Self-Healing Daemon and ParallelWorkerDispatcher (`alpha_worker/daemon_supervisor.py`, `ops/launchd/`, `commit 3f26fe9`, `tsk_eva_bf0605fe5a51`).
 
 ### Active / In-Progress
 
@@ -289,7 +290,7 @@ Goal: run approved tasks safely and recover across restarts/network loss.
 - [x] Add worker registration, signed identity, heartbeat, and capability report.
   - [x] Control-plane API persists signed worker registration, capability declaration, and health
     samples. Local daemon outbound reporting remains open.
-- [ ] Install worker with launchd under dedicated non-admin macOS user.
+- [x] Install worker with launchd under dedicated non-admin macOS user (`commit 3f26fe9`, `tsk_eva_bf0605fe5a51`).
   - [x] Launchd plist template, preflight installation script, uninstall script, and automated plist validation pass. Physical dedicated non-admin account install plus reboot/login proof remains pending operator action.
 - [x] Make Mac worker fully background-only: outbound connection to cloud control plane,
   headless AGY execution, no Chrome/IDE/meeting UI automation.
