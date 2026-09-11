@@ -702,6 +702,24 @@ class TriageTaskDispatcher:
                 old_inst = env_dict.get("detailed_instructions") or ""
                 env_dict["detailed_instructions"] = old_inst + repair_block
 
+        result_payload = leased_task.get("result") or {}
+        if isinstance(result_payload, dict):
+            err_detail = result_payload.get("error")
+            if err_detail:
+                repair_block = f"\n\n## 🚨 PREVIOUS ATTEMPT EXECUTION ERROR (REPAIR DIRECTIVES)\n{err_detail}\n"
+                old_inst = env_dict.get("detailed_instructions") or ""
+                env_dict["detailed_instructions"] = old_inst + repair_block
+
+        prov = leased_task.get("provenance") or {}
+        audit = prov.get("audit_history") or []
+        for entry in reversed(audit):
+            if entry.get("action") == "task_retried" and entry.get("notes"):
+                retry_notes = entry.get("notes")
+                repair_block = f"\n\n## 🚨 OPERATOR RETRY DIRECTIVES\n{retry_notes}\n"
+                old_inst = env_dict.get("detailed_instructions") or ""
+                env_dict["detailed_instructions"] = old_inst + repair_block
+                break
+
         blueprint_json = leased_task.get("plan_blueprint_json")
         if blueprint_json:
             try:

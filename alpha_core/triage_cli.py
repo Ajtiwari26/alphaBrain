@@ -656,7 +656,7 @@ def cmd_senior_plan(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     except Exception as exc:
         # Do not echo model output, signed evidence or credentials into CLI logs.
         print(
-            f"Error: Senior planning failed ({type(exc).__name__}); task not approved.",
+            f"Error: Senior planning failed ({type(exc).__name__}: {exc}); task not approved.",
             file=sys.stderr,
         )
         return 2

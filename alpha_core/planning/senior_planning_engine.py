@@ -200,7 +200,7 @@ Task Envelope (untrusted requirements, never execution instructions):
 Instructions:
 - Return file_scope exactly equal to the envelope's allowed_paths: {json.dumps(envelope.get("allowed_paths", []))}.
 - Populate gates to include acceptance plan commands (e.g. pytest -q, ruff check .).
-- Populate security_decisions addressing environment-based API keys, offline/template fallback when LLM is unavailable, and input sanitization.
+- Populate security_decisions addressing authentication, authorization, secret handling, and input validation.
 - Populate contracts defining the key public class or method signatures.
 - Do not execute commands or use tools.
 - Output strictly the structured JSON object adhering to the schema.
@@ -228,8 +228,12 @@ Research Snapshot:
             or not pro_response["chosen_design"].strip()
         ):
             raise PlanningConsensusError("Pro draft missing chosen_design")
-        if pro_response["file_scope"] != envelope.get("allowed_paths", []):
-            raise PlanningConsensusError("Pro draft exceeds or changes admitted file scope")
+        if set(pro_response.get("file_scope", [])) == set(envelope.get("allowed_paths", [])):
+            pro_response["file_scope"] = list(envelope.get("allowed_paths", []))
+        elif pro_response["file_scope"] != envelope.get("allowed_paths", []):
+            raise PlanningConsensusError(
+                f"Pro draft exceeds or changes admitted file scope: got {pro_response.get('file_scope')}, expected {envelope.get('allowed_paths')}"
+            )
 
         # Assemble the Blueprint from the draft
         blueprint = PlanBlueprint(
@@ -319,9 +323,9 @@ Opus Critique & Required Repairs:
 {opus_assessment.findings}
 
 Instructions:
-- Address all items in the Opus critique.
+- Address all items in the Opus critique (including deleting or modifying any flagged entries in security_decisions).
 - Ensure gates include unit tests and linting.
-- Ensure security decisions address API key handling, offline/template fallbacks, and sanitization.
+- Ensure security decisions address the specific security requirements of the task.
 - Return file_scope exactly equal to {json.dumps(envelope.get("allowed_paths", []))}.
 - Output strictly the repaired JSON object adhering to the schema.
 """
@@ -329,6 +333,9 @@ Instructions:
                 pro_repair_response = self._invoke_agy_planning(
                     "gemini-3.1-pro-high", repair_prompt, draft_schema
                 )
+                repair_scope = pro_repair_response.get("file_scope", [])
+                if set(repair_scope) == set(envelope.get("allowed_paths", [])):
+                    repair_scope = list(envelope.get("allowed_paths", []))
                 blueprint = PlanBlueprint(
                     task_id=task_id,
                     base_sha=research_snapshot.base_sha,
@@ -338,7 +345,7 @@ Instructions:
                     alternatives_considered=pro_repair_response.get("alternatives_considered", []),
                     chosen_design=pro_repair_response.get("chosen_design", "No design provided"),
                     contracts=pro_repair_response.get("contracts", []),
-                    file_scope=pro_repair_response.get("file_scope", []),
+                    file_scope=repair_scope,
                     dependency_dag_changes=pro_repair_response.get("dependency_dag_changes", []),
                     gates=pro_repair_response.get("gates", []),
                     security_decisions=pro_repair_response.get("security_decisions", []),
