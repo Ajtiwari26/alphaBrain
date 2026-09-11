@@ -54,8 +54,8 @@ Gemini 3.1 Pro High.
 
 ### Active / In-Progress
 
-- [ ] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees.
-- [ ] Autonomous TODO and Roadmap State Machine Sync Engine.
+- [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
+- [x] Autonomous TODO and Roadmap State Machine Sync Engine (`commit e70bf73`, `tsk_eva_37eceb12e1b8`).
 - [ ] Async Redis token-bucket rate limiter for FastAPI endpoints (`tsk_eva_5fb3a94658b7`).
 - [ ] Real meeting specification extraction.
 - [ ] Real AgentLine call-job integration.

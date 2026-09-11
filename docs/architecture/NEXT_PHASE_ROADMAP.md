@@ -32,21 +32,23 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit 5599d81`, `tsk_eva_3d9c0ffc2606`)
 - **Objective**: Implemented Amazon-style client tracking portal UI (`alpha_portal/`) and FastAPI live SSE stream endpoint.
 
----
-
-## Active Parallel Development Pipeline (Current)
+### Task 8: Parallel Worker Dispatcher Daemon
+- **Status**: `[x] COMPLETED & MERGED` (`commit c859b57`, `tsk_eva_faabb0476659`)
+- **Task Title**: Implement Parallel Worker Dispatcher Daemon for Concurrent Worktree Execution
+- **Objective**: Query TaskTriageQueue for approved tasks and manage a concurrent pool of up to max_workers in isolated worktrees
+- **Allowed Scope**: `alpha_worker/parallel_dispatcher.py`, `alpha_worker/`
+- **Acceptance Criteria**: Passes multi-worker lease concurrency tests without race conditions or lock contention.
 
 ### Task 7: Autonomous TODO and Roadmap State Machine Sync Engine
+- **Status**: `[x] COMPLETED & MERGED` (`commit e70bf73`, `tsk_eva_37eceb12e1b8`)
 - **Task Title**: Implement Autonomous TODO and Roadmap Synchronization Engine
-- **Objective**: Automatically parse merged task metadata upon atomic promotion (`cmd_merge`) and update `TODO.md` and roadmap markdown checklists atomically with commit SHAs and verified proof.
+- **Objective**: State machine synchronization engine to automatically parse merged task metadata and update TODO.md and NEXT_PHASE_ROADMAP.md
 - **Allowed Scope**: `alpha_core/automation/`, `alpha_core/triage_cli.py`
 - **Acceptance Criteria**: Passing unit tests verifying markdown parsing, checklist regex update, and idempotency.
 
-### Task 8: Parallel Worker Dispatcher Daemon
-- **Task Title**: Implement Parallel Worker Dispatcher Daemon for Concurrent Worktree Execution
-- **Objective**: Build an autonomous multi-worker daemon in `alpha_worker/parallel_dispatcher.py` that leases up to $N$ approved tasks concurrently, allocates isolated worktrees, runs `worker-cycle` in parallel using Gemini 3.1 Pro High, and queues tasks for senior review.
-- **Allowed Scope**: `alpha_worker/parallel_dispatcher.py`, `alpha_worker/`
-- **Acceptance Criteria**: Passes multi-worker lease concurrency tests without race conditions or lock contention.
+---
+
+## Active Parallel Development Pipeline (Current)
 
 ### Task 9: Async Redis Rate Limiter for FastAPI Endpoints
 - **Task Title**: Evaluate and implement open-source Python Redis rate limiter for async FastAPI (`tsk_eva_5fb3a94658b7`)
