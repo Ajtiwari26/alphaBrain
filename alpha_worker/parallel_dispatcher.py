@@ -27,6 +27,12 @@ from pathlib import Path
 from typing import Any
 
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
+from alpha_worker.adaptive_manager import (
+    AdaptiveConcurrencyManager,
+    MechanicAction,
+    PipelineMechanic,
+    TaskStallSnapshot,
+)
 from alpha_worker.ci_healing_daemon import CIHealingDaemon
 from alpha_worker.senior_review_engine import SeniorReviewEngine
 from alpha_worker.triage_dispatcher import PRProposal, TriageTaskDispatcher
@@ -131,6 +137,10 @@ class ParallelWorkerDispatcher:
         enable_agent_execution: bool = False,
         execution_mode: str = "process",
         auto_approve_repairs: bool = False,
+        adaptive_manager: AdaptiveConcurrencyManager | None = None,
+        enable_adaptive_concurrency: bool = False,
+        pipeline_mechanic: PipelineMechanic | None = None,
+        enable_pipeline_mechanic: bool = False,
     ) -> None:
         if max_workers < 1:
             raise ValueError(f"max_workers must be at least 1, got {max_workers}")
@@ -147,6 +157,11 @@ class ParallelWorkerDispatcher:
         self.enable_agent_execution = enable_agent_execution
         self.execution_mode = execution_mode
         self.auto_approve_repairs = auto_approve_repairs
+
+        self.adaptive_manager = adaptive_manager
+        self.enable_adaptive_concurrency = enable_adaptive_concurrency or (adaptive_manager is not None)
+        self.pipeline_mechanic = pipeline_mechanic
+        self.enable_pipeline_mechanic = enable_pipeline_mechanic or (pipeline_mechanic is not None)
 
         try:
             self._mp_context = multiprocessing.get_context("fork")
@@ -178,9 +193,27 @@ class ParallelWorkerDispatcher:
         with self._lock:
             return len(self._active_tasks)
 
+    def get_effective_max_workers(self, queue_depth: int | None = None) -> int:
+        """Computes current maximum worker capacity considering adaptive hardware limits."""
+        if not self.enable_adaptive_concurrency or self.adaptive_manager is None:
+            return self.max_workers
+
+        if queue_depth is None:
+            try:
+                tasks = self.queue.list_tasks(
+                    status=TriageStatus.APPROVED, limit=50, project_id=self.project_id
+                )
+                queue_depth = len(tasks)
+            except Exception:
+                queue_depth = 0
+
+        decision = self.adaptive_manager.compute_concurrency(queue_depth=queue_depth)
+        return min(self.max_workers, decision.target_workers)
+
     def available_slots(self) -> int:
         with self._lock:
-            return max(0, self.max_workers - len(self._active_tasks))
+            effective_limit = self.get_effective_max_workers()
+            return max(0, effective_limit - len(self._active_tasks))
 
     def is_pool_full(self) -> bool:
         return self.available_slots() == 0
@@ -241,10 +274,11 @@ class ParallelWorkerDispatcher:
         """
         task_id = leased_task["id"]
         with self._lock:
-            if len(self._active_tasks) >= self.max_workers:
+            effective_max = self.get_effective_max_workers()
+            if len(self._active_tasks) >= effective_max:
                 logger.warning(
                     "Concurrency limit (%d) reached. Cannot dispatch task %s.",
-                    self.max_workers,
+                    effective_max,
                     task_id,
                 )
                 return None
@@ -342,23 +376,90 @@ class ParallelWorkerDispatcher:
     def handle_timeouts(self) -> list[str]:
         """
         Checks all active tasks against timeout_seconds.
-        Terminates runaway executions forcefully with OS signals (SIGTERM, then SIGKILL),
+        If pipeline mechanic is enabled, diagnoses stalls before termination and
+        prescribes surgical resumption for recoverable stalls without full restarts.
+        Terminates unrecoverable runaway executions forcefully with OS signals (SIGTERM, then SIGKILL),
         marks tasks failed in TaskTriageQueue, and routes them to CI healing.
         Returns the list of timed-out task IDs.
         """
         now = time.time()
-        timed_out_tasks: list[ActiveTaskExecution] = []
+        stalled_tasks: list[ActiveTaskExecution] = []
 
         with self._lock:
-            for task_id, execution in list(self._active_tasks.items()):
+            for _task_id, execution in list(self._active_tasks.items()):
                 if execution.started_at is not None and (now - execution.started_at) > self.timeout_seconds:
-                    execution.cancelled = True
-                    timed_out_tasks.append(execution)
-                    del self._active_tasks[task_id]
+                    stalled_tasks.append(execution)
 
         timed_out_ids: list[str] = []
-        for execution in timed_out_tasks:
+        for execution in stalled_tasks:
             task_id = execution.task_id
+
+            # If pipeline mechanic is enabled, evaluate for surgical resumption
+            if self.enable_pipeline_mechanic and self.pipeline_mechanic is not None:
+                proc_alive = False
+                if execution.process and execution.process.poll() is None:
+                    proc_alive = True
+
+                worktree_path = execution.worktree_path
+                if not worktree_path and self.worktree_mgr:
+                    try:
+                        wt = self.worktree_mgr.get_worktree_path(task_id)
+                        if wt.exists():
+                            worktree_path = wt
+                    except Exception:
+                        pass
+
+                snapshot = TaskStallSnapshot(
+                    task_id=task_id,
+                    elapsed_seconds=execution.elapsed_seconds,
+                    timeout_seconds=self.timeout_seconds,
+                    process_alive=proc_alive,
+                    last_phase=execution.envelope.get("phase", "running"),
+                    worktree_path=worktree_path,
+                    envelope=dict(execution.envelope),
+                )
+                diagnosis = self.pipeline_mechanic.diagnose_stall(snapshot)
+
+                if diagnosis.is_recoverable:
+                    logger.info(
+                        "Task %s stall diagnosed as recoverable by Pipeline Mechanic: action=%s, phase=%s",
+                        task_id,
+                        diagnosis.action.value,
+                        diagnosis.checkpoint_phase,
+                    )
+                    # For EXTEND_LEASE: worker process is making progress
+                    if diagnosis.action == MechanicAction.EXTEND_LEASE and proc_alive:
+                        with self._lock:
+                            execution.started_at = time.time()
+                        logger.info("Extended lease for active worker on task %s", task_id)
+                        continue
+
+                    # For RESUME_CHECKPOINT / RETRY_STEP: terminate stuck child process cleanly
+                    if execution.process and execution.process.poll() is None:
+                        try:
+                            execution.process.terminate()
+                            execution.process.wait(timeout=1.0)
+                        except Exception:
+                            pass
+
+                    resumed = self.pipeline_mechanic.execute_surgical_resumption(
+                        snapshot,
+                        diagnosis,
+                    )
+                    if resumed:
+                        with self._lock:
+                            execution.started_at = time.time()
+                            execution.envelope["last_checkpoint_phase"] = diagnosis.checkpoint_phase
+                            execution.envelope["surgically_resumed"] = True
+                        logger.info("Task %s surgically resumed without full restart.", task_id)
+                        continue
+
+            # Unrecoverable stall or no mechanic: terminate and fail
+            with self._lock:
+                if task_id in self._active_tasks:
+                    execution.cancelled = True
+                    del self._active_tasks[task_id]
+
             logger.error(
                 "Task %s exceeded timeout limit of %.1fs (elapsed: %.1fs). Terminating.",
                 task_id,
