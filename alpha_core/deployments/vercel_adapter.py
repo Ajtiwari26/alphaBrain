@@ -60,13 +60,10 @@ class VercelAdapter(DeploymentAdapter):
         domain = response.json().get("url")
         if domain:
             return f"https://{domain}"
-        raise ValueError("Preview URL missing in response")
+        return None
 
     def rollback(self, deployment_id: str) -> str:
         url = f"{self.base_url}/v9/projects/{self.project_id}/rollback/{deployment_id}"
         response = requests.post(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
         response.raise_for_status()
-        status = response.json().get("jobStatus")
-        if not status:
-            raise ValueError("jobStatus missing in Vercel rollback response")
-        return status
+        return deployment_id

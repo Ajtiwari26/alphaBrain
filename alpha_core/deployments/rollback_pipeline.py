@@ -17,18 +17,6 @@ class RollbackPipeline:
             logger.info(f"Rollback triggered. Tracking ID or status: {tracking_id}")
 
             start_time = time.time()
-            # If the adapter returns jobStatus as the tracking_id for Vercel, it doesn't match poll_status signature.
-            # Usually we'd poll the status of the new deployment_id. Assuming tracking_id is pollable,
-            # except Vercel rollback doesn't return a deploy id, it returns jobStatus.
-            # To handle both safely without crashing the orchestration pipeline:
-            if tracking_id in ("succeeded", "failed", "in_progress", "pending"):
-                # Fast track Vercel jobStatus parsing
-                if tracking_id == "succeeded":
-                    logger.info("Rollback job marked as succeeded.")
-                    return tracking_id
-                elif tracking_id == "failed":
-                    logger.error("Rollback job failed.")
-                    raise RuntimeError("Rollback failed according to jobStatus.")
 
             # Generic polling loop for standard deployment IDs
             while (time.time() - start_time) < timeout_seconds:

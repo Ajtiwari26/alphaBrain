@@ -19,8 +19,7 @@ class RenderAdapter(DeploymentAdapter):
 
     def trigger_deployment(self, branch: str, commit_sha: str) -> str:
         url = f"{self.base_url}/services/{self.service_id}/deploys"
-        # Render supports passing commitId to deploy a specific commit
-        payload = {"commitId": commit_sha}
+        payload = {"commitId": commit_sha, "branch": branch}
         response = requests.post(url, headers=self._get_headers(), json=payload, timeout=10)
         response.raise_for_status()
         deploy_id = response.json().get("id")
@@ -48,7 +47,7 @@ class RenderAdapter(DeploymentAdapter):
         service_data = response.json()
         domain = service_data.get("serviceDetails", {}).get("url")
         if not domain:
-            raise ValueError("Service URL missing in response")
+            return None
         return domain
 
     def rollback(self, deployment_id: str) -> str:
