@@ -6,11 +6,12 @@ Status: foundation prototype
 Target: secure, durable, evidence-backed system connecting Unifold, Alpha Brain,
 AgentLine, Inito, and local Mac execution worker.
 
-Latest verified progress: 31 August 2026 — local stabilization passes 506 tests with
-one intentional skip, including Docker-backed PostgreSQL migration, checkpoint, and
-watchdog-concurrency gates. Ruff lint/format, mypy across 63 source files, JavaScript
-syntax, and diff checks pass. Earlier Gemini 2.5 native-audio RTC proof remains valid;
-real Gemini 3.5 Live Translate provider-audio proof remains open.
+Latest verified progress: 11 September 2026 — autonomous self-development loop
+fully established. Completed strict multi-tenant isolation and API authentication,
+temporal workflows, Mac daemon isolation via launchd, Vercel/Render deployment
+adapters, Amazon-style client tracking portal with live SSE stream, CI/CD self-healing
+daemon, and full test suite stabilization. Antigravity live adapter verified with
+Gemini 3.1 Pro High.
 
 ## How to use this file
 
@@ -39,25 +40,28 @@ real Gemini 3.5 Live Translate provider-audio proof remains open.
 - [x] Gemini Live setup/audio message formatter and parser.
 - [x] Plivo media message formatter and parser.
 - [x] Basic Mac battery/load health check.
-- [x] 506 deterministic/hermetic tests pass without manual `PYTHONPATH` configuration;
-  one explicitly skipped environment-dependent test remains visible.
-
-### Not production-complete
-
-- [ ] Authentication and authorization.
-- [ ] Tenant isolation.
-- [ ] Safe command/tool execution.
-- [ ] Real Temporal workflow.
-- [ ] Real Antigravity execution.
-- [ ] Codex and Gemini worker adapters.
+- [x] Authentication and authorization (`alpha_core/security.py`, `773cbde`).
+- [x] Strict tenant isolation and project-scoped SQL filtering (`773cbde`).
+- [x] Safe command/tool execution with SafetyGate and `safety_hook.py`.
+- [x] Real Temporal workflow integration (`alpha_core/queue/`, `276d945`).
+- [x] Real Antigravity execution via `alpha_worker/adapters/antigravity_live.py`.
+- [x] Client tracking portal with live SSE stream (`alpha_portal/`, `5599d81`).
+- [x] Deployment and rollback pipeline for Vercel and Render (`24eb3af`).
+- [x] Automated CI/CD Self-Healing Daemon (`alpha_worker/ci_healing_daemon.py`).
 - [x] Real LiveKit room connection.
 - [x] Real Gemini Live duplex audio through Vertex AI.
+- [x] 506+ deterministic/hermetic tests pass without manual `PYTHONPATH` configuration.
+
+### Active / In-Progress
+
+- [ ] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees.
+- [ ] Autonomous TODO and Roadmap State Machine Sync Engine.
+- [ ] Async Redis token-bucket rate limiter for FastAPI endpoints (`tsk_eva_5fb3a94658b7`).
 - [ ] Real meeting specification extraction.
 - [ ] Real AgentLine call-job integration.
 - [ ] Inito Node Keeper integration.
-- [ ] Client tracking portal.
-- [ ] Deployment and rollback pipeline.
 - [ ] Production security, reliability, and privacy validation.
+- [-] Codex worker adapter (Discarded/Superseded: standardized on Antigravity Live + Gemini 3.1 Pro High).
 
 ## P0 — Stop unsafe execution
 

@@ -6,59 +6,59 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 
 ---
 
-## Part 1: Finalize Partially Implemented Foundation (Priority 1)
-
-These components have skeletal structures but lack production implementation.
+## Completed & Merged Milestones (September 2026)
 
 ### Task 1: Worker Execution Adapters
-- **Task Title**: Implement Codex and Gemini worker adapters for autonomous execution
-- **Objective**: Replace mocked worker execution in `alpha_worker/adapters` with real integrations for Antigravity, Codex, and Gemini execution workers.
-- **Allowed Scope**: `alpha_worker/adapters/`
-- **Acceptance Criteria**: Adapters successfully parse tasks, stream telemetry, and exit cleanly with structured result schemas.
+- **Status**: `[-] SUPERSEDED`
+- **Resolution**: Discarded Codex dependency. Standardized on `alpha_worker/adapters/antigravity_live.py` which natively executes all tasks via Google Antigravity CLI (`agy`) and Gemini 3.1 Pro High.
 
 ### Task 2: Sandbox & Daemon Isolation
-- **Task Title**: Harden macOS `launchd` non-admin worker isolation
-- **Objective**: Finalize the `daemon.py` and `launchd` configuration to securely isolate the autonomous coding worker inside a restricted non-admin macOS user environment.
-- **Allowed Scope**: `alpha_worker/daemon.py`, `alpha_worker/launchd_status.py`
-- **Acceptance Criteria**: Launchd plists deploy successfully to target user; unauthorized file access is blocked by macOS permissions.
+- **Status**: `[x] COMPLETED & MERGED` (`commit 6e11eeb`, `tsk_eva_47cc21ccaea2`)
+- **Objective**: Isolated autonomous coding worker inside restricted non-admin macOS user environment via `launchd`.
 
 ### Task 3: Temporal Workflow Integration
-- **Task Title**: Migrate task state engine to Temporal workflows
-- **Objective**: Replace local SQLite mutable polling with a real Temporal Cloud or local Temporal cluster workflow engine for robust, durable task progress tracking.
-- **Allowed Scope**: `alpha_core/queue/`, `pyproject.toml`
-- **Acceptance Criteria**: Task admittance, leasing, and completion are driven by Temporal signals and queries.
+- **Status**: `[x] COMPLETED & MERGED` (`commit 276d945`, `tsk_eva_29983ef163bf`)
+- **Objective**: Migrated task state engine to durable Temporal workflows.
+
+### Task 4: Tenant Isolation & Authentication
+- **Status**: `[x] COMPLETED & MERGED` (`commit 773cbde`, `tsk_eva_ad11f5fe2258`)
+- **Objective**: Enforce multi-tenant boundaries and RBAC with JWT token claims and scoped SQL filtering.
+
+### Task 5: Automated Deployment Adapters
+- **Status**: `[x] COMPLETED & MERGED` (`commit 24eb3af`, `tsk_eva_61135c1759ef`)
+- **Objective**: Implemented deterministic Vercel and Render deployment adapters with rollback pipelines.
+
+### Task 6: Client Portal API & Frontend
+- **Status**: `[x] COMPLETED & MERGED` (`commit 5599d81`, `tsk_eva_3d9c0ffc2606`)
+- **Objective**: Implemented Amazon-style client tracking portal UI (`alpha_portal/`) and FastAPI live SSE stream endpoint.
 
 ---
 
-## Part 2: Build Untouched Core Features (Priority 2)
+## Active Parallel Development Pipeline (Current)
 
-These features have not been started and require fresh implementation.
+### Task 7: Autonomous TODO and Roadmap State Machine Sync Engine
+- **Task Title**: Implement Autonomous TODO and Roadmap Synchronization Engine
+- **Objective**: Automatically parse merged task metadata upon atomic promotion (`cmd_merge`) and update `TODO.md` and roadmap markdown checklists atomically with commit SHAs and verified proof.
+- **Allowed Scope**: `alpha_core/automation/`, `alpha_core/triage_cli.py`
+- **Acceptance Criteria**: Passing unit tests verifying markdown parsing, checklist regex update, and idempotency.
 
-### Task 4: Tenant Isolation & Authentication
-- **Task Title**: Implement strict Tenant Isolation and API Authentication
-- **Objective**: Enforce multi-tenant boundaries and RBAC for all FastAPI routes, replacing current anonymous or single-tenant default scopes.
-- **Allowed Scope**: `alpha_core/api/`, `alpha_core/database/`
-- **Acceptance Criteria**: JWT-based auth enforces project-level scope; cross-project queries return 403.
+### Task 8: Parallel Worker Dispatcher Daemon
+- **Task Title**: Implement Parallel Worker Dispatcher Daemon for Concurrent Worktree Execution
+- **Objective**: Build an autonomous multi-worker daemon in `alpha_worker/parallel_dispatcher.py` that leases up to $N$ approved tasks concurrently, allocates isolated worktrees, runs `worker-cycle` in parallel using Gemini 3.1 Pro High, and queues tasks for senior review.
+- **Allowed Scope**: `alpha_worker/parallel_dispatcher.py`, `alpha_worker/`
+- **Acceptance Criteria**: Passes multi-worker lease concurrency tests without race conditions or lock contention.
 
-### Task 5: Automated Deployment Adapters
-- **Task Title**: Build Vercel/Render deployment adapters and rollback pipelines
-- **Objective**: Allow AlphaBrain to autonomously deploy passed PRs to preview environments and manage production rollbacks.
-- **Allowed Scope**: `alpha_core/deployments/` (New)
-- **Acceptance Criteria**: Adapter can trigger a deployment, poll status, and return a public preview URL.
-
-### Task 6: Client Portal API
-- **Task Title**: Implement the Client Tracking Portal API
-- **Objective**: Build endpoints for clients to track workflow phases, view preview links, and approve specifications/deployments.
-- **Allowed Scope**: `alpha_portal/api/` (New)
-- **Acceptance Criteria**: Endpoints expose read-only state for clients and write-access for milestone approvals.
+### Task 9: Async Redis Rate Limiter for FastAPI Endpoints
+- **Task Title**: Evaluate and implement open-source Python Redis rate limiter for async FastAPI (`tsk_eva_5fb3a94658b7`)
+- **Objective**: Implement robust token-bucket rate limiting on public and client-facing endpoints.
+- **Allowed Scope**: `alpha_core/api/rate_limiter.py`
+- **Acceptance Criteria**: Unit tests and lint gates pass cleanly.
 
 ---
 
 ## Execution Handoff
 
-These tasks have been admitted into the `alpha_core` triage queue. 
-
-To execute them autonomously, the operator should run the standard AlphaBrain lifecycle for each task:
+Tasks are admitted into the `alpha_core` triage queue and executed via the autonomous pipeline:
 1. `alpha_core.triage_cli review <task_id>`
 2. `alpha_core.triage_cli approve <task_id>`
 3. `alpha_core.triage_cli senior-research <task_id>`
