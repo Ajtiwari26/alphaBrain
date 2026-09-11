@@ -494,3 +494,49 @@ async def test_burst_and_variable_cost() -> None:
     assert res2.allowed is False
     assert res2.remaining == 15
 
+
+def test_instantiation_without_running_event_loop() -> None:
+    """Instantiating AsyncRateLimiter and InMemoryTokenBucket outside an event loop does not crash."""
+    import threading
+
+    err: list[Exception] = []
+
+    def worker() -> None:
+        try:
+            limiter = AsyncRateLimiter()
+            bucket = InMemoryTokenBucket()
+            assert limiter.memory_backend is not None
+            assert bucket._lock is None
+        except Exception as exc:
+            err.append(exc)
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join()
+    assert not err
+
+
+def test_decorator_sync_function_executed_in_threadpool() -> None:
+    """Decorator dispatches sync endpoint functions via run_in_threadpool without blocking."""
+    import threading
+
+    limiter = AsyncRateLimiter()
+    app = FastAPI()
+    executed_thread_id: list[int] = []
+
+    @app.get("/sync-worker")
+    @limiter.limit("5/minute")
+    def sync_route(request: Request) -> dict[str, str]:
+        executed_thread_id.append(threading.get_ident())
+        return {"status": "ok"}
+
+    client = TestClient(app)
+    main_thread_id = threading.get_ident()
+    resp = client.get("/sync-worker")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+    assert len(executed_thread_id) == 1
+    # run_in_threadpool executes on a worker thread pool, distinct from the main thread
+    assert executed_thread_id[0] != main_thread_id
+
+

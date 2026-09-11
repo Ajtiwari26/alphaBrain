@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
@@ -215,8 +216,13 @@ class InMemoryTokenBucket:
 
     def __init__(self) -> None:
         self._buckets: dict[str, tuple[float, float]] = {}  # key -> (tokens, last_updated)
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
         self._last_prune = time.time()
+
+    def _get_lock(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def check(
         self,
@@ -230,7 +236,7 @@ class InMemoryTokenBucket:
         if now is None:
             now = time.time()
 
-        async with self._lock:
+        async with self._get_lock():
             # Periodic prune of stale keys if table grows
             if now - self._last_prune > 300.0:
                 self._prune(now)
@@ -283,6 +289,7 @@ class InMemoryTokenBucket:
         """Clear all in-memory buckets (useful for test fixtures)."""
         self._buckets.clear()
         self._last_prune = time.time()
+        self._lock = None
 
 
 class AsyncRateLimiter:
@@ -442,6 +449,14 @@ class AsyncRateLimiter:
     ) -> Callable[..., Any]:
         """Decorator for FastAPI endpoint route handlers.
 
+        Note:
+            For idiomatic FastAPI endpoints, `limiter.dependency(...)` is recommended
+            because FastAPI automatically injects the `Response` object to populate
+            rate limit headers. When using `@limiter.limit`, declare `response: Response`
+            in the endpoint signature or return a `Response` instance to ensure headers
+            are attached. Synchronous endpoint handlers are safely executed in a threadpool
+            via `run_in_threadpool` to avoid blocking the main event loop.
+
         Example:
             @app.get("/items")
             @limiter.limit("20/minute")
@@ -501,9 +516,10 @@ class AsyncRateLimiter:
                         headers=result.headers,
                     )
 
-                res = func(*args, **kwargs)
-                if inspect.iscoroutine(res):
-                    res = await res
+                if inspect.iscoroutinefunction(func):
+                    res = await func(*args, **kwargs)
+                else:
+                    res = await run_in_threadpool(func, *args, **kwargs)
 
                 # If the function returned a Response directly, attach headers
                 if isinstance(res, Response):
