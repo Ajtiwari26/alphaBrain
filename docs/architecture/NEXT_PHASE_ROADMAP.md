@@ -53,6 +53,14 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Allowed Scope**: `alpha_core/api/rate_limiter.py`
 - **Acceptance Criteria**: Unit tests and lint gates pass cleanly.
 
+### Implement P9.7 Operational Monitoring and Live Metrics Telemetry Exporter for AlphaBrain
+- **Status**: `[x] COMPLETED & MERGED` (`commit 15b839f`, `tsk_eva_b5fa5c42cd60`)
+- **Objective**: Implement P9.7 Operational Monitoring and Live Metrics Telemetry Exporter for AlphaBrain
+
+### Integrate CIHealingDaemon with ParallelWorkerDispatcher and TaskTriageQueue
+- **Status**: `[x] COMPLETED & MERGED` (`commit 6899625`, `tsk_eva_c4eb3d7b96bd`)
+- **Objective**: Automated CI/CD failure analysis, repair synthesis, and parallel auto-retry loop with circuit breaker protection
+
 ---
 
 ## Active Parallel Development Pipeline (Current)
