@@ -13,7 +13,9 @@ Validates:
 8. Daemon cycle execution and graceful shutdown.
 """
 
-import threading
+import multiprocessing as mp
+import subprocess
+import sys
 import time
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -21,8 +23,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue, TriageStatus
-from alpha_worker.parallel_dispatcher import ParallelWorkerDispatcher
-from alpha_worker.triage_dispatcher import PRProposal
+from alpha_worker.parallel_dispatcher import ActiveTaskExecution, ParallelWorkerDispatcher
+from testscript.planning_fixtures import attach_test_plan
 
 
 @pytest.fixture
@@ -86,44 +88,44 @@ def test_dispatcher_retrieves_approved_tasks(test_env):
 def test_dispatcher_respects_max_workers_concurrency(test_env):
     queue, _ = test_env
     max_workers = 2
+    ctx = mp.get_context("fork")
 
-    active_tasks_seen = set()
-    peak_concurrency = 0
-    concurrency_lock = threading.Lock()
-    barrier = threading.Barrier(max_workers)
-    release_event = threading.Event()
+    active_count = ctx.Value("i", 0)
+    peak_concurrency = ctx.Value("i", 0)
+    counter_lock = ctx.Lock()
+    all_active_event = ctx.Event()
+    release_event = ctx.Event()
 
     def mock_worker_cycle(task_dict):
-        nonlocal peak_concurrency
         t_id = task_dict["id"]
-        with concurrency_lock:
-            active_tasks_seen.add(t_id)
-            current_count = len(active_tasks_seen)
-            if current_count > peak_concurrency:
-                peak_concurrency = current_count
+        with counter_lock:
+            active_count.value += 1
+            if active_count.value > peak_concurrency.value:
+                peak_concurrency.value = active_count.value
+            if active_count.value >= max_workers:
+                all_active_event.set()
 
-        barrier.wait(timeout=5.0)
         release_event.wait(timeout=5.0)
 
-        with concurrency_lock:
-            active_tasks_seen.remove(t_id)
+        with counter_lock:
+            active_count.value -= 1
 
-        return PRProposal(
-            task_id=t_id,
-            project_id="alphabrain_dogfood",
-            branch_name=f"alpha/{t_id}",
-            base_commit="abc1234",
-            head_commit="def5678",
-            title="Test PR",
-            description="Testing concurrency",
-            files_changed=["file.py"],
-            diff_stat="1 file changed",
-            gates_passed=True,
-            evidence=[],
-            created_at=time.time(),
-            attempt_id="att_1",
-            worker_id="wrk_1",
-        )
+        return {
+            "task_id": t_id,
+            "project_id": "alphabrain_dogfood",
+            "branch_name": f"alpha/{t_id}",
+            "base_commit": "abc1234",
+            "head_commit": "def5678",
+            "title": "Test PR",
+            "description": "Testing concurrency",
+            "files_changed": ["file.py"],
+            "diff_stat": "1 file changed",
+            "gates_passed": True,
+            "evidence": [],
+            "created_at": time.time(),
+            "attempt_id": "att_1",
+            "worker_id": "wrk_1",
+        }
 
     dispatcher = ParallelWorkerDispatcher(
         queue=queue,
@@ -150,25 +152,26 @@ def test_dispatcher_respects_max_workers_concurrency(test_env):
     assert d3 is None
     assert dispatcher.active_count() == 2
 
+    # Wait for all workers to be concurrently executing
+    assert all_active_event.wait(timeout=5.0) is True
+
     # Release workers
     release_event.set()
     time.sleep(0.2)
     dispatcher.reap_completed_tasks()
 
-    assert peak_concurrency == 2
+    assert peak_concurrency.value == 2
     assert dispatcher.active_count() == 0
     dispatcher.stop(wait=True)
 
 
 def test_isolated_git_worktree_per_task(test_env):
     queue, tmp_path = test_env
-    worktrees_created: list[tuple[str, str]] = []
 
     class MockWorktreeManager:
         def create_or_resume_worktree(self, repo_path, task_id, base_commit):
             wt_path = tmp_path / "worktrees" / f"alpha_{task_id}"
             wt_path.mkdir(parents=True, exist_ok=True)
-            worktrees_created.append((task_id, str(wt_path)))
             return wt_path
 
         @staticmethod
@@ -176,13 +179,11 @@ def test_isolated_git_worktree_per_task(test_env):
             return []
 
     mock_mgr = MockWorktreeManager()
-    executed_worktrees: list[str] = []
 
     def mock_worker_cycle(task_dict):
         t_id = task_dict["id"]
         wt = mock_mgr.create_or_resume_worktree("/repo", t_id, "base_sha")
-        executed_worktrees.append(str(wt))
-        return None
+        return {"worktree": str(wt), "task_id": t_id}
 
     dispatcher = ParallelWorkerDispatcher(
         queue=queue,
@@ -200,11 +201,11 @@ def test_isolated_git_worktree_per_task(test_env):
     time.sleep(0.3)
     dispatcher.reap_completed_tasks()
 
-    assert len(worktrees_created) == 2
-    wt_dict = dict(worktrees_created)
-    assert wt_dict["tsk_wt_1"] != wt_dict["tsk_wt_2"]
-    assert "alpha_tsk_wt_1" in wt_dict["tsk_wt_1"]
-    assert "alpha_tsk_wt_2" in wt_dict["tsk_wt_2"]
+    wt1 = tmp_path / "worktrees" / "alpha_tsk_wt_1"
+    wt2 = tmp_path / "worktrees" / "alpha_tsk_wt_2"
+    assert wt1.exists()
+    assert wt2.exists()
+    assert wt1 != wt2
     dispatcher.stop(wait=True)
 
 
@@ -220,7 +221,8 @@ def test_execution_timeout_termination_and_queue_handling(test_env):
         initial_status=TriageStatus.EXECUTING,
     )
 
-    task_started = threading.Event()
+    ctx = mp.get_context("fork")
+    task_started = ctx.Event()
 
     def hanging_worker_cycle(task_dict):
         task_started.set()
@@ -242,12 +244,20 @@ def test_execution_timeout_termination_and_queue_handling(test_env):
     assert dispatched == task_id
     assert task_started.wait(timeout=2.0) is True
 
+    # Capture execution object and verify process exists
+    active_exec = dispatcher.active_tasks[task_id]
+    assert active_exec.process is not None
+    assert active_exec.process.pid is not None
+
     # Sleep slightly to allow timeout threshold to pass
     time.sleep(0.3)
 
     timed_out = dispatcher.handle_timeouts()
     assert task_id in timed_out
     assert dispatcher.active_count() == 0
+
+    # Verify process was terminated and is no longer running
+    assert active_exec.process.poll() is not None
 
     # Verify task was marked FAILED in TaskTriageQueue
     task_row = queue.get_task(task_id)
@@ -359,3 +369,173 @@ def test_run_once_and_continuous_mode_execution(test_env):
     start = time.time()
     dispatcher.run_continuously(interval=0.01, max_cycles=2)
     assert time.time() - start < 2.0
+
+
+def test_worker_pool_recovers_after_timeouts_without_starvation(test_env):
+    """
+    Verifies that when max_workers tasks time out, the worker pool does NOT deadlock
+    or suffer from worker pool starvation, and subsequent tasks can be dispatched and completed.
+    """
+    queue, _ = test_env
+    max_workers = 2
+    ctx = mp.get_context("fork")
+
+    hang_ev = ctx.Event()
+    success_count = ctx.Value("i", 0)
+
+    def dynamic_worker(task_dict):
+        t_id = task_dict["id"]
+        if "hang" in t_id:
+            hang_ev.set()
+            time.sleep(10.0)
+            return None
+        else:
+            with success_count.get_lock():
+                success_count.value += 1
+            return {"status": "ok", "task_id": t_id}
+
+    dispatcher = ParallelWorkerDispatcher(
+        queue=queue,
+        max_workers=max_workers,
+        timeout_seconds=0.2,
+        worker_cycle_fn=dynamic_worker,
+    )
+
+    # 1. Dispatch max_workers hanging tasks
+    for i in range(max_workers):
+        t_id = f"tsk_hang_{i}"
+        queue.enqueue_task(
+            task_id=t_id,
+            envelope={"project_id": "p"},
+            provenance=make_dummy_provenance(t_id),
+            initial_status=TriageStatus.APPROVED,
+        )
+        assert dispatcher.dispatch_task({"id": t_id, "envelope": {}}) == t_id
+
+    assert dispatcher.is_pool_full() is True
+    assert hang_ev.wait(timeout=2.0) is True
+
+    # 2. Allow timeout to expire and handle timeouts
+    time.sleep(0.3)
+    timed_out = dispatcher.handle_timeouts()
+    assert len(timed_out) == max_workers
+    assert dispatcher.active_count() == 0
+    assert dispatcher.available_slots() == max_workers
+
+    # 3. Dispatch new valid tasks - must NOT be deadlocked!
+    for i in range(max_workers):
+        t_id = f"tsk_success_{i}"
+        queue.enqueue_task(
+            task_id=t_id,
+            envelope={"project_id": "p"},
+            provenance=make_dummy_provenance(t_id),
+            initial_status=TriageStatus.APPROVED,
+        )
+        dispatched = dispatcher.dispatch_task({"id": t_id, "envelope": {}})
+        assert dispatched == t_id
+
+    time.sleep(0.3)
+    reaped = dispatcher.reap_completed_tasks()
+    assert len(reaped["completed"]) == max_workers
+    assert success_count.value == max_workers
+    dispatcher.stop(wait=True)
+
+
+def test_queued_tasks_do_not_suffer_cascading_timeouts(test_env):
+    """
+    Verifies that tasks waiting in the queue do not start their timeout countdown
+    until they are actually dispatched and start executing, preventing false timeouts.
+    """
+    queue, _ = test_env
+
+    for i in range(2):
+        t_id = f"tsk_cascade_{i}"
+        queue.enqueue_task(
+            task_id=t_id,
+            envelope={"project_id": "p", "base_commit": "a" * 40, "allowed_paths": ["TODO.md"]},
+            provenance=make_dummy_provenance(t_id),
+            initial_status=TriageStatus.PENDING_REVIEW,
+        )
+        attach_test_plan(queue, t_id)
+        assert queue.approve_task(t_id) is True
+
+    def fast_worker(task_dict):
+        time.sleep(0.05)
+        return {"status": "ok"}
+
+    dispatcher = ParallelWorkerDispatcher(
+        queue=queue,
+        max_workers=1,
+        timeout_seconds=0.2,
+        worker_cycle_fn=fast_worker,
+    )
+
+    # 1. Dispatch first task
+    d1 = dispatcher.lease_and_dispatch_next()
+    assert d1 == "tsk_cascade_0"
+
+    # Sleep longer than timeout_seconds to simulate queue wait time for remaining tasks
+    time.sleep(0.25)
+
+    # The running task will have timed out
+    timed_out = dispatcher.handle_timeouts()
+    assert d1 in timed_out
+
+    # 2. Next task should now lease and run without having expired in the queue
+    d2 = dispatcher.lease_and_dispatch_next()
+    assert d2 == "tsk_cascade_1"
+    exec2 = dispatcher.active_tasks[d2]
+    # Verify execution timer just started, not 0.25s ago
+    assert exec2.elapsed_seconds < 0.15
+
+    time.sleep(0.08)
+    reaped = dispatcher.reap_completed_tasks()
+    assert d2 in reaped["completed"]
+    dispatcher.stop(wait=True)
+
+
+def test_subprocess_popen_execution_and_timeout_kill(test_env):
+    """
+    Verifies that ActiveTaskExecution works with a real subprocess.Popen object,
+    and handle_timeouts forcefully terminates the OS process with SIGTERM/SIGKILL.
+    """
+    queue, _ = test_env
+    task_id = "tsk_popen_test"
+    queue.enqueue_task(
+        task_id=task_id,
+        envelope={"project_id": "p"},
+        provenance=make_dummy_provenance(task_id),
+        initial_status=TriageStatus.EXECUTING,
+    )
+
+    dispatcher = ParallelWorkerDispatcher(
+        queue=queue,
+        max_workers=2,
+        timeout_seconds=0.2,
+    )
+
+    # Launch a real hanging subprocess using sys.executable
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(100.0)"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert proc.poll() is None
+
+    execution = ActiveTaskExecution(
+        task_id=task_id,
+        started_at=time.time(),
+        worker_id="wrk_popen_1",
+        process=proc,
+    )
+    with dispatcher._lock:
+        dispatcher._active_tasks[task_id] = execution
+
+    time.sleep(0.3)
+    timed_out = dispatcher.handle_timeouts()
+    assert task_id in timed_out
+    assert dispatcher.active_count() == 0
+
+    # Verify subprocess was killed
+    assert proc.poll() is not None
+    dispatcher.stop(wait=False)

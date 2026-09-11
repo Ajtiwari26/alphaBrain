@@ -12,11 +12,14 @@ Orchestrates concurrent worker execution:
 
 from __future__ import annotations
 
-import concurrent.futures
+import argparse
 import dataclasses
+import inspect
 import logging
+import multiprocessing
 import signal
 import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -32,22 +35,79 @@ from alpha_worker.worktree import WorktreeManager
 logger = logging.getLogger("alphabrain.worker.parallel_dispatcher")
 
 
+class ProcessHandle:
+    """Wrapper around multiprocessing.Process providing a subprocess.Popen-compatible interface."""
+
+    def __init__(self, process: multiprocessing.Process) -> None:
+        self._proc = process
+
+    @property
+    def pid(self) -> int | None:
+        return self._proc.pid
+
+    def poll(self) -> int | None:
+        if self._proc.is_alive():
+            return None
+        return self._proc.exitcode
+
+    def terminate(self) -> None:
+        self._proc.terminate()
+
+    def kill(self) -> None:
+        self._proc.kill()
+
+    def wait(self, timeout: float | None = None) -> int | None:
+        self._proc.join(timeout=timeout)
+        return self.poll()
+
+
 @dataclasses.dataclass
 class ActiveTaskExecution:
     """Tracks state and metadata for an actively running worker task."""
 
     task_id: str
-    started_at: float
+    started_at: float | None
     worker_id: str
-    future: concurrent.futures.Future[Any] | None = None
-    process: subprocess.Popen[Any] | None = None
+    process: subprocess.Popen[Any] | ProcessHandle | None = None
+    result_queue: Any | None = None
     worktree_path: Path | str | None = None
     envelope: dict[str, Any] = dataclasses.field(default_factory=dict)
     cancelled: bool = False
+    future: Any | None = None
 
     @property
     def elapsed_seconds(self) -> float:
+        if self.started_at is None:
+            return 0.0
         return max(0.0, time.time() - self.started_at)
+
+
+def _worker_process_target(
+    worker_fn: Callable[..., Any],
+    leased_task: dict[str, Any],
+    worker_id: str,
+    result_queue: Any,
+) -> None:
+    """Entrypoint executing inside an isolated worker child process."""
+    try:
+        sig = inspect.signature(worker_fn)
+        if len(sig.parameters) >= 2:
+            res = worker_fn(leased_task, worker_id)
+        else:
+            res = worker_fn(leased_task)
+
+        res_data: Any
+        if hasattr(res, "to_dict"):
+            res_data = res.to_dict()
+        elif isinstance(res, (dict, list, str, int, float, bool, type(None))):
+            res_data = res
+        else:
+            res_data = str(res)
+
+        result_queue.put({"success": True, "result": res_data, "error": None})
+    except Exception as e:
+        logger.exception("Worker execution error on task %s: %s", leased_task.get("id"), e)
+        result_queue.put({"success": False, "result": None, "error": str(e)})
 
 
 class ParallelWorkerDispatcher:
@@ -69,6 +129,7 @@ class ParallelWorkerDispatcher:
         ci_healing_daemon: CIHealingDaemon | None = None,
         worker_cycle_fn: Callable[[dict[str, Any]], Any] | None = None,
         enable_agent_execution: bool = False,
+        execution_mode: str = "process",
     ) -> None:
         if max_workers < 1:
             raise ValueError(f"max_workers must be at least 1, got {max_workers}")
@@ -83,13 +144,15 @@ class ParallelWorkerDispatcher:
         self.ci_healing_daemon = ci_healing_daemon
         self.worker_cycle_fn = worker_cycle_fn
         self.enable_agent_execution = enable_agent_execution
+        self.execution_mode = execution_mode
+
+        try:
+            self._mp_context = multiprocessing.get_context("fork")
+        except ValueError:
+            self._mp_context = multiprocessing.get_context()
 
         self._lock = threading.Lock()
         self._active_tasks: dict[str, ActiveTaskExecution] = {}
-        self._executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers,
-            thread_name_prefix="AlphaParallelWorker",
-        )
         self._shutdown = False
 
     # -------------------------------------------------------------------------
@@ -136,7 +199,7 @@ class ParallelWorkerDispatcher:
     # Worker-Cycle Task Execution
     # -------------------------------------------------------------------------
     def execute_single_worker_cycle(
-        self, leased_task: dict[str, Any], worker_id: str
+        self, leased_task: dict[str, Any], worker_id: str = ""
     ) -> PRProposal | None:
         """
         Executes a single leased task through worker-cycle inside an isolated git worktree.
@@ -145,6 +208,9 @@ class ParallelWorkerDispatcher:
         logger.info("Executing worker cycle for task %s on worker %s", task_id, worker_id)
 
         if self.worker_cycle_fn is not None:
+            sig = inspect.signature(self.worker_cycle_fn)
+            if len(sig.parameters) >= 2:
+                return self.worker_cycle_fn(leased_task, worker_id)
             return self.worker_cycle_fn(leased_task)
 
         dispatcher = TriageTaskDispatcher(
@@ -154,28 +220,12 @@ class ParallelWorkerDispatcher:
         )
         return dispatcher.execute_task(leased_task)
 
-    def _worker_runner(self, leased_task: dict[str, Any], worker_id: str) -> Any:
-        task_id = leased_task["id"]
-        try:
-            return self.execute_single_worker_cycle(leased_task, worker_id)
-        except Exception as e:
-            logger.exception("Worker execution error on task %s: %s", task_id, e)
-            try:
-                self.queue.fail_task(
-                    task_id=task_id,
-                    error_details={"error": str(e)},
-                    allow_retry=False,
-                )
-            except Exception as fail_err:
-                logger.error("Failed to mark task %s failed in queue: %s", task_id, fail_err)
-            raise
-
     # -------------------------------------------------------------------------
     # Dispatch Logic
     # -------------------------------------------------------------------------
     def dispatch_task(self, leased_task: dict[str, Any]) -> str | None:
         """
-        Submits a leased task to the concurrent worker pool.
+        Submits a leased task to the concurrent worker pool in an isolated OS process.
         Returns task_id on success, or None if pool is full or dispatch was rejected.
         """
         task_id = leased_task["id"]
@@ -193,19 +243,58 @@ class ParallelWorkerDispatcher:
                 return None
 
             worker_id = f"wrk_parallel_{task_id}_{int(time.time() * 1000)}"
+
+            proc_handle: subprocess.Popen[Any] | ProcessHandle
+            result_queue: Any | None
+            if self.execution_mode == "subprocess":
+                cmd = [
+                    sys.executable,
+                    "-m",
+                    "alpha_worker.parallel_dispatcher",
+                    "worker-cycle",
+                    "--task-id",
+                    task_id,
+                    "--db-path",
+                    str(self.queue.db_path),
+                ]
+                proc_handle = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                started_at = time.time()
+                result_queue = None
+            else:
+                # Process isolation execution
+                result_queue = self._mp_context.Queue()
+                worker_fn = self.worker_cycle_fn or self.execute_single_worker_cycle
+
+                proc = self._mp_context.Process(
+                    target=_worker_process_target,
+                    args=(worker_fn, leased_task, worker_id, result_queue),
+                )
+                proc.start()
+                started_at = time.time()
+                proc_handle = ProcessHandle(proc)
+
             execution = ActiveTaskExecution(
                 task_id=task_id,
-                started_at=time.time(),
+                started_at=started_at,
                 worker_id=worker_id,
+                process=proc_handle,
+                result_queue=result_queue,
                 envelope=leased_task.get("envelope", {}),
             )
-
-            # Submit task to ThreadPoolExecutor
-            future = self._executor.submit(self._worker_runner, leased_task, worker_id)
-            execution.future = future
             self._active_tasks[task_id] = execution
 
-        logger.info("Dispatched task %s to concurrent worker pool (active: %d/%d)", task_id, self.active_count(), self.max_workers)
+        logger.info(
+            "Dispatched task %s to concurrent worker pool (active: %d/%d, pid: %s)",
+            task_id,
+            self.active_count(),
+            self.max_workers,
+            proc_handle.pid,
+        )
         return task_id
 
     def lease_and_dispatch_next(self) -> str | None:
@@ -242,8 +331,8 @@ class ParallelWorkerDispatcher:
     def handle_timeouts(self) -> list[str]:
         """
         Checks all active tasks against timeout_seconds.
-        Terminates runaway executions, marks tasks failed in TaskTriageQueue,
-        and routes them to CI healing.
+        Terminates runaway executions forcefully with OS signals (SIGTERM, then SIGKILL),
+        marks tasks failed in TaskTriageQueue, and routes them to CI healing.
         Returns the list of timed-out task IDs.
         """
         now = time.time()
@@ -251,7 +340,7 @@ class ParallelWorkerDispatcher:
 
         with self._lock:
             for task_id, execution in list(self._active_tasks.items()):
-                if (now - execution.started_at) > self.timeout_seconds:
+                if execution.started_at is not None and (now - execution.started_at) > self.timeout_seconds:
                     execution.cancelled = True
                     timed_out_tasks.append(execution)
                     del self._active_tasks[task_id]
@@ -266,20 +355,25 @@ class ParallelWorkerDispatcher:
                 execution.elapsed_seconds,
             )
 
-            # Cancel future if not yet completed
-            if execution.future and not execution.future.done():
+            # Cancel future if present
+            if execution.future and hasattr(execution.future, "cancel") and not execution.future.done():
                 execution.future.cancel()
 
-            # Terminate subprocess if active
-            if execution.process and execution.process.poll() is None:
+            # Forcibly terminate runaway process
+            if execution.process:
                 try:
-                    execution.process.terminate()
-                    execution.process.wait(timeout=2.0)
-                except Exception:
-                    try:
+                    if execution.process.poll() is None:
+                        execution.process.terminate()
+                        execution.process.wait(timeout=2.0)
+                except Exception as term_err:
+                    logger.warning("Error terminating process for task %s: %s", task_id, term_err)
+
+                try:
+                    if execution.process.poll() is None:
                         execution.process.kill()
-                    except Exception:
-                        pass
+                        execution.process.wait(timeout=1.0)
+                except Exception as kill_err:
+                    logger.warning("Error killing process for task %s: %s", task_id, kill_err)
 
             # Fail the task in the queue
             timeout_msg = f"Task execution exceeded timeout limit of {self.timeout_seconds}s"
@@ -385,42 +479,81 @@ class ParallelWorkerDispatcher:
     # -------------------------------------------------------------------------
     def reap_completed_tasks(self) -> dict[str, list[str]]:
         """
-        Inspects running workers, harvests finished executions, and routes them.
+        Inspects running worker processes, harvests finished executions, and routes them.
         """
         completed_ids: list[str] = []
         failed_ids: list[str] = []
-
-        finished_tasks: list[tuple[str, ActiveTaskExecution, Any, Exception | None]] = []
+        finished_tasks: list[tuple[str, ActiveTaskExecution, Any, str | None]] = []
 
         with self._lock:
             for task_id, execution in list(self._active_tasks.items()):
-                if execution.future and execution.future.done():
-                    exc: Exception | None = None
+                is_done = False
+                if execution.process and execution.process.poll() is not None:
+                    is_done = True
+                elif execution.future and execution.future.done():
+                    is_done = True
+
+                if is_done:
                     res: Any = None
-                    try:
-                        res = execution.future.result()
-                    except Exception as err:
-                        exc = err
-                    finished_tasks.append((task_id, execution, res, exc))
+                    err: str | None = None
+
+                    if execution.result_queue is not None:
+                        try:
+                            if not execution.result_queue.empty():
+                                msg = execution.result_queue.get_nowait()
+                                if msg.get("success"):
+                                    res = msg.get("result")
+                                else:
+                                    err = msg.get("error")
+                        except Exception as q_err:
+                            logger.warning(
+                                "Error reading result queue for task %s: %s",
+                                task_id,
+                                q_err,
+                            )
+
+                    if execution.process:
+                        exit_code = execution.process.poll()
+                        if exit_code not in (0, None) and not err:
+                            err = f"Worker process exited with code {exit_code}"
+
+                    if execution.future and execution.future.done() and not err and not res:
+                        try:
+                            res = execution.future.result()
+                        except Exception as f_err:
+                            err = str(f_err)
+
+                    finished_tasks.append((task_id, execution, res, err))
                     del self._active_tasks[task_id]
 
-        for task_id, _execution, _res, exc in finished_tasks:
-            if exc:
-                logger.error("Task %s completed with exception: %s", task_id, exc)
+        for task_id, execution, _res, err in finished_tasks:
+            if execution.process:
+                try:
+                    execution.process.wait(timeout=0.5)
+                except Exception:
+                    pass
+
+            if err:
+                logger.error("Task %s completed with error: %s", task_id, err)
+                try:
+                    self.queue.fail_task(
+                        task_id=task_id,
+                        error_details={"error": err},
+                        allow_retry=False,
+                    )
+                except Exception:
+                    pass
                 failed_ids.append(task_id)
-                self.route_failed_task(task_id, reason=str(exc))
+                self.route_failed_task(task_id, reason=err)
             else:
                 task_row = self.queue.get_task(task_id)
                 status = task_row.get("status") if task_row else None
-                if status == TriageStatus.COMPLETED.value:
-                    logger.info("Task %s completed successfully. Routing.", task_id)
-                    completed_ids.append(task_id)
-                    self.route_completed_task(task_row or task_id)
-                elif status == TriageStatus.FAILED.value:
+                if status == TriageStatus.FAILED.value:
                     logger.warning("Task %s status is FAILED. Routing to CI healing.", task_id)
                     failed_ids.append(task_id)
                     self.route_failed_task(task_row or task_id)
                 else:
+                    logger.info("Task %s completed successfully. Routing.", task_id)
                     completed_ids.append(task_id)
                     self.route_completed_task(task_row or task_id)
 
@@ -505,7 +638,58 @@ class ParallelWorkerDispatcher:
 
     def stop(self, wait: bool = True) -> None:
         """
-        Stops the daemon and terminates the worker executor.
+        Stops the daemon and terminates all running worker processes.
         """
         self._shutdown = True
-        self._executor.shutdown(wait=wait, cancel_futures=True)
+        with self._lock:
+            active = list(self._active_tasks.values())
+            self._active_tasks.clear()
+
+        for execution in active:
+            if execution.future and hasattr(execution.future, "cancel") and not execution.future.done():
+                execution.future.cancel()
+
+            if execution.process and execution.process.poll() is None:
+                try:
+                    execution.process.terminate()
+                    if wait:
+                        execution.process.wait(timeout=2.0)
+                except Exception:
+                    pass
+
+                try:
+                    if execution.process.poll() is None:
+                        execution.process.kill()
+                        if wait:
+                            execution.process.wait(timeout=1.0)
+                except Exception:
+                    pass
+
+
+def main() -> int:
+    """CLI entrypoint for running parallel dispatcher or worker cycles."""
+    parser = argparse.ArgumentParser(description="AlphaBrain Parallel Worker Dispatcher")
+    subparsers = parser.add_subparsers(dest="command")
+
+    p_worker = subparsers.add_parser("worker-cycle", help="Execute single worker cycle")
+    p_worker.add_argument("--task-id", required=True, help="Task ID to execute")
+    p_worker.add_argument("--db-path", required=True, help="SQLite database path")
+    p_worker.add_argument("--emergency-lock", help="Emergency lock file path")
+
+    args = parser.parse_args()
+    if args.command == "worker-cycle":
+        queue = TaskTriageQueue(db_path=args.db_path, emergency_lock_path=args.emergency_lock)
+        task = queue.get_task(args.task_id)
+        if not task:
+            print(f"Task {args.task_id} not found", file=sys.stderr)
+            return 1
+        dispatcher = TriageTaskDispatcher(queue=queue)
+        proposal = dispatcher.execute_task(task)
+        if proposal and proposal.gates_passed:
+            return 0
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
