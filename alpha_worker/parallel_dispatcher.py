@@ -1,0 +1,511 @@
+"""
+alpha_worker/parallel_dispatcher.py
+Parallel Worker Dispatcher Daemon for AlphaBrain.
+
+Orchestrates concurrent worker execution:
+1. Queries TaskTriageQueue for approved tasks.
+2. Maintains a concurrency pool bounded by max_workers.
+3. Dispatches tasks simultaneously into isolated git worktrees via worker-cycle.
+4. Enforces execution timeouts, terminating runaway workers and recording failure.
+5. Routes completed tasks to Senior Review and CI Healing daemons.
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import dataclasses
+import logging
+import signal
+import subprocess
+import threading
+import time
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
+from alpha_worker.ci_healing_daemon import CIHealingDaemon
+from alpha_worker.senior_review_engine import SeniorReviewEngine
+from alpha_worker.triage_dispatcher import PRProposal, TriageTaskDispatcher
+from alpha_worker.worktree import WorktreeManager
+
+logger = logging.getLogger("alphabrain.worker.parallel_dispatcher")
+
+
+@dataclasses.dataclass
+class ActiveTaskExecution:
+    """Tracks state and metadata for an actively running worker task."""
+
+    task_id: str
+    started_at: float
+    worker_id: str
+    future: concurrent.futures.Future[Any] | None = None
+    process: subprocess.Popen[Any] | None = None
+    worktree_path: Path | str | None = None
+    envelope: dict[str, Any] = dataclasses.field(default_factory=dict)
+    cancelled: bool = False
+
+    @property
+    def elapsed_seconds(self) -> float:
+        return max(0.0, time.time() - self.started_at)
+
+
+class ParallelWorkerDispatcher:
+    """
+    Parallel Worker Dispatcher Daemon managing a concurrent pool of up to max_workers.
+    Queries TaskTriageQueue for approved tasks, executes them concurrently in isolated
+    git worktrees, enforces execution timeouts, and routes completions to Senior Review and CI Healing.
+    """
+
+    def __init__(
+        self,
+        queue: TaskTriageQueue,
+        max_workers: int = 4,
+        worktree_mgr: WorktreeManager | None = None,
+        timeout_seconds: float = 300.0,
+        poll_interval: float = 1.0,
+        project_id: str | None = None,
+        senior_review_engine: SeniorReviewEngine | None = None,
+        ci_healing_daemon: CIHealingDaemon | None = None,
+        worker_cycle_fn: Callable[[dict[str, Any]], Any] | None = None,
+        enable_agent_execution: bool = False,
+    ) -> None:
+        if max_workers < 1:
+            raise ValueError(f"max_workers must be at least 1, got {max_workers}")
+
+        self.queue = queue
+        self.max_workers = max_workers
+        self.worktree_mgr = worktree_mgr or WorktreeManager()
+        self.timeout_seconds = timeout_seconds
+        self.poll_interval = poll_interval
+        self.project_id = project_id
+        self.senior_review_engine = senior_review_engine
+        self.ci_healing_daemon = ci_healing_daemon
+        self.worker_cycle_fn = worker_cycle_fn
+        self.enable_agent_execution = enable_agent_execution
+
+        self._lock = threading.Lock()
+        self._active_tasks: dict[str, ActiveTaskExecution] = {}
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers,
+            thread_name_prefix="AlphaParallelWorker",
+        )
+        self._shutdown = False
+
+    # -------------------------------------------------------------------------
+    # Pool State and Capacity
+    # -------------------------------------------------------------------------
+    @property
+    def active_tasks(self) -> dict[str, ActiveTaskExecution]:
+        with self._lock:
+            return dict(self._active_tasks)
+
+    def active_count(self) -> int:
+        with self._lock:
+            return len(self._active_tasks)
+
+    def available_slots(self) -> int:
+        with self._lock:
+            return max(0, self.max_workers - len(self._active_tasks))
+
+    def is_pool_full(self) -> bool:
+        return self.available_slots() == 0
+
+    # -------------------------------------------------------------------------
+    # Task Retrieval & Queue Querying
+    # -------------------------------------------------------------------------
+    def get_approved_tasks(self, limit: int = 50) -> list[dict[str, Any]]:
+        """
+        Queries TaskTriageQueue for approved tasks eligible for worker execution.
+        """
+        if self.queue.is_emergency_stopped():
+            logger.warning("Emergency stop active; approved task retrieval suspended.")
+            return []
+
+        try:
+            return self.queue.list_tasks(
+                status=TriageStatus.APPROVED,
+                limit=limit,
+                project_id=self.project_id,
+            )
+        except Exception as e:
+            logger.error("Failed to query approved tasks from queue: %s", e)
+            return []
+
+    # -------------------------------------------------------------------------
+    # Worker-Cycle Task Execution
+    # -------------------------------------------------------------------------
+    def execute_single_worker_cycle(
+        self, leased_task: dict[str, Any], worker_id: str
+    ) -> PRProposal | None:
+        """
+        Executes a single leased task through worker-cycle inside an isolated git worktree.
+        """
+        task_id = leased_task["id"]
+        logger.info("Executing worker cycle for task %s on worker %s", task_id, worker_id)
+
+        if self.worker_cycle_fn is not None:
+            return self.worker_cycle_fn(leased_task)
+
+        dispatcher = TriageTaskDispatcher(
+            queue=self.queue,
+            worktree_mgr=self.worktree_mgr,
+            enable_agent_execution=self.enable_agent_execution,
+        )
+        return dispatcher.execute_task(leased_task)
+
+    def _worker_runner(self, leased_task: dict[str, Any], worker_id: str) -> Any:
+        task_id = leased_task["id"]
+        try:
+            return self.execute_single_worker_cycle(leased_task, worker_id)
+        except Exception as e:
+            logger.exception("Worker execution error on task %s: %s", task_id, e)
+            try:
+                self.queue.fail_task(
+                    task_id=task_id,
+                    error_details={"error": str(e)},
+                    allow_retry=False,
+                )
+            except Exception as fail_err:
+                logger.error("Failed to mark task %s failed in queue: %s", task_id, fail_err)
+            raise
+
+    # -------------------------------------------------------------------------
+    # Dispatch Logic
+    # -------------------------------------------------------------------------
+    def dispatch_task(self, leased_task: dict[str, Any]) -> str | None:
+        """
+        Submits a leased task to the concurrent worker pool.
+        Returns task_id on success, or None if pool is full or dispatch was rejected.
+        """
+        task_id = leased_task["id"]
+        with self._lock:
+            if len(self._active_tasks) >= self.max_workers:
+                logger.warning(
+                    "Concurrency limit (%d) reached. Cannot dispatch task %s.",
+                    self.max_workers,
+                    task_id,
+                )
+                return None
+
+            if task_id in self._active_tasks:
+                logger.warning("Task %s is already running in worker pool.", task_id)
+                return None
+
+            worker_id = f"wrk_parallel_{task_id}_{int(time.time() * 1000)}"
+            execution = ActiveTaskExecution(
+                task_id=task_id,
+                started_at=time.time(),
+                worker_id=worker_id,
+                envelope=leased_task.get("envelope", {}),
+            )
+
+            # Submit task to ThreadPoolExecutor
+            future = self._executor.submit(self._worker_runner, leased_task, worker_id)
+            execution.future = future
+            self._active_tasks[task_id] = execution
+
+        logger.info("Dispatched task %s to concurrent worker pool (active: %d/%d)", task_id, self.active_count(), self.max_workers)
+        return task_id
+
+    def lease_and_dispatch_next(self) -> str | None:
+        """
+        Atomically leases the next approved task from TaskTriageQueue and dispatches it.
+        Returns task_id on success, or None if no approved tasks or pool is full.
+        """
+        if self.queue.is_emergency_stopped():
+            return None
+
+        if self.is_pool_full():
+            return None
+
+        worker_tag = f"wrk_pool_{int(time.time() * 1000)}"
+        leased = self.queue.lease_next_approved_task(worker_id=worker_tag)
+        if not leased:
+            return None
+
+        dispatched_id = self.dispatch_task(leased)
+        if not dispatched_id:
+            # Revert or handle un-dispatched leased task
+            logger.error("Failed to dispatch leased task %s to pool. Marking failed for retry.", leased["id"])
+            try:
+                self.queue.fail_task(leased["id"], error_details="Worker pool dispatch saturation", allow_retry=True)
+            except Exception:
+                pass
+            return None
+
+        return dispatched_id
+
+    # -------------------------------------------------------------------------
+    # Timeout Enforcement
+    # -------------------------------------------------------------------------
+    def handle_timeouts(self) -> list[str]:
+        """
+        Checks all active tasks against timeout_seconds.
+        Terminates runaway executions, marks tasks failed in TaskTriageQueue,
+        and routes them to CI healing.
+        Returns the list of timed-out task IDs.
+        """
+        now = time.time()
+        timed_out_tasks: list[ActiveTaskExecution] = []
+
+        with self._lock:
+            for task_id, execution in list(self._active_tasks.items()):
+                if (now - execution.started_at) > self.timeout_seconds:
+                    execution.cancelled = True
+                    timed_out_tasks.append(execution)
+                    del self._active_tasks[task_id]
+
+        timed_out_ids: list[str] = []
+        for execution in timed_out_tasks:
+            task_id = execution.task_id
+            logger.error(
+                "Task %s exceeded timeout limit of %.1fs (elapsed: %.1fs). Terminating.",
+                task_id,
+                self.timeout_seconds,
+                execution.elapsed_seconds,
+            )
+
+            # Cancel future if not yet completed
+            if execution.future and not execution.future.done():
+                execution.future.cancel()
+
+            # Terminate subprocess if active
+            if execution.process and execution.process.poll() is None:
+                try:
+                    execution.process.terminate()
+                    execution.process.wait(timeout=2.0)
+                except Exception:
+                    try:
+                        execution.process.kill()
+                    except Exception:
+                        pass
+
+            # Fail the task in the queue
+            timeout_msg = f"Task execution exceeded timeout limit of {self.timeout_seconds}s"
+            try:
+                self.queue.fail_task(
+                    task_id=task_id,
+                    error_details={"error": timeout_msg, "timeout": True},
+                    allow_retry=False,
+                )
+            except Exception as e:
+                logger.error("Failed to mark timed out task %s failed in queue: %s", task_id, e)
+
+            # Route to CI Healing
+            try:
+                self.route_failed_task(task_id, reason=timeout_msg)
+            except Exception as e:
+                logger.error("Failed to route timed out task %s to CI healing: %s", task_id, e)
+
+            timed_out_ids.append(task_id)
+
+        return timed_out_ids
+
+    # -------------------------------------------------------------------------
+    # Task Completion & Routing (Senior Review & CI Healing)
+    # -------------------------------------------------------------------------
+    def route_completed_task(self, task_or_id: str | dict[str, Any]) -> dict[str, Any]:
+        """
+        Routes a successfully completed task to Senior Review and CI Healing.
+        """
+        task_id = task_or_id if isinstance(task_or_id, str) else task_or_id["id"]
+        task_dict = (
+            task_or_id
+            if isinstance(task_or_id, dict)
+            else self.queue.get_task(task_id) or {"id": task_id}
+        )
+
+        results: dict[str, Any] = {
+            "task_id": task_id,
+            "senior_review": None,
+            "ci_healing": None,
+        }
+
+        # 1. Route to Senior Review
+        engine = self.senior_review_engine or SeniorReviewEngine(queue=self.queue)
+        try:
+            logger.info("Routing completed task %s to Senior Review Engine", task_id)
+            verdict = engine.execute_senior_review(task_id)
+            results["senior_review"] = verdict.to_dict() if hasattr(verdict, "to_dict") else verdict
+        except Exception as e:
+            logger.warning("Senior review execution for completed task %s: %s", task_id, e)
+            results["senior_review"] = {"error": str(e), "approved": False}
+
+        # 2. Route to CI Healing
+        healing_daemon = self.ci_healing_daemon or CIHealingDaemon(
+            queue=self.queue,
+            project_id=self.project_id or "alphabrain_dogfood",
+        )
+        try:
+            logger.info("Routing completed task %s to CI Healing Daemon", task_id)
+            healing_daemon.process_completed_task(task_dict)
+            results["ci_healing"] = {"status": "processed"}
+        except Exception as e:
+            logger.warning("CI healing processing for completed task %s: %s", task_id, e)
+            results["ci_healing"] = {"error": str(e)}
+
+        return results
+
+    def route_failed_task(
+        self, task_or_id: str | dict[str, Any], reason: str | None = None
+    ) -> dict[str, Any]:
+        """
+        Routes a failed task to CI Healing for failure analysis and repair synthesis.
+        """
+        task_id = task_or_id if isinstance(task_or_id, str) else task_or_id["id"]
+        task_dict = (
+            task_or_id
+            if isinstance(task_or_id, dict)
+            else self.queue.get_task(task_id) or {"id": task_id}
+        )
+
+        results: dict[str, Any] = {
+            "task_id": task_id,
+            "ci_healing": None,
+            "reason": reason,
+        }
+
+        healing_daemon = self.ci_healing_daemon or CIHealingDaemon(
+            queue=self.queue,
+            project_id=self.project_id or "alphabrain_dogfood",
+        )
+        try:
+            logger.info("Routing failed task %s to CI Healing Daemon", task_id)
+            healing_daemon.process_failed_task(task_dict)
+            results["ci_healing"] = {"status": "processed"}
+        except Exception as e:
+            logger.warning("CI healing processing for failed task %s: %s", task_id, e)
+            results["ci_healing"] = {"error": str(e)}
+
+        return results
+
+    # -------------------------------------------------------------------------
+    # Execution Lifecycle (Reaping & Dispatch Cycle)
+    # -------------------------------------------------------------------------
+    def reap_completed_tasks(self) -> dict[str, list[str]]:
+        """
+        Inspects running workers, harvests finished executions, and routes them.
+        """
+        completed_ids: list[str] = []
+        failed_ids: list[str] = []
+
+        finished_tasks: list[tuple[str, ActiveTaskExecution, Any, Exception | None]] = []
+
+        with self._lock:
+            for task_id, execution in list(self._active_tasks.items()):
+                if execution.future and execution.future.done():
+                    exc: Exception | None = None
+                    res: Any = None
+                    try:
+                        res = execution.future.result()
+                    except Exception as err:
+                        exc = err
+                    finished_tasks.append((task_id, execution, res, exc))
+                    del self._active_tasks[task_id]
+
+        for task_id, _execution, _res, exc in finished_tasks:
+            if exc:
+                logger.error("Task %s completed with exception: %s", task_id, exc)
+                failed_ids.append(task_id)
+                self.route_failed_task(task_id, reason=str(exc))
+            else:
+                task_row = self.queue.get_task(task_id)
+                status = task_row.get("status") if task_row else None
+                if status == TriageStatus.COMPLETED.value:
+                    logger.info("Task %s completed successfully. Routing.", task_id)
+                    completed_ids.append(task_id)
+                    self.route_completed_task(task_row or task_id)
+                elif status == TriageStatus.FAILED.value:
+                    logger.warning("Task %s status is FAILED. Routing to CI healing.", task_id)
+                    failed_ids.append(task_id)
+                    self.route_failed_task(task_row or task_id)
+                else:
+                    completed_ids.append(task_id)
+                    self.route_completed_task(task_row or task_id)
+
+        return {"completed": completed_ids, "failed": failed_ids}
+
+    def dispatch_batch(self) -> list[str]:
+        """
+        Dispatches as many approved tasks as available concurrency slots permit.
+        Returns list of newly dispatched task IDs.
+        """
+        if self.queue.is_emergency_stopped():
+            logger.warning("Emergency stop is active. No tasks dispatched.")
+            return []
+
+        # 1. Harvest completed/failed tasks
+        self.reap_completed_tasks()
+
+        # 2. Check and enforce timeouts
+        self.handle_timeouts()
+
+        # 3. Fill available concurrency slots
+        dispatched: list[str] = []
+        slots = self.available_slots()
+        while slots > 0:
+            task_id = self.lease_and_dispatch_next()
+            if not task_id:
+                break
+            dispatched.append(task_id)
+            slots = self.available_slots()
+
+        return dispatched
+
+    def run_once(self) -> dict[str, Any]:
+        """
+        Executes a single cycle of timeout checks, reaping, and dispatching.
+        Returns summary dictionary.
+        """
+        timed_out = self.handle_timeouts()
+        reaped = self.reap_completed_tasks()
+        dispatched = self.dispatch_batch()
+
+        return {
+            "active_count": self.active_count(),
+            "available_slots": self.available_slots(),
+            "timed_out": timed_out,
+            "reaped_completed": reaped["completed"],
+            "reaped_failed": reaped["failed"],
+            "dispatched": dispatched,
+        }
+
+    def run_continuously(self, interval: float | None = None, max_cycles: int | None = None) -> None:
+        """
+        Runs the ParallelWorkerDispatcher daemon loop until stopped or max_cycles reached.
+        """
+        sleep_sec = interval if interval is not None else self.poll_interval
+        logger.info("Starting ParallelWorkerDispatcher continuous daemon (max_workers=%d)", self.max_workers)
+
+        def handle_signal(signum: int, frame: Any) -> None:
+            logger.info("Signal %d received. Gracefully stopping daemon...", signum)
+            self._shutdown = True
+
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
+
+        cycle_count = 0
+        while not self._shutdown:
+            try:
+                self.run_once()
+            except Exception as e:
+                logger.error("Error in daemon cycle: %s", e)
+
+            cycle_count += 1
+            if max_cycles is not None and cycle_count >= max_cycles:
+                logger.info("Reached maximum requested cycles (%d). Stopping.", max_cycles)
+                break
+
+            if not self._shutdown:
+                time.sleep(sleep_sec)
+
+        self.stop()
+        logger.info("ParallelWorkerDispatcher daemon stopped.")
+
+    def stop(self, wait: bool = True) -> None:
+        """
+        Stops the daemon and terminates the worker executor.
+        """
+        self._shutdown = True
+        self._executor.shutdown(wait=wait, cancel_futures=True)
