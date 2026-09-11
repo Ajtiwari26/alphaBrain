@@ -1019,6 +1019,7 @@ class TaskEngine:
         worker_id: str,
         lease_duration_seconds: int = 300,
         preferred_agent: str | None = None,
+        project_ids: list[str] | tuple[str, ...] | None = None,
     ) -> tuple[TaskRecord, TaskEnvelope] | None:
         """Atomic task leasing with dependencies, concurrency limits, and pause enforcement."""
         if not worker_kill_switch.can_execute():
@@ -1057,6 +1058,9 @@ class TaskEngine:
             )
             .order_by(TaskRecord.created_at.asc())
         )
+
+        if project_ids is not None:
+            query = query.where(TaskRecord.project_id.in_(project_ids))
 
         if session.bind and session.bind.dialect.name == "postgresql":
             query = query.with_for_update(skip_locked=True)

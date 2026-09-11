@@ -316,7 +316,8 @@ def require_worker_principal(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid worker identity token"
         )
-    return AuthPrincipal(subject=str(claims["sub"]), role=PrincipalRole.WORKER)
+    project_ids = tuple(claims.get("projects", []))
+    return AuthPrincipal(subject=str(claims["sub"]), role=PrincipalRole.WORKER, project_ids=project_ids)
 
 
 def require_worker_bootstrap_principal(
@@ -389,6 +390,7 @@ def create_worker_identity_token(
     worker_id: str,
     capabilities: list[str] | None = None,
     ttl_seconds: int = 3600,
+    project_ids: list[str] | tuple[str, ...] | None = None,
 ) -> str:
     """Create a signed short-lived token for worker authentication."""
     if not settings.ALPHA_SIGNING_SECRET:
@@ -398,6 +400,7 @@ def create_worker_identity_token(
         "sub": worker_id,
         "role": PrincipalRole.WORKER.value,
         "cap": capabilities or [],
+        "projects": list(project_ids or []),
     }
     encoded_claims = (
         base64.urlsafe_b64encode(

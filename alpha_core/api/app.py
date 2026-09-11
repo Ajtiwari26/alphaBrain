@@ -866,55 +866,21 @@ async def lease_task(
         raise HTTPException(status_code=422, detail="Invalid worker ID")
     preferred_agent = payload.get("preferred_agent")
 
-    now = utc_now()
-    query = select(TaskRecord.project_id).where(
-        and_(
-            TaskRecord.status == TaskStatus.QUEUED.value,
-            or_(TaskRecord.next_eligible_at.is_(None), TaskRecord.next_eligible_at <= now)
-        )
-    ).order_by(TaskRecord.created_at.asc())
-    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
-        query = query.where(TaskRecord.project_id.in_(principal.project_ids))
-    res = await session.execute(query.limit(1))
-    next_project_id = res.scalar_one_or_none()
-
-    if not next_project_id:
-        return {"status": "no_tasks_available"}
-
+    allowed_project_ids = list(principal.project_ids) if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN} else None
     leased_tuple = await TaskEngine.lease_next_task(
         session,
         worker_id,
         preferred_agent=preferred_agent,
         lease_duration_seconds=settings.WORKER_LEASE_DURATION_SECONDS,
+        project_ids=allowed_project_ids
     )
+
+    await session.commit()
+
     if not leased_tuple:
         return {"status": "no_tasks_available"}
 
     task_record, envelope = leased_tuple
-    try:
-        require_project_access(principal, task_record.project_id)
-    except HTTPException:
-        logger.warning(
-            "Worker %s attempted to lease task %s outside their project scope. Rolling back lease.",
-            worker_id,
-            task_record.id,
-        )
-        task_record.status = TaskStatus.QUEUED.value
-        task_record.lease_token = None
-        task_record.worker_id = None
-        task_record.lease_expires_at = None
-        session.add(
-            AuditEventRecord(
-                id=f"evt_{uuid.uuid4().hex[:12]}",
-                event_type="lease_released",
-                project_id=task_record.project_id,
-                task_id=task_record.id,
-                actor="system",
-                details_json={"reason": "Unauthorized tenant lease released"}
-            )
-        )
-        await session.commit()
-        return {"status": "no_tasks_available"}
 
     return {
         "status": "leased",
