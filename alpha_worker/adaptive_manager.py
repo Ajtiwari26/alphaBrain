@@ -490,6 +490,22 @@ Respond with a single valid JSON object strictly matching this schema:
             diagnosis.checkpoint_phase,
         )
 
+        # 1. Execute resume callback first if present (transactional verification)
+        if resume_callback is not None:
+            try:
+                callback_ok = resume_callback(
+                    snapshot.task_id,
+                    diagnosis.checkpoint_phase or "init",
+                    snapshot.envelope,
+                )
+                if not callback_ok:
+                    logger.warning("Resume callback returned False for task %s; aborting queue update", snapshot.task_id)
+                    return False
+            except Exception as cb_err:
+                logger.error("Resume callback failed for task %s: %s; aborting queue update", snapshot.task_id, cb_err)
+                return False
+
+        # 2. Update task envelope transactionally
         if self.queue is not None:
             try:
                 task = self.queue.get_task(snapshot.task_id)
@@ -513,16 +529,5 @@ Respond with a single valid JSON object strictly matching this schema:
                         self.queue.update_task_envelope(snapshot.task_id, envelope)
             except Exception as e:
                 logger.warning("Failed updating queue envelope during surgical resumption: %s", e)
-
-        if resume_callback is not None:
-            try:
-                return resume_callback(
-                    snapshot.task_id,
-                    diagnosis.checkpoint_phase or "init",
-                    snapshot.envelope,
-                )
-            except Exception as cb_err:
-                logger.error("Resume callback failed for task %s: %s", snapshot.task_id, cb_err)
-                return False
 
         return True

@@ -509,3 +509,199 @@ def test_handle_timeouts_race_condition_aborts_resumption(temp_queue):
     row = temp_queue.get_task("tsk_race_test")
     assert row["status"] != TriageStatus.FAILED.value
 
+
+def test_handle_timeouts_sigkill_fallback_on_unresponsive_child(temp_queue):
+    """Verifies that if a child process ignores SIGTERM during recoverable stall, SIGKILL fallback is invoked."""
+    prov = TaskProvenance(
+        meeting_id="meet_kill",
+        speaker_id="speaker_1",
+        utterance_timestamp=1000.0,
+        transcript_excerpt="test",
+        extraction_model="test-model",
+        extraction_confidence=1.0,
+        eva_session_id="sess_kill",
+        created_at=1000.0,
+        content_hash="hash_kill",
+    )
+    temp_queue.enqueue_task(
+        task_id="tsk_sigkill_test",
+        envelope={"project_id": "alphabrain_dogfood"},
+        provenance=prov,
+        initial_status=TriageStatus.EXECUTING,
+    )
+
+    stubborn_proc = MagicMock()
+    stubborn_proc.poll.return_value = None
+
+    def on_kill():
+        stubborn_proc.poll.return_value = -9
+
+    stubborn_proc.kill.side_effect = on_kill
+    # First wait(timeout=1.0) on terminate raises TimeoutExpired, second wait on kill succeeds
+    stubborn_proc.wait.side_effect = [subprocess.TimeoutExpired(cmd="worker", timeout=1.0), 0]
+
+    mechanic = PipelineMechanic(
+        queue=temp_queue,
+        llm_invoker=lambda m, p: {
+            "is_recoverable": True,
+            "action": "RESUME_CHECKPOINT",
+            "reason": "Stubborn child process stall",
+            "checkpoint_phase": "phase_compile",
+        },
+    )
+    dispatcher = ParallelWorkerDispatcher(
+        queue=temp_queue,
+        max_workers=2,
+        timeout_seconds=50.0,
+        pipeline_mechanic=mechanic,
+        enable_pipeline_mechanic=True,
+    )
+
+    new_proc = MagicMock()
+    new_proc.poll.return_value = None
+    dispatcher._spawn_worker_process = MagicMock(return_value=(new_proc, None, time.time()))
+
+    execution = ActiveTaskExecution(
+        task_id="tsk_sigkill_test",
+        started_at=time.time() - 100.0,
+        worker_id="wrk_stubborn",
+        process=stubborn_proc,
+    )
+    dispatcher._active_tasks["tsk_sigkill_test"] = execution
+
+    dispatcher.handle_timeouts()
+
+    # Verify terminate was attempted, timed out, and kill was called as fallback
+    assert stubborn_proc.terminate.called
+    assert stubborn_proc.kill.called
+    assert dispatcher.active_tasks["tsk_sigkill_test"].process is new_proc
+
+
+def test_handle_timeouts_log_tail_capture_in_snapshot(temp_queue, tmp_path):
+    """Verifies that stdout and stderr tails are extracted from disk logs and passed into TaskStallSnapshot."""
+    prov = TaskProvenance(
+        meeting_id="meet_logs",
+        speaker_id="speaker_1",
+        utterance_timestamp=1000.0,
+        transcript_excerpt="test",
+        extraction_model="test-model",
+        extraction_confidence=1.0,
+        eva_session_id="sess_logs",
+        created_at=1000.0,
+        content_hash="hash_logs",
+    )
+    temp_queue.enqueue_task(
+        task_id="tsk_log_test",
+        envelope={"project_id": "alphabrain_dogfood"},
+        provenance=prov,
+        initial_status=TriageStatus.EXECUTING,
+    )
+
+    stdout_file = tmp_path / "stdout.log"
+    stderr_file = tmp_path / "stderr.log"
+    stdout_file.write_text("Worker compilation progress 85%\n", encoding="utf-8")
+    stderr_file.write_text("Warning: resource contention detected\n", encoding="utf-8")
+
+    captured_snapshots = []
+
+    def mock_invoker(model: str, prompt: str) -> dict[str, Any]:
+        return {
+            "is_recoverable": True,
+            "action": "RESUME_CHECKPOINT",
+            "reason": "Log test diagnosis",
+            "checkpoint_phase": "phase_compile",
+        }
+
+    mechanic = PipelineMechanic(queue=temp_queue, llm_invoker=mock_invoker)
+    orig_diagnose = mechanic.diagnose_stall
+
+    def wrapped_diagnose(snapshot):
+        captured_snapshots.append(snapshot)
+        return orig_diagnose(snapshot)
+
+    mechanic.diagnose_stall = wrapped_diagnose
+
+    dispatcher = ParallelWorkerDispatcher(
+        queue=temp_queue,
+        max_workers=2,
+        timeout_seconds=50.0,
+        pipeline_mechanic=mechanic,
+        enable_pipeline_mechanic=True,
+    )
+
+    proc_ref = MagicMock()
+    proc_ref.poll.return_value = None
+    proc_ref.wait.return_value = 0
+    new_proc = MagicMock()
+    new_proc.poll.return_value = None
+    dispatcher._spawn_worker_process = MagicMock(return_value=(new_proc, None, time.time()))
+
+    execution = ActiveTaskExecution(
+        task_id="tsk_log_test",
+        started_at=time.time() - 100.0,
+        worker_id="wrk_log_test",
+        process=proc_ref,
+        stdout_path=stdout_file,
+        stderr_path=stderr_file,
+    )
+    dispatcher._active_tasks["tsk_log_test"] = execution
+
+    dispatcher.handle_timeouts()
+
+    assert len(captured_snapshots) == 1
+    assert "Worker compilation progress 85%" in captured_snapshots[0].stdout_tail
+    assert "Warning: resource contention detected" in captured_snapshots[0].stderr_tail
+
+
+def test_transactional_resumption_failure_preserves_envelope(temp_queue, tmp_path):
+    """Verifies that if resume_callback fails, execute_surgical_resumption aborts without modifying envelope."""
+    prov = TaskProvenance(
+        meeting_id="meet_tx",
+        speaker_id="speaker_1",
+        utterance_timestamp=1000.0,
+        transcript_excerpt="test",
+        extraction_model="test-model",
+        extraction_confidence=1.0,
+        eva_session_id="sess_tx",
+        created_at=1000.0,
+        content_hash="hash_tx",
+    )
+    temp_queue.enqueue_task(
+        task_id="tsk_tx_fail",
+        envelope={"project_id": "alphabrain_dogfood", "title": "Untouched Task"},
+        provenance=prov,
+        initial_status=TriageStatus.APPROVED,
+    )
+
+    mechanic = PipelineMechanic(queue=temp_queue)
+    snapshot = TaskStallSnapshot(
+        task_id="tsk_tx_fail",
+        elapsed_seconds=150.0,
+        timeout_seconds=100.0,
+        process_alive=True,
+        last_phase="phase_build",
+        worktree_path=tmp_path,
+    )
+    from alpha_worker.adaptive_manager import MechanicDiagnosis
+
+    diagnosis = MechanicDiagnosis(
+        is_recoverable=True,
+        action=MechanicAction.RESUME_CHECKPOINT,
+        reason="Test failure transactional preservation",
+        checkpoint_phase="phase_build",
+    )
+
+    def failing_cb(task_id: str, phase: str, envelope: dict[str, Any]) -> bool:
+        return False
+
+    success = mechanic.execute_surgical_resumption(
+        snapshot, diagnosis, resume_callback=failing_cb
+    )
+
+    assert success is False
+    # Verify task envelope in DB was not polluted with mechanic intervention
+    task_row = temp_queue.get_task("tsk_tx_fail")
+    assert "mechanic_interventions" not in task_row["envelope"]
+    assert "last_checkpoint_phase" not in task_row["envelope"]
+
+

@@ -17,9 +17,11 @@ import dataclasses
 import inspect
 import logging
 import multiprocessing
+import os
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import Callable
@@ -80,6 +82,10 @@ class ActiveTaskExecution:
     envelope: dict[str, Any] = dataclasses.field(default_factory=dict)
     cancelled: bool = False
     future: Any | None = None
+    stdout_path: Path | None = None
+    stderr_path: Path | None = None
+    stdout_tail: str = ""
+    stderr_tail: str = ""
 
     @property
     def elapsed_seconds(self) -> float:
@@ -272,6 +278,13 @@ class ParallelWorkerDispatcher:
         proc_handle: subprocess.Popen[Any] | ProcessHandle
         result_queue: Any | None
         if self.execution_mode == "subprocess":
+            log_dir = Path(tempfile.gettempdir()) / "alphabrain_worker_logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            stdout_path = log_dir / f"{worker_id}_stdout.log"
+            stderr_path = log_dir / f"{worker_id}_stderr.log"
+            stdout_file = open(stdout_path, "w+", encoding="utf-8")
+            stderr_file = open(stderr_path, "w+", encoding="utf-8")
+
             cmd = [
                 sys.executable,
                 "-m",
@@ -284,10 +297,22 @@ class ParallelWorkerDispatcher:
             ]
             proc_handle = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=stdout_file,
+                stderr=stderr_file,
                 text=True,
             )
+            try:
+                stdout_file.close()
+                stderr_file.close()
+            except Exception:
+                pass
+
+            try:
+                proc_handle.stdout_path = stdout_path  # type: ignore[attr-defined]
+                proc_handle.stderr_path = stderr_path  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
             started_at = time.time()
             result_queue = None
         else:
@@ -333,6 +358,8 @@ class ParallelWorkerDispatcher:
                 process=proc_handle,
                 result_queue=result_queue,
                 envelope=leased_task.get("envelope", {}),
+                stdout_path=getattr(proc_handle, "stdout_path", None),
+                stderr_path=getattr(proc_handle, "stderr_path", None),
             )
             self._active_tasks[task_id] = execution
 
@@ -412,6 +439,46 @@ class ParallelWorkerDispatcher:
                     except Exception:
                         pass
 
+                # Capture stdout and stderr tails for diagnostic snapshot
+                stdout_tail = ""
+                stderr_tail = ""
+                stdout_path = getattr(execution, "stdout_path", None)
+                if stdout_path and Path(stdout_path).exists():
+                    try:
+                        with open(stdout_path, encoding="utf-8", errors="replace") as f:
+                            f.seek(0, os.SEEK_END)
+                            size = f.tell()
+                            f.seek(max(0, size - 4096), os.SEEK_SET)
+                            stdout_tail = f.read()
+                    except Exception as read_err:
+                        logger.debug("Failed reading stdout_path for task %s: %s", task_id, read_err)
+
+                stderr_path = getattr(execution, "stderr_path", None)
+                if stderr_path and Path(stderr_path).exists():
+                    try:
+                        with open(stderr_path, encoding="utf-8", errors="replace") as f:
+                            f.seek(0, os.SEEK_END)
+                            size = f.tell()
+                            f.seek(max(0, size - 4096), os.SEEK_SET)
+                            stderr_tail = f.read()
+                    except Exception as read_err:
+                        logger.debug("Failed reading stderr_path for task %s: %s", task_id, read_err)
+
+                if not stdout_tail:
+                    stdout_tail = str(
+                        execution.envelope.get("stdout_tail")
+                        or execution.envelope.get("stdout")
+                        or getattr(execution, "stdout_tail", "")
+                        or ""
+                    )
+                if not stderr_tail:
+                    stderr_tail = str(
+                        execution.envelope.get("stderr_tail")
+                        or execution.envelope.get("stderr")
+                        or getattr(execution, "stderr_tail", "")
+                        or ""
+                    )
+
                 snapshot = TaskStallSnapshot(
                     task_id=task_id,
                     elapsed_seconds=execution.elapsed_seconds,
@@ -420,6 +487,8 @@ class ParallelWorkerDispatcher:
                     last_phase=execution.envelope.get("phase", "running"),
                     worktree_path=worktree_path,
                     envelope=dict(execution.envelope),
+                    stdout_tail=stdout_tail,
+                    stderr_tail=stderr_tail,
                 )
                 diagnosis = self.pipeline_mechanic.diagnose_stall(snapshot)
 
@@ -452,7 +521,11 @@ class ParallelWorkerDispatcher:
                             execution.process.terminate()
                             execution.process.wait(timeout=1.0)
                         except Exception:
-                            pass
+                            try:
+                                execution.process.kill()
+                                execution.process.wait(timeout=1.0)
+                            except Exception:
+                                pass
 
                     # Prepare task payload with checkpoint envelope for surgical resumption
                     task_row = self.queue.get_task(task_id) or {"id": task_id}
@@ -476,6 +549,8 @@ class ParallelWorkerDispatcher:
                             execution.worker_id = new_worker_id
                             execution.envelope = resumed_envelope
                             execution.cancelled = False
+                            execution.stdout_path = getattr(new_proc, "stdout_path", None)
+                            execution.stderr_path = getattr(new_proc, "stderr_path", None)
                         logger.info(
                             "Task %s surgically resumed with active worker process (pid: %s, phase: %s). Zero full restarts.",
                             task_id,
