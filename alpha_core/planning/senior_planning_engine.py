@@ -130,7 +130,7 @@ class SeniorPlanningEngine:
 
             if res.returncode != 0:
                 raise RuntimeError(
-                    f"Planning model exited with status {res.returncode}; no attestation issued"
+                    f"Planning model exited with status {res.returncode}: stderr={res.stderr} stdout={res.stdout}; no attestation issued"
                 )
 
             return self._parse_response(res.stdout.strip())
@@ -292,16 +292,33 @@ Review Instructions:
 - Evaluate the plan against AlphaBrain invariants.
 - Decide to APPROVE, REPAIR_REQUIRED, or BLOCKED and output strictly the structured JSON object with findings and verdict.
 """
+        critique_model = os.getenv("ALPHA_CRITIQUE_MODEL", "claude-opus-4-6-thinking")
+        if os.getenv("CLAUDE_ON_HOLIDAY", "1") == "1" or critique_model != "claude-opus-4-6-thinking":
+            critique_model = "gemini-3.1-pro-high"
+            critique_principal = "gemini-3.1-pro-high-critique"
+        else:
+            critique_principal = "claude-opus-4-6-thinking"
+
         try:
             opus_response = self._invoke_agy_planning(
-                "claude-opus-4-6-thinking", opus_prompt, critique_schema
+                critique_model, opus_prompt, critique_schema, timeout_seconds=180
             )
         except Exception as e:
-            raise PlanningConsensusError(f"Opus Critique failed: {e}") from e
+            if critique_model == "claude-opus-4-6-thinking":
+                logger.warning(
+                    f"Opus critique failed ({e}). Claude on holiday fallback -> invoking gemini-3.1-pro-high..."
+                )
+                critique_model = "gemini-3.1-pro-high"
+                critique_principal = "gemini-3.1-pro-high-critique"
+                opus_response = self._invoke_agy_planning(
+                    critique_model, opus_prompt, critique_schema, timeout_seconds=180
+                )
+            else:
+                raise PlanningConsensusError(f"Planning Critique failed: {e}") from e
 
         opus_verdict = opus_response.get("verdict", "BLOCKED")
         opus_assessment = PlanAssessment(
-            reviewer_principal="claude-opus-4-6-thinking",
+            reviewer_principal=critique_principal,
             role="critique",
             plan_digest=blueprint_digest,
             verdict=opus_verdict,

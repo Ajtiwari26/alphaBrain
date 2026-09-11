@@ -408,13 +408,33 @@ Review Instructions:
 2. Do not attempt to use tools to read files or execute commands. Rely entirely on the diff provided above.
 3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
-        opus_res = self._invoke_agy(
-            "claude-opus-4-6-thinking",
-            opus_prompt,
-            schema_path=str(opus_schema_path),
-            cwd=task.get("worktree_path"),
-            timeout_seconds=900,
-        )
+        claude_model = os.getenv("ALPHA_SENIOR_REVIEW_MODEL", "claude-opus-4-6-thinking")
+        if os.getenv("CLAUDE_ON_HOLIDAY", "1") == "1" or claude_model != "claude-opus-4-6-thinking":
+            claude_model = "gemini-3.1-pro-high"
+
+        try:
+            opus_res = self._invoke_agy(
+                claude_model,
+                opus_prompt,
+                schema_path=str(opus_schema_path),
+                cwd=task.get("worktree_path"),
+                timeout_seconds=300,
+            )
+        except Exception as e:
+            if claude_model == "claude-opus-4-6-thinking":
+                logger.warning(
+                    f"Round 2 review on Claude failed ({e}). Claude on holiday fallback -> invoking gemini-3.1-pro-high..."
+                )
+                claude_model = "gemini-3.1-pro-high"
+                opus_res = self._invoke_agy(
+                    claude_model,
+                    opus_prompt,
+                    schema_path=str(opus_schema_path),
+                    cwd=task.get("worktree_path"),
+                    timeout_seconds=300,
+                )
+            else:
+                raise e
         opus_out = opus_res.get("response", "")
         opus_struct = opus_res.get("structured_output", {})
         if isinstance(opus_struct, dict) and len(opus_struct) == 1 and "verdict" in opus_struct:

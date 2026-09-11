@@ -154,7 +154,7 @@ class Settings(BaseModel):
     ANTIGRAVITY_EXECUTION_ENABLED: bool = (
         os.getenv("ANTIGRAVITY_EXECUTION_ENABLED", "true").lower() == "true"
     )
-    ANTIGRAVITY_MODEL: str = os.getenv("ANTIGRAVITY_MODEL", "gemini-3.1-pro-high")
+    ANTIGRAVITY_MODEL: str = os.getenv("ANTIGRAVITY_MODEL", "gemini-3.8-flash-high")
     ANTIGRAVITY_UNATTENDED_COMMANDS: bool = (
         os.getenv("ANTIGRAVITY_UNATTENDED_COMMANDS", "true").lower() == "true"
     )
