@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alpha_core.commentary import LiveCommentaryEngine
 from alpha_core.config import settings
 from alpha_core.db.connection import get_db_session, get_session_factory, init_db
 from alpha_core.db.models import (
@@ -2649,6 +2650,7 @@ async def portal_stream_generator(
     current_seq = int(last_event_id) if last_event_id and str(last_event_id).isdigit() else 0
     iterations = 0
     last_heartbeat_time = 0.0
+    engine = LiveCommentaryEngine()
 
     try:
         while asyncio.get_event_loop().time() < deadline:
@@ -2665,6 +2667,7 @@ async def portal_stream_generator(
                         "event_type": ev["event_type"],
                         "created_at": ev["created_at"],
                         "live": True,
+                        "commentary": engine.translate_event(ev["event_type"], ev.get("payload", {})),
                     }
                     yield f"id: {current_seq}\nevent: task_update\ndata: {json.dumps(data)}\n\n"
             else:

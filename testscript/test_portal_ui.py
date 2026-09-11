@@ -22,10 +22,12 @@ def test_portal_static_mount(client):
     # Check for Amazon-style milestone tracker
     assert "step-circle" in html
     assert "step-line" in html
-    assert "Received" in html
-    assert "In Progress" in html
-    assert "Review" in html
-    assert "Completed" in html
+    assert "Admitted" in html
+    assert "Planning" in html
+    assert "Executing" in html
+    assert "Quality Gates" in html
+    assert "Senior Review" in html
+    assert "Delivered" in html
 
     # Check for dark mode responsive UI
     assert "dark" in html

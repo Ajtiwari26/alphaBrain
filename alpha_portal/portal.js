@@ -26,20 +26,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateMilestones(state) {
         const stateMap = {
             'received': 0,
-            'pending_review': 0,
-            'approved': 0,
-            'in_progress': 1,
-            'in-progress': 1,
-            'executing': 1,
-            'review': 2,
-            'senior_review': 2,
-            'completed': 3,
-            'done': 3
+            'queued': 0,
+            'admitted': 0,
+            'leased': 1,
+            'planning': 1,
+            'running': 2,
+            'executing': 2,
+            'in_progress': 2,
+            'in-progress': 2,
+            'testing': 3,
+            'quality_gates': 3,
+            'review': 4,
+            'senior_review': 4,
+            'waiting_approval': 4,
+            'completed': 5,
+            'done': 5,
+            'verified': 5,
+            'delivered': 5
         };
         const normalized = (state || '').toLowerCase();
         let currentIndex = Object.prototype.hasOwnProperty.call(stateMap, normalized) ? stateMap[normalized] : 0;
 
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 6; i++) {
             const circle = document.getElementById(`step-${i}`);
             const line = document.getElementById(`line-${i}`);
             
@@ -106,16 +114,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             eventSource.addEventListener('task_update', (e) => {
                 handleEvent(e);
-                logEvent(`Task update received: ${e.data}`);
                 try {
                     const data = JSON.parse(e.data);
+                    if (data.commentary) {
+                        logEvent(data.commentary);
+                    } else {
+                        logEvent(`Task update received: ${data.state || data.status}`);
+                    }
                     if (data.task_id === taskId && data.project_id === projectId && data.state) {
                         // Legacy approval events must never imply successful promotion.
                         const state = data.state === 'completed' && data.event_type !== 'task_promoted'
                             ? 'review' : data.state;
                         updateMilestones(state);
                     }
-                } catch (err) {}
+                } catch (err) {
+                    logEvent(`Task update received: ${e.data}`);
+                }
             });
 
             eventSource.onmessage = (e) => {

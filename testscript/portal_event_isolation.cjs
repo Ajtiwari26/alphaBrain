@@ -37,7 +37,7 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../alpha_portal/portal.
 (async () => {
   await ready();
   await new Promise(resolve => setImmediate(resolve));
-  const completed = () => node('step-4').classes.has('active');
+  const completed = () => node('step-6').classes.has('active');
   assert.equal(completed(), false);
   const emit = data => source.handlers.task_update({data: JSON.stringify(data), lastEventId: '1'});
   emit({project_id: 'project-A', task_id: 'task-B', state: 'completed', event_type: 'task_promoted'});
