@@ -274,7 +274,10 @@ class ParallelWorkerDispatcher:
         self, leased_task: dict[str, Any], worker_id: str
     ) -> tuple[subprocess.Popen[Any] | ProcessHandle, Any | None, float]:
         """Spawns an isolated worker child process and returns (proc_handle, result_queue, started_at)."""
-        task_id = leased_task["id"]
+        task_id = str(leased_task["id"])
+        if task_id.startswith("-"):
+            raise ValueError(f"Invalid task_id '{task_id}': cannot start with a hyphen")
+
         proc_handle: subprocess.Popen[Any] | ProcessHandle
         result_queue: Any | None
         if self.execution_mode == "subprocess":
@@ -285,27 +288,32 @@ class ParallelWorkerDispatcher:
             stdout_file = open(stdout_path, "w+", encoding="utf-8")
             stderr_file = open(stderr_path, "w+", encoding="utf-8")
 
-            cmd = [
-                sys.executable,
-                "-m",
-                "alpha_worker.parallel_dispatcher",
-                "worker-cycle",
-                "--task-id",
-                task_id,
-                "--db-path",
-                str(self.queue.db_path),
-            ]
-            proc_handle = subprocess.Popen(
-                cmd,
-                stdout=stdout_file,
-                stderr=stderr_file,
-                text=True,
-            )
             try:
-                stdout_file.close()
-                stderr_file.close()
-            except Exception:
-                pass
+                cmd = [
+                    sys.executable,
+                    "-m",
+                    "alpha_worker.parallel_dispatcher",
+                    "worker-cycle",
+                    "--task-id",
+                    task_id,
+                    "--db-path",
+                    str(self.queue.db_path),
+                ]
+                proc_handle = subprocess.Popen(
+                    cmd,
+                    stdout=stdout_file,
+                    stderr=stderr_file,
+                    text=True,
+                )
+            finally:
+                try:
+                    stdout_file.close()
+                except Exception:
+                    pass
+                try:
+                    stderr_file.close()
+                except Exception:
+                    pass
 
             try:
                 proc_handle.stdout_path = stdout_path  # type: ignore[attr-defined]
@@ -333,7 +341,11 @@ class ParallelWorkerDispatcher:
         Submits a leased task to the concurrent worker pool in an isolated OS process.
         Returns task_id on success, or None if pool is full or dispatch was rejected.
         """
-        task_id = leased_task["id"]
+        task_id = str(leased_task["id"])
+        if task_id.startswith("-"):
+            logger.error("Rejected dispatch for task_id '%s': cannot start with a hyphen", task_id)
+            return None
+
         with self._lock:
             effective_max = self.get_effective_max_workers()
             if len(self._active_tasks) >= effective_max:
@@ -439,28 +451,28 @@ class ParallelWorkerDispatcher:
                     except Exception:
                         pass
 
-                # Capture stdout and stderr tails for diagnostic snapshot
+                # Capture stdout and stderr tails for diagnostic snapshot (binary-safe seek)
                 stdout_tail = ""
                 stderr_tail = ""
                 stdout_path = getattr(execution, "stdout_path", None)
                 if stdout_path and Path(stdout_path).exists():
                     try:
-                        with open(stdout_path, encoding="utf-8", errors="replace") as f:
+                        with open(stdout_path, "rb") as f:
                             f.seek(0, os.SEEK_END)
                             size = f.tell()
                             f.seek(max(0, size - 4096), os.SEEK_SET)
-                            stdout_tail = f.read()
+                            stdout_tail = f.read().decode("utf-8", errors="replace")
                     except Exception as read_err:
                         logger.debug("Failed reading stdout_path for task %s: %s", task_id, read_err)
 
                 stderr_path = getattr(execution, "stderr_path", None)
                 if stderr_path and Path(stderr_path).exists():
                     try:
-                        with open(stderr_path, encoding="utf-8", errors="replace") as f:
+                        with open(stderr_path, "rb") as f:
                             f.seek(0, os.SEEK_END)
                             size = f.tell()
                             f.seek(max(0, size - 4096), os.SEEK_SET)
-                            stderr_tail = f.read()
+                            stderr_tail = f.read().decode("utf-8", errors="replace")
                     except Exception as read_err:
                         logger.debug("Failed reading stderr_path for task %s: %s", task_id, read_err)
 
@@ -527,19 +539,21 @@ class ParallelWorkerDispatcher:
                             except Exception:
                                 pass
 
-                    # Prepare task payload with checkpoint envelope for surgical resumption
-                    task_row = self.queue.get_task(task_id) or {"id": task_id}
-                    resumed_envelope = dict(task_row.get("envelope", {}) or execution.envelope)
-                    resumed_envelope["last_checkpoint_phase"] = diagnosis.checkpoint_phase
-                    resumed_envelope["surgically_resumed"] = True
-                    task_dict = dict(task_row)
-                    task_dict["envelope"] = resumed_envelope
-
                     resumed = self.pipeline_mechanic.execute_surgical_resumption(
                         snapshot,
                         diagnosis,
                     )
                     if resumed:
+                        # Re-fetch task state from queue AFTER execute_surgical_resumption to preserve updated mechanic_interventions
+                        updated_row = self.queue.get_task(task_id) or {"id": task_id}
+                        task_dict = dict(updated_row)
+                        resumed_envelope = dict(task_dict.get("envelope", {}) or execution.envelope)
+                        if "mechanic_interventions" not in resumed_envelope and "mechanic_interventions" in snapshot.envelope:
+                            resumed_envelope["mechanic_interventions"] = snapshot.envelope["mechanic_interventions"]
+                        resumed_envelope["last_checkpoint_phase"] = diagnosis.checkpoint_phase
+                        resumed_envelope["surgically_resumed"] = True
+                        task_dict["envelope"] = resumed_envelope
+
                         new_worker_id = f"wrk_resumed_{task_id}_{int(time.time() * 1000)}"
                         new_proc, new_rq, new_started = self._spawn_worker_process(task_dict, new_worker_id)
                         with self._lock:

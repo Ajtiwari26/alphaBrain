@@ -14,6 +14,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import re
 import shutil
 import subprocess
 import tempfile
@@ -286,10 +287,64 @@ class PipelineMechanic:
         raw_result = self._call_gemini(prompt, snapshot)
         return self._parse_diagnosis(raw_result, snapshot)
 
+    @staticmethod
+    def _scrub_secrets(text: str) -> str:
+        """
+        Masks API keys, bearer tokens, AWS/GCP keys, and env secret patterns to prevent
+        accidental credential leakage to external LLM diagnostic endpoints.
+        """
+        if not text:
+            return ""
+
+        scrubbed = text
+
+        # 1. Private key blocks
+        scrubbed = re.sub(
+            r"-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+PRIVATE KEY-----",
+            "[REDACTED_SECRET]",
+            scrubbed,
+        )
+
+        # 2. Authorization Bearer / Basic tokens
+        scrubbed = re.sub(
+            r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9_\-\.+=]{8,}",
+            r"\1 [REDACTED_SECRET]",
+            scrubbed,
+        )
+
+        # 3. Known Provider Keys
+        scrubbed = re.sub(r"\bAIza[0-9A-Za-z\-_]{35}\b", "[REDACTED_SECRET]", scrubbed)
+        scrubbed = re.sub(r"\bAKIA[0-9A-Z]{16}\b", "[REDACTED_SECRET]", scrubbed)
+        scrubbed = re.sub(r"\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}\b", "[REDACTED_SECRET]", scrubbed)
+        scrubbed = re.sub(r"\bAQ\.[A-Za-z0-9_\-]{20,}\b", "[REDACTED_SECRET]", scrubbed)
+        scrubbed = re.sub(
+            r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
+            "[REDACTED_SECRET]",
+            scrubbed,
+        )
+
+        # 4. Key-Value pairs for secrets, passwords, tokens, API keys
+        scrubbed = re.sub(
+            r"""(?i)\b(api[_-]?key|secret[_-]?key|private[_-]?key|secret|token|password|passwd|auth[_-]?token|access[_-]?token|client[_-]?secret)\b(\s*[:=]\s*['"]?)[^\s'"&;,]{8,}(['"]?)""",
+            r"\1\2[REDACTED_SECRET]\3",
+            scrubbed,
+        )
+
+        # 5. Env var assignments (e.g. GEMINI_API_KEY=..., SECRET_KEY=...)
+        scrubbed = re.sub(
+            r"""(?i)\b([A-Z0-9_]*(?:SECRET|KEY|TOKEN|PASSWORD|PASS|AUTH)[A-Z0-9_]*)(\s*=\s*['"]?)[^\s'"]{8,}(['"]?)""",
+            r"\1\2[REDACTED_SECRET]\3",
+            scrubbed,
+        )
+
+        return scrubbed
+
     def _construct_prompt(self, snapshot: TaskStallSnapshot) -> str:
-        """Generates structured diagnostic prompt for Gemini 3.1 Pro."""
-        out_tail = snapshot.stdout_tail[-1500:] if snapshot.stdout_tail else "(data empty)"
-        err_tail = snapshot.stderr_tail[-1500:] if snapshot.stderr_tail else "(data empty)"
+        """Generates structured diagnostic prompt for Gemini 3.1 Pro with secrets scrubbed."""
+        clean_stdout = self._scrub_secrets(snapshot.stdout_tail)
+        clean_stderr = self._scrub_secrets(snapshot.stderr_tail)
+        out_tail = clean_stdout[-1500:] if clean_stdout else "(data empty)"
+        err_tail = clean_stderr[-1500:] if clean_stderr else "(data empty)"
 
         return f"""You are the AlphaBrain Gemini 3.1 Pro Pipeline Mechanic.
 A worker executing task '{snapshot.task_id}' has halted or exceeded its execution window.
@@ -349,29 +404,20 @@ Respond with a single valid JSON object strictly matching this schema:
                     "plan",
                     "--output-format",
                     "json",
-                    "--input-format",
-                    "text",
-                    "--print-timeout",
-                    "60s",
+                    "--input-file",
+                    prompt_file,
                 ]
-                with open(prompt_file) as pf:
-                    res = subprocess.run(
-                        cmd,
-                        stdin=pf,
-                        capture_output=True,
-                        text=True,
-                        timeout=70,
-                        check=False,
-                    )
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=30.0)
                 if res.returncode == 0 and res.stdout.strip():
-                    parsed = self._extract_json(res.stdout)
-                    if parsed:
-                        return parsed
+                    return json.loads(res.stdout.strip())
             except Exception as e:
-                logger.warning("AGY CLI execution failed for mechanic: %s", e)
+                logger.warning("AGY CLI execution failed: %s; falling back to deterministic", e)
             finally:
-                if prompt_file:
-                    Path(prompt_file).unlink(missing_ok=True)
+                if prompt_file is not None:
+                    try:
+                        Path(prompt_file).unlink(missing_ok=True)
+                    except Exception:
+                        pass
 
         return self._deterministic_fallback_diagnosis(snapshot)
 
@@ -523,10 +569,24 @@ Respond with a single valid JSON object strictly matching this schema:
                     )
                     envelope["mechanic_interventions"] = mechanic_history
                     envelope["last_checkpoint_phase"] = diagnosis.checkpoint_phase
+                    snapshot.envelope["mechanic_interventions"] = mechanic_history
+                    snapshot.envelope["last_checkpoint_phase"] = diagnosis.checkpoint_phase
+
+                    modified = False
                     if hasattr(self.queue, "modify_task"):
-                        self.queue.modify_task(snapshot.task_id, new_envelope=envelope)
+                        modified = self.queue.modify_task(snapshot.task_id, new_envelope=envelope)
                     elif hasattr(self.queue, "update_task_envelope"):
-                        self.queue.update_task_envelope(snapshot.task_id, envelope)
+                        modified = self.queue.update_task_envelope(snapshot.task_id, envelope)
+
+                    if not modified and hasattr(self.queue, "_execute_write_with_retry"):
+                        def _update_env(conn: Any) -> bool:
+                            conn.execute(
+                                "UPDATE task_triage_queue SET envelope_json = ? WHERE id = ?;",
+                                (json.dumps(envelope, default=str), snapshot.task_id),
+                            )
+                            return True
+
+                        self.queue._execute_write_with_retry(_update_env)
             except Exception as e:
                 logger.warning("Failed updating queue envelope during surgical resumption: %s", e)
 

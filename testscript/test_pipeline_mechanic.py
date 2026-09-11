@@ -705,3 +705,183 @@ def test_transactional_resumption_failure_preserves_envelope(temp_queue, tmp_pat
     assert "last_checkpoint_phase" not in task_row["envelope"]
 
 
+def test_scrub_secrets_masks_sensitive_credentials():
+    """Verifies that PipelineMechanic._scrub_secrets masks API keys and tokens before prompt construction."""
+    sample_text = (
+        "Server starting with GEMINI_API_KEY=AIzaSyD-1234567890abcdefghijklmnopqr\n"
+        "Connecting with Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.doNotLeakThisSignature\n"
+        "AWS credentials: AKIAIOSFODNN7EXAMPLE and secret_key: 1234567890abcdef\n"
+        "Stitch token: AQ.Ab8RN6deadbeef123456789\n"
+        "Normal log: Task compilation step 3 passed in 1.4s"
+    )
+
+    scrubbed = PipelineMechanic._scrub_secrets(sample_text)
+
+    assert "AIza" not in scrubbed
+    assert "AKIA" not in scrubbed
+    assert "AQ.Ab8RN6" not in scrubbed
+    assert "doNotLeakThisSignature" not in scrubbed
+    assert "1234567890abcdef" not in scrubbed
+    assert "[REDACTED_SECRET]" in scrubbed
+    assert "Normal log: Task compilation step 3 passed in 1.4s" in scrubbed
+
+
+def test_handle_timeouts_binary_safe_tail_multibyte_utf8(temp_queue, tmp_path):
+    """Verifies that binary-mode log tailing safely decodes multibyte UTF-8 characters without crash."""
+    prov = TaskProvenance(
+        meeting_id="meet_utf8",
+        speaker_id="speaker_1",
+        utterance_timestamp=1000.0,
+        transcript_excerpt="test",
+        extraction_model="test-model",
+        extraction_confidence=1.0,
+        eva_session_id="sess_utf8",
+        created_at=1000.0,
+        content_hash="hash_utf8",
+    )
+    temp_queue.enqueue_task(
+        task_id="tsk_utf8_test",
+        envelope={"project_id": "alphabrain_dogfood"},
+        provenance=prov,
+        initial_status=TriageStatus.EXECUTING,
+    )
+
+    stdout_file = tmp_path / "stdout_utf8.log"
+    # Write a repeating multibyte emoji pattern > 5000 bytes so that a 4096-byte seek hits a multibyte boundary
+    multibyte_text = "🚀 AlphaBrain pipeline worker heartbeat 🌟\n" * 150
+    stdout_file.write_bytes(multibyte_text.encode("utf-8"))
+
+    captured_snapshots = []
+
+    def mock_invoker(model: str, prompt: str) -> dict[str, Any]:
+        return {
+            "is_recoverable": True,
+            "action": "RESUME_CHECKPOINT",
+            "reason": "Multibyte test diagnosis",
+            "checkpoint_phase": "phase_utf8",
+        }
+
+    mechanic = PipelineMechanic(queue=temp_queue, llm_invoker=mock_invoker)
+    orig_diagnose = mechanic.diagnose_stall
+
+    def wrapped_diagnose(snapshot):
+        captured_snapshots.append(snapshot)
+        return orig_diagnose(snapshot)
+
+    mechanic.diagnose_stall = wrapped_diagnose
+
+    dispatcher = ParallelWorkerDispatcher(
+        queue=temp_queue,
+        max_workers=2,
+        timeout_seconds=50.0,
+        pipeline_mechanic=mechanic,
+        enable_pipeline_mechanic=True,
+    )
+
+    proc_ref = MagicMock()
+    proc_ref.poll.return_value = None
+    proc_ref.wait.return_value = 0
+    new_proc = MagicMock()
+    new_proc.poll.return_value = None
+    dispatcher._spawn_worker_process = MagicMock(return_value=(new_proc, None, time.time()))
+
+    execution = ActiveTaskExecution(
+        task_id="tsk_utf8_test",
+        started_at=time.time() - 100.0,
+        worker_id="wrk_utf8",
+        process=proc_ref,
+        stdout_path=stdout_file,
+    )
+    dispatcher._active_tasks["tsk_utf8_test"] = execution
+
+    dispatcher.handle_timeouts()
+
+    assert len(captured_snapshots) == 1
+    assert "AlphaBrain pipeline worker heartbeat" in captured_snapshots[0].stdout_tail
+
+
+def test_handle_timeouts_preserves_mechanic_interventions_in_resumed_worker(temp_queue):
+    """Verifies that newly spawned process receives task_dict containing updated mechanic_interventions."""
+    prov = TaskProvenance(
+        meeting_id="meet_audit",
+        speaker_id="speaker_1",
+        utterance_timestamp=1000.0,
+        transcript_excerpt="test",
+        extraction_model="test-model",
+        extraction_confidence=1.0,
+        eva_session_id="sess_audit",
+        created_at=1000.0,
+        content_hash="hash_audit",
+    )
+    temp_queue.enqueue_task(
+        task_id="tsk_audit_test",
+        envelope={"project_id": "alphabrain_dogfood", "phase": "phase_tests"},
+        provenance=prov,
+        initial_status=TriageStatus.EXECUTING,
+    )
+
+    mechanic = PipelineMechanic(
+        queue=temp_queue,
+        llm_invoker=lambda m, p: {
+            "is_recoverable": True,
+            "action": "RESUME_CHECKPOINT",
+            "reason": "Audit preservation verification",
+            "checkpoint_phase": "phase_tests",
+        },
+    )
+    dispatcher = ParallelWorkerDispatcher(
+        queue=temp_queue,
+        max_workers=2,
+        timeout_seconds=50.0,
+        pipeline_mechanic=mechanic,
+        enable_pipeline_mechanic=True,
+    )
+
+    spawned_tasks = []
+
+    def mock_spawn(task_dict, worker_id):
+        spawned_tasks.append(task_dict)
+        proc = MagicMock()
+        proc.poll.return_value = None
+        return proc, None, time.time()
+
+    dispatcher._spawn_worker_process = mock_spawn
+
+    proc_ref = MagicMock()
+    proc_ref.poll.return_value = None
+    proc_ref.wait.return_value = 0
+
+    execution = ActiveTaskExecution(
+        task_id="tsk_audit_test",
+        started_at=time.time() - 100.0,
+        worker_id="wrk_audit",
+        process=proc_ref,
+        envelope={"project_id": "alphabrain_dogfood", "phase": "phase_tests"},
+    )
+    dispatcher._active_tasks["tsk_audit_test"] = execution
+
+    dispatcher.handle_timeouts()
+
+    assert len(spawned_tasks) == 1
+    spawned_env = spawned_tasks[0].get("envelope", {})
+    interventions = spawned_env.get("mechanic_interventions", [])
+    assert len(interventions) >= 1
+    assert interventions[0]["action"] == "RESUME_CHECKPOINT"
+    assert interventions[0]["zero_restart"] is True
+
+
+def test_spawn_worker_process_rejects_hyphen_task_id(temp_queue):
+    """Verifies that _spawn_worker_process and dispatch_task reject task_id with leading hyphen."""
+    dispatcher = ParallelWorkerDispatcher(queue=temp_queue)
+
+    malicious_task = {"id": "--help", "envelope": {}}
+    import pytest
+
+    with pytest.raises(ValueError, match="cannot start with a hyphen"):
+        dispatcher._spawn_worker_process(malicious_task, "wrk_malicious")
+
+    # dispatch_task should safely reject and return None
+    assert dispatcher.dispatch_task(malicious_task) is None
+
+
+
