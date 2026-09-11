@@ -52,6 +52,8 @@ Gemini 3.1 Pro High.
 - [x] Real Gemini Live duplex audio through Vertex AI.
 - [x] 506+ deterministic/hermetic tests pass without manual `PYTHONPATH` configuration.
 
+- [x] tsk_test_merge_auth (`commit 2222222`, `tsk_test_merge_auth`).
+
 ### Active / In-Progress
 
 - [ ] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees.

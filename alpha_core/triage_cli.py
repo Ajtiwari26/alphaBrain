@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 from typing import cast
 
+from alpha_core.automation.todo_sync import sync_task_completion
 from alpha_core.promotion_checkout import advance_checkout
 from alpha_core.queue.triage_queue import (
     DEFAULT_DB_PATH,
@@ -981,6 +982,15 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
                 except Exception as e:
                     print(f"Error: Finalized promotion cannot be verified: {e}", file=sys.stderr)
                     return 1
+                try:
+                    sync_task_completion(
+                        repo_path=repo_path,
+                        task_id=args.task_id,
+                        commit_sha=result_sha,
+                        task=task,
+                    )
+                except Exception as e:
+                    print(f"Warning: TODO/Roadmap synchronization failed: {e}", file=sys.stderr)
                 if getattr(args, "json", False):
                     print(json.dumps({"task_id": args.task_id, "status": "merged"}))
                 else:
@@ -1016,6 +1026,16 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
                     state_data["state"] = "FINALIZED"
                     _atomic_write_json(nonce_state_file, state_data)
+
+                    try:
+                        sync_task_completion(
+                            repo_path=repo_path,
+                            task_id=args.task_id,
+                            commit_sha=result_sha,
+                            task=task,
+                        )
+                    except Exception as e:
+                        print(f"Warning: TODO/Roadmap synchronization failed: {e}", file=sys.stderr)
 
                     if getattr(args, "json", False):
                         print(json.dumps({"task_id": args.task_id, "status": "merged"}))
@@ -1104,6 +1124,16 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         # 6. Finalize state
         state_data["state"] = "FINALIZED"
         _atomic_write_json(nonce_state_file, state_data)
+
+        try:
+            sync_task_completion(
+                repo_path=repo_path,
+                task_id=args.task_id,
+                commit_sha=result_sha,
+                task=task,
+            )
+        except Exception as e:
+            print(f"Warning: TODO/Roadmap synchronization failed: {e}", file=sys.stderr)
 
         if worktree_path and Path(worktree_path).exists():
             print(f"Pruning git worktree '{worktree_path}'...")
