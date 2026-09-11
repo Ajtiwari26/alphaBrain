@@ -335,6 +335,7 @@ Respond with a single valid JSON object strictly matching this schema:
                 logger.warning("Custom LLM invoker failed: %s; falling back", e)
 
         if self.agy_bin.exists():
+            prompt_file = None
             try:
                 with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
                     f.write(prompt)
@@ -362,13 +363,15 @@ Respond with a single valid JSON object strictly matching this schema:
                         timeout=70,
                         check=False,
                     )
-                Path(prompt_file).unlink(missing_ok=True)
                 if res.returncode == 0 and res.stdout.strip():
                     parsed = self._extract_json(res.stdout)
                     if parsed:
                         return parsed
             except Exception as e:
                 logger.warning("AGY CLI execution failed for mechanic: %s", e)
+            finally:
+                if prompt_file:
+                    Path(prompt_file).unlink(missing_ok=True)
 
         return self._deterministic_fallback_diagnosis(snapshot)
 

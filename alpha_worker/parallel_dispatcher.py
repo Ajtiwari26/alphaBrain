@@ -423,6 +423,15 @@ class ParallelWorkerDispatcher:
                 )
                 diagnosis = self.pipeline_mechanic.diagnose_stall(snapshot)
 
+                # Re-acquire lock to guard against race conditions if task completed naturally during diagnosis
+                with self._lock:
+                    if task_id not in self._active_tasks:
+                        logger.info("Task %s was removed or completed during diagnosis; aborting resumption.", task_id)
+                        continue
+                    if execution.process and execution.process.poll() is not None:
+                        logger.info("Task %s completed naturally during diagnosis; aborting resumption.", task_id)
+                        continue
+
                 if diagnosis.is_recoverable:
                     logger.info(
                         "Task %s stall diagnosed as recoverable by Pipeline Mechanic: action=%s, phase=%s",

@@ -5,11 +5,12 @@ Unit tests for Gemini 3.1 Pro-Powered Pipeline Mechanic in AlphaBrain.
 
 from __future__ import annotations
 
+import subprocess
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -400,7 +401,7 @@ def test_dispatcher_timeout_unrecoverable_termination(temp_queue):
     )
 
     mock_proc = MagicMock()
-    mock_proc.poll.return_value = 1  # Exited with error
+    mock_proc.poll.return_value = None  # Running/hanging worker process
 
     execution = ActiveTaskExecution(
         task_id="tsk_unrecoverable",
@@ -416,3 +417,95 @@ def test_dispatcher_timeout_unrecoverable_termination(temp_queue):
     assert "tsk_unrecoverable" not in dispatcher.active_tasks
     row = temp_queue.get_task("tsk_unrecoverable")
     assert row["status"] == TriageStatus.FAILED.value
+
+
+def test_tempfile_cleanup_on_subprocess_timeout(temp_dir):
+    """Verifies that prompt_file is cleanly deleted even when subprocess.run raises TimeoutExpired."""
+    fake_agy = temp_dir / "agy"
+    fake_agy.touch()
+
+    mechanic = PipelineMechanic(agy_bin=fake_agy, llm_invoker=None)
+    snapshot = TaskStallSnapshot(
+        task_id="tsk_timeout_leak",
+        elapsed_seconds=300.0,
+        timeout_seconds=300.0,
+        process_alive=True,
+    )
+
+    created_tempfiles = []
+    real_named_temp = tempfile.NamedTemporaryFile
+
+    def tracking_tempfile(*args, **kwargs):
+        tf = real_named_temp(*args, **kwargs)
+        created_tempfiles.append(Path(tf.name))
+        return tf
+
+    with (
+        patch("tempfile.NamedTemporaryFile", side_effect=tracking_tempfile),
+        patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="agy", timeout=60)),
+    ):
+        diag = mechanic.diagnose_stall(snapshot)
+
+    assert diag is not None
+    assert len(created_tempfiles) == 1
+    assert not created_tempfiles[0].exists()
+
+
+def test_handle_timeouts_race_condition_aborts_resumption(temp_queue):
+    """Verifies that if task finishes naturally during LLM diagnosis, resumption is safely aborted."""
+    prov = TaskProvenance(
+        meeting_id="meet_race",
+        speaker_id="speaker_1",
+        utterance_timestamp=1000.0,
+        transcript_excerpt="test",
+        extraction_model="test-model",
+        extraction_confidence=1.0,
+        eva_session_id="sess_race",
+        created_at=1000.0,
+        content_hash="hash_race",
+    )
+    temp_queue.enqueue_task(
+        task_id="tsk_race_test",
+        envelope={"project_id": "alphabrain_dogfood"},
+        provenance=prov,
+        initial_status=TriageStatus.EXECUTING,
+    )
+
+    proc_ref = MagicMock()
+    proc_ref.poll.return_value = None  # Hanging initially
+
+    def slow_llm_invoker(model: str, prompt: str) -> dict[str, Any]:
+        # Task completes naturally while LLM is generating diagnosis
+        proc_ref.poll.return_value = 0
+        return {
+            "is_recoverable": True,
+            "action": "RESUME_CHECKPOINT",
+            "reason": "Old stall diagnosis",
+            "checkpoint_phase": "phase_init",
+        }
+
+    mechanic = PipelineMechanic(queue=temp_queue, llm_invoker=slow_llm_invoker)
+    dispatcher = ParallelWorkerDispatcher(
+        queue=temp_queue,
+        max_workers=2,
+        timeout_seconds=50.0,
+        pipeline_mechanic=mechanic,
+        enable_pipeline_mechanic=True,
+    )
+
+    execution = ActiveTaskExecution(
+        task_id="tsk_race_test",
+        started_at=time.time() - 100.0,
+        worker_id="wrk_test_race",
+        process=proc_ref,
+    )
+    dispatcher._active_tasks["tsk_race_test"] = execution
+
+    timed_out_ids = dispatcher.handle_timeouts()
+
+    assert timed_out_ids == []
+    assert "tsk_race_test" in dispatcher.active_tasks
+    assert dispatcher.active_tasks["tsk_race_test"].process is proc_ref
+    row = temp_queue.get_task("tsk_race_test")
+    assert row["status"] != TriageStatus.FAILED.value
+
