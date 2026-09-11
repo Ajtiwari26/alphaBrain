@@ -95,6 +95,8 @@ class SeniorPlanningEngine:
                 "--model",
                 model,
                 "--sandbox",
+                "--mode",
+                "plan",
                 "--output-format",
                 "json",
                 "--input-format",
@@ -393,12 +395,25 @@ Review Instructions:
 - Verify whether all previous repair requirements were resolved.
 - Output strictly the structured JSON object with findings and verdict ("APPROVE", "REPAIR_REQUIRED", or "BLOCKED").
 """
-                opus_response = self._invoke_agy_planning(
-                    "claude-opus-4-6-thinking", opus_recheck_prompt, critique_schema
-                )
+                try:
+                    opus_response = self._invoke_agy_planning(
+                        critique_model, opus_recheck_prompt, critique_schema, timeout_seconds=180
+                    )
+                except Exception as e:
+                    if critique_model == "claude-opus-4-6-thinking":
+                        logger.warning(
+                            f"Opus recheck failed ({e}). Claude on holiday fallback -> invoking gemini-3.1-pro-high..."
+                        )
+                        critique_model = "gemini-3.1-pro-high"
+                        critique_principal = "gemini-3.1-pro-high-critique"
+                        opus_response = self._invoke_agy_planning(
+                            critique_model, opus_recheck_prompt, critique_schema, timeout_seconds=180
+                        )
+                    else:
+                        raise
                 opus_verdict = opus_response.get("verdict", "BLOCKED")
                 opus_assessment = PlanAssessment(
-                    reviewer_principal="claude-opus-4-6-thinking",
+                    reviewer_principal=critique_principal,
                     role="critique",
                     plan_digest=blueprint_digest,
                     verdict=opus_verdict,
