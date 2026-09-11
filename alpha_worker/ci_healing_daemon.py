@@ -17,9 +17,17 @@ logger = logging.getLogger("alphabrain.worker.healing_daemon")
 
 
 class CIHealingDaemon:
-    def __init__(self, queue: TaskTriageQueue, project_id: str = "prj_phase10"):
+    def __init__(
+        self,
+        queue: TaskTriageQueue,
+        project_id: str = "prj_phase10",
+        auto_approve_repairs: bool = False,
+        repair_initial_status: TriageStatus | None = None,
+    ):
         self.queue = queue
         self.project_id = project_id
+        self.auto_approve_repairs = auto_approve_repairs
+        self.repair_initial_status = repair_initial_status
         self.failure_analyzer = FailureAnalyzer()
         self._shutdown = False
         self._init_db()
@@ -121,10 +129,10 @@ class CIHealingDaemon:
         except Exception as e:
             logger.error(f"Error processing completed task {task_id}: {e}")
 
-    def process_failed_task(self, task: dict[str, Any]) -> None:
+    def process_failed_task(self, task: dict[str, Any]) -> dict[str, Any]:
         task_id = task["id"]
         if self.is_task_processed(task_id):
-            return
+            return {"status": "already_processed", "task_id": task_id}
 
         logger.info(f"Processing failed task: {task_id}")
 
@@ -132,7 +140,7 @@ class CIHealingDaemon:
         if not worktree_dir or not os.path.exists(worktree_dir):
             logger.warning(f"No valid worktree found for failed task {task_id}")
             self.queue.reject_task(task_id, reason="No valid worktree found")
-            return
+            return {"status": "rejected", "task_id": task_id, "reason": "No valid worktree found"}
 
         evidence_dir = os.path.join(worktree_dir, "evidence")
         pytest_output = ""
@@ -146,6 +154,23 @@ class CIHealingDaemon:
         if os.path.exists(ruff_log):
             with open(ruff_log) as f:
                 ruff_output = f.read()
+
+        # Fallback: check task payload for evidence / error details
+        if not pytest_output and not ruff_output:
+            result_data = task.get("result") or task.get("error_details") or {}
+            if isinstance(result_data, dict):
+                evidence = result_data.get("evidence", [])
+                if isinstance(evidence, list):
+                    for ev in evidence:
+                        if isinstance(ev, dict):
+                            gate = ev.get("gate_type", "")
+                            snippet = (ev.get("stdout_snippet") or "") + "\n" + (ev.get("stderr_snippet") or "")
+                            if gate in ("unit_test", "pytest"):
+                                pytest_output = snippet
+                            elif gate in ("lint", "ruff"):
+                                ruff_output = snippet
+                if not pytest_output and not ruff_output and "error" in result_data:
+                    pytest_output = str(result_data["error"])
 
         analysis = self.failure_analyzer.analyze(pytest_output, ruff_output)
         signature = analysis.get("signature", "unknown")
@@ -162,7 +187,14 @@ class CIHealingDaemon:
                 task_id,
                 reason="ESCALATED: Identical failures exceeded threshold. Needs human intervention.",
             )
-            return
+            return {
+                "status": "circuit_breaker_tripped",
+                "task_id": task_id,
+                "root_id": root_id,
+                "signature": signature,
+                "trip_reason": trip_reason.value if hasattr(trip_reason, "value") else str(trip_reason),
+                "attempts": cb.attempts if cb else 0,
+            }
 
         epoch = cb.attempts
         synthesizer = RepairEnvelopeSynthesizer(parent_task_id=task_id, repair_epoch=epoch)
@@ -179,7 +211,11 @@ class CIHealingDaemon:
         if not all(k in repair_envelope for k in ("allowed_paths", "actionable_prompt")):
             logger.error("Synthesizer returned invalid envelope shape")
             self.queue.reject_task(task_id, reason="Synthesizer returned invalid envelope shape")
-            return
+            return {
+                "status": "rejected",
+                "task_id": task_id,
+                "reason": "Synthesizer returned invalid envelope shape",
+            }
 
         logger.info(f"Synthesized repair envelope for {task_id}: {repair_envelope}")
 
@@ -193,23 +229,66 @@ class CIHealingDaemon:
             json.dumps(new_env, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
         ).hexdigest()
 
-        prov_dict = task.get("provenance", {})
+        prov_raw = task.get("provenance") or {}
+        if isinstance(prov_raw, TaskProvenance):
+            prov_dict = prov_raw.to_dict()
+        elif isinstance(prov_raw, dict):
+            prov_dict = dict(prov_raw)
+        else:
+            prov_dict = {}
+
         prov_dict["content_hash"] = canonical_hash
-        prov = TaskProvenance.from_dict(prov_dict)
+        prov_dict.setdefault("meeting_id", "ci_healing")
+        prov_dict.setdefault("speaker_id", "ci_healing_daemon")
+        prov_dict.setdefault("utterance_timestamp", time.time())
+        prov_dict.setdefault("transcript_excerpt", f"Automated repair for {task_id}")
+        prov_dict.setdefault("extraction_model", "CIHealingDaemon")
+        prov_dict.setdefault("extraction_confidence", 1.0)
+        prov_dict.setdefault("eva_session_id", f"healing_{task_id}")
+        prov_dict.setdefault("created_at", time.time())
+
+        valid_prov_fields = {
+            "meeting_id",
+            "speaker_id",
+            "utterance_timestamp",
+            "transcript_excerpt",
+            "extraction_model",
+            "extraction_confidence",
+            "eva_session_id",
+            "created_at",
+            "content_hash",
+        }
+        filtered_prov = {k: v for k, v in prov_dict.items() if k in valid_prov_fields}
+        prov = TaskProvenance.from_dict(filtered_prov)
 
         repair_task_id = f"{task_id}_repair_{epoch}"
+
+        initial_status = (
+            self.repair_initial_status
+            if self.repair_initial_status is not None
+            else (TriageStatus.APPROVED if self.auto_approve_repairs else TriageStatus.PENDING_REVIEW)
+        )
 
         # S1: Explicit initial_status
         self.queue.enqueue_task(
             task_id=repair_task_id,
             envelope=new_env,
             provenance=prov,
-            initial_status=TriageStatus.PENDING_REVIEW,
+            initial_status=initial_status,
         )
         logger.info(f"Submitted repair task {repair_task_id} for {task_id}")
 
         # Supersede the old task safely to prevent re-execution
         self.queue.reject_task(task_id, reason=f"Superseded by {repair_task_id}")
+
+        return {
+            "status": "repair_enqueued",
+            "task_id": task_id,
+            "repair_task_id": repair_task_id,
+            "epoch": epoch,
+            "signature": signature,
+            "initial_status": initial_status.value,
+        }
 
     def run_once(self) -> None:
         if self.queue.is_emergency_stopped():

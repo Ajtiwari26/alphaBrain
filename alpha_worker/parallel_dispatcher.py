@@ -130,6 +130,7 @@ class ParallelWorkerDispatcher:
         worker_cycle_fn: Callable[[dict[str, Any]], Any] | None = None,
         enable_agent_execution: bool = False,
         execution_mode: str = "process",
+        auto_approve_repairs: bool = False,
     ) -> None:
         if max_workers < 1:
             raise ValueError(f"max_workers must be at least 1, got {max_workers}")
@@ -145,6 +146,7 @@ class ParallelWorkerDispatcher:
         self.worker_cycle_fn = worker_cycle_fn
         self.enable_agent_execution = enable_agent_execution
         self.execution_mode = execution_mode
+        self.auto_approve_repairs = auto_approve_repairs
 
         try:
             self._mp_context = multiprocessing.get_context("fork")
@@ -154,6 +156,15 @@ class ParallelWorkerDispatcher:
         self._lock = threading.Lock()
         self._active_tasks: dict[str, ActiveTaskExecution] = {}
         self._shutdown = False
+
+    def _get_healing_daemon(self) -> CIHealingDaemon:
+        if self.ci_healing_daemon is not None:
+            return self.ci_healing_daemon
+        return CIHealingDaemon(
+            queue=self.queue,
+            project_id=self.project_id or "alphabrain_dogfood",
+            auto_approve_repairs=self.auto_approve_repairs,
+        )
 
     # -------------------------------------------------------------------------
     # Pool State and Capacity
@@ -427,10 +438,7 @@ class ParallelWorkerDispatcher:
             results["senior_review"] = {"error": str(e), "approved": False}
 
         # 2. Route to CI Healing
-        healing_daemon = self.ci_healing_daemon or CIHealingDaemon(
-            queue=self.queue,
-            project_id=self.project_id or "alphabrain_dogfood",
-        )
+        healing_daemon = self._get_healing_daemon()
         try:
             logger.info("Routing completed task %s to CI Healing Daemon", task_id)
             healing_daemon.process_completed_task(task_dict)
@@ -449,10 +457,19 @@ class ParallelWorkerDispatcher:
         """
         task_id = task_or_id if isinstance(task_or_id, str) else task_or_id["id"]
         task_dict = (
-            task_or_id
+            dict(task_or_id)
             if isinstance(task_or_id, dict)
             else self.queue.get_task(task_id) or {"id": task_id}
         )
+
+        # Ensure worktree_path is present if resolvable from worktree_mgr
+        if not task_dict.get("worktree_path") and self.worktree_mgr:
+            try:
+                wt = self.worktree_mgr.get_worktree_path(task_id)
+                if wt.exists():
+                    task_dict["worktree_path"] = str(wt)
+            except Exception:
+                pass
 
         results: dict[str, Any] = {
             "task_id": task_id,
@@ -460,18 +477,42 @@ class ParallelWorkerDispatcher:
             "reason": reason,
         }
 
-        healing_daemon = self.ci_healing_daemon or CIHealingDaemon(
-            queue=self.queue,
-            project_id=self.project_id or "alphabrain_dogfood",
-        )
+        healing_daemon = self._get_healing_daemon()
         try:
             logger.info("Routing failed task %s to CI Healing Daemon", task_id)
-            healing_daemon.process_failed_task(task_dict)
-            results["ci_healing"] = {"status": "processed"}
+            healing_res = healing_daemon.process_failed_task(task_dict)
+            ci_status: dict[str, Any] = {"status": "processed"}
+            if isinstance(healing_res, dict):
+                ci_status["result"] = healing_res
+            results["ci_healing"] = ci_status
         except Exception as e:
             logger.warning("CI healing processing for failed task %s: %s", task_id, e)
             results["ci_healing"] = {"error": str(e)}
 
+        return results
+
+    def process_pending_heals(self) -> list[dict[str, Any]]:
+        """
+        Queries TaskTriageQueue for FAILED tasks and processes them through CI healing.
+        Returns list of healing results.
+        """
+        if self.queue.is_emergency_stopped():
+            return []
+
+        results: list[dict[str, Any]] = []
+        try:
+            failed_tasks = self.queue.list_tasks(
+                status=TriageStatus.FAILED, limit=50, project_id=self.project_id
+            )
+            for task in failed_tasks:
+                try:
+                    route_res = self.route_failed_task(task)
+                    res = route_res.get("ci_healing", {}).get("result") or route_res
+                    results.append({"task_id": task.get("id"), "result": res})
+                except Exception as e:
+                    logger.error("Failed healing processing for task %s: %s", task.get("id"), e)
+        except Exception as e:
+            logger.error("Failed querying failed tasks for healing: %s", e)
         return results
 
     # -------------------------------------------------------------------------
