@@ -34,14 +34,17 @@ class VercelAdapter(DeploymentAdapter):
             }
         }
         response = requests.post(
-            url, headers=self._get_headers(), params=self._get_params(), json=payload
+            url, headers=self._get_headers(), params=self._get_params(), json=payload, timeout=10
         )
         response.raise_for_status()
-        return response.json().get("id", "")
+        deploy_id = response.json().get("id")
+        if not deploy_id:
+            raise ValueError("Deployment ID missing in response")
+        return deploy_id
 
     def poll_status(self, deployment_id: str) -> str:
         url = f"{self.base_url}/v13/deployments/{deployment_id}"
-        response = requests.get(url, headers=self._get_headers(), params=self._get_params())
+        response = requests.get(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
         response.raise_for_status()
         state = response.json().get("readyState", "")
         if state == "READY":
@@ -52,15 +55,18 @@ class VercelAdapter(DeploymentAdapter):
 
     def get_preview_url(self, deployment_id: str) -> str | None:
         url = f"{self.base_url}/v13/deployments/{deployment_id}"
-        response = requests.get(url, headers=self._get_headers(), params=self._get_params())
+        response = requests.get(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
         response.raise_for_status()
         domain = response.json().get("url")
         if domain:
             return f"https://{domain}"
-        return None
+        raise ValueError("Preview URL missing in response")
 
     def rollback(self, deployment_id: str) -> str:
         url = f"{self.base_url}/v9/projects/{self.project_id}/rollback/{deployment_id}"
-        response = requests.post(url, headers=self._get_headers(), params=self._get_params())
+        response = requests.post(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
         response.raise_for_status()
-        return response.json().get("id", deployment_id)
+        status = response.json().get("jobStatus")
+        if not status:
+            raise ValueError("jobStatus missing in Vercel rollback response")
+        return status

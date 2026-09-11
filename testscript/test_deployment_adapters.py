@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from alpha_core.deployments.render_adapter import RenderAdapter
 from alpha_core.deployments.rollback_pipeline import RollbackPipeline
 from alpha_core.deployments.vercel_adapter import VercelAdapter
@@ -19,6 +21,17 @@ def test_vercel_trigger_deployment(mock_post):
     args, kwargs = mock_post.call_args
     assert "https://api.vercel.com/v13/deployments" in args[0]
     assert kwargs["json"]["gitSource"]["ref"] == "main"
+    assert kwargs["timeout"] == 10
+
+@patch("alpha_core.deployments.vercel_adapter.requests.post")
+def test_vercel_trigger_deployment_missing_id(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {}
+    mock_post.return_value = mock_resp
+
+    adapter = VercelAdapter("token", "proj123")
+    with pytest.raises(ValueError, match="Deployment ID missing"):
+        adapter.trigger_deployment("main", "sha123")
 
 @patch("alpha_core.deployments.vercel_adapter.requests.get")
 def test_vercel_poll_status(mock_get):
@@ -30,6 +43,8 @@ def test_vercel_poll_status(mock_get):
     status = adapter.poll_status("dpl_123")
 
     assert status == "READY"
+    _args, kwargs = mock_get.call_args
+    assert kwargs["timeout"] == 10
 
 @patch("alpha_core.deployments.vercel_adapter.requests.get")
 def test_vercel_get_preview_url(mock_get):
@@ -45,14 +60,14 @@ def test_vercel_get_preview_url(mock_get):
 @patch("alpha_core.deployments.vercel_adapter.requests.post")
 def test_vercel_rollback(mock_post):
     mock_resp = MagicMock()
-    mock_resp.json.return_value = {"id": "dpl_456"}
+    mock_resp.json.return_value = {"jobStatus": "succeeded"}
     mock_post.return_value = mock_resp
 
     adapter = VercelAdapter("token", "proj123")
     pipeline = RollbackPipeline(adapter)
     new_id = pipeline.execute_rollback("dpl_123")
 
-    assert new_id == "dpl_456"
+    assert new_id == "succeeded"
 
 @patch("alpha_core.deployments.render_adapter.requests.post")
 def test_render_trigger_deployment(mock_post):
@@ -64,6 +79,19 @@ def test_render_trigger_deployment(mock_post):
     deploy_id = adapter.trigger_deployment("main", "sha123")
 
     assert deploy_id == "dep_123"
+    _args, kwargs = mock_post.call_args
+    assert kwargs["json"]["commitId"] == "sha123"
+    assert kwargs["timeout"] == 10
+
+@patch("alpha_core.deployments.render_adapter.requests.post")
+def test_render_trigger_deployment_missing_id(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {}
+    mock_post.return_value = mock_resp
+
+    adapter = RenderAdapter("key", "srv123")
+    with pytest.raises(ValueError, match="Deployment ID missing"):
+        adapter.trigger_deployment("main", "sha123")
 
 @patch("alpha_core.deployments.render_adapter.requests.get")
 def test_render_poll_status(mock_get):
@@ -75,6 +103,8 @@ def test_render_poll_status(mock_get):
     status = adapter.poll_status("dep_123")
 
     assert status == "READY"
+    _args, kwargs = mock_get.call_args
+    assert kwargs["timeout"] == 10
 
 @patch("alpha_core.deployments.render_adapter.requests.get")
 def test_render_get_preview_url(mock_get):
@@ -86,3 +116,32 @@ def test_render_get_preview_url(mock_get):
     url = adapter.get_preview_url("dep_123")
 
     assert url == "https://my-app.onrender.com"
+
+@patch("alpha_core.deployments.render_adapter.requests.post")
+def test_render_rollback(mock_post):
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"id": "dep_456"}
+    mock_post.return_value = mock_resp
+
+    adapter = RenderAdapter("key", "srv123")
+    new_id = adapter.rollback("dep_123")
+
+    assert new_id == "dep_456"
+
+@patch("alpha_core.deployments.render_adapter.requests.post")
+@patch("alpha_core.deployments.render_adapter.requests.get")
+def test_pipeline_polling(mock_get, mock_post):
+    mock_post_resp = MagicMock()
+    mock_post_resp.json.return_value = {"id": "dep_456"}
+    mock_post.return_value = mock_post_resp
+
+    mock_get_resp = MagicMock()
+    mock_get_resp.json.return_value = {"status": "live"}
+    mock_get.return_value = mock_get_resp
+
+    adapter = RenderAdapter("key", "srv123")
+    pipeline = RollbackPipeline(adapter)
+
+    with patch("time.sleep", return_value=None):
+        new_id = pipeline.execute_rollback("dep_123")
+        assert new_id == "dep_456"
