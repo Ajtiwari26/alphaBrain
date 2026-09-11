@@ -43,7 +43,27 @@ class LaunchdInspector:
 
         if report.plist_installed:
             code, _, _ = self._run_cmd(["plutil", "-lint", str(self._plist_path)])
-            report.plist_valid = code == 0
+            if code == 0:
+                report.plist_valid = True
+                try:
+                    import plistlib
+                    with open(self._plist_path, "rb") as f:
+                        plist_data = plistlib.load(f)
+
+                    if plist_data.get("UserName") == "root":
+                        report.plist_valid = False
+                    if "RootDirectory" in plist_data:
+                        report.plist_valid = False
+                    if not plist_data.get("KeepAlive"):
+                        report.plist_valid = False
+                    if plist_data.get("ThrottleInterval", 0) < 10:
+                        report.plist_valid = False
+                    if plist_data.get("ProcessType") != "Background":
+                        report.plist_valid = False
+                except Exception:
+                    report.plist_valid = False
+            else:
+                report.plist_valid = False
 
         # Use launchctl list to check loaded/running/exit_code
         code, stdout, _ = self._run_cmd(["launchctl", "list"])

@@ -26,7 +26,7 @@ def test_absent_plist(tmp_path: Path) -> None:
 def test_invalid_plist(tmp_path: Path) -> None:
     plist = tmp_path / "Library" / "LaunchAgents" / "com.deploymate.alphabrain.worker.plist"
     plist.parent.mkdir(parents=True, exist_ok=True)
-    plist.touch()
+    plist.write_bytes(b"NOT XML")
 
     def mock_run(cmd: list[str]) -> tuple[int, str, str]:
         if cmd[0] == "plutil":
@@ -48,7 +48,13 @@ def test_invalid_plist(tmp_path: Path) -> None:
 def test_loaded_healthy_fresh(tmp_path: Path) -> None:
     plist = tmp_path / "Library" / "LaunchAgents" / "com.deploymate.alphabrain.worker.plist"
     plist.parent.mkdir(parents=True, exist_ok=True)
-    plist.touch()
+    import plistlib
+    with open(plist, "wb") as f:
+        plistlib.dump({
+            "KeepAlive": True,
+            "ThrottleInterval": 10,
+            "ProcessType": "Background"
+        }, f)
 
     status_file = tmp_path / "node_status.json"
     status_file.write_text(json.dumps({"status": "online"}))
@@ -82,7 +88,13 @@ def test_loaded_healthy_fresh(tmp_path: Path) -> None:
 def test_stopped_failed_worker(tmp_path: Path) -> None:
     plist = tmp_path / "Library" / "LaunchAgents" / "com.deploymate.alphabrain.worker.plist"
     plist.parent.mkdir(parents=True, exist_ok=True)
-    plist.touch()
+    import plistlib
+    with open(plist, "wb") as f:
+        plistlib.dump({
+            "KeepAlive": True,
+            "ThrottleInterval": 10,
+            "ProcessType": "Background"
+        }, f)
 
     def mock_run(cmd: list[str]) -> tuple[int, str, str]:
         if cmd[0] == "plutil":
@@ -108,7 +120,13 @@ def test_stopped_failed_worker(tmp_path: Path) -> None:
 def test_stale_health(tmp_path: Path) -> None:
     plist = tmp_path / "Library" / "LaunchAgents" / "com.deploymate.alphabrain.worker.plist"
     plist.parent.mkdir(parents=True, exist_ok=True)
-    plist.touch()
+    import plistlib
+    with open(plist, "wb") as f:
+        plistlib.dump({
+            "KeepAlive": True,
+            "ThrottleInterval": 10,
+            "ProcessType": "Background"
+        }, f)
 
     status_file = tmp_path / "node_status.json"
     status_file.write_text(json.dumps({"status": "online"}))
@@ -139,7 +157,13 @@ def test_stale_health(tmp_path: Path) -> None:
 def test_command_failure(tmp_path: Path) -> None:
     plist = tmp_path / "Library" / "LaunchAgents" / "com.deploymate.alphabrain.worker.plist"
     plist.parent.mkdir(parents=True, exist_ok=True)
-    plist.touch()
+    import plistlib
+    with open(plist, "wb") as f:
+        plistlib.dump({
+            "KeepAlive": True,
+            "ThrottleInterval": 10,
+            "ProcessType": "Background"
+        }, f)
 
     def mock_run(cmd: list[str]) -> tuple[int, str, str]:
         if cmd[0] == "launchctl" and cmd[1] == "list":
@@ -156,3 +180,77 @@ def test_command_failure(tmp_path: Path) -> None:
     assert not report.loaded
     assert report.recovery_command is not None
     assert "Service not loaded. Run:" in report.recovery_command
+
+
+def test_plist_validation_rules(tmp_path: Path) -> None:
+    import plistlib
+    plist_path = tmp_path / "Library" / "LaunchAgents" / "com.deploymate.alphabrain.worker.plist"
+    plist_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write_plist(data):
+        with open(plist_path, "wb") as f:
+            plistlib.dump(data, f)
+
+    def mock_run(cmd: list[str]) -> tuple[int, str, str]:
+        if cmd[0] == "plutil":
+            return 0, "OK", ""
+        if cmd[0] == "launchctl" and cmd[1] == "list":
+            return 0, "1234 0 com.deploymate.alphabrain.worker\n", ""
+        return 1, "", ""
+
+    def get_inspector():
+        return LaunchdInspector(
+            command_runner=mock_run,
+            home_dir=tmp_path,
+            status_file=None,
+        )
+
+    # Valid plist
+    write_plist({
+        "KeepAlive": True,
+        "ThrottleInterval": 10,
+        "ProcessType": "Background"
+    })
+    assert get_inspector().inspect().plist_valid
+
+    # Root user
+    write_plist({
+        "UserName": "root",
+        "KeepAlive": True,
+        "ThrottleInterval": 10,
+        "ProcessType": "Background"
+    })
+    assert not get_inspector().inspect().plist_valid
+
+    # Root directory
+    write_plist({
+        "RootDirectory": "/var",
+        "KeepAlive": True,
+        "ThrottleInterval": 10,
+        "ProcessType": "Background"
+    })
+    assert not get_inspector().inspect().plist_valid
+
+    # Missing KeepAlive
+    write_plist({
+        "ThrottleInterval": 10,
+        "ProcessType": "Background"
+    })
+    assert not get_inspector().inspect().plist_valid
+
+    # Low throttle
+    write_plist({
+        "KeepAlive": True,
+        "ThrottleInterval": 5,
+        "ProcessType": "Background"
+    })
+    assert not get_inspector().inspect().plist_valid
+
+    # Wrong process type
+    write_plist({
+        "KeepAlive": True,
+        "ThrottleInterval": 10,
+        "ProcessType": "Interactive"
+    })
+    assert not get_inspector().inspect().plist_valid
+

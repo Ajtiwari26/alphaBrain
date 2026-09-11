@@ -242,6 +242,10 @@ class AlphaWorkerDaemon:
         spool: DurableEventSpool | None = None,
         control_store: WorkerControlStore | None = None,
     ):
+        import os
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            raise RuntimeError("Worker must not run as root to enforce confinement.")
+
         self.worker_id = worker_id or settings.WORKER_ID
         self.worktree_mgr = WorktreeManager()
         self.health_checker = HardwareHealthChecker()
@@ -830,6 +834,19 @@ class AlphaWorkerDaemon:
     async def run_loop(self, poll_interval_seconds: int = 5):
         """Continuous background execution loop."""
         self.running = True
+
+        loop = asyncio.get_running_loop()
+        import signal
+        def handle_stop_signal():
+            logger.info("Received stop signal, initiating graceful shutdown...")
+            self.running = False
+
+        try:
+            loop.add_signal_handler(signal.SIGTERM, handle_stop_signal)
+            loop.add_signal_handler(signal.SIGINT, handle_stop_signal)
+        except NotImplementedError:
+            pass  # Windows does not support add_signal_handler for these signals
+
         if not self.control_plane and not settings.WORKER_ALLOW_LOCAL_DB:
             raise RuntimeError(
                 "Production worker requires WORKER_CONTROL_PLANE_URL; local DB mode disabled"
