@@ -307,6 +307,47 @@ def test_subprocess_service_supervision(tmp_path: Path) -> None:
     assert supervisor.inspect_health().services["subproc"].state == ServiceState.STOPPED.value
 
 
+def test_subprocess_crash_recovery_and_restart(tmp_path: Path) -> None:
+    supervisor = DaemonSupervisor(state_dir=tmp_path)
+
+    marker = tmp_path / "subproc_runs.txt"
+    cmd = [
+        sys.executable,
+        "-c",
+        (
+            "import sys, pathlib; "
+            "p = pathlib.Path(sys.argv[1]); "
+            "n = int(p.read_text()) if p.exists() else 0; "
+            "p.write_text(str(n + 1)); "
+            "sys.exit(1 if n == 0 else 0)"
+        ),
+        str(marker),
+    ]
+    cfg = ServiceConfig(
+        name="subproc_flaky",
+        command=cmd,
+        backoff_base_seconds=0.01,
+        restart_window_seconds=10.0,
+        max_restarts=3,
+    )
+    supervisor.register_service(cfg)
+    supervisor.start_service("subproc_flaky")
+
+    # Initial cycle processes the exit
+    time.sleep(0.15)
+    supervisor.supervise_cycle()
+
+    # Backoff window elapses, next supervise cycle triggers restart
+    time.sleep(0.05)
+    supervisor.supervise_cycle()
+    time.sleep(0.15)
+    supervisor.supervise_cycle()
+
+    assert marker.exists()
+    assert int(marker.read_text()) >= 2
+    supervisor.stop(timeout=1.0)
+
+
 # ---------------------------------------------------------------------------
 # Unit Tests for Signal Handling
 # ---------------------------------------------------------------------------

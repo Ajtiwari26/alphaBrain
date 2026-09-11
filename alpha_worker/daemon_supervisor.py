@@ -210,13 +210,12 @@ class DaemonSupervisor:
                 env.update(cfg.env)
             cwd = str(cfg.cwd) if cfg.cwd else None
             logger.info("Spawning subprocess service '%s': %s", cfg.name, cfg.command)
+            # Inherit parent stdout/stderr to avoid 64KB OS pipe buffer exhaustion deadlock.
+            # Under launchd, child logs stream directly to StandardOutPath and StandardErrorPath.
             proc = subprocess.Popen(
                 cfg.command,
                 cwd=cwd,
                 env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
             )
             runtime.process = proc
             runtime.pid = proc.pid
