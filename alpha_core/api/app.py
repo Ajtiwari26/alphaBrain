@@ -892,6 +892,12 @@ async def task_heartbeat(
 ):
     require_permission(principal, "task:write")
     lease_token = payload.get("lease_token", "")
+    # Enforce multi-tenant boundaries
+    task = await session.get(TaskRecord, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(principal, task.project_id)
+    require_project_access(principal, task.project_id)
     success = await TaskEngine.record_heartbeat(session, task_id, lease_token, principal.subject)
     if not success:
         task = await session.get(TaskRecord, task_id)
@@ -919,6 +925,7 @@ async def cancel_task_execution(
     task = await session.get(TaskRecord, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(principal, task.project_id)
     require_project_access(principal, task.project_id)
     try:
         cancelled = await TaskEngine.cancel_task(
@@ -1005,6 +1012,7 @@ async def get_task_details(
     task = res.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(_principal, task.project_id)
     if not (_principal.has_permission("task:read") or _principal.has_permission("project:read")):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1536,6 +1544,7 @@ async def append_task_checkpoint(
     task = res.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(_principal, task.project_id)
 
     now = datetime.now(UTC)
     if task.status not in {TaskStatus.LEASED.value, TaskStatus.RUNNING.value}:
@@ -1639,6 +1648,7 @@ async def get_latest_task_checkpoint(
     chk = res.scalar_one_or_none()
     if not chk:
         raise HTTPException(status_code=404, detail="No checkpoints found for task")
+    require_project_access(_principal, chk.project_id)
 
     return TaskCheckpoint(
         checkpoint_id=chk.id,
@@ -1676,6 +1686,7 @@ async def get_resume_decision(
     task = res.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(_principal, task.project_id)
 
     # 1. Fetch latest checkpoint
     res_chk = await session.execute(
@@ -1916,6 +1927,7 @@ async def fetch_next_promotion(
     attempt = await session.get(AttemptRecord, approval.attempt_id)
     if not task or not attempt:
         raise HTTPException(status_code=500, detail="Task or attempt record missing")
+    require_project_access(principal, task.project_id)
 
     review_res = await session.execute(
         select(ApprovalRecord)
@@ -1982,6 +1994,7 @@ async def submit_promotion_result(
     task = await session.get(TaskRecord, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(principal, task.project_id)
 
     res_promo = await session.execute(
         select(ApprovalRecord).where(
@@ -2185,6 +2198,7 @@ async def list_triage_tasks(
                 detail=f"Invalid status '{status_filter}'. Choices: {[s.value for s in TriageStatus]}",
             ) from None
     tasks = queue.list_tasks(status=parsed_status, limit=limit)
+    tasks = [t for t in tasks if principal.can_access_project(t.get("envelope", {}).get("project_id", ""))]
     return {"tasks": tasks, "count": len(tasks)}
 
 
@@ -2200,6 +2214,7 @@ async def get_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
+    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
     return dict(task)
 
 
@@ -2215,6 +2230,7 @@ async def review_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
+    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
     safety_gate = SafetyGate()
     verdict = safety_gate.evaluate_envelope(task["envelope"])
     return {
@@ -2239,6 +2255,7 @@ async def approve_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
+    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
 
     if queue.is_emergency_stopped():
         raise HTTPException(
@@ -2278,6 +2295,7 @@ async def reject_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
+    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
 
     success = queue.reject_task(task_id, reason=payload.reason)
     if not success:
@@ -2301,6 +2319,7 @@ async def modify_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
+    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
 
     try:
         success = queue.modify_task(
@@ -2589,6 +2608,7 @@ async def get_portal_task_trace(
     task = queue.get_task(task_id)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
 
     # Enforce tenant isolation (Invariant I-33)
     project_id = task.get("envelope", {}).get("project_id")
