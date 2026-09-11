@@ -53,9 +53,9 @@ async def test_tenant_isolation():
 
         # Test list triage tasks
         res_triage_list = await client.get("/api/triage/tasks", headers={"Authorization": f"Bearer {token1}"})
-        # token1 should only see tasks for prj_1
+        # token1 (CLIENT) should get 403 because it requires FOUNDER or ADMIN
         assert res_triage_list.status_code == 403, f'Expected 403 due to require_triage_access, got {res_triage_list.status_code}'
-        # Wait, if queue is empty since we only put things in db and not triage queue
-        # It should just return 200 OK.
-        # But wait, require_triage_access restricts to FOUNDER/ADMIN?
-        # Let's see if it returns 200 or 403.
+
+        founder_token = create_scoped_principal_token("founder1", PrincipalRole.FOUNDER, ["prj_1"])
+        res_triage_list_founder = await client.get("/api/triage/tasks", headers={"Authorization": f"Bearer {founder_token}"})
+        assert res_triage_list_founder.status_code == 200, f'Expected 200, got {res_triage_list_founder.status_code}'

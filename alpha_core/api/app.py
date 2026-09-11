@@ -866,6 +866,25 @@ async def lease_task(
         raise HTTPException(status_code=422, detail="Invalid worker ID")
     preferred_agent = payload.get("preferred_agent")
 
+    now = utc_now()
+    res = await session.execute(
+        select(TaskRecord.project_id)
+        .where(
+            and_(
+                TaskRecord.status == TaskStatus.QUEUED.value,
+                or_(TaskRecord.next_eligible_at.is_(None), TaskRecord.next_eligible_at <= now),
+            )
+        )
+        .order_by(TaskRecord.created_at.asc())
+        .limit(1)
+    )
+    next_project_id = res.scalar_one_or_none()
+    if next_project_id:
+        try:
+            require_project_access(principal, next_project_id)
+        except HTTPException:
+            return {"status": "no_tasks_available"}
+
     leased_tuple = await TaskEngine.lease_next_task(
         session,
         worker_id,
@@ -910,9 +929,9 @@ async def task_heartbeat(
     require_project_access(principal, task.project_id)
     success = await TaskEngine.record_heartbeat(session, task_id, lease_token, principal.subject)
     if not success:
-        await session.refresh(task)
         if (
-            task.status == TaskStatus.CANCELLED.value
+            task
+            and task.status == TaskStatus.CANCELLED.value
             and task.worker_id == principal.subject
             and task.lease_token == lease_token
         ):
@@ -1652,6 +1671,11 @@ async def get_latest_task_checkpoint(
 ):
     require_permission(_principal, "task:read")
 
+    task = await session.get(TaskRecord, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(_principal, task.project_id)
+
     res = await session.execute(
         select(TaskCheckpointRecord)
         .where(TaskCheckpointRecord.task_id == task_id)
@@ -1661,7 +1685,6 @@ async def get_latest_task_checkpoint(
     chk = res.scalar_one_or_none()
     if not chk:
         raise HTTPException(status_code=404, detail="No checkpoints found for task")
-    require_project_access(_principal, chk.project_id)
 
     return TaskCheckpoint(
         checkpoint_id=chk.id,
@@ -2232,7 +2255,10 @@ async def get_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
-    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
+    project_id = task.get("envelope", {}).get("project_id")
+    if not project_id:
+        raise HTTPException(status_code=500, detail="Task missing project_id")
+    require_project_access(principal, project_id)
     return dict(task)
 
 
@@ -2248,7 +2274,10 @@ async def review_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
-    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
+    project_id = task.get("envelope", {}).get("project_id")
+    if not project_id:
+        raise HTTPException(status_code=500, detail="Task missing project_id")
+    require_project_access(principal, project_id)
     safety_gate = SafetyGate()
     verdict = safety_gate.evaluate_envelope(task["envelope"])
     return {
@@ -2273,7 +2302,10 @@ async def approve_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
-    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
+    project_id = task.get("envelope", {}).get("project_id")
+    if not project_id:
+        raise HTTPException(status_code=500, detail="Task missing project_id")
+    require_project_access(principal, project_id)
 
     if queue.is_emergency_stopped():
         raise HTTPException(
@@ -2313,7 +2345,10 @@ async def reject_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
-    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
+    project_id = task.get("envelope", {}).get("project_id")
+    if not project_id:
+        raise HTTPException(status_code=500, detail="Task missing project_id")
+    require_project_access(principal, project_id)
 
     success = queue.reject_task(task_id, reason=payload.reason)
     if not success:
@@ -2337,7 +2372,10 @@ async def modify_triage_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Task '{task_id}' not found"
         )
-    require_project_access(principal, task.get("envelope", {}).get("project_id", ""))
+    project_id = task.get("envelope", {}).get("project_id")
+    if not project_id:
+        raise HTTPException(status_code=500, detail="Task missing project_id")
+    require_project_access(principal, project_id)
 
     try:
         success = queue.modify_task(
