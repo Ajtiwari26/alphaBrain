@@ -7,7 +7,7 @@ from alpha_core.deployments.rollback_pipeline import RollbackPipeline
 from alpha_core.deployments.vercel_adapter import VercelAdapter
 
 
-@patch("alpha_core.deployments.vercel_adapter.requests.post")
+@patch("alpha_core.deployments.vercel_adapter.requests.Session.post")
 def test_vercel_trigger_deployment(mock_post):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"id": "dpl_123"}
@@ -21,9 +21,10 @@ def test_vercel_trigger_deployment(mock_post):
     args, kwargs = mock_post.call_args
     assert "https://api.vercel.com/v13/deployments" in args[0]
     assert kwargs["json"]["gitSource"]["ref"] == "main"
-    assert kwargs["timeout"] == 10
+    assert kwargs["timeout"] == 30
 
-@patch("alpha_core.deployments.vercel_adapter.requests.post")
+
+@patch("alpha_core.deployments.vercel_adapter.requests.Session.post")
 def test_vercel_trigger_deployment_missing_id(mock_post):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {}
@@ -33,7 +34,8 @@ def test_vercel_trigger_deployment_missing_id(mock_post):
     with pytest.raises(ValueError, match="Deployment ID missing"):
         adapter.trigger_deployment("main", "sha123")
 
-@patch("alpha_core.deployments.vercel_adapter.requests.get")
+
+@patch("alpha_core.deployments.vercel_adapter.requests.Session.get")
 def test_vercel_poll_status(mock_get):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"readyState": "READY"}
@@ -44,9 +46,10 @@ def test_vercel_poll_status(mock_get):
 
     assert status == "READY"
     _args, kwargs = mock_get.call_args
-    assert kwargs["timeout"] == 10
+    assert kwargs["timeout"] == 30
 
-@patch("alpha_core.deployments.vercel_adapter.requests.get")
+
+@patch("alpha_core.deployments.vercel_adapter.requests.Session.get")
 def test_vercel_get_preview_url(mock_get):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"url": "my-app.vercel.app"}
@@ -57,7 +60,8 @@ def test_vercel_get_preview_url(mock_get):
 
     assert url == "https://my-app.vercel.app"
 
-@patch("alpha_core.deployments.vercel_adapter.requests.get")
+
+@patch("alpha_core.deployments.vercel_adapter.requests.Session.get")
 def test_vercel_get_preview_url_missing(mock_get):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {}
@@ -67,11 +71,22 @@ def test_vercel_get_preview_url_missing(mock_get):
     url = adapter.get_preview_url("dpl_123")
     assert url is None
 
-@patch("alpha_core.deployments.vercel_adapter.requests.post")
-def test_vercel_rollback(mock_post):
+
+@patch("alpha_core.deployments.vercel_adapter.requests.Session.post")
+@patch("alpha_core.deployments.vercel_adapter.requests.Session.get")
+def test_vercel_rollback(mock_get, mock_post):
+    # Simulate first poll returns in_progress, second returns succeeded
     mock_post_resp = MagicMock()
-    mock_post_resp.json.return_value = {"jobStatus": "succeeded"}
+    mock_post_resp.json.return_value = {"jobStatus": "in_progress"}
     mock_post.return_value = mock_post_resp
+
+    mock_get_resp1 = MagicMock()
+    mock_get_resp1.json.return_value = {"jobStatus": "in_progress"}
+
+    mock_get_resp2 = MagicMock()
+    mock_get_resp2.json.return_value = {"jobStatus": "succeeded"}
+
+    mock_get.side_effect = [mock_get_resp1, mock_get_resp2]
 
     adapter = VercelAdapter("token", "proj123")
     pipeline = RollbackPipeline(adapter)
@@ -79,9 +94,11 @@ def test_vercel_rollback(mock_post):
     with patch("time.sleep", return_value=None):
         new_id = pipeline.execute_rollback("dpl_123")
 
-    assert new_id == "vercel_job:succeeded"
+    assert new_id == "vercel_job:dpl_123"
+    assert mock_get.call_count == 2
 
-@patch("alpha_core.deployments.render_adapter.requests.post")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.post")
 def test_render_trigger_deployment(mock_post):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"id": "dep_123"}
@@ -93,9 +110,10 @@ def test_render_trigger_deployment(mock_post):
     assert deploy_id == "dep_123"
     _args, kwargs = mock_post.call_args
     assert kwargs["json"]["commitId"] == "sha123"
-    assert kwargs["timeout"] == 10
+    assert kwargs["timeout"] == 30
 
-@patch("alpha_core.deployments.render_adapter.requests.post")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.post")
 def test_render_trigger_deployment_missing_id(mock_post):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {}
@@ -105,7 +123,8 @@ def test_render_trigger_deployment_missing_id(mock_post):
     with pytest.raises(ValueError, match="Deployment ID missing"):
         adapter.trigger_deployment("main", "sha123")
 
-@patch("alpha_core.deployments.render_adapter.requests.get")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.get")
 def test_render_poll_status(mock_get):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"status": "live"}
@@ -116,9 +135,10 @@ def test_render_poll_status(mock_get):
 
     assert status == "READY"
     _args, kwargs = mock_get.call_args
-    assert kwargs["timeout"] == 10
+    assert kwargs["timeout"] == 30
 
-@patch("alpha_core.deployments.render_adapter.requests.get")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.get")
 def test_render_get_preview_url(mock_get):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"serviceDetails": {"url": "https://my-app.onrender.com"}}
@@ -129,7 +149,8 @@ def test_render_get_preview_url(mock_get):
 
     assert url == "https://my-app.onrender.com"
 
-@patch("alpha_core.deployments.render_adapter.requests.get")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.get")
 def test_render_get_preview_url_missing(mock_get):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"serviceDetails": {}}
@@ -140,7 +161,8 @@ def test_render_get_preview_url_missing(mock_get):
 
     assert url is None
 
-@patch("alpha_core.deployments.render_adapter.requests.post")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.post")
 def test_render_rollback(mock_post):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"id": "dep_456"}
@@ -151,8 +173,9 @@ def test_render_rollback(mock_post):
 
     assert new_id == "dep_456"
 
-@patch("alpha_core.deployments.render_adapter.requests.post")
-@patch("alpha_core.deployments.render_adapter.requests.get")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.post")
+@patch("alpha_core.deployments.render_adapter.requests.Session.get")
 def test_pipeline_polling(mock_get, mock_post):
     mock_post_resp = MagicMock()
     mock_post_resp.json.return_value = {"id": "dep_456"}
@@ -169,8 +192,9 @@ def test_pipeline_polling(mock_get, mock_post):
         new_id = pipeline.execute_rollback("dep_123")
         assert new_id == "dep_456"
 
-@patch("alpha_core.deployments.render_adapter.requests.post")
-@patch("alpha_core.deployments.render_adapter.requests.get")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.post")
+@patch("alpha_core.deployments.render_adapter.requests.Session.get")
 def test_pipeline_polling_timeout(mock_get, mock_post):
     mock_post_resp = MagicMock()
     mock_post_resp.json.return_value = {"id": "dep_456"}
@@ -188,8 +212,9 @@ def test_pipeline_polling_timeout(mock_get, mock_post):
         with pytest.raises(TimeoutError, match="Rollback timed out"):
             pipeline.execute_rollback("dep_123", timeout_seconds=300)
 
-@patch("alpha_core.deployments.render_adapter.requests.post")
-@patch("alpha_core.deployments.render_adapter.requests.get")
+
+@patch("alpha_core.deployments.render_adapter.requests.Session.post")
+@patch("alpha_core.deployments.render_adapter.requests.Session.get")
 def test_pipeline_polling_failed(mock_get, mock_post):
     from alpha_core.deployments.rollback_pipeline import RollbackFailedError
 
@@ -198,7 +223,6 @@ def test_pipeline_polling_failed(mock_get, mock_post):
     mock_post.return_value = mock_post_resp
 
     mock_get_resp = MagicMock()
-    # E.g., status is update_failed
     mock_get_resp.json.return_value = {"status": "update_failed"}
     mock_get.return_value = mock_get_resp
 

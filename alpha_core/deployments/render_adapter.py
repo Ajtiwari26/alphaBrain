@@ -1,5 +1,7 @@
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .base import DeploymentAdapter
 
@@ -10,7 +12,11 @@ class RenderAdapter(DeploymentAdapter):
         self.service_id = service_id
         self.base_url = "https://api.render.com/v1"
 
-    def _get_headers(self) -> dict:
+        self.session = requests.Session()
+        retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
+    def _get_headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json",
@@ -20,7 +26,7 @@ class RenderAdapter(DeploymentAdapter):
     def trigger_deployment(self, branch: str, commit_sha: str) -> str:
         url = f"{self.base_url}/services/{self.service_id}/deploys"
         payload = {"commitId": commit_sha, "branch": branch}
-        response = requests.post(url, headers=self._get_headers(), json=payload, timeout=10)
+        response = self.session.post(url, headers=self._get_headers(), json=payload, timeout=30)
         response.raise_for_status()
         deploy_id = response.json().get("id")
         if not deploy_id:
@@ -29,7 +35,7 @@ class RenderAdapter(DeploymentAdapter):
 
     def poll_status(self, deployment_id: str) -> str:
         url = f"{self.base_url}/services/{self.service_id}/deploys/{deployment_id}"
-        response = requests.get(url, headers=self._get_headers(), timeout=10)
+        response = self.session.get(url, headers=self._get_headers(), timeout=30)
         response.raise_for_status()
         status = response.json().get("status", "")
         if status == "live":
@@ -42,7 +48,7 @@ class RenderAdapter(DeploymentAdapter):
         # Render services do not natively expose unique preview URLs per deploy via standard GET service.
         # It typically returns the main service URL. Documenting this limitation explicitly.
         url = f"{self.base_url}/services/{self.service_id}"
-        response = requests.get(url, headers=self._get_headers(), timeout=10)
+        response = self.session.get(url, headers=self._get_headers(), timeout=30)
         response.raise_for_status()
         service_data = response.json()
         domain = service_data.get("serviceDetails", {}).get("url")
@@ -51,9 +57,9 @@ class RenderAdapter(DeploymentAdapter):
         return domain
 
     def rollback(self, deployment_id: str) -> str:
-        url = f"{self.base_url}/services/{self.service_id}/rollbacks"
-        payload = {"deployId": deployment_id}
-        response = requests.post(url, headers=self._get_headers(), json=payload, timeout=10)
+        # Redeploy a specific deploy as Render's rollback mechanism
+        url = f"{self.base_url}/services/{self.service_id}/deploys/{deployment_id}"
+        response = self.session.post(url, headers=self._get_headers(), timeout=30)
         response.raise_for_status()
         deploy_id_new = response.json().get("id")
         if not deploy_id_new:

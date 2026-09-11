@@ -1,5 +1,7 @@
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .base import DeploymentAdapter
 
@@ -11,13 +13,17 @@ class VercelAdapter(DeploymentAdapter):
         self.team_id = team_id
         self.base_url = "https://api.vercel.com"
 
-    def _get_headers(self) -> dict:
+        self.session = requests.Session()
+        retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
+    def _get_headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_token}",
             "Content-Type": "application/json"
         }
 
-    def _get_params(self) -> dict:
+    def _get_params(self) -> dict[str, str]:
         params = {}
         if self.team_id:
             params["teamId"] = self.team_id
@@ -33,8 +39,8 @@ class VercelAdapter(DeploymentAdapter):
                 "sha": commit_sha
             }
         }
-        response = requests.post(
-            url, headers=self._get_headers(), params=self._get_params(), json=payload, timeout=10
+        response = self.session.post(
+            url, headers=self._get_headers(), params=self._get_params(), json=payload, timeout=30
         )
         response.raise_for_status()
         deploy_id = response.json().get("id")
@@ -44,7 +50,11 @@ class VercelAdapter(DeploymentAdapter):
 
     def poll_status(self, deployment_id: str) -> str:
         if deployment_id.startswith("vercel_job:"):
-            status = deployment_id.split(":")[1]
+            target_id = deployment_id.split(":")[1]
+            url = f"{self.base_url}/v9/projects/{self.project_id}/rollback/{target_id}"
+            response = self.session.get(url, headers=self._get_headers(), params=self._get_params(), timeout=30)
+            response.raise_for_status()
+            status = response.json().get("jobStatus", "")
             if status == "succeeded":
                 return "READY"
             elif status == "failed":
@@ -52,7 +62,7 @@ class VercelAdapter(DeploymentAdapter):
             return "BUILDING"
 
         url = f"{self.base_url}/v13/deployments/{deployment_id}"
-        response = requests.get(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
+        response = self.session.get(url, headers=self._get_headers(), params=self._get_params(), timeout=30)
         response.raise_for_status()
         state = response.json().get("readyState", "")
         if state == "READY":
@@ -63,7 +73,7 @@ class VercelAdapter(DeploymentAdapter):
 
     def get_preview_url(self, deployment_id: str) -> str | None:
         url = f"{self.base_url}/v13/deployments/{deployment_id}"
-        response = requests.get(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
+        response = self.session.get(url, headers=self._get_headers(), params=self._get_params(), timeout=30)
         response.raise_for_status()
         domain = response.json().get("url")
         if domain:
@@ -72,9 +82,8 @@ class VercelAdapter(DeploymentAdapter):
 
     def rollback(self, deployment_id: str) -> str:
         url = f"{self.base_url}/v9/projects/{self.project_id}/rollback/{deployment_id}"
-        response = requests.post(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
+        response = self.session.post(url, headers=self._get_headers(), params=self._get_params(), timeout=30)
         response.raise_for_status()
-        status = response.json().get("jobStatus")
-        if not status:
-            raise ValueError("jobStatus missing in Vercel rollback response")
-        return f"vercel_job:{status}"
+        # Vercel creates a rollback job against the original deployment id
+        # We encode it to let poll_status know it needs to poll the rollback API instead of normal deployment API
+        return f"vercel_job:{deployment_id}"
