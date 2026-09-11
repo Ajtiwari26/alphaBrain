@@ -4,10 +4,6 @@ This roadmap outlines the prioritized sequence for AlphaBrain's autonomous self-
 
 Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are explicitly excluded from this roadmap.
 
-### tsk_test_merge_auth
-- **Status**: `[x] COMPLETED & MERGED` (`commit 2222222`, `tsk_test_merge_auth`)
-- **Objective**: tsk_test_merge_auth
-
 ---
 
 ## Completed & Merged Milestones (September 2026)
