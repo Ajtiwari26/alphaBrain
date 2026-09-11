@@ -56,6 +56,8 @@ Gemini 3.1 Pro High.
 - [x] P9.7 Operational Monitoring & Live Metrics Telemetry Exporter with Prometheus exposition (`alpha_core/monitoring/`, `commit 15b839f`, `tsk_eva_b5fa5c42cd60`).
 - [x] Persistent Daemon Supervisor via macOS launchd managing CI/CD Self-Healing Daemon and ParallelWorkerDispatcher (`alpha_worker/daemon_supervisor.py`, `ops/launchd/`, `commit 3f26fe9`, `tsk_eva_bf0605fe5a51`).
 
+- [x] Implement Adaptive Hardware Concurrency Manager and Gemini-Powered Pipeline Mechanic (`commit f106563`, `tsk_eva_159a8263d109`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
