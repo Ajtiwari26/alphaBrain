@@ -867,23 +867,19 @@ async def lease_task(
     preferred_agent = payload.get("preferred_agent")
 
     now = utc_now()
-    res = await session.execute(
-        select(TaskRecord.project_id)
-        .where(
-            and_(
-                TaskRecord.status == TaskStatus.QUEUED.value,
-                or_(TaskRecord.next_eligible_at.is_(None), TaskRecord.next_eligible_at <= now),
-            )
+    query = select(TaskRecord.project_id).where(
+        and_(
+            TaskRecord.status == TaskStatus.QUEUED.value,
+            or_(TaskRecord.next_eligible_at.is_(None), TaskRecord.next_eligible_at <= now)
         )
-        .order_by(TaskRecord.created_at.asc())
-        .limit(1)
-    )
+    ).order_by(TaskRecord.created_at.asc())
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        query = query.where(TaskRecord.project_id.in_(principal.project_ids))
+    res = await session.execute(query.limit(1))
     next_project_id = res.scalar_one_or_none()
-    if next_project_id:
-        try:
-            require_project_access(principal, next_project_id)
-        except HTTPException:
-            return {"status": "no_tasks_available"}
+
+    if not next_project_id:
+        return {"status": "no_tasks_available"}
 
     leased_tuple = await TaskEngine.lease_next_task(
         session,
@@ -903,7 +899,21 @@ async def lease_task(
             worker_id,
             task_record.id,
         )
-        await session.rollback()
+        task_record.status = TaskStatus.QUEUED.value
+        task_record.lease_token = None
+        task_record.worker_id = None
+        task_record.lease_expires_at = None
+        session.add(
+            AuditEventRecord(
+                id=f"evt_{uuid.uuid4().hex[:12]}",
+                event_type="lease_released",
+                project_id=task_record.project_id,
+                task_id=task_record.id,
+                actor="system",
+                details_json={"reason": "Unauthorized tenant lease released"}
+            )
+        )
+        await session.commit()
         return {"status": "no_tasks_available"}
 
     return {
@@ -2233,13 +2243,7 @@ async def list_triage_tasks(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Invalid status '{status_filter}'. Choices: {[s.value for s in TriageStatus]}",
             ) from None
-    tasks = []
-    if principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
-        tasks = queue.list_tasks(status=parsed_status, limit=limit)
-    else:
-        for pid in principal.project_ids:
-            tasks.extend(queue.list_tasks(status=parsed_status, limit=limit, project_id=pid))
-        tasks = sorted(tasks, key=lambda t: t.get("created_at", ""), reverse=True)[:limit]
+    tasks = queue.list_tasks(status=parsed_status, limit=limit)
     return {"tasks": tasks, "count": len(tasks)}
 
 
@@ -2257,6 +2261,7 @@ async def get_triage_task(
         )
     project_id = task.get("envelope", {}).get("project_id")
     if not project_id:
+        logger.error(f"Task '{task_id}' missing project_id field in envelope", extra={"task_id": task_id})
         raise HTTPException(status_code=500, detail="Task missing project_id")
     require_project_access(principal, project_id)
     return dict(task)
@@ -2276,6 +2281,7 @@ async def review_triage_task(
         )
     project_id = task.get("envelope", {}).get("project_id")
     if not project_id:
+        logger.error(f"Task '{task_id}' missing project_id field in envelope", extra={"task_id": task_id})
         raise HTTPException(status_code=500, detail="Task missing project_id")
     require_project_access(principal, project_id)
     safety_gate = SafetyGate()
@@ -2304,6 +2310,7 @@ async def approve_triage_task(
         )
     project_id = task.get("envelope", {}).get("project_id")
     if not project_id:
+        logger.error(f"Task '{task_id}' missing project_id field in envelope", extra={"task_id": task_id})
         raise HTTPException(status_code=500, detail="Task missing project_id")
     require_project_access(principal, project_id)
 
@@ -2347,6 +2354,7 @@ async def reject_triage_task(
         )
     project_id = task.get("envelope", {}).get("project_id")
     if not project_id:
+        logger.error(f"Task '{task_id}' missing project_id field in envelope", extra={"task_id": task_id})
         raise HTTPException(status_code=500, detail="Task missing project_id")
     require_project_access(principal, project_id)
 
@@ -2374,6 +2382,7 @@ async def modify_triage_task(
         )
     project_id = task.get("envelope", {}).get("project_id")
     if not project_id:
+        logger.error(f"Task '{task_id}' missing project_id field in envelope", extra={"task_id": task_id})
         raise HTTPException(status_code=500, detail="Task missing project_id")
     require_project_access(principal, project_id)
 

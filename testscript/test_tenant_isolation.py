@@ -17,6 +17,13 @@ async def setup_db():
         await session.execute(delete(ProjectRecord).where(ProjectRecord.id.in_(["prj_1", "prj_2"])))
         await session.commit()
 
+    yield
+
+    async with session_factory() as session:
+        await session.execute(delete(TaskRecord).where(TaskRecord.id.in_(["task_1", "task_2"])))
+        await session.execute(delete(ProjectRecord).where(ProjectRecord.id.in_(["prj_1", "prj_2"])))
+        await session.commit()
+
 @pytest.mark.asyncio
 async def test_tenant_isolation():
     session_factory = get_session_factory()
@@ -32,7 +39,7 @@ async def test_tenant_isolation():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         res1 = await client.get("/api/tasks/task_1", headers={"Authorization": f"Bearer {token1}"})
-        assert res1.status_code in (200, 404), f"res1 got {res1.status_code}"
+        assert res1.status_code == 200, f"res1 got {res1.status_code}"
 
         res2 = await client.get("/api/tasks/task_2", headers={"Authorization": f"Bearer {token1}"})
         assert res2.status_code == 403, f"Expected 403, got {res2.status_code}"
@@ -40,7 +47,7 @@ async def test_tenant_isolation():
         # Test task_heartbeat (which requires worker principal)
         worker_token = create_scoped_principal_token("worker1", PrincipalRole.WORKER, ["prj_1"])
         res_heartbeat = await client.post("/api/tasks/task_2/heartbeat", headers={"Authorization": f"Bearer {worker_token}", "x-alpha-worker-identity": f"{worker_token}"}, json={"lease_token": "token"})
-        assert res_heartbeat.status_code in (401, 403), f"Expected 401 or 403, got {res_heartbeat.status_code}"
+        assert res_heartbeat.status_code == 403, f"Expected 403, got {res_heartbeat.status_code}"
 
         # Test trace endpoint
         res_trace = await client.get("/api/portal/tasks/task_2/trace", headers={"Authorization": f"Bearer {token1}"})
