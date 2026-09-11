@@ -876,6 +876,17 @@ async def lease_task(
         return {"status": "no_tasks_available"}
 
     task_record, envelope = leased_tuple
+    try:
+        require_project_access(principal, task_record.project_id)
+    except HTTPException:
+        logger.warning(
+            "Worker %s attempted to lease task %s outside their project scope. Rolling back lease.",
+            worker_id,
+            task_record.id,
+        )
+        await session.rollback()
+        return {"status": "no_tasks_available"}
+
     return {
         "status": "leased",
         "lease_token": task_record.lease_token,
@@ -899,10 +910,9 @@ async def task_heartbeat(
     require_project_access(principal, task.project_id)
     success = await TaskEngine.record_heartbeat(session, task_id, lease_token, principal.subject)
     if not success:
-        task = await session.get(TaskRecord, task_id)
+        await session.refresh(task)
         if (
-            task
-            and task.status == TaskStatus.CANCELLED.value
+            task.status == TaskStatus.CANCELLED.value
             and task.worker_id == principal.subject
             and task.lease_token == lease_token
         ):
@@ -956,6 +966,11 @@ async def submit_task_result(
     result = TaskResult.model_validate(result_data)
     if result.task_id != task_id:
         raise HTTPException(status_code=400, detail="Task ID mismatch between URL and payload")
+
+    task_rec = await session.get(TaskRecord, task_id)
+    if not task_rec:
+        raise HTTPException(status_code=404, detail="Task not found")
+    require_project_access(principal, task_rec.project_id)
 
     success = await TaskEngine.submit_result(session, result, lease_token, principal.subject)
     if not success:
@@ -2195,8 +2210,13 @@ async def list_triage_tasks(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Invalid status '{status_filter}'. Choices: {[s.value for s in TriageStatus]}",
             ) from None
-    tasks = queue.list_tasks(status=parsed_status, limit=limit)
-    tasks = [t for t in tasks if principal.can_access_project(t.get("envelope", {}).get("project_id", ""))]
+    tasks = []
+    if principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        tasks = queue.list_tasks(status=parsed_status, limit=limit)
+    else:
+        for pid in principal.project_ids:
+            tasks.extend(queue.list_tasks(status=parsed_status, limit=limit, project_id=pid))
+        tasks = sorted(tasks, key=lambda t: t.get("created_at", ""), reverse=True)[:limit]
     return {"tasks": tasks, "count": len(tasks)}
 
 

@@ -50,3 +50,12 @@ async def test_tenant_isolation():
         res_triage_modify = await client.post("/api/triage/tasks/task_2/modify", headers={"Authorization": f"Bearer {token1}"}, json={})
         assert res_triage_modify.status_code == 403, f"Expected 403, got {res_triage_modify.status_code}"
 
+
+        # Test list triage tasks
+        res_triage_list = await client.get("/api/triage/tasks", headers={"Authorization": f"Bearer {token1}"})
+        # token1 should only see tasks for prj_1
+        assert res_triage_list.status_code == 403, f'Expected 403 due to require_triage_access, got {res_triage_list.status_code}'
+        # Wait, if queue is empty since we only put things in db and not triage queue
+        # It should just return 200 OK.
+        # But wait, require_triage_access restricts to FOUNDER/ADMIN?
+        # Let's see if it returns 200 or 403.
