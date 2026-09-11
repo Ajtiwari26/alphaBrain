@@ -43,6 +43,14 @@ class VercelAdapter(DeploymentAdapter):
         return deploy_id
 
     def poll_status(self, deployment_id: str) -> str:
+        if deployment_id.startswith("vercel_job:"):
+            status = deployment_id.split(":")[1]
+            if status == "succeeded":
+                return "READY"
+            elif status == "failed":
+                return "FAILED"
+            return "BUILDING"
+
         url = f"{self.base_url}/v13/deployments/{deployment_id}"
         response = requests.get(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
         response.raise_for_status()
@@ -66,4 +74,7 @@ class VercelAdapter(DeploymentAdapter):
         url = f"{self.base_url}/v9/projects/{self.project_id}/rollback/{deployment_id}"
         response = requests.post(url, headers=self._get_headers(), params=self._get_params(), timeout=10)
         response.raise_for_status()
-        return deployment_id
+        status = response.json().get("jobStatus")
+        if not status:
+            raise ValueError("jobStatus missing in Vercel rollback response")
+        return f"vercel_job:{status}"

@@ -5,6 +5,10 @@ from .base import DeploymentAdapter
 
 logger = logging.getLogger(__name__)
 
+class RollbackFailedError(RuntimeError):
+    """Exception raised when a rollback operation fails."""
+    pass
+
 class RollbackPipeline:
     def __init__(self, adapter: DeploymentAdapter):
         self.adapter = adapter
@@ -21,7 +25,6 @@ class RollbackPipeline:
             # Generic polling loop for standard deployment IDs
             while (time.time() - start_time) < timeout_seconds:
                 try:
-                    # Note: For Vercel, poll_status with jobStatus might 404, we catch and log.
                     status = self.adapter.poll_status(tracking_id)
                     logger.info(f"Rollback status: {status}")
                     if status == "READY":
@@ -29,7 +32,9 @@ class RollbackPipeline:
                         return tracking_id
                     elif status == "FAILED":
                         logger.error("Rollback failed during polling.")
-                        raise RuntimeError("Rollback failed.")
+                        raise RollbackFailedError("Rollback failed.")
+                except RollbackFailedError:
+                    raise
                 except Exception as poll_e:
                     logger.warning(f"Failed to poll status for {tracking_id}: {poll_e}")
                     # Keep polling, the API might just be flaky

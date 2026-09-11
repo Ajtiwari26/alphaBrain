@@ -68,22 +68,18 @@ def test_vercel_get_preview_url_missing(mock_get):
     assert url is None
 
 @patch("alpha_core.deployments.vercel_adapter.requests.post")
-@patch("alpha_core.deployments.vercel_adapter.requests.get")
-def test_vercel_rollback(mock_get, mock_post):
+def test_vercel_rollback(mock_post):
     mock_post_resp = MagicMock()
     mock_post_resp.json.return_value = {"jobStatus": "succeeded"}
     mock_post.return_value = mock_post_resp
 
-    mock_get_resp = MagicMock()
-    mock_get_resp.json.return_value = {"readyState": "READY"}
-    mock_get.return_value = mock_get_resp
-
     adapter = VercelAdapter("token", "proj123")
     pipeline = RollbackPipeline(adapter)
+
     with patch("time.sleep", return_value=None):
         new_id = pipeline.execute_rollback("dpl_123")
 
-    assert new_id == "dpl_123"
+    assert new_id == "vercel_job:succeeded"
 
 @patch("alpha_core.deployments.render_adapter.requests.post")
 def test_render_trigger_deployment(mock_post):
@@ -191,3 +187,24 @@ def test_pipeline_polling_timeout(mock_get, mock_post):
          patch("time.time", side_effect=[0, 10, 20, 310]):
         with pytest.raises(TimeoutError, match="Rollback timed out"):
             pipeline.execute_rollback("dep_123", timeout_seconds=300)
+
+@patch("alpha_core.deployments.render_adapter.requests.post")
+@patch("alpha_core.deployments.render_adapter.requests.get")
+def test_pipeline_polling_failed(mock_get, mock_post):
+    from alpha_core.deployments.rollback_pipeline import RollbackFailedError
+
+    mock_post_resp = MagicMock()
+    mock_post_resp.json.return_value = {"id": "dep_456"}
+    mock_post.return_value = mock_post_resp
+
+    mock_get_resp = MagicMock()
+    # E.g., status is update_failed
+    mock_get_resp.json.return_value = {"status": "update_failed"}
+    mock_get.return_value = mock_get_resp
+
+    adapter = RenderAdapter("key", "srv123")
+    pipeline = RollbackPipeline(adapter)
+
+    with patch("time.sleep", return_value=None):
+        with pytest.raises(RollbackFailedError, match="Rollback failed"):
+            pipeline.execute_rollback("dep_123")
