@@ -7,9 +7,10 @@ from .base import DeploymentAdapter
 
 
 class VercelAdapter(DeploymentAdapter):
-    def __init__(self, api_token: str, project_id: str, team_id: str | None = None):
+    def __init__(self, api_token: str, project_id: str, project_name: str, team_id: str | None = None):
         self.api_token = api_token
         self.project_id = project_id
+        self.project_name = project_name
         self.team_id = team_id
         self.base_url = "https://api.vercel.com"
 
@@ -32,7 +33,7 @@ class VercelAdapter(DeploymentAdapter):
     def trigger_deployment(self, branch: str, commit_sha: str) -> str:
         url = f"{self.base_url}/v13/deployments"
         payload = {
-            "name": self.project_id,
+            "name": self.project_name,
             "gitSource": {
                 "type": "github",
                 "ref": branch,

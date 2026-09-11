@@ -57,11 +57,24 @@ class RenderAdapter(DeploymentAdapter):
         return domain
 
     def rollback(self, deployment_id: str) -> str:
-        # Redeploy a specific deploy as Render's rollback mechanism
-        url = f"{self.base_url}/services/{self.service_id}/deploys/{deployment_id}"
-        response = self.session.post(url, headers=self._get_headers(), timeout=30)
-        response.raise_for_status()
-        deploy_id_new = response.json().get("id")
+        # Fetch the target deployment to get its commit SHA
+        url_get = f"{self.base_url}/services/{self.service_id}/deploys/{deployment_id}"
+        response_get = self.session.get(url_get, headers=self._get_headers(), timeout=30)
+        response_get.raise_for_status()
+        deploy_data = response_get.json()
+
+        # Depending on API response, commit info might be under "commit" object
+        commit_obj = deploy_data.get("commit", {})
+        commit_sha = commit_obj.get("id") or deploy_data.get("commitId")
+        if not commit_sha:
+            raise ValueError(f"Could not find commit SHA in Render deploy {deployment_id}")
+
+        # Trigger a new deployment for that commit SHA
+        url_post = f"{self.base_url}/services/{self.service_id}/deploys"
+        payload = {"commitId": commit_sha}
+        response_post = self.session.post(url_post, headers=self._get_headers(), json=payload, timeout=30)
+        response_post.raise_for_status()
+        deploy_id_new = response_post.json().get("id")
         if not deploy_id_new:
             raise ValueError("Rollback ID missing in response")
         return deploy_id_new
