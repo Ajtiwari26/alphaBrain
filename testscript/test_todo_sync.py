@@ -567,3 +567,146 @@ def test_atomic_write_cleans_up_on_failure(tmp_path):
     assert len(lingering_tmp) == 0
 
 
+def test_roadmap_migration_preserves_task_metadata_and_custom_properties(tmp_path):
+    roadmap_file = tmp_path / "NEXT_PHASE_ROADMAP.md"
+    content = """# Roadmap
+
+## Completed & Merged Milestones
+### Task 1: Foundation
+- **Status**: `[x] COMPLETED & MERGED` (`commit 0000000`, `tsk_init`)
+- **Objective**: Base setup.
+
+---
+
+## Active Parallel Development Pipeline
+
+### Task 7: Autonomous TODO and Roadmap State Machine Sync Engine
+- **Task Title**: Implement Autonomous TODO and Roadmap Synchronization Engine
+- **Objective**: Automatically parse merged task metadata.
+- **Allowed Scope**: `alpha_core/automation/`, `alpha_core/triage_cli.py`
+- **Acceptance Criteria**: Passing unit tests verifying markdown parsing.
+- **Notes**: Custom developer notes that must never be deleted.
+- **Review History**: Approved in round 2.
+
+### Task 8: Parallel Worker Dispatcher Daemon
+- **Task Title**: Implement Parallel Worker
+"""
+    roadmap_file.write_text(content, encoding="utf-8")
+
+    engine = TodoSyncEngine(repo_path=tmp_path, roadmap_path=roadmap_file)
+    updated = engine.update_roadmap(
+        task_id="tsk_eva_37eceb12e1b8",
+        commit_sha="fedcba9876543210",
+        title="Autonomous TODO and Roadmap State Machine Sync Engine",
+        objective="Automatically parse merged task metadata upon atomic promotion.",
+    )
+    assert updated is True
+
+    text = roadmap_file.read_text(encoding="utf-8")
+
+    # Verify task migrated to completed
+    assert text.find("## Completed") < text.find("### Task 7") < text.find("---") < text.find("## Active")
+    # Verify status line updated
+    assert "- **Status**: `[x] COMPLETED & MERGED` (`commit fedcba9`, `tsk_eva_37eceb12e1b8`)" in text
+    # Verify objective updated
+    assert "- **Objective**: Automatically parse merged task metadata upon atomic promotion." in text
+    # Verify ALL original properties and custom notes are strictly preserved
+    assert "- **Task Title**: Implement Autonomous TODO and Roadmap Synchronization Engine" in text
+    assert "- **Allowed Scope**: `alpha_core/automation/`, `alpha_core/triage_cli.py`" in text
+    assert "- **Acceptance Criteria**: Passing unit tests verifying markdown parsing." in text
+    assert "- **Notes**: Custom developer notes that must never be deleted." in text
+    assert "- **Review History**: Approved in round 2." in text
+    # Verify Task 8 remains in active
+    assert "### Task 8: Parallel Worker Dispatcher Daemon" in text
+
+
+def test_roadmap_in_place_update_preserves_trailing_divider_and_sections(tmp_path):
+    roadmap_file = tmp_path / "NEXT_PHASE_ROADMAP.md"
+    content = """# Roadmap
+
+## Completed & Merged Milestones (September 2026)
+
+### Task 6: Client Portal API & Frontend
+- **Status**: `[x] COMPLETED & MERGED` (`commit 5599d81`, `tsk_eva_3d9c0ffc2606`)
+- **Objective**: Implemented Amazon-style client tracking portal UI.
+- **Custom Detail**: Detailed portal specs.
+
+---
+
+## Active Parallel Development Pipeline (Current)
+
+### Task 7: Autonomous TODO Sync
+- **Objective**: Ongoing work.
+"""
+    roadmap_file.write_text(content, encoding="utf-8")
+
+    engine = TodoSyncEngine(repo_path=tmp_path, roadmap_path=roadmap_file)
+    # Update Task 6 in place with new commit SHA
+    updated = engine.update_roadmap(
+        task_id="tsk_eva_3d9c0ffc2606",
+        commit_sha="6666666777777777",
+        title="Client Portal API & Frontend",
+    )
+    assert updated is True
+
+    text = roadmap_file.read_text(encoding="utf-8")
+    assert "- **Status**: `[x] COMPLETED & MERGED` (`commit 6666666`, `tsk_eva_3d9c0ffc2606`)" in text
+    assert "- **Objective**: Implemented Amazon-style client tracking portal UI." in text
+    assert "- **Custom Detail**: Detailed portal specs." in text
+    # Ensure delimiter and active pipeline headers are NOT deleted
+    assert "---" in text
+    assert "## Active Parallel Development Pipeline (Current)" in text
+    assert "### Task 7: Autonomous TODO Sync" in text
+
+
+def test_roadmap_migrating_last_task_preserves_trailing_divider_and_execution_handoff(tmp_path):
+    roadmap_file = tmp_path / "NEXT_PHASE_ROADMAP.md"
+    content = """# Roadmap
+
+## Completed & Merged Milestones
+
+### Task 1: Worker Execution Adapters
+- **Status**: `[x] COMPLETED & MERGED` (`commit 1111111`, `tsk_1`)
+- **Objective**: Worker adapters.
+
+---
+
+## Active Parallel Development Pipeline (Current)
+
+### Task 9: Async Redis Rate Limiter for FastAPI Endpoints
+- **Task Title**: Evaluate and implement open-source Python Redis rate limiter
+- **Objective**: Implement robust token-bucket rate limiting on public endpoints.
+- **Allowed Scope**: `alpha_core/api/rate_limiter.py`
+- **Acceptance Criteria**: Unit tests pass cleanly.
+
+---
+
+## Execution Handoff
+
+Tasks are admitted into the alpha_core triage queue and executed via autonomous pipeline:
+1. alpha_core.triage_cli review <task_id>
+2. alpha_core.triage_cli merge <task_id>
+"""
+    roadmap_file.write_text(content, encoding="utf-8")
+
+    engine = TodoSyncEngine(repo_path=tmp_path, roadmap_path=roadmap_file)
+    updated = engine.update_roadmap(
+        task_id="tsk_eva_5fb3a94658b7",
+        commit_sha="9999999000000000",
+        title="Async Redis Rate Limiter for FastAPI Endpoints",
+    )
+    assert updated is True
+
+    text = roadmap_file.read_text(encoding="utf-8")
+    # Verify Task 9 moved to Completed
+    assert text.find("## Completed") < text.find("### Task 9") < text.find("---")
+    # Verify Task 9 properties preserved
+    assert "- **Task Title**: Evaluate and implement open-source Python Redis rate limiter" in text
+    assert "- **Allowed Scope**: `alpha_core/api/rate_limiter.py`" in text
+    assert "- **Acceptance Criteria**: Unit tests pass cleanly." in text
+    # Verify Execution Handoff and trailing divider are NOT deleted
+    assert "## Execution Handoff" in text
+    assert "Tasks are admitted into the alpha_core triage queue" in text
+    assert "1. alpha_core.triage_cli review <task_id>" in text
+
+

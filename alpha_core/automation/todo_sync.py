@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,141 @@ def _extract_keywords(text: str) -> set[str]:
     }
     words = re.findall(r"[a-zA-Z0-9_-]+", text.lower())
     return {w for w in words if len(w) > 2 and w not in stop_words}
+
+
+@dataclass
+class _TaskBlock:
+    start: int
+    end: int
+    first_line: str
+    raw_block: str
+    is_in_active: bool
+
+
+def _extract_task_blocks(content: str) -> list[_TaskBlock]:
+    """
+    Extract all task blocks starting with '### ' from markdown content,
+    recording their exact start/end character bounds, heading, raw text,
+    and whether they reside in an active section.
+    """
+    delim_pattern = re.compile(r"^(?:#{1,3}\s+.*|---\s*)$", re.MULTILINE)
+    delims = list(delim_pattern.finditer(content))
+    blocks: list[_TaskBlock] = []
+
+    for idx, m in enumerate(delims):
+        line = m.group(0)
+        if line.startswith("### "):
+            start = m.start()
+            end = delims[idx + 1].start() if (idx + 1 < len(delims)) else len(content)
+            raw_block = content[start:end].rstrip()
+            first_line = raw_block.splitlines()[0] if raw_block else line
+
+            preceding = content[:start]
+            active_pos = preceding.rfind("## Active")
+            completed_pos = preceding.rfind("## Completed")
+            is_in_active = (active_pos > completed_pos and active_pos != -1)
+
+            blocks.append(
+                _TaskBlock(
+                    start=start,
+                    end=end,
+                    first_line=first_line,
+                    raw_block=raw_block,
+                    is_in_active=is_in_active,
+                )
+            )
+
+    return blocks
+
+
+def _surgically_update_task_block(
+    raw_block: str,
+    status_line: str,
+    objective: str | None = None,
+) -> str:
+    """
+    Surgically update a task block's status line (and objective if provided/missing),
+    preserving all existing metadata fields, custom developer notes, and structure.
+    """
+    lines = raw_block.splitlines(keepends=True)
+    if not lines:
+        return status_line
+
+    if not lines[0].endswith("\n"):
+        lines[0] += "\n"
+
+    status_idx = -1
+    for idx, line in enumerate(lines[1:], start=1):
+        if re.match(r"^\s*-\s*\*\*Status\*\*:", line):
+            status_idx = idx
+            break
+
+    if status_idx != -1:
+        lines[status_idx] = status_line
+    else:
+        lines.insert(1, status_line)
+
+    obj_idx = -1
+    for idx, line in enumerate(lines[1:], start=1):
+        if re.match(r"^\s*-\s*\*\*Objective\*\*:", line):
+            obj_idx = idx
+            break
+
+    if obj_idx != -1:
+        if objective and objective.strip():
+            lines[obj_idx] = f"- **Objective**: {objective.strip()}\n"
+    else:
+        if objective and objective.strip():
+            curr_status_idx = -1
+            for idx, line in enumerate(lines[1:], start=1):
+                if re.match(r"^\s*-\s*\*\*Status\*\*:", line):
+                    curr_status_idx = idx
+                    break
+            insert_at = (curr_status_idx + 1) if curr_status_idx != -1 else 2
+            lines.insert(insert_at, f"- **Objective**: {objective.strip()}\n")
+
+    return "".join(lines)
+
+
+def _insert_into_completed_section(content: str, block_to_insert: str) -> str:
+    """
+    Insert a task block into the Completed section before any trailing horizontal
+    divider or next major section (such as ## Active).
+    """
+    completed_match = re.search(r"^##\s+Completed", content, flags=re.MULTILINE | re.IGNORECASE)
+    if completed_match:
+        comp_start = completed_match.start()
+        sub_text = content[comp_start:]
+        header_line_end = sub_text.find("\n")
+        if header_line_end != -1:
+            search_offset = comp_start + header_line_end + 1
+            search_slice = content[search_offset:]
+            boundary_match = re.search(
+                r"^(?:---\s*$|##\s+(?!Completed))",
+                search_slice,
+                flags=re.MULTILINE | re.IGNORECASE,
+            )
+            if boundary_match:
+                insert_pos = search_offset + boundary_match.start()
+            else:
+                insert_pos = len(content)
+        else:
+            insert_pos = len(content)
+    else:
+        boundary_match = re.search(
+            r"^(?:---\s*$|##\s+Active)", content, flags=re.MULTILINE | re.IGNORECASE
+        )
+        if boundary_match:
+            insert_pos = boundary_match.start()
+        else:
+            insert_pos = len(content)
+
+    before = content[:insert_pos].rstrip()
+    after = content[insert_pos:].lstrip("\n")
+    if after:
+        return f"{before}\n\n{block_to_insert.rstrip()}\n\n{after}"
+    else:
+        return f"{before}\n\n{block_to_insert.rstrip()}\n"
 
 
 class TodoSyncEngine:
@@ -206,7 +342,7 @@ class TodoSyncEngine:
     ) -> bool:
         """
         Atomically promote task in NEXT_PHASE_ROADMAP.md with completion status,
-        commit SHA, and task ID.
+        commit SHA, and task ID. Surgically preserves all other fields and headers.
         Returns True if the file was modified, False if already up to date.
         """
         short_sha = self._format_short_sha(commit_sha)
@@ -237,170 +373,75 @@ class TodoSyncEngine:
         if idempotent_pattern.search(content):
             return False
 
-        # Parse roadmap into sections by ###
-        sections = re.split(r"(?=^###\s+)", content, flags=re.MULTILINE)
-        matched_idx = -1
+        # Parse roadmap task blocks
+        task_blocks = _extract_task_blocks(content)
+        matched_block: _TaskBlock | None = None
 
-        for i, sec in enumerate(sections):
-            if not sec.startswith("###"):
-                continue
-            first_line = sec.splitlines()[0]
-            if task_id in sec:
-                matched_idx = i
-                break
-            if item_title:
-                clean_heading = re.sub(r"[^a-zA-Z0-9\s]", "", first_line).strip().lower()
-                clean_title = re.sub(r"[^a-zA-Z0-9\s]", "", item_title).strip().lower()
-                if clean_title in clean_heading or clean_heading in clean_title:
-                    matched_idx = i
+        if task_id:
+            for blk in task_blocks:
+                if task_id in blk.raw_block:
+                    matched_block = blk
+                    break
+
+        if matched_block is None and item_title:
+            clean_title = re.sub(r"[^a-zA-Z0-9\s]", "", item_title).strip().lower()
+            for blk in task_blocks:
+                clean_heading = re.sub(r"[^a-zA-Z0-9\s]", "", blk.first_line).strip().lower()
+                if clean_title and (clean_title in clean_heading or clean_heading in clean_title):
+                    matched_block = blk
+                    break
+                # Check Task Title in block
+                matched_tt = False
+                for line in blk.raw_block.splitlines():
+                    if "**Task Title**:" in line:
+                        tt_val = line.split("**Task Title**:", 1)[1].strip().lower()
+                        clean_tt = re.sub(r"[^a-zA-Z0-9\s]", "", tt_val).strip()
+                        if clean_title and (clean_title in clean_tt or clean_tt in clean_title):
+                            matched_tt = True
+                            break
+                if matched_tt:
+                    matched_block = blk
                     break
                 if keywords:
-                    sec_words = _extract_keywords(first_line)
+                    sec_words = _extract_keywords(blk.first_line)
                     if len(keywords.intersection(sec_words)) >= 2:
-                        matched_idx = i
+                        matched_block = blk
                         break
 
         status_line = (
             f"- **Status**: `[x] {status}` (`commit {short_sha}`, `{task_id}`)\n"
         )
 
-        if matched_idx != -1:
-            target_sec = sections[matched_idx]
-            lines = target_sec.splitlines(keepends=True)
-            heading = lines[0]
-
-            # Extract objective from existing block if present
-            found_obj = ""
-            for line in lines:
-                if "**Objective**:" in line:
-                    found_obj = line.split("**Objective**:", 1)[1].strip()
-                    break
-
-            final_obj = item_obj or found_obj or item_title or task_id
-            new_sec = (
-                f"{heading}"
-                f"{status_line}"
-                f"- **Objective**: {final_obj}\n\n"
+        if matched_block is not None:
+            new_block = _surgically_update_task_block(
+                raw_block=matched_block.raw_block,
+                status_line=status_line,
+                objective=item_obj or None,
             )
 
-            # Check if this task is in the Active pipeline and needs migration to Completed
-            is_in_active = False
-            preceding_text = "".join(sections[:matched_idx])
-            active_pos = preceding_text.rfind("## Active")
-            completed_pos = preceding_text.rfind("## Completed")
-
-            if active_pos > completed_pos and active_pos != -1:
-                is_in_active = True
-
-            if is_in_active:
-                # Remove from current position and insert into Completed section
-                sections.pop(matched_idx)
-                reconstructed = "".join(sections)
-
-                # Find Completed section insert point (after ## Completed, before divider `---` or before `## Active`)
-                completed_idx = reconstructed.find("## Completed")
-                if completed_idx != -1:
-                    divider_match = re.search(r"\n---\n", reconstructed[completed_idx:])
-                    if divider_match:
-                        insert_pos = completed_idx + divider_match.start()
-                        updated_content = (
-                            reconstructed[:insert_pos].rstrip()
-                            + "\n\n"
-                            + new_sec
-                            + "---\n"
-                            + reconstructed[completed_idx + divider_match.end():]
-                        )
-                    else:
-                        active_match = re.search(r"\n## Active", reconstructed[completed_idx:])
-                        if active_match:
-                            insert_pos = completed_idx + active_match.start()
-                            updated_content = (
-                                reconstructed[:insert_pos].rstrip()
-                                + "\n\n"
-                                + new_sec
-                                + "\n"
-                                + reconstructed[insert_pos:]
-                            )
-                        else:
-                            updated_content = reconstructed + "\n\n" + new_sec
-                else:
-                    divider_match = re.search(r"\n---\n", reconstructed)
-                    if divider_match:
-                        insert_pos = divider_match.start()
-                        updated_content = (
-                            reconstructed[:insert_pos].rstrip()
-                            + "\n\n"
-                            + new_sec
-                            + "---\n"
-                            + reconstructed[divider_match.end():]
-                        )
-                    else:
-                        active_match = re.search(r"\n## Active", reconstructed)
-                        if active_match:
-                            insert_pos = active_match.start()
-                            updated_content = (
-                                reconstructed[:insert_pos].rstrip()
-                                + "\n\n"
-                                + new_sec
-                                + "\n"
-                                + reconstructed[active_match.start():]
-                            )
-                        else:
-                            updated_content = reconstructed + "\n\n" + new_sec
+            if matched_block.is_in_active:
+                before_task = content[:matched_block.start].rstrip("\n")
+                after_task = content[matched_block.end:].lstrip("\n")
+                content_without_task = f"{before_task}\n\n{after_task}"
+                updated_content = _insert_into_completed_section(content_without_task, new_block)
             else:
-                # Update in place
-                sections[matched_idx] = new_sec
-                updated_content = "".join(sections)
+                before = content[:matched_block.start].rstrip()
+                after = content[matched_block.end:].lstrip("\n")
+                if after:
+                    updated_content = f"{before}\n\n{new_block.rstrip()}\n\n{after}"
+                else:
+                    updated_content = f"{before}\n\n{new_block.rstrip()}\n"
 
             _atomic_write_file(self.roadmap_path, updated_content)
             return True
 
-        # If not found anywhere, append to Completed section or document
+        # Task not found anywhere in document, append to Completed
         new_entry = (
             f"### {item_title or task_id}\n"
             f"{status_line}"
-            f"- **Objective**: {item_obj or item_title or task_id}\n\n"
+            f"- **Objective**: {item_obj or item_title or task_id}\n"
         )
-
-        completed_idx = content.find("## Completed")
-        if completed_idx != -1:
-            divider_match = re.search(r"\n---\n", content[completed_idx:])
-            if divider_match:
-                insert_pos = completed_idx + divider_match.start()
-                updated_content = (
-                    content[:insert_pos].rstrip()
-                    + "\n\n"
-                    + new_entry
-                    + "---\n"
-                    + content[completed_idx + divider_match.end():]
-                )
-            else:
-                active_match = re.search(r"\n## Active", content[completed_idx:])
-                if active_match:
-                    insert_pos = completed_idx + active_match.start()
-                    updated_content = (
-                        content[:insert_pos].rstrip()
-                        + "\n\n"
-                        + new_entry
-                        + "\n"
-                        + content[insert_pos:]
-                    )
-                else:
-                    updated_content = content.rstrip() + "\n\n" + new_entry
-        else:
-            divider_match = re.search(r"\n---\n", content)
-            if divider_match:
-                insert_pos = divider_match.start()
-                updated_content = (
-                    content[:insert_pos].rstrip()
-                    + "\n\n"
-                    + new_entry
-                    + "---\n"
-                    + content[divider_match.end():]
-                )
-            else:
-                updated_content = content.rstrip() + "\n\n" + new_entry
-
+        updated_content = _insert_into_completed_section(content, new_entry)
         _atomic_write_file(self.roadmap_path, updated_content)
         return True
 
