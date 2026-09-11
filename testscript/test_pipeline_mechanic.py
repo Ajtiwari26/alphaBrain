@@ -275,42 +275,86 @@ def test_dispatcher_timeout_interception_zero_restart(temp_queue):
 
     mechanic = PipelineMechanic(queue=temp_queue, llm_invoker=mock_gemini_invoker)
 
+    mock_ci_healing = MagicMock()
+    mock_senior_review = MagicMock()
+    mock_senior_review.execute_senior_review.return_value = MagicMock(to_dict=lambda: {"verdict": "APPROVE"})
+
     dispatcher = ParallelWorkerDispatcher(
         queue=temp_queue,
         max_workers=2,
         timeout_seconds=50.0,
         pipeline_mechanic=mechanic,
         enable_pipeline_mechanic=True,
+        ci_healing_daemon=mock_ci_healing,
+        senior_review_engine=mock_senior_review,
     )
 
-    mock_proc = MagicMock()
-    mock_proc.poll.return_value = None  # Process still running/hung
+    # 1. Setup old stalled process
+    old_proc = MagicMock()
+    old_proc.poll.return_value = None  # Initially hanging
 
-    execution = ActiveTaskExecution(
+    def fake_terminate():
+        old_proc.poll.return_value = -15  # Process died from SIGTERM
+
+    old_proc.terminate.side_effect = fake_terminate
+
+    old_execution = ActiveTaskExecution(
         task_id="tsk_timeout_intercept",
         started_at=time.time() - 100.0,  # Exceeds 50s timeout limit
-        worker_id="wrk_test_1",
-        process=mock_proc,
+        worker_id="wrk_test_old",
+        process=old_proc,
         envelope={"phase": "phase_tests"},
     )
-    dispatcher._active_tasks["tsk_timeout_intercept"] = execution
+    dispatcher._active_tasks["tsk_timeout_intercept"] = old_execution
 
-    # Run handle_timeouts
+    # 2. Setup mock for newly spawned process upon surgical resumption
+    new_proc = MagicMock()
+    new_proc.poll.return_value = None  # Newly spawned process is alive and running
+    new_proc.pid = 88888
+    new_rq = MagicMock()
+    new_rq.empty.return_value = True
+
+    dispatcher._spawn_worker_process = MagicMock(
+        return_value=(new_proc, new_rq, time.time())
+    )
+
+    # 3. Run handle_timeouts
     timed_out_ids = dispatcher.handle_timeouts()
 
+    # Verify old process was terminated cleanly
+    assert old_proc.terminate.called
+    assert old_proc.poll() == -15
+
     # Zero full restarts on recoverable stall:
-    # 1. Timed out list is empty because the task was surgically resumed
+    # A. Timed out list is empty because the task was surgically resumed
     assert timed_out_ids == []
-    # 2. Task remains active in dispatcher pool
+
+    # B. Task remains active in pool and has been assigned the newly spawned process
     assert "tsk_timeout_intercept" in dispatcher.active_tasks
     resumed_exec = dispatcher.active_tasks["tsk_timeout_intercept"]
+    assert resumed_exec.process is not old_proc
+    assert resumed_exec.process is new_proc
+    assert resumed_exec.process.poll() is None
     assert resumed_exec.envelope.get("surgically_resumed") is True
-    # 3. Started_at was renewed (within last 5 seconds)
-    assert resumed_exec.started_at is not None
+    assert resumed_exec.envelope.get("last_checkpoint_phase") == "phase_tests"
     assert (time.time() - resumed_exec.started_at) < 5.0
-    # 4. Task in queue was NOT marked failed
-    row = temp_queue.get_task("tsk_timeout_intercept")
-    assert row["status"] != TriageStatus.FAILED.value
+
+    # C. Verify reap_completed_tasks does NOT falsely fail the task as a zombie
+    reap_res = dispatcher.reap_completed_tasks()
+    assert reap_res["failed"] == []
+    assert reap_res["completed"] == []
+    assert "tsk_timeout_intercept" in dispatcher.active_tasks
+
+    # D. Simulate the newly spawned process completing its resumed cycle successfully
+    new_proc.poll.return_value = 0
+    new_rq.empty.return_value = False
+    new_rq.get_nowait.return_value = {"success": True, "result": {"resumed": True}}
+
+    final_reap = dispatcher.reap_completed_tasks()
+    assert "tsk_timeout_intercept" in final_reap["completed"]
+    assert final_reap["failed"] == []
+    assert "tsk_timeout_intercept" not in dispatcher.active_tasks
+    mock_senior_review.execute_senior_review.assert_called_with("tsk_timeout_intercept")
 
 
 def test_dispatcher_timeout_unrecoverable_termination(temp_queue):

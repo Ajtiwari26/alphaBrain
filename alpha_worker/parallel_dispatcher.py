@@ -264,9 +264,45 @@ class ParallelWorkerDispatcher:
         )
         return dispatcher.execute_task(leased_task)
 
-    # -------------------------------------------------------------------------
-    # Dispatch Logic
-    # -------------------------------------------------------------------------
+    def _spawn_worker_process(
+        self, leased_task: dict[str, Any], worker_id: str
+    ) -> tuple[subprocess.Popen[Any] | ProcessHandle, Any | None, float]:
+        """Spawns an isolated worker child process and returns (proc_handle, result_queue, started_at)."""
+        task_id = leased_task["id"]
+        proc_handle: subprocess.Popen[Any] | ProcessHandle
+        result_queue: Any | None
+        if self.execution_mode == "subprocess":
+            cmd = [
+                sys.executable,
+                "-m",
+                "alpha_worker.parallel_dispatcher",
+                "worker-cycle",
+                "--task-id",
+                task_id,
+                "--db-path",
+                str(self.queue.db_path),
+            ]
+            proc_handle = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            started_at = time.time()
+            result_queue = None
+        else:
+            result_queue = self._mp_context.Queue()
+            worker_fn = self.worker_cycle_fn or self.execute_single_worker_cycle
+
+            proc = self._mp_context.Process(
+                target=_worker_process_target,
+                args=(worker_fn, leased_task, worker_id, result_queue),
+            )
+            proc.start()
+            started_at = time.time()
+            proc_handle = ProcessHandle(proc)
+        return proc_handle, result_queue, started_at
+
     def dispatch_task(self, leased_task: dict[str, Any]) -> str | None:
         """
         Submits a leased task to the concurrent worker pool in an isolated OS process.
@@ -288,40 +324,7 @@ class ParallelWorkerDispatcher:
                 return None
 
             worker_id = f"wrk_parallel_{task_id}_{int(time.time() * 1000)}"
-
-            proc_handle: subprocess.Popen[Any] | ProcessHandle
-            result_queue: Any | None
-            if self.execution_mode == "subprocess":
-                cmd = [
-                    sys.executable,
-                    "-m",
-                    "alpha_worker.parallel_dispatcher",
-                    "worker-cycle",
-                    "--task-id",
-                    task_id,
-                    "--db-path",
-                    str(self.queue.db_path),
-                ]
-                proc_handle = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                started_at = time.time()
-                result_queue = None
-            else:
-                # Process isolation execution
-                result_queue = self._mp_context.Queue()
-                worker_fn = self.worker_cycle_fn or self.execute_single_worker_cycle
-
-                proc = self._mp_context.Process(
-                    target=_worker_process_target,
-                    args=(worker_fn, leased_task, worker_id, result_queue),
-                )
-                proc.start()
-                started_at = time.time()
-                proc_handle = ProcessHandle(proc)
+            proc_handle, result_queue, started_at = self._spawn_worker_process(leased_task, worker_id)
 
             execution = ActiveTaskExecution(
                 task_id=task_id,
@@ -442,16 +445,34 @@ class ParallelWorkerDispatcher:
                         except Exception:
                             pass
 
+                    # Prepare task payload with checkpoint envelope for surgical resumption
+                    task_row = self.queue.get_task(task_id) or {"id": task_id}
+                    resumed_envelope = dict(task_row.get("envelope", {}) or execution.envelope)
+                    resumed_envelope["last_checkpoint_phase"] = diagnosis.checkpoint_phase
+                    resumed_envelope["surgically_resumed"] = True
+                    task_dict = dict(task_row)
+                    task_dict["envelope"] = resumed_envelope
+
                     resumed = self.pipeline_mechanic.execute_surgical_resumption(
                         snapshot,
                         diagnosis,
                     )
                     if resumed:
+                        new_worker_id = f"wrk_resumed_{task_id}_{int(time.time() * 1000)}"
+                        new_proc, new_rq, new_started = self._spawn_worker_process(task_dict, new_worker_id)
                         with self._lock:
-                            execution.started_at = time.time()
-                            execution.envelope["last_checkpoint_phase"] = diagnosis.checkpoint_phase
-                            execution.envelope["surgically_resumed"] = True
-                        logger.info("Task %s surgically resumed without full restart.", task_id)
+                            execution.process = new_proc
+                            execution.result_queue = new_rq
+                            execution.started_at = new_started
+                            execution.worker_id = new_worker_id
+                            execution.envelope = resumed_envelope
+                            execution.cancelled = False
+                        logger.info(
+                            "Task %s surgically resumed with active worker process (pid: %s, phase: %s). Zero full restarts.",
+                            task_id,
+                            new_proc.pid,
+                            diagnosis.checkpoint_phase,
+                        )
                         continue
 
             # Unrecoverable stall or no mechanic: terminate and fail
