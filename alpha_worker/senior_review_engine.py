@@ -336,6 +336,13 @@ class SeniorReviewEngine:
 
         graph_md = extract_code_review_graph(worktree_path, diff_content)
 
+        # Verify and optimize CLI quota before running senior review rounds (CLI only)
+        try:
+            logger.info("Verifying CLI quota health via agy-switch plan...")
+            subprocess.run(["agy-switch", "plan"], capture_output=True, text=True, timeout=60)
+        except Exception as q_err:
+            logger.warning("Quota pre-check via agy-switch plan bypassed: %s", q_err)
+
         # --- Round 1 Step 1: Gemini 3.1 Pro High ---
         logger.info("Executing Senior Review Round 1 (Gemini 3.1 Pro High) for %s...", task_id)
         pro_prompt = f"""You are Gemini 3.1 Pro High (gemini-3.1-pro-high), conducting Round 1 Senior Engineering Code Review for task {task_id}.
@@ -412,13 +419,14 @@ Review Instructions:
         if os.getenv("CLAUDE_ON_HOLIDAY", "0") == "1" or claude_model != "claude-opus-4-6-thinking":
             claude_model = "gemini-3.1-pro-high"
 
+        opus_timeout = int(os.getenv("ALPHA_SENIOR_REVIEW_TIMEOUT", "900"))
         try:
             opus_res = self._invoke_agy(
                 claude_model,
                 opus_prompt,
                 schema_path=str(opus_schema_path),
                 cwd=task.get("worktree_path"),
-                timeout_seconds=300,
+                timeout_seconds=opus_timeout,
             )
         except Exception as e:
             if claude_model == "claude-opus-4-6-thinking":
@@ -431,7 +439,7 @@ Review Instructions:
                     opus_prompt,
                     schema_path=str(opus_schema_path),
                     cwd=task.get("worktree_path"),
-                    timeout_seconds=300,
+                    timeout_seconds=opus_timeout,
                 )
             else:
                 raise e

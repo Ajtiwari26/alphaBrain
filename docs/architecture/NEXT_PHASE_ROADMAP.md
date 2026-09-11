@@ -46,15 +46,16 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Allowed Scope**: `alpha_core/automation/`, `alpha_core/triage_cli.py`
 - **Acceptance Criteria**: Passing unit tests verifying markdown parsing, checklist regex update, and idempotency.
 
+### Task 9: Async Redis Rate Limiter for FastAPI Endpoints
+- **Status**: `[x] COMPLETED & MERGED` (`commit 40b5e21`, `tsk_eva_5fb3a94658b7`)
+- **Task Title**: Evaluate and implement open-source Python Redis rate limiter for async FastAPI (`tsk_eva_5fb3a94658b7`)
+- **Objective**: Implement async Redis and in-memory fallback token-bucket rate limiter for FastAPI endpoints
+- **Allowed Scope**: `alpha_core/api/rate_limiter.py`
+- **Acceptance Criteria**: Unit tests and lint gates pass cleanly.
+
 ---
 
 ## Active Parallel Development Pipeline (Current)
-
-### Task 9: Async Redis Rate Limiter for FastAPI Endpoints
-- **Task Title**: Evaluate and implement open-source Python Redis rate limiter for async FastAPI (`tsk_eva_5fb3a94658b7`)
-- **Objective**: Implement robust token-bucket rate limiting on public and client-facing endpoints.
-- **Allowed Scope**: `alpha_core/api/rate_limiter.py`
-- **Acceptance Criteria**: Unit tests and lint gates pass cleanly.
 
 ---
 
