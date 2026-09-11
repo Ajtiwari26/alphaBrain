@@ -98,6 +98,7 @@ from alpha_voice.plivo_bridge import PlivoVoiceBridge
 MEET_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "alpha_meet" / "frontend"
 PORTAL_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "alpha_portal"
 eva_meet_agent = EvaMeetingAgent()
+live_commentary_engine = LiveCommentaryEngine()
 logger = logging.getLogger("alpha_core.api")
 SAFE_EXTERNAL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SAFE_LANGUAGE_CODE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
@@ -2650,7 +2651,6 @@ async def portal_stream_generator(
     current_seq = int(last_event_id) if last_event_id and str(last_event_id).isdigit() else 0
     iterations = 0
     last_heartbeat_time = 0.0
-    engine = LiveCommentaryEngine()
 
     try:
         while asyncio.get_event_loop().time() < deadline:
@@ -2659,6 +2659,15 @@ async def portal_stream_generator(
             if events:
                 for ev in events:
                     current_seq = ev["seq"]
+                    try:
+                        sanitized = sanitize_client_event_details(ev.get("payload", {}))
+                        commentary = await asyncio.to_thread(
+                            live_commentary_engine.translate_event, ev["event_type"], sanitized
+                        )
+                    except Exception as e:
+                        logger.error("Commentary engine error: %s", redact_secrets(str(e)))
+                        commentary = f"Event: {ev['event_type']}"
+
                     data = {
                         "project_id": ev["project_id"],
                         "task_id": ev["task_id"],
@@ -2667,7 +2676,7 @@ async def portal_stream_generator(
                         "event_type": ev["event_type"],
                         "created_at": ev["created_at"],
                         "live": True,
-                        "commentary": engine.translate_event(ev["event_type"], ev.get("payload", {})),
+                        "commentary": commentary,
                     }
                     yield f"id: {current_seq}\nevent: task_update\ndata: {json.dumps(data)}\n\n"
             else:
