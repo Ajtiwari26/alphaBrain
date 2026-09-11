@@ -293,7 +293,7 @@ Review Instructions:
 - Decide to APPROVE, REPAIR_REQUIRED, or BLOCKED and output strictly the structured JSON object with findings and verdict.
 """
         critique_model = os.getenv("ALPHA_CRITIQUE_MODEL", "claude-opus-4-6-thinking")
-        if os.getenv("CLAUDE_ON_HOLIDAY", "1") == "1" or critique_model != "claude-opus-4-6-thinking":
+        if os.getenv("CLAUDE_ON_HOLIDAY", "0") == "1" or critique_model != "claude-opus-4-6-thinking":
             critique_model = "gemini-3.1-pro-high"
             critique_principal = "gemini-3.1-pro-high-critique"
         else:

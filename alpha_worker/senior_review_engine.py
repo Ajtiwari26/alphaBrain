@@ -409,7 +409,7 @@ Review Instructions:
 3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
         claude_model = os.getenv("ALPHA_SENIOR_REVIEW_MODEL", "claude-opus-4-6-thinking")
-        if os.getenv("CLAUDE_ON_HOLIDAY", "1") == "1" or claude_model != "claude-opus-4-6-thinking":
+        if os.getenv("CLAUDE_ON_HOLIDAY", "0") == "1" or claude_model != "claude-opus-4-6-thinking":
             claude_model = "gemini-3.1-pro-high"
 
         try:
