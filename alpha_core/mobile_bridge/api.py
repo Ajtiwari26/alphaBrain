@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, status
@@ -27,6 +28,7 @@ from alpha_core.mobile_bridge.schemas import (
     PromotionResponse,
     ReviewRequest,
     ReviewResponse,
+    RollbackRequest,
     SelfHealingRadar,
     SpokenCommandRequest,
     SpokenCommandResponse,
@@ -132,9 +134,12 @@ async def list_deployments() -> list[DeploymentTarget]:
 
 
 @router.post("/deployments/{deployment_id}/rollback", response_model=dict[str, Any])
-async def trigger_rollback(deployment_id: str) -> dict[str, Any]:
+async def trigger_rollback(
+    deployment_id: str, payload: RollbackRequest | None = None
+) -> dict[str, Any]:
     """Screen 08: Instant deployment rollback."""
-    return get_service().trigger_rollback(deployment_id)
+    reason = payload.reason if payload else "Manual founder rollback via mobile companion"
+    return get_service().trigger_rollback(deployment_id, reason=reason)
 
 
 @router.get("/self-healing", response_model=SelfHealingRadar)
@@ -198,7 +203,7 @@ async def sse_event_stream(request: Request) -> StreamingResponse:
             emergency = service.get_emergency_stop_state()
             data = {
                 "event": "tick",
-                "timestamp": asyncio.get_event_loop().time(),
+                "timestamp": time.time(),
                 "telemetry": telemetry.model_dump(),
                 "emergency_stop": emergency.active,
             }
@@ -226,7 +231,7 @@ def create_mobile_bridge_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
