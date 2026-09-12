@@ -73,6 +73,14 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit 16c905a`, `tsk_eva_0aa79e3888d2`)
 - **Objective**: Implement OpenAI Codex Senior Review & Planning Integration with CODEX_ON_HOLIDAY Circuit Breaker
 
+### Fix directory prefix matching in triage_dispatcher post-gate containment
+- **Status**: `[x] COMPLETED & MERGED` (`commit 079a7c8`, `tsk_eva_ef43e7472649`)
+- **Objective**: Fix directory prefix matching in triage_dispatcher post-gate containment
+
+### P13.1 Production Data Privacy, Consent Management, and Data Retention Engine
+- **Status**: `[x] COMPLETED & MERGED` (`commit da25fcf`, `tsk_eva_d3e234883c78`)
+- **Objective**: P13.1 Production Data Privacy, Consent Management, and Data Retention Engine
+
 ---
 
 ## Active Parallel Development Pipeline (Current)

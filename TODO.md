@@ -60,6 +60,8 @@ Gemini 3.1 Pro High.
 
 - [x] Implement OpenAI Codex Senior Review & Planning Integration with CODEX_ON_HOLIDAY Circuit Breaker (`commit 16c905a`, `tsk_eva_0aa79e3888d2`).
 
+- [x] Fix directory prefix matching in triage_dispatcher post-gate containment (`commit 079a7c8`, `tsk_eva_ef43e7472649`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
@@ -68,7 +70,7 @@ Gemini 3.1 Pro High.
 - [ ] Real meeting specification extraction.
 - [ ] Real AgentLine call-job integration.
 - [ ] Inito Node Keeper integration.
-- [ ] Production security, reliability, and privacy validation.
+- [x] Production security, reliability, and privacy validation (`commit da25fcf`, `tsk_eva_d3e234883c78`).
 - [-] Codex worker adapter (Discarded/Superseded: standardized on Antigravity Live + Gemini 3.1 Pro High).
 
 ## P0 — Stop unsafe execution
