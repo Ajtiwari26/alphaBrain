@@ -82,8 +82,8 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Objective**: P13.1 Production Data Privacy, Consent Management, and Data Retention Engine
 
 ### P14: Build AlphaBrain Founder Companion mobile app with React 19 + Vite + Tailwind + Capacitor Android, implementing all 14 DeployMate Locomotive screens, FastAPI backend bridge, and compiling debug Android APK for device 10BF5P2AZF0010T
-- **Status**: `[x] COMPLETED & MERGED` (`commit fb8ba39`, `tsk_eva_1d262851bd6a`)
-- **Objective**: P14: Build AlphaBrain Founder Companion mobile app with React 19 + Vite + Tailwind + Capacitor Android, implementing all 14 DeployMate Locomotive screens, FastAPI backend bridge, and compiling debug Android APK for device 10BF5P2AZF0010T
+- **Status**: `[x] COMPLETED & MERGED` (`commit c9fe9c6`, `tsk_eva_b099b480c6da`)
+- **Objective**: P14.1: Mount Founder Companion Mobile Bridge into Main AlphaBrain Backend (alpha_core.api.app)
 
 ---
 

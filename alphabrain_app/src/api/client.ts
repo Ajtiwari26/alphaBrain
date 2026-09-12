@@ -16,12 +16,21 @@ import {
 
 const API_BASE = '/api/v1/mobile';
 
+export function getAuthToken(): string {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('alpha_api_token') || 'alpha-local-meeting-2026-test-token-32chars';
+  }
+  return 'alpha-local-meeting-2026-test-token-32chars';
+}
+
 async function safeFetch<T = any>(endpoint: string, options?: RequestInit, fallback?: T): Promise<T> {
   try {
+    const token = getAuthToken();
     const res = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },
     });
