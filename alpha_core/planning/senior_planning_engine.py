@@ -126,7 +126,6 @@ class SeniorPlanningEngine:
         try:
             res = subprocess.run(
                 cmd,
-                input=prompt,
                 cwd=cwd,
                 capture_output=True,
                 text=True,

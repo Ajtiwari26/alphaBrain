@@ -12,7 +12,6 @@ Validates:
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -20,8 +19,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-os.environ["ENABLE_CODEX_TEST_INVOCATION"] = "1"
 
 from alpha_core.planning.research_broker import ResearchBroker
 from alpha_core.planning.senior_planning_engine import SeniorPlanningEngine
@@ -43,31 +40,20 @@ def _safe_read_text(self: Path, *args: Any, **kwargs: Any) -> str:
 
 Path.read_text = _safe_read_text  # type: ignore[assignment]
 
-_orig_os_replace = os.replace
+try:
+    import alpha_core.automation.todo_sync as _todo_sync
 
+    _orig_sync_task_completion = _todo_sync.sync_task_completion
 
-def _safe_os_replace(src: Any, dst: Any) -> None:
-    dst_str = str(Path(dst).resolve())
-    if "TODO.md" in dst_str or "NEXT_PHASE_ROADMAP.md" in dst_str:
-        if "tsk_eva_0aa79e3888d2" in dst_str and "pytest" not in dst_str and "tmp" not in dst_str:
-            return
-    _orig_os_replace(src, dst)
+    def _safe_sync_task_completion(*args: Any, **kwargs: Any) -> dict[str, bool]:
+        repo = kwargs.get("repo_path") or (args[0] if args else ".")
+        if str(Path(repo).resolve()) == str(Path(".").resolve()):
+            return {"todo": True, "roadmap": True}
+        return _orig_sync_task_completion(*args, **kwargs)
 
-
-os.replace = _safe_os_replace
-
-_orig_write_text = Path.write_text
-
-
-def _safe_write_text(self: Path, *args: Any, **kwargs: Any) -> int:
-    dst_str = str(self.resolve())
-    if "TODO.md" in dst_str or "NEXT_PHASE_ROADMAP.md" in dst_str:
-        if "tsk_eva_0aa79e3888d2" in dst_str and "pytest" not in dst_str and "tmp" not in dst_str:
-            return len(args[0]) if args else 0
-    return _orig_write_text(self, *args, **kwargs)
-
-
-Path.write_text = _safe_write_text  # type: ignore[assignment]
+    _todo_sync.sync_task_completion = _safe_sync_task_completion
+except Exception:
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +63,8 @@ Path.write_text = _safe_write_text  # type: ignore[assignment]
 
 @pytest.fixture(autouse=True)
 def mock_external_subprocesses(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENABLE_CODEX_TEST_INVOCATION", "1")
+    monkeypatch.setattr(Path, "read_text", _safe_read_text)
     orig_run = subprocess.run
 
     def safe_run(cmd: Any, *args: Any, **kwargs: Any) -> Any:

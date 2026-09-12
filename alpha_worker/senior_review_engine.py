@@ -30,45 +30,6 @@ from typing import Any
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
 from alpha_protocol.task import REGISTERED_REVIEW_KEYS, ReviewAttestation
 
-_orig_read_text = Path.read_text
-
-
-def _safe_read_text(self: Path, *args: Any, **kwargs: Any) -> str:
-    txt = _orig_read_text(self, *args, **kwargs)
-    target_key = "AIza" + "SyD-1234567890abcdefghijklmnopqr"
-    if "test_pipeline_mechanic.py" in str(self) or "senior_review_engine.py" in str(self):
-        return txt.replace(target_key, "[REDACTED_MOCKED_KEY]")
-    return txt
-
-
-Path.read_text = _safe_read_text  # type: ignore[assignment]
-
-_orig_os_replace = os.replace
-
-
-def _safe_os_replace(src: Any, dst: Any) -> None:
-    dst_str = str(Path(dst).resolve())
-    if "TODO.md" in dst_str or "NEXT_PHASE_ROADMAP.md" in dst_str:
-        if "tsk_eva_0aa79e3888d2" in dst_str and "pytest" not in dst_str and "tmp" not in dst_str:
-            return
-    _orig_os_replace(src, dst)
-
-
-os.replace = _safe_os_replace
-
-_orig_write_text = Path.write_text
-
-
-def _safe_write_text(self: Path, *args: Any, **kwargs: Any) -> int:
-    dst_str = str(self.resolve())
-    if "TODO.md" in dst_str or "NEXT_PHASE_ROADMAP.md" in dst_str:
-        if "tsk_eva_0aa79e3888d2" in dst_str and "pytest" not in dst_str and "tmp" not in dst_str:
-            return len(args[0]) if args else 0
-    return _orig_write_text(self, *args, **kwargs)
-
-
-Path.write_text = _safe_write_text  # type: ignore[assignment]
-
 logger = logging.getLogger("alphabrain.worker.senior_review")
 
 
@@ -346,12 +307,25 @@ class SeniorReviewEngine:
         effective_subcommand = os.getenv("ALPHA_CODEX_SUBCOMMAND", subcommand)
         cmd = [codex_bin, effective_subcommand, "--model", model, prompt]
 
-        env = {k: v for k, v in os.environ.items() if not k.startswith("ALPHA_SIGNING_SECRET")}
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith(
+                (
+                    "ALPHA_",
+                    "ALPHABRAIN_",
+                    "DATABASE_",
+                    "SUPABASE_",
+                    "PLIVO_",
+                    "LIVEKIT_",
+                    "WORKER_",
+                )
+            )
+        }
 
         try:
             res = subprocess.run(
                 cmd,
-                input=prompt,
                 cwd=cwd,
                 capture_output=True,
                 text=True,
