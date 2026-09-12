@@ -119,6 +119,7 @@ class ConsentRecord(Base):
     org_id = Column(String(64), ForeignKey("organizations.id"), nullable=True)
     project_id = Column(String(64), ForeignKey("projects.id"), nullable=True)
     user_id = Column(String(64), ForeignKey("users.id"), nullable=True)
+    phone_number = Column(String(32), nullable=True, index=True)
     consent_type = Column(
         String(64), nullable=False
     )  # voice_recording, telephonic_outreach, ai_processing, data_retention
@@ -127,8 +128,12 @@ class ConsentRecord(Base):
     user_agent = Column(String(255), nullable=True)
     recorded_at = Column(DateTime(timezone=True), default=utc_now)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    metadata_json = Column(JSON, default=dict)
 
-    __table_args__ = (Index("ix_consent_project_user", "project_id", "user_id"),)
+    __table_args__ = (
+        Index("ix_consent_project_user", "project_id", "user_id"),
+        Index("ix_consent_phone_type", "phone_number", "consent_type"),
+    )
 
 
 # ---------------------------------------------------------------------------

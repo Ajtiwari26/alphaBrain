@@ -44,6 +44,7 @@ from alpha_core.db.models import (
     WorkerRecord,
     utc_now,
 )
+from alpha_core.privacy.router import privacy_router
 from alpha_core.queue.triage_queue import (
     EmergencyStopActiveError,
     TaskTriageQueue,
@@ -213,6 +214,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(privacy_router)
 
 MEETING_CONTENT_SECURITY_POLICY = "; ".join(
     (
