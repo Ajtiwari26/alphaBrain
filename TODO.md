@@ -62,6 +62,8 @@ Gemini 3.1 Pro High.
 
 - [x] Fix directory prefix matching in triage_dispatcher post-gate containment (`commit 079a7c8`, `tsk_eva_ef43e7472649`).
 
+- [x] P14: Build AlphaBrain Founder Companion mobile app with React 19 + Vite + Tailwind + Capacitor Android, implementing all 14 DeployMate Locomotive screens, FastAPI backend bridge, and compiling debug Android APK for device 10BF5P2AZF0010T (`commit fb8ba39`, `tsk_eva_1d262851bd6a`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
