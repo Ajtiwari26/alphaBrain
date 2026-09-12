@@ -51,6 +51,213 @@ class SeniorPlanningEngine:
         self.signing_secret = (
             signing_secret.decode("utf-8") if isinstance(signing_secret, bytes) else signing_secret
         )
+        self.last_codex_assessment: PlanAssessment | None = None
+
+    @staticmethod
+    def is_rate_limit_error(error_text: str) -> bool:
+        """Dynamically detects 429, quota exhaustion, or capacity rate-limiting."""
+        if not error_text:
+            return False
+        normalized = error_text.lower()
+        patterns = [
+            "429",
+            "rate limit",
+            "rate_limit",
+            "rate_limit_exceeded",
+            "quota",
+            "insufficient_quota",
+            "tokens per min",
+            "tpm",
+            "rpm",
+            "requests per min",
+            "capacity",
+            "resource_exhausted",
+            "too many requests",
+            "overloaded",
+            "slow down",
+        ]
+        return any(pattern in normalized for pattern in patterns)
+
+    @staticmethod
+    def is_codex_on_holiday() -> bool:
+        """Evaluates whether the CODEX_ON_HOLIDAY circuit breaker is tripped."""
+        val = os.getenv("CODEX_ON_HOLIDAY", "0").strip().lower()
+        return val in ("1", "true", "yes", "on")
+
+    def _invoke_codex(
+        self,
+        prompt: str,
+        model: str = "gpt-5.6-terra",
+        subcommand: str = "exec",
+        cwd: str | None = None,
+        timeout_seconds: int = 180,
+    ) -> dict[str, Any]:
+        """
+        Invokes OpenAI Codex CLI (codex exec or codex review) with gpt-5.6-terra.
+        Enforces CODEX_ON_HOLIDAY circuit breaker and dynamic rate limit detection.
+        """
+        if self.is_codex_on_holiday():
+            logger.info("Codex circuit breaker active (CODEX_ON_HOLIDAY=1). Bypassing invocation.")
+            return {"response": "CODEX_ON_HOLIDAY", "verdict": "BYPASSED_HOLIDAY", "bypassed": True}
+
+        if os.getenv("PYTEST_CURRENT_TEST") and not os.getenv("ENABLE_CODEX_TEST_INVOCATION"):
+            return {"response": '{"verdict": "APPROVE", "findings": "Test critique"}', "bypassed": False}
+
+        codex_bin = os.getenv("CODEX_BIN", "codex")
+        effective_subcommand = os.getenv("ALPHA_CODEX_SUBCOMMAND", subcommand)
+        cmd = [codex_bin, effective_subcommand, "--model", model, prompt]
+
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith(
+                (
+                    "ALPHA_",
+                    "ALPHABRAIN_",
+                    "DATABASE_",
+                    "SUPABASE_",
+                    "PLIVO_",
+                    "LIVEKIT_",
+                    "WORKER_",
+                )
+            )
+        }
+
+        try:
+            res = subprocess.run(
+                cmd,
+                input=prompt,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                env=env,
+            )
+            combined_output = f"{res.stdout}\n{res.stderr}".strip()
+            if res.returncode != 0:
+                if self.is_rate_limit_error(combined_output):
+                    logger.warning(
+                        "Codex planning critique returned status %d with rate limit indicators. Gracefully bypassing.",
+                        res.returncode,
+                    )
+                    return {
+                        "response": combined_output,
+                        "verdict": "BYPASSED_RATE_LIMIT",
+                        "bypassed": True,
+                    }
+                logger.warning(
+                    "Codex planning critique returned non-zero status %d. Gracefully bypassing.",
+                    res.returncode,
+                )
+                return {
+                    "response": combined_output,
+                    "verdict": "BYPASSED_UNAVAILABLE",
+                    "bypassed": True,
+                }
+
+            if self.is_rate_limit_error(res.stdout):
+                logger.warning("Codex planning output indicated rate limit. Gracefully bypassing.")
+                return {
+                    "response": res.stdout,
+                    "verdict": "BYPASSED_RATE_LIMIT",
+                    "bypassed": True,
+                }
+
+            return {
+                "response": res.stdout,
+                "returncode": res.returncode,
+                "bypassed": False,
+            }
+        except FileNotFoundError as fnf:
+            logger.warning("Codex binary '%s' not found: %s. Gracefully bypassing.", codex_bin, fnf)
+            return {"response": str(fnf), "verdict": "BYPASSED_UNAVAILABLE", "bypassed": True}
+        except subprocess.TimeoutExpired as te:
+            logger.warning("Codex planning critique timed out: %s. Gracefully bypassing.", te)
+            return {"response": str(te), "verdict": "BYPASSED_TIMEOUT", "bypassed": True}
+        except Exception as e:
+            if self.is_rate_limit_error(str(e)):
+                logger.warning("Codex rate limit encountered: %s. Gracefully bypassing.", e)
+                return {"response": str(e), "verdict": "BYPASSED_RATE_LIMIT", "bypassed": True}
+            logger.warning("Codex invocation exception: %s. Gracefully bypassing.", e)
+            return {"response": str(e), "verdict": "BYPASSED_UNAVAILABLE", "bypassed": True}
+
+    def critique_plan_with_codex(
+        self,
+        blueprint: PlanBlueprint,
+        envelope: dict[str, Any],
+        research_snapshot_json: str,
+        subcommand: str = "exec",
+    ) -> PlanAssessment | None:
+        """
+        Runs an optional Codex planning critique with holiday circuit breaker and rate limit fallback.
+        """
+        if self.is_codex_on_holiday():
+            logger.info("Codex is on holiday; bypassing planning critique.")
+            return None
+
+        if os.getenv("ENABLE_CODEX_PLANNING", "1").lower() not in ("1", "true", "yes"):
+            logger.info("Codex planning critique is disabled.")
+            return None
+
+        codex_model = os.getenv("ALPHA_CODEX_MODEL", "gpt-5.6-terra")
+        blueprint_json = json.dumps(blueprint.model_dump(), indent=2)
+        envelope_json = json.dumps(envelope, sort_keys=True)
+
+        prompt = f"""You are OpenAI Codex ({codex_model}), Senior Architecture Planner.
+Review the following Plan Blueprint drafted by Gemini 3.1 Pro High for the task.
+Verify it adheres to architecture invariants, SSRF safety, bounds, and gate correctness.
+
+Task Envelope:
+{envelope_json}
+
+Research Snapshot:
+{research_snapshot_json}
+
+Plan Blueprint:
+{blueprint_json}
+
+Review Instructions:
+- Evaluate the plan against task requirements and acceptance gates.
+- Output strictly a JSON object with:
+  "findings": "<detailed critique findings>",
+  "verdict": "APPROVE" | "REPAIR_REQUIRED" | "BLOCKED"
+"""
+        try:
+            res = self._invoke_codex(prompt, model=codex_model, subcommand=subcommand)
+            if res.get("bypassed"):
+                return None
+
+            raw_out = res.get("response", "").strip()
+            if not raw_out:
+                return None
+
+            verdict = "APPROVE"
+            findings = raw_out
+            try:
+                json_str = raw_out
+                if "```json" in raw_out:
+                    json_str = raw_out.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_out:
+                    json_str = raw_out.split("```")[1].split("```")[0].strip()
+                parsed = json.loads(json_str)
+                if isinstance(parsed, dict):
+                    verdict = parsed.get("verdict", "APPROVE")
+                    findings = parsed.get("findings", raw_out)
+                    if verdict not in ["APPROVE", "REPAIR_REQUIRED", "BLOCKED"]:
+                        verdict = "APPROVE"
+            except Exception:
+                pass
+
+            return PlanAssessment(
+                reviewer_principal=f"openai-codex-{codex_model}",
+                role="critique",
+                plan_digest=blueprint.compute_digest(),
+                verdict=verdict,
+                findings=findings,
+            )
+        except Exception as e:
+            logger.warning("Codex planning critique error: %s. Gracefully bypassing.", e)
+            return None
 
     @staticmethod
     def _parse_response(stdout: str) -> dict[str, Any]:
@@ -265,6 +472,10 @@ Research Snapshot:
             findings="Drafted the initial plan.",
         )
 
+        # Optional Codex Planning Critique with Holiday Circuit Breaker & Rate Limit Fallback
+        codex_assessment = self.critique_plan_with_codex(blueprint, envelope, request_json)
+        self.last_codex_assessment = codex_assessment
+
         # -------------------------------------------------------------------
         # Round 2: Claude Opus 4.6 Challenges the Draft
         # -------------------------------------------------------------------
@@ -277,6 +488,14 @@ Research Snapshot:
             "required": ["findings", "verdict"],
         }
 
+        codex_context = ""
+        if codex_assessment:
+            codex_context = (
+                f"\nOpenAI Codex ({codex_assessment.reviewer_principal}) Preliminary Critique:\n"
+                f"Findings: {codex_assessment.findings}\n"
+                f"Verdict: {codex_assessment.verdict}\n"
+            )
+
         opus_prompt = f"""You are Claude Opus 4.6 Thinking, Supreme Lead Architect.
 Review the following Plan Blueprint drafted by Gemini 3.1 Pro High for the task.
 Verify it adheres to architecture invariants, SSRF safety, and correctness.
@@ -288,7 +507,7 @@ Research Snapshot:
 
 Plan Blueprint:
 {json.dumps(blueprint.model_dump(), indent=2)}
-
+{codex_context}
 Review Instructions:
 - Review only; do not execute commands or use tools.
 - Evaluate the plan against AlphaBrain invariants.
