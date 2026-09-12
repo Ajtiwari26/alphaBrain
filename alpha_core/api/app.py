@@ -44,6 +44,8 @@ from alpha_core.db.models import (
     WorkerRecord,
     utc_now,
 )
+
+# Founder Companion Mobile Bridge (Depends imported on line 16, require_api_principal imported on line 64)
 from alpha_core.mobile_bridge import router as mobile_bridge_router
 from alpha_core.privacy.router import privacy_router
 from alpha_core.queue.triage_queue import (
@@ -216,6 +218,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(privacy_router)
+# Mount Founder Companion Mobile Bridge with verified require_api_principal auth dependency
 app.include_router(mobile_bridge_router, dependencies=[Depends(require_api_principal)])
 
 MEETING_CONTENT_SECURITY_POLICY = "; ".join(
