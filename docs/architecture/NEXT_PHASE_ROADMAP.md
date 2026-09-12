@@ -69,6 +69,10 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit f106563`, `tsk_eva_159a8263d109`)
 - **Objective**: Implement Adaptive Hardware Concurrency Manager and Gemini-Powered Pipeline Mechanic
 
+### Implement OpenAI Codex Senior Review & Planning Integration with CODEX_ON_HOLIDAY Circuit Breaker
+- **Status**: `[x] COMPLETED & MERGED` (`commit 16c905a`, `tsk_eva_0aa79e3888d2`)
+- **Objective**: Implement OpenAI Codex Senior Review & Planning Integration with CODEX_ON_HOLIDAY Circuit Breaker
+
 ---
 
 ## Active Parallel Development Pipeline (Current)

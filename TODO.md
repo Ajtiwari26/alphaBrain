@@ -58,6 +58,8 @@ Gemini 3.1 Pro High.
 
 - [x] Implement Adaptive Hardware Concurrency Manager and Gemini-Powered Pipeline Mechanic (`commit f106563`, `tsk_eva_159a8263d109`).
 
+- [x] Implement OpenAI Codex Senior Review & Planning Integration with CODEX_ON_HOLIDAY Circuit Breaker (`commit 16c905a`, `tsk_eva_0aa79e3888d2`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
