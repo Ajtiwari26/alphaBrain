@@ -2811,3 +2811,35 @@ With the ratification of Phase 14, the Executive Status table (§2) is amended:
 
 *End of Section 14 — AlphaBrain Founder Companion (Commercial Mobile App & Android APK Architecture)*
 
+---
+
+### 14.1 Mobile Bridge Router Mounting — Blueprint Review Record
+
+**Sub-milestone:** P14.1 — Mount Founder Companion Mobile Bridge into Main AlphaBrain Backend
+**Blueprint Revision:** `2fe61c33791d45e99b8356c8f683e4a7`
+**Task ID:** `tsk_eva_b9c74c5bc184`
+**Base SHA:** `0657f2ffe4eaceea462a3f92987e4a685adfcd5a`
+**Review Status:** 🟢 **APPROVED** by Claude Opus 4.6 (Thinking), 2026-09-13
+**Prior Review:** REPAIR_REQUIRED (2026-09-12) — 4 findings (F1–F4), all resolved in revision `2fe61c33`
+
+**Approved Design:**
+Mount `mobile_bridge_router` in `alpha_core/api/app.py` with `app.include_router(mobile_bridge_router, dependencies=[Depends(require_api_principal)])` to enforce authentication on all 14+ mobile bridge endpoints. Remove vestigial `create_mobile_bridge_app()`. Append `http://localhost:5173` and `http://127.0.0.1:5173` to `CORS_ORIGINS` (preserving existing `:8000` origins). Migrate test fixtures to master app `TestClient` with `app.dependency_overrides` for DB/lifespan isolation.
+
+**File Scope:** `alpha_core/api/app.py`, `alpha_core/config.py`, `testscript/test_mobile_bridge_api.py`
+
+**Security Constraints (Binding):**
+1. Router-level `Depends(require_api_principal)` is MANDATORY — no unauthenticated mobile bridge endpoints
+2. CORS must APPEND origins, never replace — wildcard CORS is forbidden
+3. Input validation on all mobile bridge endpoints must be preserved
+4. SSRF safety on outbound URLs must be maintained
+
+**Advisory Notes for Executors:**
+- **F5 (file_scope):** If `create_mobile_bridge_app()` is defined outside `app.py`, include its source file in the changeset
+- **F6 (test mocking):** `app.dependency_overrides` intercepts `Depends()` only — use `unittest.mock.patch` for lifespan-level calls (`init_db`, watchdog scheduler, LiveKit)
+
+**Gates:** `pytest -q`, `ruff check .`
+
+---
+
+*P14.1 review record authored by Claude Opus 4.6 (Thinking) on 2026-09-13.*
+
