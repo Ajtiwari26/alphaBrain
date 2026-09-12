@@ -714,6 +714,43 @@ async def test_direct_engine_methods(setup_db):
 @pytest.mark.asyncio
 async def test_auth_bypass_and_idor_protection(setup_db):
     """Verifies that all privacy endpoints enforce authentication and block IDOR attacks."""
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        # Seed Alice (client)
+        user_alice = UserRecord(
+            id="usr_alice",
+            name="Alice Client",
+            email="alice@startup.io",
+            role="client",
+        )
+        # Seed Bob (victim/admin)
+        user_bob = UserRecord(
+            id="usr_bob",
+            name="Bob Admin",
+            email="admin@startup.io",
+            role="admin",
+        )
+        session.add_all([user_alice, user_bob])
+
+        # Alice's verified consent phone
+        consent_alice = ConsentRecord(
+            id="cst_alice_1",
+            user_id="usr_alice",
+            phone_number="+14155551234",
+            consent_type="voice_recording",
+            granted=True,
+        )
+        # Bob's phone
+        consent_bob = ConsentRecord(
+            id="cst_bob_1",
+            user_id="usr_bob",
+            phone_number="+19999999999",
+            consent_type="voice_recording",
+            granted=True,
+        )
+        session.add_all([consent_alice, consent_bob])
+        await session.commit()
+
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 1. Unauthenticated requests are rejected with 401
         res1 = await client.get("/api/v1/privacy/consent?user_id=usr_alice")
@@ -743,21 +780,60 @@ async def test_auth_bypass_and_idor_protection(setup_db):
         )
         assert alice_export.status_code == 200
 
-        # Alice attempting IDOR attack on Bob's data -> 403 Forbidden
+        # Alice accessing with own verified email -> 200
+        alice_full_export = await client.post(
+            "/api/v1/privacy/export",
+            json={"user_id": "usr_alice", "email": "alice@startup.io"},
+            headers=alice_headers,
+        )
+        assert alice_full_export.status_code == 200
+
+        # EXPLOIT SCENARIO 1: Alice passes own user_id + Bob's email + Bob's phone to /delete
+        exploit_delete = await client.post(
+            "/api/v1/privacy/delete",
+            json={
+                "user_id": "usr_alice",
+                "email": "admin@startup.io",
+                "phone_number": "+19999999999",
+            },
+            headers=alice_headers,
+        )
+        assert exploit_delete.status_code == 403
+        assert "does not match" in exploit_delete.json()["detail"]
+
+        # EXPLOIT SCENARIO 2: Alice passes own user_id + Bob's email to /export
+        exploit_export = await client.post(
+            "/api/v1/privacy/export",
+            json={"user_id": "usr_alice", "email": "admin@startup.io"},
+            headers=alice_headers,
+        )
+        assert exploit_export.status_code == 403
+        assert "does not match" in exploit_export.json()["detail"]
+
+        # EXPLOIT SCENARIO 3: Alice passes Bob's arbitrary phone number to /export
+        exploit_phone = await client.post(
+            "/api/v1/privacy/export",
+            json={"user_id": "usr_alice", "phone_number": "+19999999999"},
+            headers=alice_headers,
+        )
+        assert exploit_phone.status_code == 403
+        assert "not associated with" in exploit_phone.json()["detail"]
+
+        # Direct IDOR attack on Bob's user_id -> 403 Forbidden
         bob_export_attack = await client.get(
             "/api/v1/privacy/export?user_id=usr_bob",
             headers=alice_headers,
         )
         assert bob_export_attack.status_code == 403
-        assert "not authorized" in bob_export_attack.json()["detail"]
+        assert "does not match" in bob_export_attack.json()["detail"]
 
-        # Alice attempting IDOR deletion of Bob's data -> 403 Forbidden
+        # Direct IDOR deletion of Bob's data -> 403 Forbidden
         bob_delete_attack = await client.delete(
             "/api/v1/privacy/delete?user_id=usr_bob",
             headers=alice_headers,
         )
         assert bob_delete_attack.status_code == 403
-        assert "not authorized" in bob_delete_attack.json()["detail"]
+        assert "does not match" in bob_delete_attack.json()["detail"]
 
         # Alice attempting to trigger administrative retention pruning -> 403 Forbidden
         alice_prune_attack = await client.post(

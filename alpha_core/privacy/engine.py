@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alpha_core.db.models import (
@@ -238,7 +238,9 @@ class RTBFManager:
         if user_id or email:
             u_query = select(UserRecord)
             if user_id and email:
-                u_query = u_query.where(or_(UserRecord.id == user_id, UserRecord.email == email))
+                u_query = u_query.where(
+                    and_(UserRecord.id == user_id, UserRecord.email == email)
+                )
             elif user_id:
                 u_query = u_query.where(UserRecord.id == user_id)
             else:
@@ -407,7 +409,9 @@ class RTBFManager:
         if user_id or email:
             u_query = select(UserRecord)
             if user_id and email:
-                u_query = u_query.where(or_(UserRecord.id == user_id, UserRecord.email == email))
+                u_query = u_query.where(
+                    and_(UserRecord.id == user_id, UserRecord.email == email)
+                )
             elif user_id:
                 u_query = u_query.where(UserRecord.id == user_id)
             else:

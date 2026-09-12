@@ -1,9 +1,11 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alpha_core.db.connection import get_db_session
+from alpha_core.db.models import ConsentRecord, UserRecord
 from alpha_core.privacy.engine import (
     DEFAULT_DATA_RETENTION_TTLS,
     ConsentManager,
@@ -33,7 +35,8 @@ logger = logging.getLogger("alpha_core.privacy.router")
 privacy_router = APIRouter(prefix="/api/v1/privacy", tags=["privacy"])
 
 
-def verify_privacy_subject_authorization(
+async def verify_privacy_subject_authorization(
+    session: AsyncSession,
     principal: AuthPrincipal,
     user_id: str | None = None,
     email: str | None = None,
@@ -43,28 +46,76 @@ def verify_privacy_subject_authorization(
     """
     Verify that the authenticated principal is authorized to access or modify subject data.
     - Founders, Admins, and Service principals have global privacy authorization.
-    - Scoped Client and Worker principals are restricted strictly to their own identity (subject)
-      or permitted project scope, preventing Insecure Direct Object Reference (IDOR) attacks.
+    - Non-admin principals (Client / Worker) MUST be verified against ALL provided identifiers.
+      Any provided identifier (user_id, email, phone_number) that cannot be confirmed as belonging
+      to the authenticated user will result in immediate rejection (HTTP 403 Forbidden).
     """
     if principal.role in (PrincipalRole.FOUNDER, PrincipalRole.ADMIN, PrincipalRole.SERVICE):
         return
 
-    # Client/Worker identity verification
-    if user_id and principal.subject == user_id:
-        return
-    if email and principal.subject == email:
-        return
-
-    # Project-level access check (if principal's project scope includes project_id)
-    if project_id and principal.project_ids and project_id in principal.project_ids:
-        # Permitted if accessing general project data without impersonating a foreign user
-        if not user_id and not email:
+    # At least one subject identifier or valid project must be provided
+    if not user_id and not email and not phone_number:
+        if project_id and principal.project_ids and project_id in principal.project_ids:
             return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: no authorized subject identity anchor provided",
+        )
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Access denied: principal is not authorized to access or modify this subject's data",
+    # Resolve authenticated principal's UserRecord if exists
+    u_res = await session.execute(
+        select(UserRecord).where(
+            or_(UserRecord.id == principal.subject, UserRecord.email == principal.subject)
+        )
     )
+    auth_user = u_res.scalars().first()
+
+    # 1. Verify user_id if provided
+    if user_id:
+        if user_id != principal.subject and (not auth_user or auth_user.id != user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: provided user_id does not match authenticated principal",
+            )
+
+    # 2. Verify email if provided
+    if email:
+        if email != principal.subject and (not auth_user or auth_user.email != email):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: provided email does not match authenticated principal",
+            )
+
+    # 3. Verify phone_number if provided
+    if phone_number:
+        if phone_number != principal.subject:
+            # Check if this phone number is tied to the authenticated user's consents
+            phone_found = False
+            user_anchor_id = (
+                auth_user.id
+                if auth_user
+                else (user_id if user_id == principal.subject else None)
+            )
+            if user_anchor_id:
+                phone_q = select(ConsentRecord.id).where(
+                    ConsentRecord.user_id == user_anchor_id,
+                    ConsentRecord.phone_number == phone_number,
+                )
+                if (await session.execute(phone_q)).scalars().first():
+                    phone_found = True
+
+            if not phone_found:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied: provided phone_number is not associated with authenticated principal",
+                )
+
+    # 4. Verify project_id if provided
+    if project_id and principal.project_ids and project_id not in principal.project_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: principal is not authorized for the requested project",
+        )
 
 
 def verify_admin_authorization(principal: AuthPrincipal) -> None:
@@ -95,7 +146,8 @@ async def record_consent(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one of user_id or phone_number must be specified",
         )
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         user_id=payload.user_id,
         phone_number=payload.phone_number,
@@ -118,7 +170,8 @@ async def withdraw_consent_post(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one of user_id or phone_number must be specified",
         )
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         user_id=payload.user_id,
         phone_number=payload.phone_number,
@@ -145,7 +198,8 @@ async def withdraw_consent_delete(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one of user_id or phone_number must be specified",
         )
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         user_id=user_id,
         phone_number=phone_number,
@@ -174,7 +228,8 @@ async def list_consents(
     principal: AuthPrincipal = Depends(require_api_principal),
 ) -> ConsentListResponse:
     """List and filter consent records."""
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         user_id=user_id,
         phone_number=phone_number,
@@ -210,8 +265,8 @@ async def export_data_get(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must specify at least one of user_id, phone_number, or email",
         )
-    verify_privacy_subject_authorization(
-        principal, user_id=user_id, email=email, phone_number=phone_number
+    await verify_privacy_subject_authorization(
+        session, principal, user_id=user_id, email=email, phone_number=phone_number
     )
     return await RTBFManager.export_user_data(
         session, user_id=user_id, phone_number=phone_number, email=email
@@ -230,7 +285,8 @@ async def export_data_post(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must specify at least one of user_id, phone_number, or email",
         )
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         user_id=payload.user_id,
         email=payload.email,
@@ -256,7 +312,8 @@ async def delete_data_post(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must specify at least one of user_id, phone_number, or email",
         )
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         user_id=payload.user_id,
         email=payload.email,
@@ -288,8 +345,8 @@ async def delete_data_delete(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must specify at least one of user_id, phone_number, or email",
         )
-    verify_privacy_subject_authorization(
-        principal, user_id=user_id, email=email, phone_number=phone_number
+    await verify_privacy_subject_authorization(
+        session, principal, user_id=user_id, email=email, phone_number=phone_number
     )
     resp = await RTBFManager.delete_user_data(
         session,
@@ -347,7 +404,8 @@ async def validate_telephony_post(
     principal: AuthPrincipal = Depends(require_api_principal),
 ) -> TelephonyValidationResponse:
     """Validate whether an outbound or inbound call complies with consent and statutory disclosures."""
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         phone_number=payload.recipient_phone,
         project_id=payload.project_id,
@@ -371,7 +429,8 @@ async def validate_telephony_get(
     principal: AuthPrincipal = Depends(require_api_principal),
 ) -> TelephonyValidationResponse:
     """Validate telephony consent via GET query parameters."""
-    verify_privacy_subject_authorization(
+    await verify_privacy_subject_authorization(
+        session,
         principal,
         phone_number=recipient_phone,
         project_id=project_id,
