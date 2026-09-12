@@ -485,6 +485,7 @@ class RTBFManager:
             )
             for tr in tr_res.scalars().all():
                 tr.speaker_name = "[REDACTED]"
+                tr.speaker_identity = f"redacted_{uuid.uuid4().hex[:8]}"
                 tr.text = "[REDACTED PURSUANT TO DATA PRIVACY RTBF REQUEST]"
                 counts["transcripts_redacted"] += 1
 
@@ -578,21 +579,31 @@ class DataRetentionEngine:
         call_ttl = effective_ttls.get(DataClass.CALL_RECORDS.value, 90)
         call_cutoff = now - timedelta(days=call_ttl)
         cutoffs[DataClass.CALL_RECORDS.value] = call_cutoff.isoformat()
-        # Find call job IDs to prune
-        expired_calls_q = select(CallJobRecord.id).where(
+        # Scalable subquery for expired call jobs
+        expired_calls_subq = (
+            select(CallJobRecord.id)
+            .where(
+                CallJobRecord.created_at < call_cutoff,
+                CallJobRecord.status.in_(["completed", "failed", "cancelled"]),
+            )
+            .scalar_subquery()
+        )
+        call_count_stmt = select(func.count(CallJobRecord.id)).where(
             CallJobRecord.created_at < call_cutoff,
             CallJobRecord.status.in_(["completed", "failed", "cancelled"]),
         )
-        # Check call_status history first to avoid FK constraint errors
-        expired_call_ids = (await session.execute(expired_calls_q)).scalars().all()
-        call_count = len(expired_call_ids)
+        call_count = (await session.execute(call_count_stmt)).scalar() or 0
+
         if not dry_run and call_count > 0:
-            # Delete call status entries first
+            # Delete dependent call status records via subquery without loading IDs into Python memory
             await session.execute(
-                delete(CallStatusRecord).where(CallStatusRecord.call_job_id.in_(expired_call_ids))
+                delete(CallStatusRecord).where(
+                    CallStatusRecord.call_job_id.in_(expired_calls_subq)
+                )
             )
+            # Delete call jobs via subquery
             await session.execute(
-                delete(CallJobRecord).where(CallJobRecord.id.in_(expired_call_ids))
+                delete(CallJobRecord).where(CallJobRecord.id.in_(expired_calls_subq))
             )
         counts[DataClass.CALL_RECORDS.value] = call_count
 

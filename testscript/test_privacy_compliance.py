@@ -32,6 +32,7 @@ from alpha_core.privacy.models import (
     ConsentRecordRequest,
     ConsentWithdrawalRequest,
 )
+from alpha_core.security import PrincipalRole, create_scoped_principal_token
 
 
 @pytest.fixture
@@ -302,6 +303,8 @@ async def test_right_to_be_forgotten_export_and_deletion(setup_db, auth_headers)
         # Check Transcript is redacted
         tr = await session.get(TranscriptSegmentRecord, "seg_rtbf_1")
         assert tr.speaker_name == "[REDACTED]"
+        assert tr.speaker_identity != test_user_id
+        assert tr.speaker_identity.startswith("redacted_")
         assert "[REDACTED PURSUANT TO DATA PRIVACY RTBF REQUEST]" in tr.text
 
         # Check immutable AuditEvent exists
@@ -706,3 +709,61 @@ async def test_direct_engine_methods(setup_db):
             disclosure_acknowledged=True,
         )
         assert t_val.allowed is False
+
+
+@pytest.mark.asyncio
+async def test_auth_bypass_and_idor_protection(setup_db):
+    """Verifies that all privacy endpoints enforce authentication and block IDOR attacks."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Unauthenticated requests are rejected with 401
+        res1 = await client.get("/api/v1/privacy/consent?user_id=usr_alice")
+        assert res1.status_code == 401
+
+        res2 = await client.get("/api/v1/privacy/export?user_id=usr_alice")
+        assert res2.status_code == 401
+
+        res3 = await client.delete("/api/v1/privacy/delete?user_id=usr_alice")
+        assert res3.status_code == 401
+
+        res4 = await client.post("/api/v1/privacy/retention/prune", json={})
+        assert res4.status_code == 401
+
+        # 2. Client principal authentication
+        alice_token = create_scoped_principal_token(
+            subject="usr_alice",
+            role=PrincipalRole.CLIENT,
+            project_ids=["prj_alice_app"],
+        )
+        alice_headers = {"Authorization": f"Bearer {alice_token}"}
+
+        # Alice accessing Alice's own data -> 200
+        alice_export = await client.get(
+            "/api/v1/privacy/export?user_id=usr_alice",
+            headers=alice_headers,
+        )
+        assert alice_export.status_code == 200
+
+        # Alice attempting IDOR attack on Bob's data -> 403 Forbidden
+        bob_export_attack = await client.get(
+            "/api/v1/privacy/export?user_id=usr_bob",
+            headers=alice_headers,
+        )
+        assert bob_export_attack.status_code == 403
+        assert "not authorized" in bob_export_attack.json()["detail"]
+
+        # Alice attempting IDOR deletion of Bob's data -> 403 Forbidden
+        bob_delete_attack = await client.delete(
+            "/api/v1/privacy/delete?user_id=usr_bob",
+            headers=alice_headers,
+        )
+        assert bob_delete_attack.status_code == 403
+        assert "not authorized" in bob_delete_attack.json()["detail"]
+
+        # Alice attempting to trigger administrative retention pruning -> 403 Forbidden
+        alice_prune_attack = await client.post(
+            "/api/v1/privacy/retention/prune",
+            json={},
+            headers=alice_headers,
+        )
+        assert alice_prune_attack.status_code == 403
+        assert "administrative role required" in alice_prune_attack.json()["detail"]
