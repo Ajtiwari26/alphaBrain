@@ -70,10 +70,12 @@ async def get_overview() -> ExecutiveOverview:
 
 @router.get("/triage", response_model=list[TaskSummary])
 async def list_triage(
-    status: str | None = Query(default=None, description="Filter by status (pending_review, approved, etc.)"),
+    filter_status: str | None = Query(
+        default=None, alias="status", description="Filter by status (pending_review, approved, etc.)"
+    ),
 ) -> list[TaskSummary]:
     """Screen 02: Triage Queue tasks list."""
-    return get_service().list_triage_tasks(status_filter=status)
+    return get_service().list_triage_tasks(status_filter=filter_status)
 
 
 @router.post("/triage/{task_id}/review", response_model=ReviewResponse)
