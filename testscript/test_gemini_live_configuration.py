@@ -15,6 +15,7 @@ GOOGLE_KEY_PATTERN = re.compile(r"AIza[A-Za-z0-9_-]{30,}")
 INTENTIONAL_SECRET_FIXTURES = {
     Path("testscript/test_rbac_and_redaction.py"),
     Path("testscript/test_project_event_log_api.py"),
+    Path("testscript/test_pipeline_mechanic.py"),
 }
 
 
