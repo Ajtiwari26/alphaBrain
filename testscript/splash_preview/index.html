@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaBrain — Space Grotesk Headline</title>
+  <!-- Google Fonts: Space Grotesk (700) & Fira Code (500) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #ededed;
+    }
+    .space-grotesk-headline {
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif !important;
+      font-size: 50px;
+      font-weight: 700;
+      line-height: 52px;
+      letter-spacing: -0.03em;
+      color: #0A0A0A;
+    }
+    .fira-code-label {
+      font-family: 'Fira Code', monospace !important;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .phone-frame {
+      width: 412px;
+      height: 890px;
+      background: #FFFFFF;
+      box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.3), 0 0 0 12px #18181b, 0 0 0 14px #2e2e32;
+      border-radius: 52px;
+      overflow: hidden;
+      position: relative;
+    }
+    .dynamic-island {
+      width: 120px;
+      height: 30px;
+      background: #000;
+      border-radius: 20px;
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+    }
+    .home-indicator {
+      width: 140px;
+      height: 5px;
+      background: #0A0A0A;
+      border-radius: 100px;
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 antialiased">
+
+  <div class="phone-frame flex flex-col justify-between select-none relative">
+    <!-- Dynamic Island -->
+    <div class="dynamic-island flex items-center justify-end px-3">
+      <div class="w-2.5 h-2.5 rounded-full bg-[#181818]"></div>
+    </div>
+
+    <!-- Minimal Status Bar -->
+    <div class="pt-3 px-8 flex justify-between items-center text-[11px] fira-code-label text-[#0A0A0A] z-40">
+      <span class="font-bold">09:41</span>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold tracking-wider">5G</span>
+        <div class="w-5 h-2.5 border border-[#0A0A0A] p-0.5 flex items-center">
+          <div class="h-full w-3.5 bg-[#0A0A0A]"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Hero Section -->
+    <div class="flex-1 flex flex-col items-center justify-center px-8 relative -mt-4">
+      <!-- Vector SVG Alpha Logo -->
+      <div class="w-72 h-72 flex items-center justify-center mb-6">
+        <img 
+          src="alpha_symbol.svg" 
+          alt="AlphaBrain Logo Mark" 
+          class="w-full h-full object-contain"
+        />
+      </div>
+
+      <!-- Exact Space Grotesk Headline from design.md -->
+      <div class="text-center">
+        <h1 class="space-grotesk-headline">
+          AlphaBrain
+        </h1>
+      </div>
+    </div>
+
+    <!-- Bottom Anchor: Powered by DeployMate -->
+    <div class="px-8 pb-10 flex flex-col items-center justify-center relative">
+      <div class="fira-code-label mb-3">
+        POWERED BY
+      </div>
+      
+      <!-- DeployMate Brand Vector Logo -->
+      <div class="flex items-center justify-center">
+        <img 
+          src="deploymate_transparent.png" 
+          alt="DeployMate" 
+          class="h-12 w-auto object-contain"
+        />
+      </div>
+    </div>
+
+    <!-- Home Indicator -->
+    <div class="home-indicator"></div>
+  </div>
+
+</body>
+</html>

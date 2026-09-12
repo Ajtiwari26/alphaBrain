@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #e9e9eb; font-family: 'Inter', sans-serif; color: #0A0A0A; }
+    .screen-card { width: 390px; height: 844px; background: #FFFFFF; box-shadow: 0 0 0 1px #0A0A0A; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; }
+    .statusbar { padding: 12px 24px 8px; display: flex; justify-content: space-between; font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 600; }
+    .home-bar { width: 130px; height: 4px; background: #0A0A0A; margin: 10px auto 6px; border-radius: 99px; }
+    .loco-headline { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.03em; color: #0A0A0A; }
+    .loco-mono { font-family: 'Fira Code', monospace; text-transform: uppercase; }
+  </style>
+</head>
+<body class="p-8">
+  <div class="flex gap-10 justify-center">
+
+    <!-- 13 — PROJECTS -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">13 — PROJECT PORTFOLIO</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">PORTFOLIO</span>
+          <h2 class="text-3xl loco-headline mt-1">Projects</h2>
+        </div>
+        <div class="flex-1 grid grid-cols-1 divide-y divide-[#0A0A0A]">
+          <div class="p-6 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-2xl loco-headline">DeployMate</h3>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#E6391E]"></span>
+            </div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-4">LAST UPDATE: 2M AGO</span>
+          </div>
+          <div class="p-6 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-2xl loco-headline">AlphaBrain Core</h3>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#E6391E]"></span>
+            </div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-4">LAST UPDATE: 14M AGO</span>
+          </div>
+          <div class="p-6 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-2xl loco-headline">Agent Mesh</h3>
+              <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+            </div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-4">LAST UPDATE: 3D AGO</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- 14 — SETTINGS -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">14 — GLOBAL SETTINGS</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">PREFERENCES</span>
+          <h2 class="text-3xl loco-headline mt-1">Settings</h2>
+        </div>
+        <div class="flex-1 flex flex-col divide-y divide-[#0A0A0A]">
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">Autonomous Dispatch</span>
+            <span class="loco-mono text-xs font-bold text-[#E6391E]">[ ON ] / OFF</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">Senior Opus Review</span>
+            <span class="loco-mono text-xs font-bold text-[#E6391E]">[ ON ] / OFF</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">Vercel Auto-Merge</span>
+            <span class="loco-mono text-xs text-gray-400 font-bold">ON / [ OFF ]</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">USB Hardware Sync</span>
+            <span class="loco-mono text-xs font-bold text-[#E6391E]">[ ON ] / OFF</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

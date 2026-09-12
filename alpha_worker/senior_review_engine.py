@@ -280,9 +280,9 @@ class SeniorReviewEngine:
 
     @staticmethod
     def is_codex_on_holiday() -> bool:
-        """Evaluates whether the CODEX_ON_HOLIDAY circuit breaker is tripped."""
-        val = os.getenv("CODEX_ON_HOLIDAY", "0").strip().lower()
-        return val in ("1", "true", "yes", "on")
+        """Evaluates whether the CODEX_ON_HOLIDAY circuit breaker is tripped. Default True (on holiday indefinitely)."""
+        val = os.getenv("CODEX_ON_HOLIDAY", "1").strip().lower()
+        return val not in ("0", "false", "no", "off")
 
     def _invoke_codex(
         self,

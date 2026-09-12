@@ -2219,3 +2219,595 @@ def validate_gate_scope(
 
 *End of Section 6.11 — Scratch Hygiene, Universal Gate Scoping & Worker Iteration Test Strategy*
 
+---
+
+## 14. Phase 14: AlphaBrain Founder Companion (Commercial Mobile App & Android APK Architecture)
+
+**Milestone:** P14 — AlphaBrain Founder Companion Mobile App
+**Review Status:** 🟢 **APPROVED** by Claude Opus 4.6 (Thinking), 2026-09-12
+**Authority:** Exclusive write access to SENIOR_DIRECTIVE — Claude Opus 4.6 (Thinking)
+**Scope:** Canonical architectural directive for a commercial-grade mobile control center compiled to a standalone Android APK, covering framework selection, directory placement, backend bridge API surface, complete 14-screen scope, design system binding, and build-pipeline acceptance gates.
+
+---
+
+### 14.1 Executive Intent & Product Vision
+
+> [!IMPORTANT]
+> The AlphaBrain Founder Companion is a **commercial-grade mobile command center** purpose-built for a solo tech founder to orchestrate the entire AlphaBrain autonomous development system from their phone. It is not a dashboard — it is the **primary operational surface** for real-time control of a self-developing AI engineering organization.
+
+**Core Capabilities:**
+
+| Capability | Description |
+| :--- | :--- |
+| **Local Instance Sync** | QR code pairing handshake for automatic laptop ↔ phone local network discovery and persistent session binding |
+| **Live AI Quota Monitoring** | Real-time telemetry of Gemini Pro High and Claude Opus account quotas, reset countdowns, and usage velocity |
+| **GitHub Worktree Inspection** | Browse, monitor, and manage active git worktrees spawned by autonomous workers (§6.6.3) |
+| **Triage Task Board** | Full read/write access to the P9 triage queue: approve, reject, modify, and dispatch tasks (§6.5) |
+| **Live Execution Streaming** | Real-time WebSocket feed of `[AGENT]` thought streams and `[SYS]` system logs from executing workers |
+| **Vercel Deployment Console** | Monitor live production deployments: build status, commit hashes, durations, rollback controls |
+| **Project Portfolio** | Cross-project status view with last-update timestamps and active status indicators |
+
+**Target Device:** Android APK installed directly on the founder's USB-connected test device (`10BF5P2AZF0010T`) via `adb install`.
+
+---
+
+### 14.2 Architectural Decisions & Framework Selection
+
+#### 14.2.1 Mobile Frontend Stack
+
+| Layer | Technology | Version | Rationale |
+| :--- | :--- | :--- | :--- |
+| **UI Framework** | React | 19 | Concurrent rendering, server components readiness, stable ecosystem |
+| **Build Toolchain** | Vite | Latest | Sub-second HMR, ESBuild-powered production builds, native TypeScript |
+| **Language** | TypeScript | Strict mode | End-to-end type safety across API boundaries |
+| **Styling** | Tailwind CSS | v4+ | Utility-first tokenized design, zero runtime overhead, design system fidelity |
+| **Native Bridge** | Capacitor | `@capacitor/android` | Web-to-native compilation, full Android SDK access, Gradle APK output |
+
+**Rationale for React 19 + Vite + Capacitor over alternatives:**
+
+1. **Design Fidelity:** The DeployMate Locomotive design system (§14.3) demands pixel-precise control over typography (Space Grotesk, Inter, Fira Code), color tokens, and structural borders. React + Tailwind CSS provides this with zero abstraction leakage — unlike Flutter's Material widgets or React Native's platform-adaptive components that impose their own visual language.
+
+2. **Zero Runtime Overhead:** Tailwind compiles to static CSS at build time. No runtime style computation, no CSS-in-JS hydration cost, no JavaScript style injection. On a mobile device this directly translates to lower battery consumption and faster initial paint.
+
+3. **Instant Localhost Verification:** The Vite dev server renders the full app at `localhost:5173`, allowing immediate visual inspection via Chrome DevTools MCP (`take_screenshot`, `evaluate_script`, `list_console_messages`) before any Android compilation step. This is a critical developer velocity multiplier.
+
+4. **Seamless APK Compilation:** `@capacitor/android` generates a standard Android Studio project under `alphabrain_app/android/`. The APK is produced via `./gradlew assembleDebug` — a single deterministic command that integrates directly into AlphaBrain's acceptance gate system (§14.6).
+
+5. **Codebase Unification:** The backend is Python (FastAPI + alpha_core). The frontend is TypeScript. There is no third language (Dart, Kotlin-only) to maintain. The web layer runs identically in browser and Capacitor WebView.
+
+> [!TIP]
+> The Capacitor architecture means **100% of the UI code is shared** between the browser dev environment and the Android APK. There is no platform-conditional rendering, no `Platform.OS` switches, no separate native module compilation. The WebView IS the app.
+
+#### 14.2.2 Directory Placement
+
+```
+alphaBrain/
+├── alpha_core/              # Existing Python core (untouched)
+├── alpha_worker/            # Existing worker daemon (untouched)
+├── alphabrain_app/          # ◄── NEW: Mobile app root
+│   ├── src/
+│   │   ├── main.tsx
+│   │   ├── App.tsx
+│   │   ├── screens/         # 14 screen components
+│   │   │   ├── 01_Splash.tsx
+│   │   │   ├── 02_Auth.tsx
+│   │   │   ├── 03_QRSync.tsx
+│   │   │   ├── 04_Dashboard.tsx
+│   │   │   ├── 05_AIQuotas.tsx
+│   │   │   ├── 06_DeptConfig.tsx
+│   │   │   ├── 07_AgentComms.tsx
+│   │   │   ├── 08_TechDept.tsx
+│   │   │   ├── 09_WorktreeManager.tsx
+│   │   │   ├── 10_TriageBoard.tsx
+│   │   │   ├── 11_LiveStream.tsx
+│   │   │   ├── 12_VercelConsole.tsx
+│   │   │   ├── 13_ProjectPortfolio.tsx
+│   │   │   └── 14_Settings.tsx
+│   │   ├── components/      # Shared UI primitives
+│   │   ├── hooks/           # Custom React hooks (useWebSocket, useQuota, etc.)
+│   │   ├── api/             # TypeScript API client (typed fetch wrappers)
+│   │   ├── types/           # Shared TypeScript interfaces
+│   │   └── styles/          # Tailwind config + design system tokens
+│   ├── public/
+│   │   └── assets/          # SVG logos, fonts
+│   ├── android/             # Capacitor Android project (auto-generated)
+│   │   ├── app/
+│   │   │   └── build.gradle
+│   │   ├── build.gradle
+│   │   ├── gradle/
+│   │   ├── gradlew
+│   │   └── settings.gradle
+│   ├── capacitor.config.ts
+│   ├── vite.config.ts
+│   ├── tailwind.config.ts
+│   ├── tsconfig.json
+│   ├── package.json
+│   └── index.html
+├── docs/architecture/
+│   ├── SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md   # This document
+│   └── ALPHABRAIN_MOBILE_SCREENS.md            # Screen design catalog
+└── testscript/
+    ├── test_mobile_bridge_api.py               # Backend API tests
+    └── test_mobile_screens.tsx                  # Frontend component tests
+```
+
+> [!WARNING]
+> The `alphabrain_app/` directory is a **first-class citizen** of the monorepo, not a detached satellite project. It shares the same git history, branch model, and CI pipeline. However, it MUST NOT import from or depend on any Python module at the TypeScript level — the boundary between frontend and backend is exclusively the HTTP/WebSocket API surface defined in §14.4.
+
+#### 14.2.3 Backend Bridge: FastAPI + alpha_core Integration
+
+The mobile backend bridge is a **FastAPI** application (Python 3.12, Uvicorn ASGI server) that serves as the sole API surface between the mobile app and AlphaBrain's core systems. It does NOT duplicate any alpha_core logic — it delegates to existing modules.
+
+**Integration Contract:**
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                   AlphaBrain Founder Companion                   │
+│                     (Capacitor WebView)                          │
+└─────────────────────────────┬────────────────────────────────────┘
+                              │  HTTP/REST + WebSocket
+                              │  (Local Network / USB ADB Forward)
+                              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│              Mobile Bridge API (FastAPI + Uvicorn)                │
+│                                                                  │
+│  Routes:                                                         │
+│    /api/sync/qr          → QR token pairing (§14.4.1)           │
+│    /api/triage/tasks     → Triage queue CRUD (§6.5.2 proxy)     │
+│    /api/quotas           → AI quota telemetry (§14.4.3)         │
+│    /api/stream/{task_id} → WebSocket execution stream (§14.4.4) │
+│    /api/worktrees        → Git worktree status (§14.4.5)        │
+│    /api/deployments      → Vercel deployment status (§14.4.6)   │
+│    /api/projects         → Project portfolio (§14.4.7)          │
+│                                                                  │
+│  Dependencies:                                                   │
+│    alpha_core.triage_queue  → SQLite queue (~/.alphabrain/       │
+│                                task_triage_queue.db)             │
+│    alpha_core.quota_tracker → Live quota state                   │
+│    alpha_core.worktree_mgr  → Git worktree enumeration          │
+│    subprocess / agy-switch  → Account telemetry                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**RBAC Enforcement:** All mobile bridge endpoints enforce the same `require_triage_access(principal)` RBAC as §6.5.5. The QR pairing handshake (§14.4.1) establishes a session-bound JWT with `FOUNDER` role. No anonymous or `CLIENT`-role access is permitted.
+
+---
+
+### 14.3 Design System Binding: DeployMate Locomotive Tokens
+
+> [!IMPORTANT]
+> Every screen in the Founder Companion MUST strictly conform to the DeployMate Locomotive Design System. Deviation from these tokens — even by a single pixel of border-radius or a shade of color — is a **rejection-worthy defect** at senior review.
+
+**Canonical Token Set (from [`ALPHABRAIN_MOBILE_SCREENS.md`](file:///Users/ajaytiwari/Desktop/Projects/alphaBrain/docs/architecture/ALPHABRAIN_MOBILE_SCREENS.md)):**
+
+```typescript
+// alphabrain_app/src/styles/tokens.ts
+
+export const LOCOMOTIVE_TOKENS = {
+  colors: {
+    surface:   '#FFFFFF',   // Pure white backgrounds — no grays, no off-whites
+    onSurface: '#0A0A0A',   // Pure black text — not #333, not #111
+    primary:   '#E6391E',   // Signature red-orange — accents, status dots, active states
+    outline:   '#0A0A0A',   // Structural borders — same as onSurface
+  },
+  typography: {
+    headlineXL: {
+      fontFamily: "'Space Grotesk', sans-serif",
+      fontWeight: 700,
+      letterSpacing: '-0.03em',
+    },
+    body: {
+      fontFamily: "'Inter', sans-serif",
+      fontWeight: 400,
+    },
+    mono: {
+      fontFamily: "'Fira Code', monospace",
+      fontWeight: 400,
+    },
+  },
+  borders: {
+    structural: '1px solid #0A0A0A',
+  },
+  borderRadius: {
+    default: '0px',   // Zero border-radius everywhere — brutalist, no rounding
+  },
+} as const;
+```
+
+**Tailwind CSS Configuration Binding:**
+
+```typescript
+// alphabrain_app/tailwind.config.ts
+
+import type { Config } from 'tailwindcss';
+
+export default {
+  content: ['./src/**/*.{ts,tsx}', './index.html'],
+  theme: {
+    extend: {
+      colors: {
+        surface:    '#FFFFFF',
+        'on-surface': '#0A0A0A',
+        primary:    '#E6391E',
+        outline:    '#0A0A0A',
+      },
+      fontFamily: {
+        headline: ['"Space Grotesk"', 'sans-serif'],
+        body:     ['"Inter"', 'sans-serif'],
+        mono:     ['"Fira Code"', 'monospace'],
+      },
+      letterSpacing: {
+        'headline': '-0.03em',
+      },
+      borderRadius: {
+        DEFAULT: '0px',
+      },
+      borderWidth: {
+        structural: '1px',
+      },
+    },
+  },
+  plugins: [],
+} satisfies Config;
+```
+
+> [!CAUTION]
+> **No component library imports.** No Material UI, no shadcn/ui, no Radix UI, no Ant Design. The design system is implemented from scratch using Tailwind utility classes directly. Any PR introducing a third-party component library will be rejected. The Locomotive aesthetic is incompatible with pre-built component systems — their default border-radius, padding scales, and color semantics will contaminate the design.
+
+---
+
+### 14.4 Backend Bridge API Surface Specification
+
+#### 14.4.1 QR Code Sync & Session Pairing (`/api/sync/qr`)
+
+**Purpose:** Establish a secure, session-bound connection between the mobile app and the founder's laptop-hosted AlphaBrain instance over the local network.
+
+**Protocol:**
+
+```
+┌────────────────┐                              ┌────────────────────┐
+│  Laptop (Host) │                              │  Mobile (Client)   │
+│  FastAPI Server│                              │  Capacitor App     │
+└───────┬────────┘                              └────────┬───────────┘
+        │                                                │
+        │  1. GET /api/sync/qr                           │
+        │  ← 200 { qr_payload: base64(JSON),             │
+        │          token: <ephemeral_jwt>,                │
+        │          expires_in: 300 }                      │
+        │                                                │
+        │  2. Render QR code on laptop screen             │
+        │     (or terminal via qrencode)                  │
+        │                                                │
+        │                    3. Mobile scans QR ──────────┤
+        │                                                │
+        │  4. POST /api/sync/pair                        │
+        │  ← { session_token: <long_lived_jwt>,           │
+        │       instance_id: <uuid>,                      │
+        │       host: <local_ip:port> }                   │
+        │                                                │
+        │  5. Mobile stores session_token in              │
+        │     Capacitor Preferences (encrypted)           │
+        │                                                │
+        └────────────────────────────────────────────────┘
+```
+
+**QR Payload Schema:**
+
+```json
+{
+  "instance_id": "uuid-v4",
+  "host": "192.168.1.x",
+  "port": 8420,
+  "pair_token": "<ephemeral-jwt-5min-ttl>",
+  "version": "1.0"
+}
+```
+
+**Security Constraints:**
+- Ephemeral QR token has a strict 5-minute TTL. After expiry, a new QR must be generated.
+- The long-lived session JWT embeds `role: FOUNDER` and `instance_id`. It is stored in Capacitor's encrypted `Preferences` API — never in `localStorage`.
+- USB ADB port forwarding (`adb forward tcp:8420 tcp:8420`) is the fallback connectivity path when WiFi pairing is unavailable.
+
+#### 14.4.2 Triage Queue Proxy (`/api/triage/tasks`)
+
+This endpoint is a **direct proxy** to the existing triage REST API (§6.5.2). The mobile bridge does NOT re-implement triage logic — it authenticates the mobile session and forwards requests to the existing `TriageQueueManager`.
+
+| Mobile Route | Proxied To | Method |
+| :--- | :--- | :--- |
+| `GET /api/triage/tasks` | `TriageQueueManager.list_tasks()` | GET |
+| `GET /api/triage/tasks/{id}` | `TriageQueueManager.get_task()` | GET |
+| `POST /api/triage/tasks/{id}/approve` | `TriageQueueManager.approve_task()` | POST |
+| `POST /api/triage/tasks/{id}/reject` | `TriageQueueManager.reject_task()` | POST |
+
+#### 14.4.3 AI Quota Telemetry (`/api/quotas`)
+
+**Response Schema:**
+
+```json
+{
+  "accounts": [
+    {
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-high",
+      "email": "***@gmail.com",
+      "quota_remaining_pct": 85,
+      "requests_remaining": 42,
+      "reset_in_seconds": 15600,
+      "velocity_rpm": 2.3,
+      "status": "ACTIVE"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-4-6-thinking",
+      "email": "***@gmail.com",
+      "quota_remaining_pct": 42,
+      "requests_remaining": 12,
+      "reset_in_seconds": 28800,
+      "velocity_rpm": 0.8,
+      "status": "ACTIVE"
+    }
+  ],
+  "timestamp": "2026-09-12T23:00:00+05:30"
+}
+```
+
+**Data Source:** Calls `agy-switch list` and `agy-switch check <email>` subprocesses, parses JSON output, and transforms into the mobile-friendly schema above. Results are cached for 30 seconds to prevent subprocess storm.
+
+#### 14.4.4 Live Execution Stream (`/api/stream/{task_id}`)
+
+**Protocol:** WebSocket (RFC 6455)
+
+**Message Format:**
+
+```json
+{
+  "type": "AGENT" | "SYS" | "HEARTBEAT",
+  "timestamp": "2026-09-12T23:01:42.123+05:30",
+  "content": "Analyzing triage_queue.py for safety gate violations...",
+  "task_id": "tsk_f92e9acb25b0",
+  "agent_id": "worker-agy-1",
+  "sequence": 1042
+}
+```
+
+**Stream Source:** Tails the active worker's log file at `~/Library/Logs/AlphaBrain/worker-{task_id}.log`, parses structured log entries, and re-emits them as typed WebSocket frames. The `HEARTBEAT` type is sent every 5 seconds to keep the connection alive through mobile network intermediaries.
+
+**Client Controls (via WebSocket upstream messages):**
+
+| Command | Effect |
+| :--- | :--- |
+| `{"action": "PAUSE"}` | Server buffers messages but continues tailing |
+| `{"action": "RESUME"}` | Server flushes buffer and resumes live streaming |
+| `{"action": "INTERRUPT"}` | Triggers `emergency_stop()` (§6.5.4) — requires FOUNDER role confirmation |
+
+#### 14.4.5 Git Worktree Status (`/api/worktrees`)
+
+Returns the current set of active worktrees created by the P9 worker pipeline:
+
+```json
+{
+  "worktrees": [
+    {
+      "task_id": "tsk_f92e9acb25b0",
+      "branch": "alpha/tsk_f92e9acb25b0",
+      "path": "~/Library/Application Support/AlphaBrain/worktrees/tsk_f92e9acb25b0",
+      "base_commit": "a1b2c3d",
+      "head_commit": "789e0fa",
+      "changed_files": 4,
+      "status": "EXECUTING"
+    }
+  ],
+  "total": 1
+}
+```
+
+**Data Source:** Calls `git worktree list --porcelain` and enriches with task metadata from the triage queue database.
+
+#### 14.4.6 Vercel Deployment Status (`/api/deployments`)
+
+**Data Source:** Vercel REST API (`https://api.vercel.com/v6/deployments`) authenticated via project-scoped token stored in `~/.alphabrain/secrets/vercel_token`.
+
+**Response Schema:**
+
+```json
+{
+  "deployments": [
+    {
+      "id": "dpl_abc123",
+      "project": "deploymate",
+      "target": "production",
+      "state": "BUILDING" | "READY" | "ERROR",
+      "commit": "f891b2c",
+      "branch": "main",
+      "duration_seconds": 24.2,
+      "url": "https://deploymate.vercel.app",
+      "created_at": "2026-09-12T22:50:00Z"
+    }
+  ]
+}
+```
+
+#### 14.4.7 Project Portfolio (`/api/projects`)
+
+Aggregates cross-project status from the AlphaBrain task database, git remotes, and Vercel deployments into a unified portfolio view.
+
+---
+
+### 14.5 Complete 14-Screen Architectural Scope
+
+> [!NOTE]
+> Each screen's visual specification is cataloged in full detail in [`ALPHABRAIN_MOBILE_SCREENS.md`](file:///Users/ajaytiwari/Desktop/Projects/alphaBrain/docs/architecture/ALPHABRAIN_MOBILE_SCREENS.md). This section defines the **architectural contract** for each screen: its data dependencies, API bindings, and navigation relationships.
+
+#### 14.5.1 Screen Catalog & API Dependency Matrix
+
+| # | Screen | Component File | Primary API Dependency | Navigation Depth |
+| :--- | :--- | :--- | :--- | :--- |
+| 01 | Splash Screen | `01_Splash.tsx` | None (static) | Root |
+| 02 | Authentication (Identity) | `02_Auth.tsx` | Capacitor BiometricAuth | Root → Auth |
+| 03 | Local Instance Sync (QR Scanner) | `03_QRSync.tsx` | `/api/sync/qr`, `/api/sync/pair` | Auth → Sync |
+| 04 | Founder Command Center (Dashboard) | `04_Dashboard.tsx` | `/api/triage/tasks`, `/api/quotas` | **Home** (Tab Root) |
+| 05 | AI Quotas & Telemetry | `05_AIQuotas.tsx` | `/api/quotas` | Home → Detail |
+| 06 | Department Configurator | `06_DeptConfig.tsx` | `/api/departments` | Home → Detail |
+| 07 | Agent Communication Hub | `07_AgentComms.tsx` | `/api/agents`, WebSocket | Home → Detail |
+| 08 | Tech Department Overview | `08_TechDept.tsx` | `/api/triage/tasks`, `/api/worktrees` | Home → Dept → Detail |
+| 09 | GitHub Worktree Manager | `09_WorktreeManager.tsx` | `/api/worktrees` | Home → Detail |
+| 10 | Triage Task Board | `10_TriageBoard.tsx` | `/api/triage/tasks` | Home → Detail |
+| 11 | Live Task Execution Stream | `11_LiveStream.tsx` | `/api/stream/{task_id}` (WebSocket) | Board → Stream |
+| 12 | Vercel Deployment Console | `12_VercelConsole.tsx` | `/api/deployments` | Home → Detail |
+| 13 | Project Portfolio | `13_ProjectPortfolio.tsx` | `/api/projects` | Home → Detail |
+| 14 | Global Settings | `14_Settings.tsx` | Local Capacitor Preferences | Home → Settings |
+
+#### 14.5.2 Navigation Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    NAVIGATION FLOW                           │
+└─────────────────────────────────────────────────────────────┘
+
+  01 Splash ──▶ 02 Auth ──▶ 03 QR Sync ──▶ 04 Dashboard (HOME)
+                                                  │
+                    ┌─────────────┬───────────────┼───────────────┬──────────────┐
+                    ▼             ▼               ▼               ▼              ▼
+              05 AI Quotas   09 Worktrees   10 Triage Board   12 Vercel    14 Settings
+                                                  │
+                                                  ▼
+                                          11 Live Stream
+                    ▼             ▼
+              06 Dept Config  07 Agent Comms
+                    │
+                    ▼
+              08 Tech Dept ──▶ 09 Worktrees (shared)
+                           ──▶ 10 Triage Board (shared)
+
+              13 Project Portfolio (accessible from Dashboard)
+```
+
+**Router:** React Router v7 with `createBrowserRouter`. Capacitor's `@capacitor/app` plugin handles Android back-button via `App.addListener('backButton', ...)` mapped to `router.navigate(-1)`.
+
+---
+
+### 14.6 Build Pipeline & Acceptance Gates
+
+> [!IMPORTANT]
+> The Founder Companion app is built and dispatched through AlphaBrain's own autonomous self-development pipeline (`alpha_core.triage_cli`). Every task targeting `alphabrain_app/` must pass through the Safety Gate (§6.4) and the following acceptance gates before PR generation.
+
+#### 14.6.1 Acceptance Gate Commands
+
+```yaml
+acceptance_commands:
+  # Gate 1: Backend bridge API unit tests
+  - "pytest testscript/test_mobile_bridge_api.py -v --tb=short"
+
+  # Gate 2: TypeScript type checking
+  - "node node_modules/.bin/tsc --noEmit --project alphabrain_app/tsconfig.json"
+
+  # Gate 3: Frontend production build (Vite)
+  - "npm run build --prefix alphabrain_app"
+
+  # Gate 4: Android APK compilation (Debug)
+  - "./gradlew assembleDebug"
+  #   Working directory: alphabrain_app/android/
+  #   Output: alphabrain_app/android/app/build/outputs/apk/debug/app-debug.apk
+
+  # Gate 5: Lint (Tailwind + ESLint)
+  - "node node_modules/.bin/eslint alphabrain_app/src/ --ext .ts,.tsx"
+```
+
+#### 14.6.2 APK Installation & Device Deployment
+
+```bash
+# Install the debug APK on the founder's USB-connected test device
+adb -s 10BF5P2AZF0010T install -r alphabrain_app/android/app/build/outputs/apk/debug/app-debug.apk
+
+# Verify installation
+adb -s 10BF5P2AZF0010T shell pm list packages | grep alphabrain
+
+# Launch the app
+adb -s 10BF5P2AZF0010T shell am start -n com.alphabrain.companion/.MainActivity
+```
+
+> [!NOTE]
+> Per user rules, device `10BF5P2AZF0010T` is permanently connected via USB — no `adb devices` discovery step is needed. The `adb install` command is idempotent with `-r` (replace existing).
+
+#### 14.6.3 Capacitor Configuration
+
+```typescript
+// alphabrain_app/capacitor.config.ts
+
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.alphabrain.companion',
+  appName: 'AlphaBrain',
+  webDir: 'dist',              // Vite output directory
+  server: {
+    androidScheme: 'https',    // Required for modern WebView security
+  },
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,   // Controlled programmatically by 01_Splash.tsx
+      backgroundColor: '#FFFFFF',
+    },
+  },
+};
+
+export default config;
+```
+
+---
+
+### 14.7 Autonomous Dispatch Invariants
+
+> [!CAUTION]
+> These invariants extend the P9 invariant chain. Any task targeting `alphabrain_app/` that violates these constraints MUST be rejected by the Safety Gate or senior review.
+
+| # | Invariant | Enforcement Point |
+| :--- | :--- | :--- |
+| I-42 | Mobile app code lives exclusively in `alphabrain_app/` — no mobile code in `alpha_core/`, `alpha_worker/`, or `alpha_meet/` | §6.4.3 Path Protection (allowed_paths) |
+| I-43 | The backend bridge API delegates to existing `alpha_core` modules — no re-implementation of triage logic, safety gates, or queue management | Senior review (§5) |
+| I-44 | All 14 screens must strictly conform to DeployMate Locomotive tokens (§14.3) — zero border-radius, structural 1px borders, exact color hex values | Visual inspection via Chrome DevTools MCP + senior review |
+| I-45 | No third-party component library (Material UI, shadcn, Radix, etc.) may be imported — all UI is Tailwind utility classes only | `package.json` dependency audit at senior review |
+| I-46 | The frontend ↔ backend boundary is exclusively HTTP/WebSocket — no direct Python module imports from TypeScript | TypeScript compilation gate (Gate 2) |
+| I-47 | QR pairing tokens have strict 5-minute TTL — no long-lived pairing tokens | Backend unit test (Gate 1) |
+| I-48 | WebSocket execution streams include a 5-second heartbeat — no silent connection drops | Backend unit test (Gate 1) |
+| I-49 | APK must compile successfully via `./gradlew assembleDebug` — build failures block the PR | Acceptance Gate 4 (§14.6.1) |
+| I-50 | Device installation targets `10BF5P2AZF0010T` exclusively — no wildcard `adb install` | Deployment script (§14.6.2) |
+
+---
+
+### 14.8 Phase Roadmap Status Update
+
+With the ratification of Phase 14, the Executive Status table (§2) is amended:
+
+| Phase | Milestone Name | Status | Key Deliverables & Notes |
+| :--- | :--- | :--- | :--- |
+| **P14** | AlphaBrain Founder Companion | 🟡 **APPROVED — READY FOR DISPATCH** | React 19 + Vite + Tailwind + Capacitor Android. 14 screens. FastAPI bridge. Android APK for device `10BF5P2AZF0010T`. Dispatched via `alpha_core.triage_cli`. |
+
+---
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║           SECTION 14 — MILESTONE SIGNED                              ║
+║                                                                      ║
+║  Status:      APPROVED — BINDING ON ALL EXECUTORS                   ║
+║  Signed:      Claude Opus 4.6 (Thinking) — Supreme Lead Architect   ║
+║  Authority:   Exclusive write access to SENIOR_DIRECTIVE             ║
+║  Date:        2026-09-12T23:15:28+05:30                              ║
+║  Phase:       P14 — AlphaBrain Founder Companion                    ║
+║  Invariants:  I-1 through I-50 — ALL MAINTAINED OR ESTABLISHED      ║
+║  Screens:     14/14 cataloged with API dependency matrix             ║
+║  Gates:       5 acceptance commands defined (pytest, tsc, vite,      ║
+║               gradlew, eslint)                                       ║
+║                                                                      ║
+║  Section 14: ██████████████████████████████████████████████ SEALED   ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+*Section 14 authored and approved by Claude Opus 4.6 (Thinking) on 2026-09-12. Canonical architectural directive for the AlphaBrain Founder Companion commercial mobile app and Android APK build pipeline.*
+
+---
+
+*End of Section 14 — AlphaBrain Founder Companion (Commercial Mobile App & Android APK Architecture)*
+
