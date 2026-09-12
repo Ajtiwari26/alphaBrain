@@ -506,14 +506,14 @@ class TriageTaskDispatcher:
             # 4.5 Post-Gate Purity Containment: Revert any transient test mutations outside allowed_paths
             if allowed_paths:
                 ret_stat, stat_out, _ = self.run_command_in_worktree(
-                    worktree_path, ["git", "status", "--porcelain"]
+                    worktree_path, ["git", "status", "--porcelain", "-uall"]
                 )
                 if ret_stat == 0 and stat_out.strip():
                     for line in stat_out.strip().splitlines():
                         parts = line.strip().split(maxsplit=1)
                         if len(parts) == 2:
                             status_flag, f_path = parts[0], parts[1].strip('"')
-                            if f_path not in allowed_paths:
+                            if WorktreeManager.find_disallowed_changes([f_path], allowed_paths):
                                 logger.warning(
                                     "Cleaning transient gate artifact outside allowed_paths: %s",
                                     f_path,

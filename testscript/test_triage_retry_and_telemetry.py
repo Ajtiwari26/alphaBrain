@@ -148,7 +148,7 @@ def test_telemetry_snippet_retention(temp_queue: TaskTriageQueue):
     long_output = "X" * 4500
     with tempfile.TemporaryDirectory() as workdir:
         # Mock run_command_in_worktree to return 4500-char string
-        dispatcher.run_command_in_worktree = lambda path, cmd: (1, long_output, "")
+        dispatcher.run_command_in_worktree = lambda path, cmd, **kwargs: (1, long_output, "")
         passed, evidence = dispatcher.run_acceptance_gates(
             Path(workdir),
             {

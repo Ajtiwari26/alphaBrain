@@ -63,11 +63,9 @@ class MockWorktreeManager:
 
     @staticmethod
     def find_disallowed_changes(changed_files, allowed_paths):
-        violations = []
-        for f in changed_files:
-            if f not in allowed_paths:
-                violations.append(f)
-        return violations
+        from alpha_worker.worktree import WorktreeManager
+
+        return WorktreeManager.find_disallowed_changes(changed_files, allowed_paths)
 
 
 def test_validate_acceptance_plan():
@@ -182,8 +180,17 @@ def test_post_commit_uncommitted_residue(temp_repo):
         commit_message,
         author_name="AlphaBrain Autonomous Worker",
         author_email="worker@alphabrain.ai",
+        allowed_paths=None,
+        **kwargs,
     ):
-        head = original_create_git_commit(worktree_path, commit_message, author_name, author_email)
+        head = original_create_git_commit(
+            worktree_path,
+            commit_message,
+            author_name,
+            author_email,
+            allowed_paths=allowed_paths,
+            **kwargs,
+        )
         with open(worktree_path / "residue.txt", "w") as f:
             f.write("dirt")
         return head
@@ -318,3 +325,98 @@ def test_successful_execution(temp_repo):
     assert pr.task_id == "t6"
     assert "allowed.txt" in pr.files_changed
     assert len(q.failed_tasks) == 0
+
+
+def test_post_gate_containment_directory_allowed_paths(temp_repo):
+    q = MockQueue()
+    wm = MockWorktreeManager()
+    base_commit = get_head_sha(temp_repo)
+    dispatcher = TriageTaskDispatcher(
+        queue=q, worktree_mgr=wm, default_base_commit=base_commit, enable_agent_execution=False
+    )
+
+    cwd = os.getcwd()
+    os.chdir(temp_repo)
+    pkg_dir = Path("pkg/sub")
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    pkg_file = pkg_dir / "module.py"
+    pkg_file.write_text("print('in pkg')\n")
+    os.chdir(cwd)
+
+    # Acceptance command that generates a transient artifact outside allowed directory
+    envelope = {
+        "repo": temp_repo,
+        "base_commit": base_commit,
+        "allowed_paths": ["pkg"],
+        "acceptance_plan": {
+            "commands": [
+                {
+                    "gate_type": GateType.UNIT_TEST.value,
+                    "executable": "sh",
+                    "args": ["-c", "echo 'transient' > transient_leak.tmp"],
+                }
+            ]
+        },
+    }
+
+    pr = dispatcher.execute_task(build_task("t7", envelope))
+    assert pr is not None
+    assert pr.task_id == "t7"
+    assert "pkg/sub/module.py" in pr.files_changed
+    assert len(q.failed_tasks) == 0
+
+    # Verify transient_leak.tmp outside allowed directory was purged
+    assert not (Path(temp_repo) / "transient_leak.tmp").exists()
+    # Verify scoped directory file was preserved
+    assert (Path(temp_repo) / "pkg/sub/module.py").exists()
+
+
+def test_post_gate_containment_directory_trailing_slash_and_tracked_revert(temp_repo):
+    q = MockQueue()
+    wm = MockWorktreeManager()
+    base_commit = get_head_sha(temp_repo)
+    dispatcher = TriageTaskDispatcher(
+        queue=q, worktree_mgr=wm, default_base_commit=base_commit, enable_agent_execution=False
+    )
+
+    cwd = os.getcwd()
+    os.chdir(temp_repo)
+    pkg_dir = Path("pkg/nested")
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    pkg_file = pkg_dir / "worker.py"
+    pkg_file.write_text("print('worker ready')\n")
+    os.chdir(cwd)
+
+    # Acceptance command that both touches an untracked leak and mutates a tracked file outside allowed_paths
+    envelope = {
+        "repo": temp_repo,
+        "base_commit": base_commit,
+        "allowed_paths": ["pkg/"],  # Trailing slash test
+        "acceptance_plan": {
+            "commands": [
+                {
+                    "gate_type": GateType.UNIT_TEST.value,
+                    "executable": "sh",
+                    "args": [
+                        "-c",
+                        "echo 'leak' > gate_leak.tmp && echo 'polluted' > README.md",
+                    ],
+                }
+            ]
+        },
+    }
+
+    pr = dispatcher.execute_task(build_task("t8", envelope))
+    assert pr is not None
+    assert pr.task_id == "t8"
+    assert "pkg/nested/worker.py" in pr.files_changed
+    assert len(q.failed_tasks) == 0
+
+    # 1. Untracked transient leak outside allowed directory was purged
+    assert not (Path(temp_repo) / "gate_leak.tmp").exists()
+    # 2. Tracked README.md was reverted to base commit content
+    assert (Path(temp_repo) / "README.md").read_text().strip() == "Initial commit"
+    # 3. Directory scoped file was preserved and committed
+    assert (Path(temp_repo) / "pkg/nested/worker.py").exists()
+
+
