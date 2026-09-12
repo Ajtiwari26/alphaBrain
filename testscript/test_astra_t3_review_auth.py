@@ -453,9 +453,14 @@ def test_reproduce_unreachable_checks_in_cmd_merge():
             mock_run.reset_mock()
             q = MagicMock()
             q.get_task.return_value = make_task_and_att()
-            with patch("fcntl.flock"), patch("alpha_core.triage_cli.advance_checkout") as advance:
+            with (
+                patch("fcntl.flock"),
+                patch("alpha_core.triage_cli.advance_checkout") as advance,
+                patch("alpha_core.triage_cli.sync_task_completion") as mock_sync,
+            ):
                 assert cmd_merge(args, q) == 0, "Valid attestation must pass"
                 advance.assert_called_once()
+                mock_sync.assert_called_once()
 
 
 def make_standalone_task_and_att(

@@ -168,7 +168,10 @@ class TriageTaskDispatcher:
 
             executed_gates.add(gate_type)
 
-            returncode, stdout, stderr = self.run_command_in_worktree(worktree_path, full_cmd)
+            cmd_timeout = c.get("timeout_seconds", 300)
+            returncode, stdout, stderr = self.run_command_in_worktree(
+                worktree_path, full_cmd, timeout_seconds=cmd_timeout
+            )
             passed = returncode == 0
             if not passed:
                 all_passed = False
@@ -237,29 +240,47 @@ class TriageTaskDispatcher:
         commit_message: str,
         author_name: str = "AlphaBrain Autonomous Worker",
         author_email: str = "worker@alphabrain.ai",
+        allowed_paths: list[str] | None = None,
     ) -> str | None:
         """
-        Stages all modified/added files and creates a git commit inside the worktree.
+        Stages modified/added files and creates a git commit inside the worktree.
+        If allowed_paths is provided, stages ONLY files matching allowed_paths and verifies
+        that no unauthorized files are cached.
         Returns the new commit SHA on success, or None on failure.
         """
-        # git add -A
-        ret, _, err = self.run_command_in_worktree(worktree_path, ["git", "add", "-A"])
-        if ret != 0:
-            logger.error(f"git add failed: {err}")
-            return None
+        if allowed_paths:
+            for p in allowed_paths:
+                ret, _, err = self.run_command_in_worktree(worktree_path, ["git", "add", "--", p])
+                if ret != 0:
+                    logger.debug(
+                        "git add on allowed path '%s' returned %d: %s", p, ret, err
+                    )
+        else:
+            ret, _, err = self.run_command_in_worktree(worktree_path, ["git", "add", "-A"])
+            if ret != 0:
+                logger.error("git add failed: %s", err)
+                return None
 
         # Check if anything is staged
         ret, out, _ = self.run_command_in_worktree(
             worktree_path, ["git", "diff", "--cached", "--name-only"]
         )
-        if ret == 0 and not out.strip():
-            # No changes to commit
+        staged_files = [line.strip('"') for line in out.strip().splitlines() if line.strip()]
+        if ret == 0 and not staged_files:
             logger.info("No modifications staged in worktree.")
-            # Return current HEAD
             ret_head, head_out, _ = self.run_command_in_worktree(
                 worktree_path, ["git", "rev-parse", "HEAD"]
             )
             return head_out.strip() if ret_head == 0 else None
+
+        if allowed_paths:
+            violations = WorktreeManager.find_disallowed_changes(staged_files, allowed_paths)
+            if violations:
+                logger.critical(
+                    "Security Violation: Pre-commit staged changes contain files outside allowed_paths: %s",
+                    violations,
+                )
+                return None
 
         commit_cmd = [
             "git",
@@ -482,6 +503,30 @@ class TriageTaskDispatcher:
                 )
                 return None
 
+            # 4.5 Post-Gate Purity Containment: Revert any transient test mutations outside allowed_paths
+            if allowed_paths:
+                ret_stat, stat_out, _ = self.run_command_in_worktree(
+                    worktree_path, ["git", "status", "--porcelain"]
+                )
+                if ret_stat == 0 and stat_out.strip():
+                    for line in stat_out.strip().splitlines():
+                        parts = line.strip().split(maxsplit=1)
+                        if len(parts) == 2:
+                            status_flag, f_path = parts[0], parts[1].strip('"')
+                            if f_path not in allowed_paths:
+                                logger.warning(
+                                    "Cleaning transient gate artifact outside allowed_paths: %s",
+                                    f_path,
+                                )
+                                if "?" in status_flag:
+                                    self.run_command_in_worktree(
+                                        worktree_path, ["git", "clean", "-f", "--", f_path]
+                                    )
+                                else:
+                                    self.run_command_in_worktree(
+                                        worktree_path, ["git", "checkout", "--", f_path]
+                                    )
+
             # R1 (P0): Fail-Closed Law Enforcement — zero modified files with passing gates MUST fail task
             if not changed_files:
                 err_msg = (
@@ -499,7 +544,9 @@ class TriageTaskDispatcher:
             # 5. Create Git Commit on worktree
             title = envelope.get("objective") or envelope.get("title") or f"Execute task {task_id}"
             commit_msg = f"feat({project_id}): {title}\n\nTask-ID: {task_id}\nProvenance: {provenance.get('meeting_id', 'eva')}"
-            head_commit = self.create_git_commit(worktree_path, commit_msg)
+            head_commit = self.create_git_commit(
+                worktree_path, commit_msg, allowed_paths=allowed_paths
+            )
             if not head_commit:
                 err_msg = "Failed to create commit in worktree."
                 logger.error(err_msg)
