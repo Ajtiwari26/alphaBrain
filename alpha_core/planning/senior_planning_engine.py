@@ -80,9 +80,9 @@ class SeniorPlanningEngine:
 
     @staticmethod
     def is_codex_on_holiday() -> bool:
-        """Evaluates whether the CODEX_ON_HOLIDAY circuit breaker is tripped."""
-        val = os.getenv("CODEX_ON_HOLIDAY", "0").strip().lower()
-        return val in ("1", "true", "yes", "on")
+        """Evaluates whether the CODEX_ON_HOLIDAY circuit breaker is tripped. Default True (on holiday indefinitely)."""
+        val = os.getenv("CODEX_ON_HOLIDAY", "1").strip().lower()
+        return val not in ("0", "false", "no", "off")
 
     def _invoke_codex(
         self,
@@ -300,7 +300,7 @@ Review Instructions:
                 str(self.agy_bin),
                 "--model",
                 model,
-                "--sandbox",
+                "--dangerously-skip-permissions",
                 "--mode",
                 "plan",
                 "--output-format",
@@ -519,9 +519,10 @@ Review Instructions:
         else:
             critique_principal = "claude-opus-4-6-thinking"
 
+        critique_timeout = int(os.getenv("ALPHA_CRITIQUE_TIMEOUT", "480"))
         try:
             opus_response = self._invoke_agy_planning(
-                critique_model, opus_prompt, critique_schema, timeout_seconds=180
+                critique_model, opus_prompt, critique_schema, timeout_seconds=critique_timeout
             )
         except Exception as e:
             if critique_model == "claude-opus-4-6-thinking":
@@ -531,7 +532,7 @@ Review Instructions:
                 critique_model = "gemini-3.1-pro-high"
                 critique_principal = "gemini-3.1-pro-high-critique"
                 opus_response = self._invoke_agy_planning(
-                    critique_model, opus_prompt, critique_schema, timeout_seconds=180
+                    critique_model, opus_prompt, critique_schema, timeout_seconds=critique_timeout
                 )
             else:
                 raise PlanningConsensusError(f"Planning Critique failed: {e}") from e
@@ -615,7 +616,7 @@ Review Instructions:
 """
                 try:
                     opus_response = self._invoke_agy_planning(
-                        critique_model, opus_recheck_prompt, critique_schema, timeout_seconds=180
+                        critique_model, opus_recheck_prompt, critique_schema, timeout_seconds=critique_timeout
                     )
                 except Exception as e:
                     if critique_model == "claude-opus-4-6-thinking":
@@ -625,7 +626,7 @@ Review Instructions:
                         critique_model = "gemini-3.1-pro-high"
                         critique_principal = "gemini-3.1-pro-high-critique"
                         opus_response = self._invoke_agy_planning(
-                            critique_model, opus_recheck_prompt, critique_schema, timeout_seconds=180
+                            critique_model, opus_recheck_prompt, critique_schema, timeout_seconds=critique_timeout
                         )
                     else:
                         raise

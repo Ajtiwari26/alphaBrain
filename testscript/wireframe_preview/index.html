@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaBrain — Full App Locomotive Wireframe Suite</title>
+  <!-- Google Fonts: Space Grotesk, Inter, Fira Code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            headline: ['Space Grotesk', 'sans-serif'],
+            body: ['Inter', 'sans-serif'],
+            mono: ['Fira Code', 'monospace']
+          },
+          colors: {
+            dmRed: '#E6391E',
+            dmBlack: '#0A0A0A',
+            dmBorder: '#0A0A0A',
+            dmWhite: '#FFFFFF'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: #e9e9eb;
+      font-family: 'Inter', sans-serif;
+      color: #0A0A0A;
+    }
+    .screen-card {
+      width: 390px;
+      height: 844px;
+      background: #FFFFFF;
+      box-shadow: 0 20px 45px -10px rgba(0,0,0,0.15), 0 0 0 1px #0A0A0A;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .statusbar {
+      padding: 12px 24px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: #0A0A0A;
+    }
+    .home-bar {
+      width: 130px;
+      height: 4px;
+      background: #0A0A0A;
+      margin: 10px auto 6px;
+      border-radius: 99px;
+    }
+    .loco-headline {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #0A0A0A;
+    }
+    .loco-mono {
+      font-family: 'Fira Code', monospace;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body class="p-8">
+
+  <!-- Header Banner -->
+  <div class="mb-10 text-center">
+    <div class="inline-flex items-center gap-2 px-3 py-1 bg-[#0A0A0A] text-white font-mono text-xs uppercase tracking-widest mb-2">
+      <span class="w-2 h-2 bg-[#E6391E]"></span>
+      DeployMate Locomotive Design System // 14 Production Wireframes
+    </div>
+    <h1 class="text-3xl font-extrabold font-headline tracking-tight text-[#0A0A0A]">
+      AlphaBrain Founder Mobile Companion
+    </h1>
+    <p class="text-xs font-mono text-gray-600 mt-1">
+      Stark Pure White (#FFFFFF) • Ink Black (#0A0A0A) • Structural 1px Rules • Red-Orange (#E6391E) Accents
+    </p>
+  </div>
+
+  <!-- Grid of 14 Screens -->
+  <div class="flex flex-wrap gap-10 justify-center">
+
+    <!-- SCREEN 1: Splash Screen -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">01 — SPLASH SCREEN</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="flex-1 flex flex-col items-center justify-center px-8 -mt-6">
+          <div class="w-60 h-60 flex items-center justify-center mb-6">
+            <img src="alpha_symbol.svg" class="w-full h-full object-contain" alt="Alpha" />
+          </div>
+          <h1 class="text-5xl loco-headline">AlphaBrain</h1>
+        </div>
+        <div class="px-8 pb-4 text-center">
+          <p class="loco-mono text-[9px] tracking-[0.25em] text-gray-400 mb-2">POWERED BY</p>
+          <img src="deploymate_transparent.png" class="h-10 mx-auto object-contain" alt="DeployMate" />
+          <div class="home-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 2: Authentication (Identity) -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">02 — AUTHENTICATION</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-4 border-b border-[#0A0A0A] pb-3">
+          <span class="loco-mono text-[10px] text-[#E6391E] font-bold tracking-widest">01 — ACCESS</span>
+          <h2 class="text-4xl loco-headline mt-2 leading-tight">Founder<br/>Access</h2>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center px-7">
+          <div class="w-28 h-28 border-2 border-[#0A0A0A] p-4 flex items-center justify-center mb-6">
+            <!-- FaceID Geometric Icon -->
+            <svg class="w-16 h-16" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" stroke-width="1.5">
+              <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke-linecap="square"/>
+              <circle cx="9" cy="9" r="1" fill="#0A0A0A"/>
+              <circle cx="15" cy="9" r="1" fill="#0A0A0A"/>
+              <path d="M12 11v3M9 16c1 .67 2 .67 3 .67s2 0 3-.67"/>
+            </svg>
+          </div>
+          <span class="loco-mono text-[11px] text-gray-500 tracking-wider">BIOMETRIC SECURE HARDWARE</span>
+        </div>
+        <div>
+          <div class="border-t border-[#0A0A0A] p-5 flex items-center justify-between hover:bg-black hover:text-white cursor-pointer transition-colors group">
+            <span class="font-medium text-base">Tap to authenticate</span>
+            <span class="text-xl text-[#E6391E] font-bold group-hover:translate-x-1 transition-transform">↗</span>
+          </div>
+          <div class="home-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 3: Local Instance Sync (QR Scanner) -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">03 — INSTANCE SYNC</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-4 border-b border-[#0A0A0A] pb-3">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">CONNECT HARDWARE</span>
+          <h2 class="text-4xl loco-headline mt-2 leading-tight">Connect<br/>Instance</h2>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center px-7">
+          <!-- Viewfinder with red-orange corner brackets -->
+          <div class="w-64 h-64 relative flex items-center justify-center">
+            <div class="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-[#E6391E]"></div>
+            <div class="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-[#E6391E]"></div>
+            <div class="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-[#E6391E]"></div>
+            <div class="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-[#E6391E]"></div>
+            <span class="loco-mono text-[10px] text-gray-400 tracking-widest">SCAN WORKSTATION QR</span>
+          </div>
+        </div>
+        <div class="border-t border-[#0A0A0A] p-5 flex items-center justify-between">
+          <span class="loco-mono text-xs text-gray-500">MANUAL SYNC_ID</span>
+          <span class="loco-mono text-xs font-bold text-[#E6391E]">ENTER CODE ↗</span>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 4: Founder Command Center (Dashboard) -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">04 — COMMAND CENTER</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">MISSION KERNEL</span>
+          <h2 class="text-3xl loco-headline mt-1">Command Center</h2>
+        </div>
+        <div class="flex-1 flex flex-col divide-y divide-[#0A0A0A]">
+          <div class="px-7 py-5 flex items-center justify-between hover:bg-black hover:text-white transition-colors cursor-pointer group">
+            <div class="flex items-center gap-3">
+              <span class="loco-mono text-xs text-gray-400 group-hover:text-gray-300">01</span>
+              <span class="font-medium text-base">System Live</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#E6391E]"></span>
+              <span class="text-sm font-bold text-[#E6391E]">↗</span>
+            </div>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between hover:bg-black hover:text-white transition-colors cursor-pointer group">
+            <div class="flex items-center gap-3">
+              <span class="loco-mono text-xs text-gray-400 group-hover:text-gray-300">02</span>
+              <span class="font-medium text-base">AI Quotas</span>
+            </div>
+            <span class="text-sm font-bold text-[#E6391E]">↗</span>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between hover:bg-black hover:text-white transition-colors cursor-pointer group">
+            <div class="flex items-center gap-3">
+              <span class="loco-mono text-xs text-gray-400 group-hover:text-gray-300">03</span>
+              <span class="font-medium text-base">Active Projects</span>
+            </div>
+            <span class="text-sm font-bold text-[#E6391E]">↗</span>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between hover:bg-black hover:text-white transition-colors cursor-pointer group">
+            <div class="flex items-center gap-3">
+              <span class="loco-mono text-xs text-gray-400 group-hover:text-gray-300">04</span>
+              <span class="font-medium text-base">Tech Dept</span>
+            </div>
+            <span class="text-sm font-bold text-[#E6391E]">↗</span>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between hover:bg-black hover:text-white transition-colors cursor-pointer group">
+            <div class="flex items-center gap-3">
+              <span class="loco-mono text-xs text-gray-400 group-hover:text-gray-300">05</span>
+              <span class="font-medium text-base">Triage Board</span>
+            </div>
+            <span class="text-sm font-bold text-[#E6391E]">↗</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 5: AI Quotas & Resources -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">05 — AI QUOTAS</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">TELEMETRY</span>
+          <h2 class="text-3xl loco-headline mt-1">AI Quotas</h2>
+        </div>
+        <div class="flex-1 flex flex-col justify-center px-7 divide-y divide-[#0A0A0A]">
+          <div class="py-6">
+            <span class="loco-mono text-xs text-gray-500">GEMINI PRO HIGH</span>
+            <div class="text-7xl loco-headline text-[#E6391E] mt-1 leading-none">85%</div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-2 block">ACCOUNT 01 // 6H TIER</span>
+          </div>
+          <div class="py-6">
+            <span class="loco-mono text-xs text-gray-500">CLAUDE OPUS</span>
+            <div class="text-7xl loco-headline text-[#0A0A0A] mt-1 leading-none">42%</div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-2 block">ARCHITECTURAL SEAT</span>
+          </div>
+        </div>
+        <div class="border-t border-[#0A0A0A] p-4 px-7 flex items-center justify-between">
+          <span class="loco-mono text-[11px] text-gray-500">RESETS:</span>
+          <span class="loco-mono text-[11px] font-bold text-[#E6391E]">04H 20M</span>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 6: Department Configurator -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">06 — DEPARTMENTS</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">STRUCTURE</span>
+          <h2 class="text-3xl loco-headline mt-1">Departments</h2>
+        </div>
+        <div class="flex-1 flex flex-col divide-y divide-[#0A0A0A]">
+          <div class="px-7 py-6 flex items-center justify-between">
+            <div>
+              <span class="loco-mono text-xs text-[#E6391E] font-bold">01 //</span>
+              <span class="text-xl font-medium ml-2">Tech</span>
+            </div>
+            <span class="loco-mono text-xs text-gray-500">4 AGENTS</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <div>
+              <span class="loco-mono text-xs text-gray-400 font-bold">02 //</span>
+              <span class="text-xl font-medium ml-2">Operations</span>
+            </div>
+            <span class="loco-mono text-xs text-gray-500">2 AGENTS</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <div>
+              <span class="loco-mono text-xs text-gray-400 font-bold">03 //</span>
+              <span class="text-xl font-medium ml-2">Strategy</span>
+            </div>
+            <span class="loco-mono text-xs text-gray-500">1 AGENT</span>
+          </div>
+        </div>
+        <div>
+          <button class="w-full bg-[#0A0A0A] text-white py-5 loco-headline text-lg uppercase tracking-wider hover:bg-[#E6391E] transition-colors">
+            Add Department +
+          </button>
+          <div class="home-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 7: Agent Communication Hub -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">07 — AGENT COMMS</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">MESH PROTOCOL</span>
+          <h2 class="text-3xl loco-headline mt-1">Agent Hub</h2>
+        </div>
+        <div class="flex-1 flex flex-col divide-y divide-[#0A0A0A]">
+          <div class="px-7 py-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="font-bold text-base text-[#E6391E]">Worker AGY-1</span>
+              <span class="loco-mono text-[10px] font-bold bg-[#E6391E] text-white px-1.5 py-0.5">ACTIVE</span>
+            </div>
+            <div class="flex items-center gap-4 loco-mono text-xs">
+              <span class="text-[#0A0A0A] font-bold underline cursor-pointer">CHAT</span>
+              <span class="text-gray-400 cursor-pointer">CALL</span>
+              <span class="text-gray-400 cursor-pointer">VIDEO</span>
+            </div>
+          </div>
+          <div class="px-7 py-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="font-bold text-base">Research AGY-2</span>
+              <span class="loco-mono text-[10px] text-gray-400">IDLE</span>
+            </div>
+            <div class="flex items-center gap-4 loco-mono text-xs">
+              <span class="text-[#0A0A0A] font-bold underline cursor-pointer">CHAT</span>
+              <span class="text-gray-400 cursor-pointer">CALL</span>
+              <span class="text-gray-400 cursor-pointer">VIDEO</span>
+            </div>
+          </div>
+          <div class="px-7 py-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="font-bold text-base">Reviewer Opus</span>
+              <span class="loco-mono text-[10px] font-bold text-[#E6391E]">DEBATING</span>
+            </div>
+            <div class="flex items-center gap-4 loco-mono text-xs">
+              <span class="text-[#0A0A0A] font-bold underline cursor-pointer">CHAT</span>
+              <span class="text-gray-400 cursor-pointer">CALL</span>
+              <span class="text-gray-400 cursor-pointer">VIDEO</span>
+            </div>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 8: Tech Department (Overview) -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">08 — TECH OVERVIEW</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-[#E6391E] font-bold tracking-widest">DEPT // 01</span>
+          <h2 class="text-3xl loco-headline mt-1">Tech Dept</h2>
+        </div>
+        <div class="flex-1 flex flex-col justify-around px-7 divide-y divide-[#0A0A0A]">
+          <div class="py-4 flex items-baseline justify-between">
+            <span class="font-medium text-lg">Pending Tasks</span>
+            <span class="text-6xl loco-headline text-[#E6391E]">3</span>
+          </div>
+          <div class="py-4 flex items-baseline justify-between">
+            <span class="font-medium text-lg">Active Worktrees</span>
+            <span class="text-6xl loco-headline text-[#0A0A0A]">2</span>
+          </div>
+          <div class="py-4 flex items-baseline justify-between">
+            <span class="font-medium text-lg">Vercel Status</span>
+            <span class="loco-mono text-lg font-bold text-[#E6391E]">LIVE ↗</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 9: GitHub Worktree Manager -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">09 — WORKTREES</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">GIT INTEGRATION</span>
+          <h2 class="text-3xl loco-headline mt-1">Worktrees</h2>
+        </div>
+        <div class="flex-1 flex flex-col divide-y divide-[#0A0A0A]">
+          <div class="px-7 py-5 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-sm block">feat/splash-locomotive</span>
+              <span class="loco-mono text-xs text-[#E6391E] font-semibold">a1b2c3d</span>
+            </div>
+            <button class="bg-[#0A0A0A] text-white px-3 py-1.5 loco-mono text-xs font-bold hover:bg-[#E6391E]">
+              MERGE
+            </button>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-sm block">fix/triage-safety-gate</span>
+              <span class="loco-mono text-xs text-[#E6391E] font-semibold">789e0fa</span>
+            </div>
+            <button class="bg-[#0A0A0A] text-white px-3 py-1.5 loco-mono text-xs font-bold hover:bg-[#E6391E]">
+              MERGE
+            </button>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-sm block">main</span>
+              <span class="loco-mono text-xs text-gray-400 font-semibold">f442d19</span>
+            </div>
+            <span class="loco-mono text-xs text-gray-400">LOCKED</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 10: Triage Task Board -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">10 — TRIAGE BOARD</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">EXECUTION QUEUE</span>
+          <h2 class="text-3xl loco-headline mt-1">Triage Board</h2>
+        </div>
+        <div class="flex-1 flex flex-col divide-y divide-[#0A0A0A]">
+          <div class="px-7 py-5 flex items-center justify-between">
+            <div>
+              <span class="loco-mono text-xs text-gray-400 block">TSK-042</span>
+              <span class="font-medium text-sm">Design Vector Logo</span>
+            </div>
+            <span class="loco-mono text-xs font-bold text-[#E6391E]">CODING</span>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between">
+            <div>
+              <span class="loco-mono text-xs text-gray-400 block">TSK-041</span>
+              <span class="font-medium text-sm">Opus Senior Review</span>
+            </div>
+            <span class="loco-mono text-xs text-gray-600">IN REVIEW</span>
+          </div>
+          <div class="px-7 py-5 flex items-center justify-between">
+            <div>
+              <span class="loco-mono text-xs text-gray-400 block">TSK-040</span>
+              <span class="font-medium text-sm">Admit Founder Auth</span>
+            </div>
+            <span class="loco-mono text-xs text-gray-400">QUEUED</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 11: Live Task Execution Stream -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">11 — LIVE STREAM</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-[#E6391E] font-bold tracking-widest">TERMINAL FEED</span>
+          <h2 class="text-3xl loco-headline mt-1">Execution Log</h2>
+        </div>
+        <div class="flex-1 p-6 font-mono text-[11px] leading-relaxed overflow-hidden">
+          <p><span class="text-[#0A0A0A] font-bold">[SYS]</span> Initializing worktree WT-042...</p>
+          <p class="mt-2"><span class="text-[#E6391E] font-bold">[AGENT]</span> Reading design.md specification</p>
+          <p class="mt-2"><span class="text-[#E6391E] font-bold">[AGENT]</span> Tracing pure vector Alpha SVG</p>
+          <p class="mt-2"><span class="text-[#0A0A0A] font-bold">[SYS]</span> Render check passed: 200 OK</p>
+          <p class="mt-2 text-gray-400">[SYS] Awaiting senior gate approval_</p>
+        </div>
+        <div class="border-t border-[#0A0A0A] p-4 flex gap-3">
+          <button class="flex-1 border border-[#0A0A0A] py-3 loco-mono text-xs font-bold hover:bg-black hover:text-white">
+            PAUSE
+          </button>
+          <button class="flex-1 bg-[#E6391E] text-white py-3 loco-mono text-xs font-bold hover:bg-black">
+            INTERRUPT
+          </button>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 12: Vercel Deployment Console -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">12 — VERCEL CONSOLE</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">PIPELINE</span>
+          <h2 class="text-4xl loco-headline text-[#E6391E] mt-1">DEPLOYING</h2>
+        </div>
+        <div class="flex-1 p-7 font-mono text-xs space-y-3">
+          <div class="flex justify-between border-b border-gray-200 pb-2">
+            <span class="text-gray-500">TARGET:</span>
+            <span class="font-bold">PRODUCTION</span>
+          </div>
+          <div class="flex justify-between border-b border-gray-200 pb-2">
+            <span class="text-gray-500">COMMIT:</span>
+            <span class="text-[#E6391E] font-bold">f891b2c</span>
+          </div>
+          <div class="flex justify-between border-b border-gray-200 pb-2">
+            <span class="text-gray-500">BUILD TIME:</span>
+            <span class="font-bold">24.2s</span>
+          </div>
+          <p class="text-gray-400 text-[10px] mt-6 leading-relaxed">
+            Optimizing static assets...<br/>
+            Generating edge functions...<br/>
+            Deployment live in 12 regions.
+          </p>
+        </div>
+        <div class="border-t border-[#0A0A0A] p-5 flex justify-between items-center loco-mono text-xs">
+          <span class="font-bold text-[#E6391E] underline cursor-pointer">VIEW LIVE ↗</span>
+          <span class="text-gray-500 hover:text-black cursor-pointer">ROLLBACK</span>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 13: Project Portfolio -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">13 — PROJECTS</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">PORTFOLIO</span>
+          <h2 class="text-3xl loco-headline mt-1">Projects</h2>
+        </div>
+        <div class="flex-1 grid grid-cols-1 divide-y divide-[#0A0A0A]">
+          <div class="p-6 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-2xl loco-headline">DeployMate</h3>
+              <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+            </div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-4">LAST UPDATE: 2M AGO</span>
+          </div>
+          <div class="p-6 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-2xl loco-headline">AlphaBrain Core</h3>
+              <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+            </div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-4">LAST UPDATE: 14M AGO</span>
+          </div>
+          <div class="p-6 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-2xl loco-headline">Agent Mesh</h3>
+              <span class="w-2 h-2 rounded-full bg-gray-300"></span>
+            </div>
+            <span class="loco-mono text-[10px] text-gray-400 mt-4">LAST UPDATE: 3D AGO</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+    <!-- SCREEN 14: Global Settings -->
+    <div class="flex flex-col items-center">
+      <span class="font-mono text-xs font-bold text-gray-500 mb-2">14 — SETTINGS</span>
+      <div class="screen-card">
+        <div class="statusbar"><span>09:41</span><span>5G ■</span></div>
+        <div class="px-7 pt-3 pb-3 border-b border-[#0A0A0A]">
+          <span class="loco-mono text-[10px] text-gray-500 tracking-widest">PREFERENCES</span>
+          <h2 class="text-3xl loco-headline mt-1">Settings</h2>
+        </div>
+        <div class="flex-1 flex flex-col divide-y divide-[#0A0A0A]">
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">Autonomous Dispatch</span>
+            <span class="loco-mono text-xs font-bold text-[#E6391E]">[ ON ] / OFF</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">Senior Opus Review</span>
+            <span class="loco-mono text-xs font-bold text-[#E6391E]">[ ON ] / OFF</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">Vercel Auto-Merge</span>
+            <span class="loco-mono text-xs text-gray-400 font-bold">ON / [ OFF ]</span>
+          </div>
+          <div class="px-7 py-6 flex items-center justify-between">
+            <span class="font-medium text-base">USB Hardware Sync</span>
+            <span class="loco-mono text-xs font-bold text-[#E6391E]">[ ON ] / OFF</span>
+          </div>
+        </div>
+        <div class="home-bar"></div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
