@@ -44,6 +44,7 @@ from alpha_core.db.models import (
     WorkerRecord,
     utc_now,
 )
+from alpha_core.mobile_bridge import router as mobile_bridge_router
 from alpha_core.privacy.router import privacy_router
 from alpha_core.queue.triage_queue import (
     EmergencyStopActiveError,
@@ -215,6 +216,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(privacy_router)
+app.include_router(mobile_bridge_router, dependencies=[Depends(require_api_principal)])
 
 MEETING_CONTENT_SECURITY_POLICY = "; ".join(
     (

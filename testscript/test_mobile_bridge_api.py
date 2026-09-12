@@ -6,13 +6,16 @@ Tests all 14 DeployMate Locomotive endpoints, service logic, and emergency stop.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from alpha_core.mobile_bridge.api import create_mobile_bridge_app
+from alpha_core.api.app import app
+from alpha_core.config import settings
 from alpha_core.mobile_bridge.service import MobileBridgeService
+from alpha_core.security import AuthPrincipal, PrincipalRole, require_api_principal
 
 
 @pytest.fixture
@@ -23,12 +26,22 @@ def temp_service(tmp_path: Path) -> MobileBridgeService:
 
 
 @pytest.fixture
-def client(temp_service: MobileBridgeService, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    app = create_mobile_bridge_app()
+def client(temp_service: MobileBridgeService, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
     import alpha_core.mobile_bridge.api as api_mod
 
     monkeypatch.setattr(api_mod, "get_service", lambda: temp_service)
-    return TestClient(app)
+
+    def override_require_api_principal() -> AuthPrincipal:
+        return AuthPrincipal(
+            subject="founder",
+            role=PrincipalRole.FOUNDER,
+        )
+
+    app.dependency_overrides[require_api_principal] = override_require_api_principal
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(require_api_principal, None)
 
 
 def test_health_endpoint(client: TestClient) -> None:
@@ -223,3 +236,26 @@ def test_screen_14_emergency_stop_toggle(client: TestClient, temp_service: Mobil
     assert resp_disable.status_code == 200
     assert resp_disable.json()["active"] is False
     assert not temp_service.emergency_lock.exists()
+
+
+def test_cors_origins_includes_locomotive_dev_server() -> None:
+    assert "http://localhost:5173" in settings.CORS_ORIGINS
+    assert "http://127.0.0.1:5173" in settings.CORS_ORIGINS
+
+
+def test_mobile_bridge_unauthorized_without_principal() -> None:
+    unauth_client = TestClient(app)
+    resp = unauth_client.get("/api/v1/mobile/health")
+    assert resp.status_code == 401
+
+
+def test_mobile_bridge_router_mounted_on_master_app() -> None:
+    from alpha_core.api.app import mobile_bridge_router
+
+    assert mobile_bridge_router is not None
+    mounted = any(
+        getattr(route, "path", "").startswith("/api/v1/mobile")
+        or getattr(route, "original_router", None) is mobile_bridge_router
+        for route in app.routes
+    )
+    assert mounted is True
