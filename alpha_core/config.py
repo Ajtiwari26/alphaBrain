@@ -94,7 +94,7 @@ class Settings(BaseModel):
     PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
     CORS_ORIGINS: tuple[str, ...] = _csv_env(
         "CORS_ORIGINS",
-        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173",
+        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173,https://localhost,http://localhost,capacitor://localhost",
     )
 
     # AI Model Credentials (Provided by User)

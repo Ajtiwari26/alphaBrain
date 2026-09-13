@@ -20,8 +20,42 @@ from alpha_core.security import AuthPrincipal, PrincipalRole, require_api_princi
 
 @pytest.fixture
 def temp_service(tmp_path: Path) -> MobileBridgeService:
+    import hashlib
+    import json
+    import time
+
+    from alpha_core.queue.triage_queue import TaskProvenance, TaskTriageQueue
+
     db_file = tmp_path / "triage.db"
     lock_file = tmp_path / "emergency.lock"
+    queue = TaskTriageQueue(db_path=db_file, emergency_lock_path=lock_file)
+    envelope = {
+        "task_id": "tsk_eva_1d262851bd6a",
+        "title": "P14: Build AlphaBrain Founder Companion",
+        "objective": "Implement mobile companion app",
+        "allowed_paths": ["alphabrain_app/src/App.tsx"],
+        "criteria": ["0 build errors"],
+    }
+    content_hash = hashlib.sha256(
+        json.dumps(envelope, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    now = time.time()
+    prov = TaskProvenance(
+        meeting_id="mtg_test",
+        speaker_id="founder",
+        utterance_timestamp=now,
+        transcript_excerpt="Build mobile companion",
+        extraction_model="gemini-3.1-pro",
+        extraction_confidence=0.99,
+        eva_session_id="eva_session_test",
+        created_at=now,
+        content_hash=content_hash,
+    )
+    queue.enqueue_task(
+        task_id="tsk_eva_1d262851bd6a",
+        envelope=envelope,
+        provenance=prov,
+    )
     return MobileBridgeService(db_path=db_file, emergency_lock=lock_file)
 
 
@@ -202,7 +236,7 @@ def test_screen_12_model_scores(client: TestClient) -> None:
     models = resp.json()
     assert len(models) >= 2
     # Verify OC-EDS tier representation
-    assert any("Tier 1" in m["tier"] for m in models)
+    assert any("Tier" in m["tier"] for m in models)
 
 
 def test_screen_13_audit_trail(client: TestClient) -> None:

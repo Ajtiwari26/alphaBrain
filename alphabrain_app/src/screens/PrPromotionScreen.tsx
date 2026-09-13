@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { mobileApi } from '../api/client';
-import { GitPullRequest, CheckCircle2, ShieldCheck, ArrowRight, GitMerge, Sparkles } from 'lucide-react';
+import { TaskSummary } from '../types';
+import { GitPullRequest, CheckCircle2, GitMerge } from 'lucide-react';
 
 export const PrPromotionScreen: React.FC = () => {
   const [promoted, setPromoted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mergeSha, setMergeSha] = useState<string | null>(null);
+  const [targetTask, setTargetTask] = useState<TaskSummary | null>(null);
+
+  useEffect(() => {
+    mobileApi.listTriage().then((tasks) => {
+      if (tasks && tasks.length > 0) {
+        setTargetTask(tasks[0]);
+      }
+    });
+  }, []);
 
   const handlePromote = async () => {
+    if (!targetTask) return;
     setLoading(true);
     try {
-      const res = await mobileApi.promoteTask('tsk_eva_1d262851bd6a');
+      const res = await mobileApi.promoteTask(targetTask.task_id);
       setMergeSha(res.commit_sha);
       setPromoted(true);
     } catch (err) {
@@ -21,6 +32,9 @@ export const PrPromotionScreen: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const taskId = targetTask ? targetTask.task_id : 'TSK_FOUNDER_LIVE';
+  const taskTitle = targetTask ? targetTask.title : 'AlphaBrain Autonomous Pipeline Dispatch';
 
   return (
     <div className="space-y-5">
@@ -39,15 +53,15 @@ export const PrPromotionScreen: React.FC = () => {
       <div className="locomotive-card p-4 rounded-lg space-y-3">
         <div className="flex items-center justify-between text-xs font-mono">
           <span className="text-muted">TARGET PULL REQUEST</span>
-          <span className="text-accent font-semibold">PR #14</span>
+          <span className="text-accent font-semibold">{taskId}</span>
         </div>
         <div className="font-display text-base font-bold text-white leading-snug">
-          feat(alphabrain_dogfood): P14 Founder Companion Mobile App & Android APK
+          {taskTitle}
         </div>
         <div className="p-2.5 rounded bg-background border border-card-border font-mono text-xs space-y-1 text-slate-300">
           <div className="flex justify-between">
             <span className="text-muted">Source Branch:</span>
-            <span>alpha/tsk_eva_1d262851bd6a</span>
+            <span>alpha/{taskId}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted">Target Branch:</span>
@@ -108,9 +122,9 @@ export const PrPromotionScreen: React.FC = () => {
       ) : (
         <div className="space-y-2 pt-2">
           <button
-            disabled={loading}
+            disabled={loading || !targetTask}
             onClick={handlePromote}
-            className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-all active:scale-[0.98]"
+            className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             {loading ? (
               <span>Executing Fast-Forward Merge...</span>

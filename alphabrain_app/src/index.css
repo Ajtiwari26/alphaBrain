@@ -92,3 +92,84 @@ body {
 .animate-pulse-dot {
   animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Screen transition keyframes */
+@keyframes screen-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-screen-enter {
+  animation: screen-enter 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Logo breathing animation for Splash */
+@keyframes logo-breathe {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(230, 57, 30, 0));
+  }
+  50% {
+    transform: scale(1.04);
+    filter: drop-shadow(0 4px 20px rgba(230, 57, 30, 0.25));
+  }
+}
+
+.animate-logo-breathe {
+  animation: logo-breathe 2.8s ease-in-out infinite;
+}
+
+/* Scanner beam animation */
+@keyframes scan-beam {
+  0% {
+    top: 0%;
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0.2;
+  }
+}
+
+.animate-scan-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #E6391E;
+  box-shadow: 0 0 10px #E6391E, 0 0 4px #E6391E;
+  animation: scan-beam 2s ease-in-out infinite alternate;
+}
+
+/* Tactile button micro-interactions */
+.btn-tactile {
+  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-tactile:active {
+  transform: scale(0.97);
+  background-color: #0A0A0A !important;
+  color: #FFFFFF !important;
+}
+
+.card-tactile {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-tactile:active {
+  transform: scale(0.985);
+  background-color: #FAFAFA;
+}

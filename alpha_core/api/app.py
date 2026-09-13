@@ -212,7 +212,14 @@ app = FastAPI(
 # Allow only explicitly configured local or deployed web origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(settings.CORS_ORIGINS),
+    allow_origins=list(
+        {
+            *settings.CORS_ORIGINS,
+            "https://localhost",
+            "http://localhost",
+            "capacitor://localhost",
+        }
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

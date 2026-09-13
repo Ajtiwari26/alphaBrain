@@ -1,0 +1,37 @@
+{
+  "ecosystem_topology": "Three-tier architecture: 1) Mac Desktop Node (Local environment with file system/terminal access for agent workers). 2) Mobile Companion App (Remote command, telemetry viewer, and biometric authorization gate). 3) Cloud Backend (Relay server, WebSocket mesh, and authentication layer).",
+  "mac_application_spec": {
+    "screen_m01_node_setup": "Node Setup: Initial configuration screen for connecting to AlphaBrain backend, validating local dependencies (Git, Node), and setting workspace paths.",
+    "screen_m02_pairing_station": "Pairing Station: High-contrast UI displaying the rotating QR code with a 120s countdown ring and visual connection status indicators.",
+    "screen_m03_desktop_command_node": "Desktop Command Node: The primary brutalist dashboard detailing active agent tasks, live terminal logs, resource utilization, and git branch states.",
+    "screen_m04_security_enclave": "Security Enclave: A secure vault for managing API keys (Gemini, Claude), biometric confirmation toggles, and agent permission boundaries.",
+    "tech_stack": "Tauri (Rust core) + React/Vite (Frontend) + Tailwind CSS (DeployMate System)"
+  },
+  "mobile_companion_spec": {
+    "screen_01_splash": "Minimalist white canvas, 3D Alpha mesh symbol, bold AlphaBrain, POWERED BY DeployMate logo, 2s auto-handoff.",
+    "screen_02a_enrollment": "Initial device registration and cryptographic key generation sequence for new devices.",
+    "screen_02b_access_gate": "02 // ACCESS GATE, STAGE 2/3, Founder Access, Touch ID box, 4 square PIN boxes, Keypad with [AUTO] in red, [0], [\u232b], and bottom Instant Founder Biometric Unlock.",
+    "screen_03_qr_scanner_bridge": "Redesigned viewfinder composed of four #E6391E 90-degree corner brackets framing the QR scan zone. Includes a CONNECT HARDWARE eyebrow. Scans Mac screen.",
+    "screen_04_command_center": "Strict list rows bounded by 1px solid #0A0A0A divider rules, displaying live pulse indicators for System Live, AI Quotas, Active Projects, and the Triage Board."
+  },
+  "production_backend_integration": {
+    "api_endpoints": [
+      "POST /api/v1/pairing/init",
+      "POST /api/v1/pairing/confirm",
+      "GET /api/v1/pairing/status"
+    ],
+    "security_and_auth": "Strict JWT-based bearer authentication at the API gateway. End-to-End Encryption (E2EE) for paired device communication over WebSockets using ECDH shared secrets.",
+    "websocket_channels": [
+      "wss://api.alphabrain.com/v1/stream/telemetry",
+      "wss://api.alphabrain.com/v1/stream/commands",
+      "wss://api.alphabrain.com/v1/pairing/relay"
+    ]
+  },
+  "qr_pairing_protocol": {
+    "cryptographic_primitives": "ECDH P-256 for symmetric key exchange; Ed25519 for payload signing and identity verification.",
+    "mutual_handshake_flow": "1. Mac generates QR with ephemeral public key and nonce. 2. Mobile scans, validates signature. 3. Mobile derives Shared Secret, sends its public key via Backend. 4. Backend relays to Mac. 5. Mac derives Shared Secret. 6. E2EE WebSocket tunnel established.",
+    "qr_payload_schema": "alpha://pair?node_id=<UUID>&pub_key=<Base64_ECDH_Pub>&nonce=<Base64_120s_Nonce>&sig=<Ed25519_Sig>",
+    "rotation_and_expiry": "The QR code nonce rotates every 120 seconds to prevent replay attacks, visually refreshing on the Mac UI."
+  },
+  "verdict": "PROPOSAL_READY"
+}

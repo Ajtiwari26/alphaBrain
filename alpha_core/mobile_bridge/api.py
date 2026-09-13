@@ -174,6 +174,18 @@ async def get_model_scores() -> list[ModelUtilityScore]:
     return get_service().get_model_utility_scores()
 
 
+@router.get("/worktrees", response_model=list[dict[str, Any]])
+async def list_worktrees() -> list[dict[str, Any]]:
+    """Screen 09: Git Worktrees status and active branches."""
+    return get_service().get_git_worktrees()
+
+
+@router.get("/projects", response_model=list[dict[str, Any]])
+async def list_projects() -> list[dict[str, Any]]:
+    """Screen 13: Real workspace projects from Desktop/Projects."""
+    return get_service().get_projects()
+
+
 @router.get("/audit", response_model=list[AuditLogEntry])
 async def get_audit_trail(limit: int = Query(default=20, ge=1, le=100)) -> list[AuditLogEntry]:
     """Screen 13: Immutable cryptographic audit trail."""
