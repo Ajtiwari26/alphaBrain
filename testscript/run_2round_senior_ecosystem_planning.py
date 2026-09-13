@@ -264,10 +264,10 @@ YOUR SENIOR REVIEW TASKS:
         if res.returncode != 0:
             print(f"Claude Opus Round 2 Error: {res.stderr}", file=sys.stderr)
             sys.exit(res.returncode)
-        
+
         raw_stdout = res.stdout.strip()
         data = json.loads(raw_stdout)
-        
+
         # Check structured_output or parse from response
         if "structured_output" in data:
             ratification = data["structured_output"]
