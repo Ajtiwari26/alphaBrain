@@ -3,18 +3,28 @@
  */
 
 export type ScreenId =
+  | 'splash'
+  | 'auth'
+  | 'instance_sync'
   | 'overview'
+  | 'model_router'
+  | 'departments'
+  | 'agent_comms'
+  | 'tech_dept'
+  | 'worktrees'
   | 'triage'
+  | 'live_stream'
+  | 'deployments'
+  | 'projects'
+  | 'settings'
   | 'task_detail'
   | 'code_diff'
   | 'voice_briefing'
   | 'sprint_fleet'
   | 'pr_promotion'
-  | 'deployments'
-  | 'self_healing'
   | 'hardware_telemetry'
+  | 'self_healing'
   | 'privacy_compliance'
-  | 'model_router'
   | 'audit_trail'
   | 'emergency_stop';
 

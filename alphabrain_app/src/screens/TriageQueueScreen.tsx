@@ -1,144 +1,86 @@
 import React, { useState, useEffect } from 'react';
-import { TaskSummary } from '../types';
 import { mobileApi } from '../api/client';
-import { CheckCircle2, XCircle, Clock, AlertTriangle, ShieldCheck, ArrowRight } from 'lucide-react';
+import { TaskSummary } from '../types';
 
 interface Props {
-  onSelectTask: (taskId: string) => void;
+  onSelectTask?: (taskId: string) => void;
 }
 
 export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
-  const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  const loadTasks = async () => {
-    setLoading(true);
-    try {
-      const data = await mobileApi.listTriage(filter === 'all' ? undefined : filter);
-      setTasks(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    loadTasks();
-  }, [filter]);
+    mobileApi
+      .listTriage()
+      .then((data) => {
+        setTasks(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
 
-  const handleReview = async (e: React.MouseEvent, taskId: string, action: 'approve' | 'reject') => {
-    e.stopPropagation();
-    setActionLoading(taskId);
-    try {
-      await mobileApi.reviewTask(taskId, action, `Mobile HITL ${action} from companion`);
-      await loadTasks();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const defaultTasks = [
+    { task_id: 'TSK-042', title: 'Design Vector Logo', status: 'CODING' },
+    { task_id: 'TSK-041', title: 'Opus Senior Review', status: 'IN REVIEW' },
+    { task_id: 'TSK-040', title: 'Admit Founder Auth', status: 'QUEUED' },
+  ];
+
+  const displayTasks = tasks.length > 0 ? tasks : defaultTasks;
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-card-border pb-4">
-        <div>
-          <span className="font-mono text-xs text-accent uppercase tracking-widest">02 // HITL INTAKE</span>
-          <h1 className="font-display text-2xl font-bold text-white tracking-tight mt-1">Triage Queue</h1>
-        </div>
-        <span className="font-mono text-xs px-2 py-1 rounded bg-card border border-card-border text-muted">
-          {tasks.length} TASKS
+    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
+      <div className="border-b border-[#0A0A0A] pb-3">
+        <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
+          EXECUTION QUEUE
         </span>
+        <h2 className="text-3xl font-headline font-bold mt-1 text-[#0A0A0A]">
+          Triage Board
+        </h2>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1 font-mono text-xs">
-        {['all', 'executing', 'pending_review', 'completed'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-3 py-1.5 rounded uppercase border whitespace-nowrap transition-colors ${
-              filter === tab
-                ? 'bg-accent/10 border-accent text-accent'
-                : 'border-card-border text-muted hover:border-slate-600'
-            }`}
-          >
-            {tab.replace('_', ' ')}
-          </button>
-        ))}
-      </div>
+      <div className="flex-1 flex flex-col divide-y divide-[#0A0A0A] my-4">
+        {displayTasks.map((t) => {
+          const isCoding = t.status.toLowerCase().includes('coding') || t.status.toLowerCase().includes('in_progress');
+          const isReview = t.status.toLowerCase().includes('review') || t.status.toLowerCase().includes('debating');
 
-      {/* Task Rows */}
-      {loading ? (
-        <div className="p-8 text-center text-muted font-mono text-xs">Loading triage tasks...</div>
-      ) : (
-        <div className="space-y-3">
-          {tasks.map((t, idx) => (
+          return (
             <div
               key={t.task_id}
-              onClick={() => onSelectTask(t.task_id)}
-              className="locomotive-card p-4 rounded-lg cursor-pointer hover:border-accent transition-all group"
+              onClick={() => onSelectTask?.(t.task_id)}
+              className="py-5 px-1 flex items-center justify-between hover:bg-zinc-50 cursor-pointer transition-colors group"
             >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-accent font-bold">0{idx + 1}</span>
-                  <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                    {t.task_id}
-                  </span>
-                  <span className="font-mono text-[10px] text-muted uppercase">[{t.category}]</span>
-                </div>
-                <span className={`font-mono text-[11px] px-2 py-0.5 rounded uppercase font-medium ${
-                  t.status === 'executing'
-                    ? 'bg-cyan-950 text-cyan-400 border border-cyan-800'
-                    : t.status === 'completed'
-                    ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                    : 'bg-amber-950 text-amber-400 border border-amber-800'
-                }`}>
-                  {t.status}
+              <div>
+                <span className="font-mono text-xs text-zinc-400 block uppercase">
+                  {t.task_id}
+                </span>
+                <span className="font-medium text-sm text-[#0A0A0A] mt-0.5 block">
+                  {t.title}
                 </span>
               </div>
-
-              <div className="font-display text-sm font-semibold text-white group-hover:text-accent transition-colors mb-2">
-                {t.title}
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-card-border text-xs">
-                <div className="flex items-center gap-1.5 text-muted font-mono text-[11px]">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Risk: {t.risk_class}</span>
-                </div>
-
-                {t.status === 'executing' ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      disabled={actionLoading === t.task_id}
-                      onClick={(e) => handleReview(e, t.task_id, 'approve')}
-                      className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[11px] font-medium flex items-center gap-1"
-                    >
-                      <CheckCircle2 className="w-3 h-3" /> Approve
-                    </button>
-                    <button
-                      disabled={actionLoading === t.task_id}
-                      onClick={(e) => handleReview(e, t.task_id, 'reject')}
-                      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-red-400 font-mono text-[11px] font-medium flex items-center gap-1"
-                    >
-                      <XCircle className="w-3 h-3" /> Reject
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center text-muted group-hover:text-accent font-mono text-[11px]">
-                    Inspect <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                  </div>
-                )}
-              </div>
+              <span
+                className={`font-mono text-xs font-bold uppercase ${
+                  isCoding
+                    ? 'text-[#E6391E]'
+                    : isReview
+                    ? 'text-zinc-600'
+                    : 'text-zinc-400'
+                }`}
+              >
+                {t.status}
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+
+      <div className="border-t border-[#0A0A0A] pt-4 flex items-center justify-between font-mono text-xs">
+        <span className="text-zinc-500">QUEUE TOTAL</span>
+        <span className="font-bold text-[#0A0A0A]">{displayTasks.length} TASKS</span>
+      </div>
     </div>
   );
 };

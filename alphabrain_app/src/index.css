@@ -3,50 +3,78 @@
 @tailwind utilities;
 
 :root {
-  --color-background: #090a0f;
-  --color-card: #11131a;
-  --color-border: #222634;
-  --color-accent: #f97316;
-  --color-cyan: #06b6d4;
-  --color-emerald: #10b981;
-  --color-amber: #f59e0b;
-  --color-text-main: #f8fafc;
-  --color-muted: #94a3b8;
+  --color-background: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-border: #0A0A0A;
+  --color-accent: #E6391E;
+  --color-text-main: #0A0A0A;
+  --color-muted: #52525b;
 }
 
 body {
-  background-color: var(--color-background);
-  color: var(--color-text-main);
+  background-color: #FFFFFF;
+  color: #0A0A0A;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Safe area padding for mobile notch/status bar */
+.safe-top {
+  padding-top: max(env(safe-area-inset-top), 2.5rem);
+}
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+
+/* DeployMate Locomotive Minimalist Structural Styles */
+.loco-border {
+  border: 1px solid #0A0A0A;
+}
+
+.loco-border-b {
+  border-bottom: 1px solid #0A0A0A;
+}
+
+.loco-border-t {
+  border-top: 1px solid #0A0A0A;
+}
+
+.loco-border-r {
+  border-right: 1px solid #0A0A0A;
+}
+
+.loco-border-l {
+  border-left: 1px solid #0A0A0A;
+}
+
+.loco-headline {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #0A0A0A;
+}
+
+.loco-mono {
+  font-family: 'Fira Code', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Locomotive High-Craft 1px Border Index Rows */
 .locomotive-row {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid #0A0A0A;
   transition: all 0.15s ease-in-out;
 }
 
 .locomotive-row:hover {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: rgba(10, 10, 10, 0.03);
 }
 
 .locomotive-card {
-  background-color: var(--color-card);
-  border: 1px solid var(--color-border);
-}
-
-.locomotive-glow-orange {
-  box-shadow: 0 0 20px -5px rgba(249, 115, 22, 0.3);
-}
-
-.locomotive-glow-cyan {
-  box-shadow: 0 0 20px -5px rgba(6, 182, 212, 0.3);
-}
-
-.locomotive-glow-emerald {
-  box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.3);
+  background-color: #FFFFFF;
+  border: 1px solid #0A0A0A;
 }
 
 /* Monospace ticker bar */
