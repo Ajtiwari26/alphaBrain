@@ -195,13 +195,40 @@ class TriageTaskDispatcher:
 
         return all_passed, evidence
 
+    def _resolve_effective_base(self, worktree_path: Path, base_commit: str) -> str:
+        """
+        Resolves the true merge-base between main and HEAD if on a task branch,
+        preventing commits on main from appearing as task diffs after rebasing.
+        Falls back safely to base_commit.
+        """
+        ret_branch, branch_out, _ = self.run_command_in_worktree(
+            worktree_path, ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+        )
+        current_branch = branch_out.strip() if ret_branch == 0 else ""
+        if not current_branch or current_branch in ("main", "master", "HEAD"):
+            return base_commit
+
+        ret, out, _ = self.run_command_in_worktree(
+            worktree_path, ["git", "merge-base", "main", "HEAD"]
+        )
+        if ret == 0 and out.strip():
+            mb = out.strip()
+            if mb != base_commit:
+                ret_anc, _, _ = self.run_command_in_worktree(
+                    worktree_path, ["git", "merge-base", "--is-ancestor", base_commit, mb]
+                )
+                if ret_anc == 0:
+                    return mb
+        return base_commit
+
     def get_git_diff_and_changed_files(
         self, worktree_path: Path, base_commit: str
     ) -> tuple[list[str], str]:
         """Inspects git diff relative to base_commit inside the worktree, including uncommitted changes."""
+        effective_base = self._resolve_effective_base(worktree_path, base_commit)
         # 1. Changed files (committed on branch relative to base)
         ret, out, _ = self.run_command_in_worktree(
-            worktree_path, ["git", "diff", "--name-only", f"{base_commit}..HEAD"]
+            worktree_path, ["git", "diff", "--name-only", f"{effective_base}..HEAD"]
         )
         changed_files: list[str] = []
         if ret == 0 and out.strip():
@@ -222,7 +249,7 @@ class TriageTaskDispatcher:
 
         # 2. Diff stat
         _, stat_out, _ = self.run_command_in_worktree(
-            worktree_path, ["git", "diff", "--stat", f"{base_commit}..HEAD"]
+            worktree_path, ["git", "diff", "--stat", f"{effective_base}..HEAD"]
         )
         _, uncommitted_stat, _ = self.run_command_in_worktree(
             worktree_path, ["git", "diff", "--stat"]
@@ -554,8 +581,9 @@ class TriageTaskDispatcher:
                 return None
 
             # 5.5 Post-Commit Final Diff Audit & Budget Enforcement
+            effective_base = self._resolve_effective_base(worktree_path, base_commit)
             _ret, out, _ = self.run_command_in_worktree(
-                worktree_path, ["git", "diff", "--name-only", f"{base_commit}..{head_commit}"]
+                worktree_path, ["git", "diff", "--name-only", f"{effective_base}..{head_commit}"]
             )
             final_changed_files = [
                 line.strip('"') for line in out.strip().splitlines() if line.strip()
@@ -575,7 +603,7 @@ class TriageTaskDispatcher:
 
             _ret, diff_tree_out, _ = self.run_command_in_worktree(
                 worktree_path,
-                ["git", "diff-tree", "-r", "--diff-filter=ACMR", base_commit, head_commit],
+                ["git", "diff-tree", "-r", "--diff-filter=ACMR", effective_base, head_commit],
             )
             for line in diff_tree_out.strip().splitlines():
                 parts = line.split()
@@ -608,7 +636,7 @@ class TriageTaskDispatcher:
             max_diff_lines = envelope.get("max_diff_lines")
             if isinstance(max_diff_lines, int):
                 _ret, diff_stat_out, _ = self.run_command_in_worktree(
-                    worktree_path, ["git", "diff", "--shortstat", f"{base_commit}..{head_commit}"]
+                    worktree_path, ["git", "diff", "--shortstat", f"{effective_base}..{head_commit}"]
                 )
                 lines_changed = 0
                 match_ins = re.search(r"(\d+)\s+insertion", diff_stat_out)
@@ -636,7 +664,7 @@ class TriageTaskDispatcher:
                 task_id=task_id,
                 project_id=project_id,
                 branch_name=branch_name,
-                base_commit=base_commit,
+                base_commit=effective_base,
                 head_commit=head_commit,
                 title=f"Autonomous Delivery: {title}",
                 description=envelope.get("detailed_instructions")
