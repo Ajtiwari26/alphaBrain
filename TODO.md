@@ -68,6 +68,10 @@ Gemini 3.1 Pro High.
 
 - [x] P14.2-BACKEND: Cloud-First Provisioning & Node Registry API (`commit ca32697`, `tsk_eva_7775f157f872`).
 
+- [x] P14.2-FRONTEND: Mobile Remote Control Screens & Pixel-Perfect Access Gate (`commit 3df612e`, `tsk_eva_c1e6a3d51de2`).
+
+- [x] P14.2-DESKTOP: Tauri 2.0 Rust Core Mac App & 4 Locomotive Screens (M-01 to M-04) (`commit 5f65b44`, `tsk_eva_cbc068ce5324`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).

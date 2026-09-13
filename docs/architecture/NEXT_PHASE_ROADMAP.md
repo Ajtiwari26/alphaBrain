@@ -82,12 +82,20 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Objective**: P13.1 Production Data Privacy, Consent Management, and Data Retention Engine
 
 ### P14: Build AlphaBrain Founder Companion mobile app with React 19 + Vite + Tailwind + Capacitor Android, implementing all 14 DeployMate Locomotive screens, FastAPI backend bridge, and compiling debug Android APK for device 10BF5P2AZF0010T
-- **Status**: `[x] COMPLETED & MERGED` (`commit c9fe9c6`, `tsk_eva_b099b480c6da`)
-- **Objective**: P14.1: Mount Founder Companion Mobile Bridge into Main AlphaBrain Backend (alpha_core.api.app)
+- **Status**: `[x] COMPLETED & MERGED` (`commit fb8ba39`, `tsk_eva_1d262851bd6a`)
+- **Objective**: P14 Founder Companion App
 
 ### P14.2-BACKEND: Cloud-First Provisioning & Node Registry API
 - **Status**: `[x] COMPLETED & MERGED` (`commit ca32697`, `tsk_eva_7775f157f872`)
 - **Objective**: P14.2-BACKEND: Cloud-First Provisioning & Node Registry API
+
+### P14.2-FRONTEND: Mobile Remote Control Screens & Pixel-Perfect Access Gate
+- **Status**: `[x] COMPLETED & MERGED` (`commit 3df612e`, `tsk_eva_c1e6a3d51de2`)
+- **Objective**: P14.2-FRONTEND: Mobile Remote Control Screens & Pixel-Perfect Access Gate
+
+### P14.2-DESKTOP: Tauri 2.0 Rust Core Mac App & 4 Locomotive Screens (M-01 to M-04)
+- **Status**: `[x] COMPLETED & MERGED` (`commit 5f65b44`, `tsk_eva_cbc068ce5324`)
+- **Objective**: P14.2-DESKTOP: Tauri 2.0 Rust Core Mac App & 4 Locomotive Screens (M-01 to M-04)
 
 ---
 
