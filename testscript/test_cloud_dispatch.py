@@ -2,12 +2,14 @@
 testscript/test_cloud_dispatch.py
 Comprehensive unit and integration tests for Cloud-First Provisioning, Node Registry,
 Task Dispatch Lease, and Stream Broadcast API (Invariants I-52 through I-60).
+Includes tests for SQLite persistence, Founder RBAC, and timing-safe comparisons.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import Generator
 from pathlib import Path
 
@@ -35,11 +37,14 @@ from testscript.planning_fixtures import approve_with_plan
 
 
 @pytest.fixture
-def clean_stores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[dict[str, object], None, None]:
+def clean_stores(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Generator[dict[str, object], None, None]:
     """Provides isolated, clean stores and a fresh TaskTriageQueue for each test."""
-    p_store = ProvisioningSessionStore()
-    d_registry = DeviceRegistry()
-    n_registry = NodeRegistry()
+    dispatch_db = tmp_path / "cloud_dispatch.db"
+    p_store = ProvisioningSessionStore(db_path=dispatch_db)
+    d_registry = DeviceRegistry(db_path=dispatch_db)
+    n_registry = NodeRegistry(db_path=dispatch_db)
     hub = cd_mod.BroadcastStreamHub()
 
     db_file = tmp_path / "triage.db"
@@ -54,6 +59,7 @@ def clean_stores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[d
     monkeypatch.setattr(cd_mod, "get_triage_queue", lambda: queue)
 
     yield {
+        "db_path": dispatch_db,
         "provisioning_store": p_store,
         "device_registry": d_registry,
         "node_registry": n_registry,
@@ -108,18 +114,38 @@ def test_provision_session_creation(client: TestClient) -> None:
     assert qr_data["provision_token"] == data["provision_token"]
 
 
+def test_provision_session_requires_founder(clean_stores: dict[str, object]) -> None:
+    """POST /api/auth/provision-session rejects unauthenticated or non-founder callers (Finding 1)."""
+
+    def override_client_principal() -> AuthPrincipal:
+        return AuthPrincipal(
+            subject="untrusted_client",
+            role=PrincipalRole.CLIENT,
+        )
+
+    app.dependency_overrides[require_api_principal] = override_client_principal
+    try:
+        with TestClient(app) as tc:
+            resp = tc.post("/api/auth/provision-session", json={})
+            assert resp.status_code == 403
+    finally:
+        app.dependency_overrides.pop(require_api_principal, None)
+
+
 def test_provision_session_single_use(client: TestClient) -> None:
     """A provisioning session cannot be claimed more than once (Invariant I-52 & I-53)."""
     # 1. Provision
     prov_resp = client.post("/api/auth/provision-session", json={})
     assert prov_resp.status_code == 201
     session_id = prov_resp.json()["session_id"]
+    provision_token = prov_resp.json()["provision_token"]
 
     # 2. First Claim -> Success
     claim_resp_1 = client.post(
         "/api/auth/claim-session",
         json={
             "session_id": session_id,
+            "provision_token": provision_token,
             "device_id": "device-1",
             "device_name": "Founder Pixel",
         },
@@ -132,6 +158,7 @@ def test_provision_session_single_use(client: TestClient) -> None:
         "/api/auth/claim-session",
         json={
             "session_id": session_id,
+            "provision_token": provision_token,
             "device_id": "device-2",
             "device_name": "Rogue Device",
         },
@@ -141,18 +168,21 @@ def test_provision_session_single_use(client: TestClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_provision_session_expired(clean_stores: dict[str, object], client: TestClient) -> None:
+async def test_provision_session_expired(
+    clean_stores: dict[str, object], client: TestClient
+) -> None:
     """Expired provisioning sessions are rejected with 400 Bad Request (Invariant I-52)."""
     store = clean_stores["provisioning_store"]
     assert isinstance(store, ProvisioningSessionStore)
 
     # Create session with -10 second TTL (expired immediately)
-    session = await store.create_session(ttl_seconds=-10)
+    session = await store.create_session(created_by="founder", ttl_seconds=-10)
 
     claim_resp = client.post(
         "/api/auth/claim-session",
         json={
             "session_id": session.session_id,
+            "provision_token": session.provision_token,
             "device_id": "device-expired",
         },
     )
@@ -166,14 +196,16 @@ async def test_provision_session_expired(clean_stores: dict[str, object], client
 
 
 def test_claim_session_by_pairing_code(client: TestClient) -> None:
-    """Claiming via pairing code successfully binds device and issues token (Invariant I-53)."""
+    """Claiming via pairing code and provision_token binds device and issues token (Invariant I-53)."""
     prov_resp = client.post("/api/auth/provision-session", json={})
     pairing_code = prov_resp.json()["pairing_code"]
+    provision_token = prov_resp.json()["provision_token"]
 
     claim_resp = client.post(
         "/api/auth/claim-session",
         json={
             "pairing_code": pairing_code,
+            "provision_token": provision_token,
             "device_id": "10BF5P2AZF0010T",
             "device_name": "Founder Android Device",
             "device_type": "mobile_android",
@@ -206,8 +238,25 @@ def test_claim_session_by_provision_token(client: TestClient) -> None:
     assert claim_resp.json()["status"] == "claimed"
 
 
+def test_claim_session_invalid_token(client: TestClient) -> None:
+    """Claiming with mismatched provision token returns 401 Unauthorized (Finding 3)."""
+    prov_resp = client.post("/api/auth/provision-session", json={})
+    session_id = prov_resp.json()["session_id"]
+
+    claim_resp = client.post(
+        "/api/auth/claim-session",
+        json={
+            "session_id": session_id,
+            "provision_token": "wrong-secret-token",
+            "device_id": "device-attacker",
+        },
+    )
+    assert claim_resp.status_code == 401
+    assert "invalid provision token" in claim_resp.json()["detail"].lower()
+
+
 def test_claim_session_missing_identifier(client: TestClient) -> None:
-    """Attempting claim without session identifier returns 422 Unprocessable Entity."""
+    """Attempting claim without required provision_token returns 422 Unprocessable Entity."""
     resp = client.post(
         "/api/auth/claim-session",
         json={"device_id": "device-orphan"},
@@ -219,13 +268,17 @@ def test_claim_session_nonexistent(client: TestClient) -> None:
     """Attempting claim on non-existent session returns 404 Not Found."""
     resp = client.post(
         "/api/auth/claim-session",
-        json={"session_id": "non-existent-uuid", "device_id": "dev-1"},
+        json={
+            "session_id": "non-existent-uuid",
+            "provision_token": "some-token",
+            "device_id": "dev-1",
+        },
     )
     assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# Invariant I-54: Device Registry & Revocation
+# Invariant I-54: Device Registry & SQLite Persistence
 # ---------------------------------------------------------------------------
 
 
@@ -235,13 +288,23 @@ def test_devices_listing_and_revocation(client: TestClient) -> None:
     p1 = client.post("/api/auth/provision-session", json={}).json()
     client.post(
         "/api/auth/claim-session",
-        json={"session_id": p1["session_id"], "device_id": "dev-alpha", "device_name": "Device Alpha"},
+        json={
+            "session_id": p1["session_id"],
+            "provision_token": p1["provision_token"],
+            "device_id": "dev-alpha",
+            "device_name": "Device Alpha",
+        },
     )
 
     p2 = client.post("/api/auth/provision-session", json={}).json()
     client.post(
         "/api/auth/claim-session",
-        json={"session_id": p2["session_id"], "device_id": "dev-beta", "device_name": "Device Beta"},
+        json={
+            "session_id": p2["session_id"],
+            "provision_token": p2["provision_token"],
+            "device_id": "dev-beta",
+            "device_name": "Device Beta",
+        },
     )
 
     # 2. List devices
@@ -272,6 +335,31 @@ def test_devices_listing_and_revocation(client: TestClient) -> None:
     # 6. Revoke non-existent device returns 404
     non_existent_resp = client.delete("/api/auth/devices/unknown-device")
     assert non_existent_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_device_registry_sqlite_persistence(clean_stores: dict[str, object]) -> None:
+    """Device registry persists records across registry instances via SQLite (Finding 2)."""
+    db_path = clean_stores["db_path"]
+    assert isinstance(db_path, Path)
+
+    # Instance 1 registers device
+    reg_1 = DeviceRegistry(db_path=db_path)
+    await reg_1.register_device(
+        device_id="persistent-device-1",
+        name="Mac Runner Node",
+        device_type="node",
+        metadata={"os": "darwin"},
+    )
+
+    # Instance 2 (simulating restart) reads from same SQLite database
+    reg_2 = DeviceRegistry(db_path=db_path)
+    device = await reg_2.get_device("persistent-device-1")
+    assert device is not None
+    assert device.device_id == "persistent-device-1"
+    assert device.name == "Mac Runner Node"
+    assert device.status == "active"
+    assert device.metadata == {"os": "darwin"}
 
 
 def test_devices_rbac_requires_founder(clean_stores: dict[str, object]) -> None:
@@ -350,7 +438,12 @@ def test_node_register_wss_lifecycle(clean_stores: dict[str, object], client: Te
         assert pong["type"] == "pong"
 
     # Invariant I-56: After WebSocket disconnection, node status is marked offline
-    node = asyncio.run(node_registry.get_node("node-mac-runner"))
+    node = None
+    for _ in range(20):
+        node = asyncio.run(node_registry.get_node("node-mac-runner"))
+        if node and node.status == "offline":
+            break
+        time.sleep(0.05)
     assert node is not None
     assert node.status == "offline"
 
@@ -372,7 +465,9 @@ async def test_dispatch_lease_unregistered_node(client: TestClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dispatch_lease_no_tasks(clean_stores: dict[str, object], client: TestClient) -> None:
+async def test_dispatch_lease_no_tasks(
+    clean_stores: dict[str, object], client: TestClient
+) -> None:
     """Lease request when queue has no approved tasks returns status 'no_tasks'."""
     node_registry = clean_stores["node_registry"]
     assert isinstance(node_registry, NodeRegistry)
@@ -474,7 +569,9 @@ async def test_dispatch_lease_approved_task(
 
 
 @pytest.mark.asyncio
-async def test_dispatch_lease_emergency_stop_refusal(clean_stores: dict[str, object], client: TestClient) -> None:
+async def test_dispatch_lease_emergency_stop_refusal(
+    clean_stores: dict[str, object], client: TestClient
+) -> None:
     """Task lease is refused with 503 during active Emergency Stop (Invariant I-60)."""
     node_registry = clean_stores["node_registry"]
     queue = clean_stores["queue"]
@@ -580,7 +677,9 @@ def test_stream_hub_fanout_and_envelope_integrity(client: TestClient) -> None:
             assert received_sys["payload"] == sys_payload
 
 
-def test_stream_hub_emergency_stop_announcement(clean_stores: dict[str, object], client: TestClient) -> None:
+def test_stream_hub_emergency_stop_announcement(
+    clean_stores: dict[str, object], client: TestClient
+) -> None:
     """When emergency stop is active, stream hub immediately notifies connectee (Invariant I-60)."""
     queue = clean_stores["queue"]
     assert isinstance(queue, TaskTriageQueue)

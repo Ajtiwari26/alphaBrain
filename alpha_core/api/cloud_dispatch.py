@@ -3,9 +3,9 @@ alpha_core/api/cloud_dispatch.py
 Cloud-First Provisioning, Node Registry, Task Dispatch, and Broadcast Stream Hub API.
 
 Invariants Enforced:
-- I-52: Ephemeral Provisioning Session TTL & Single-Use (Strict 300s TTL, single-claim enforcement).
+- I-52: Ephemeral Provisioning Session TTL & Single-Use (Strict 300s TTL, single-claim enforcement in SQLite).
 - I-53: Atomic Session Claim & Founder Binding (Atomic transition, binds device to founder principal).
-- I-54: Device Registry & Revocation (Track all claimed devices, support revocation, require founder auth).
+- I-54: Device Registry & Revocation (Persistent SQLite registry, support revocation, require founder auth).
 - I-55: Node Authentication & Registration Heartbeat (WSS) (Secure node registration, periodic liveness).
 - I-56: Node Disconnection & Heartbeat Expiry Isolation (Auto-detect disconnection, update node status).
 - I-57: Atomic Task Dispatch Lease via Registry (Only registered online nodes, atomic lease, emergency stop check).
@@ -20,10 +20,12 @@ import asyncio
 import json
 import logging
 import secrets
+import sqlite3
 import time
 import uuid
-from contextlib import suppress
+from contextlib import closing, suppress
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -54,6 +56,61 @@ logger = logging.getLogger("alpha_core.api.cloud_dispatch")
 
 router = APIRouter(tags=["cloud_dispatch"])
 
+DEFAULT_CLOUD_DISPATCH_DB = Path.home() / ".alphabrain" / "cloud_dispatch.db"
+
+
+def init_cloud_dispatch_db(db_path: Path) -> None:
+    """Initializes SQLite persistence schemas for cloud provisioning and node registry (Finding 2)."""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(str(db_path))) as conn:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS provisioning_sessions (
+                session_id TEXT PRIMARY KEY,
+                pairing_code TEXT UNIQUE NOT NULL,
+                provision_token TEXT UNIQUE NOT NULL,
+                created_by_principal TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                status TEXT NOT NULL,
+                claimed_by_device_id TEXT,
+                claimed_at REAL,
+                metadata_json TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS registered_devices (
+                device_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                device_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                registered_at TEXT NOT NULL,
+                last_seen TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS registered_nodes (
+                node_id TEXT PRIMARY KEY,
+                hostname TEXT NOT NULL,
+                capabilities_json TEXT NOT NULL,
+                labels_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                registered_at TEXT NOT NULL,
+                last_heartbeat REAL NOT NULL,
+                active_tasks_json TEXT NOT NULL
+            );
+            """
+        )
+        conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -75,9 +132,9 @@ class ProvisionSessionResponse(BaseModel):
 
 
 class ClaimSessionRequest(BaseModel):
+    provision_token: str = Field(min_length=1, max_length=512)
     session_id: str | None = Field(default=None, max_length=128)
     pairing_code: str | None = Field(default=None, max_length=32)
-    provision_token: str | None = Field(default=None, max_length=512)
     device_id: str = Field(min_length=1, max_length=128)
     device_name: str = Field(default="Founder Device", max_length=128)
     device_type: str = Field(default="mobile", max_length=64)
@@ -121,7 +178,7 @@ class DispatchLeaseResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# State Models & In-Memory Stores
+# State Models & SQLite Stores
 # ---------------------------------------------------------------------------
 
 
@@ -131,18 +188,25 @@ class ProvisioningSession:
         session_id: str,
         pairing_code: str,
         provision_token: str,
+        created_by: str,
+        created_at: float,
+        expires_at: float,
         ttl_seconds: int = 300,
+        status: str = "pending",
+        claimed_by_device_id: str | None = None,
+        claimed_at: float | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         self.session_id = session_id
         self.pairing_code = pairing_code
         self.provision_token = provision_token
-        self.created_at = time.time()
+        self.created_by = created_by
+        self.created_at = created_at
+        self.expires_at = expires_at
         self.ttl_seconds = ttl_seconds
-        self.expires_at = self.created_at + ttl_seconds
-        self.status = "pending"  # "pending", "claimed", "expired"
-        self.claimed_by_device_id: str | None = None
-        self.claimed_at: float | None = None
+        self.status = status
+        self.claimed_by_device_id = claimed_by_device_id
+        self.claimed_at = claimed_at
         self.metadata = metadata or {}
 
     def is_expired(self) -> bool:
@@ -150,84 +214,160 @@ class ProvisioningSession:
 
 
 class ProvisioningSessionStore:
-    def __init__(self) -> None:
-        self._lock = asyncio.Lock()
-        self._sessions: dict[str, ProvisioningSession] = {}
-        self._by_code: dict[str, str] = {}
-        self._by_token: dict[str, str] = {}
+    """SQLite-backed Provisioning Session Store preventing state loss (Finding 2)."""
+
+    def __init__(self, db_path: Path | str | None = None) -> None:
+        self.db_path = Path(db_path) if db_path else DEFAULT_CLOUD_DISPATCH_DB
+        init_cloud_dispatch_db(self.db_path)
+
+    def _get_conn(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     async def create_session(
-        self, ttl_seconds: int = 300, metadata: dict[str, Any] | None = None
+        self,
+        created_by: str,
+        ttl_seconds: int = 300,
+        metadata: dict[str, Any] | None = None,
     ) -> ProvisioningSession:
-        async with self._lock:
-            self._cleanup_expired_locked()
-            session_id = str(uuid.uuid4())
-            pairing_code = f"AB-{secrets.randbelow(1000000):06d}"
-            provision_token = secrets.token_urlsafe(32)
+        session_id = str(uuid.uuid4())
+        pairing_code = f"AB-{secrets.randbelow(1000000):06d}"
+        provision_token = secrets.token_urlsafe(32)
+        now = time.time()
+        expires_at = now + ttl_seconds
+        meta_json = json.dumps(metadata or {})
 
-            session = ProvisioningSession(
-                session_id=session_id,
-                pairing_code=pairing_code,
-                provision_token=provision_token,
-                ttl_seconds=ttl_seconds,
-                metadata=metadata,
-            )
-            self._sessions[session_id] = session
-            self._by_code[pairing_code] = session_id
-            self._by_token[provision_token] = session_id
-            return session
+        def _write() -> None:
+            with closing(self._get_conn()) as conn:
+                with conn:
+                    # Clean up expired sessions
+                    conn.execute(
+                        "DELETE FROM provisioning_sessions WHERE expires_at < ? AND status != 'claimed'",
+                        (now - 3600,),
+                    )
+                    conn.execute(
+                        """
+                        INSERT INTO provisioning_sessions (
+                            session_id, pairing_code, provision_token,
+                            created_by_principal, created_at, expires_at,
+                            status, metadata_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+                        """,
+                        (
+                            session_id,
+                            pairing_code,
+                            provision_token,
+                            created_by,
+                            now,
+                            expires_at,
+                            meta_json,
+                        ),
+                    )
+
+        await asyncio.to_thread(_write)
+        return ProvisioningSession(
+            session_id=session_id,
+            pairing_code=pairing_code,
+            provision_token=provision_token,
+            created_by=created_by,
+            created_at=now,
+            expires_at=expires_at,
+            ttl_seconds=ttl_seconds,
+            status="pending",
+            metadata=metadata or {},
+        )
 
     async def claim_session(
         self,
-        session_id: str | None,
-        pairing_code: str | None,
-        provision_token: str | None,
+        provision_token: str,
         device_id: str,
+        session_id: str | None = None,
+        pairing_code: str | None = None,
     ) -> ProvisioningSession:
-        async with self._lock:
-            # Locate session (Invariant I-52 & I-53)
-            sid = session_id
-            if not sid and pairing_code:
-                sid = self._by_code.get(pairing_code)
-            if not sid and provision_token:
-                sid = self._by_token.get(provision_token)
-
-            if not sid or sid not in self._sessions:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Provisioning session not found",
-                )
-
-            session = self._sessions[sid]
-
-            # Invariant I-52: Ephemeral session TTL
-            if session.is_expired():
-                session.status = "expired"
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Provisioning session has expired",
-                )
-
-            # Invariant I-53: Atomic claim & single-use
-            if session.status == "claimed":
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Provisioning session already claimed",
-                )
-
-            session.status = "claimed"
-            session.claimed_by_device_id = device_id
-            session.claimed_at = time.time()
-            return session
-
-    def _cleanup_expired_locked(self) -> None:
         now = time.time()
-        expired_ids = [sid for sid, s in self._sessions.items() if now > s.expires_at]
-        for sid in expired_ids:
-            s = self._sessions.pop(sid, None)
-            if s:
-                self._by_code.pop(s.pairing_code, None)
-                self._by_token.pop(s.provision_token, None)
+
+        def _claim() -> ProvisioningSession:
+            with closing(self._get_conn()) as conn:
+                with conn:
+                    if session_id:
+                        row = conn.execute(
+                            "SELECT * FROM provisioning_sessions WHERE session_id = ?",
+                            (session_id,),
+                        ).fetchone()
+                    elif pairing_code:
+                        row = conn.execute(
+                            "SELECT * FROM provisioning_sessions WHERE pairing_code = ?",
+                            (pairing_code,),
+                        ).fetchone()
+                    else:
+                        row = conn.execute(
+                            "SELECT * FROM provisioning_sessions WHERE provision_token = ?",
+                            (provision_token,),
+                        ).fetchone()
+
+                    if not row:
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Provisioning session not found",
+                        )
+
+                    # Timing-safe token comparison (Finding 3)
+                    stored_token = row["provision_token"]
+                    if not secrets.compare_digest(stored_token, provision_token):
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid provision token",
+                        )
+
+                    # Invariant I-52: Ephemeral session TTL
+                    if now > row["expires_at"]:
+                        conn.execute(
+                            "UPDATE provisioning_sessions SET status = 'expired' WHERE session_id = ?",
+                            (row["session_id"],),
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Provisioning session has expired",
+                        )
+
+                    # Invariant I-53: Atomic claim & single-use
+                    if row["status"] == "claimed":
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="Provisioning session already claimed",
+                        )
+
+                    # Atomic state transition in transaction
+                    cursor = conn.execute(
+                        """
+                        UPDATE provisioning_sessions
+                        SET status = 'claimed', claimed_by_device_id = ?, claimed_at = ?
+                        WHERE session_id = ? AND status = 'pending' AND expires_at >= ?
+                        """,
+                        (device_id, now, row["session_id"], now),
+                    )
+                    if cursor.rowcount == 0:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="Provisioning session already claimed",
+                        )
+
+                    return ProvisioningSession(
+                        session_id=row["session_id"],
+                        pairing_code=row["pairing_code"],
+                        provision_token=row["provision_token"],
+                        created_by=row["created_by_principal"],
+                        created_at=row["created_at"],
+                        expires_at=row["expires_at"],
+                        ttl_seconds=int(row["expires_at"] - row["created_at"]),
+                        status="claimed",
+                        claimed_by_device_id=device_id,
+                        claimed_at=now,
+                        metadata=json.loads(row["metadata_json"]),
+                    )
+
+        return await asyncio.to_thread(_claim)
 
 
 class RegisteredDevice:
@@ -236,15 +376,18 @@ class RegisteredDevice:
         device_id: str,
         name: str,
         device_type: str,
+        status: str = "active",
+        registered_at: str | None = None,
+        last_seen: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         now_iso = datetime.now(UTC).isoformat()
         self.device_id = device_id
         self.name = name
         self.device_type = device_type
-        self.registered_at = now_iso
-        self.last_seen = now_iso
-        self.status = "active"  # "active" or "revoked"
+        self.registered_at = registered_at or now_iso
+        self.last_seen = last_seen or now_iso
+        self.status = status
         self.metadata = metadata or {}
 
     def to_dict(self) -> dict[str, Any]:
@@ -260,11 +403,16 @@ class RegisteredDevice:
 
 
 class DeviceRegistry:
-    """Manages devices bound to the Founder session (Invariant I-54)."""
+    """Persistent SQLite Device Registry (Findings 2 & Invariant I-54)."""
 
-    def __init__(self) -> None:
-        self._lock = asyncio.Lock()
-        self._devices: dict[str, RegisteredDevice] = {}
+    def __init__(self, db_path: Path | str | None = None) -> None:
+        self.db_path = Path(db_path) if db_path else DEFAULT_CLOUD_DISPATCH_DB
+        init_cloud_dispatch_db(self.db_path)
+
+    def _get_conn(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     async def register_device(
         self,
@@ -273,44 +421,100 @@ class DeviceRegistry:
         device_type: str,
         metadata: dict[str, Any] | None = None,
     ) -> RegisteredDevice:
-        async with self._lock:
-            device = self._devices.get(device_id)
-            if device:
-                device.name = name
-                device.device_type = device_type
-                device.status = "active"
-                device.last_seen = datetime.now(UTC).isoformat()
-                if metadata:
-                    device.metadata.update(metadata)
-            else:
-                device = RegisteredDevice(
-                    device_id=device_id,
-                    name=name,
-                    device_type=device_type,
-                    metadata=metadata,
-                )
-                self._devices[device_id] = device
-            return device
+        now_iso = datetime.now(UTC).isoformat()
+        meta_json = json.dumps(metadata or {})
+
+        def _upsert() -> RegisteredDevice:
+            with closing(self._get_conn()) as conn:
+                with conn:
+                    conn.execute(
+                        """
+                        INSERT INTO registered_devices (
+                            device_id, name, device_type, status,
+                            registered_at, last_seen, metadata_json
+                        ) VALUES (?, ?, ?, 'active', ?, ?, ?)
+                        ON CONFLICT(device_id) DO UPDATE SET
+                            name = excluded.name,
+                            device_type = excluded.device_type,
+                            status = 'active',
+                            last_seen = excluded.last_seen,
+                            metadata_json = excluded.metadata_json
+                        """,
+                        (device_id, name, device_type, now_iso, now_iso, meta_json),
+                    )
+            return RegisteredDevice(
+                device_id=device_id,
+                name=name,
+                device_type=device_type,
+                status="active",
+                registered_at=now_iso,
+                last_seen=now_iso,
+                metadata=metadata or {},
+            )
+
+        return await asyncio.to_thread(_upsert)
 
     async def list_devices(self, status_filter: str | None = None) -> list[RegisteredDevice]:
-        async with self._lock:
-            devices = list(self._devices.values())
-            if status_filter:
-                devices = [d for d in devices if d.status == status_filter]
-            return devices
+        def _list() -> list[RegisteredDevice]:
+            with closing(self._get_conn()) as conn:
+                if status_filter:
+                    rows = conn.execute(
+                        "SELECT * FROM registered_devices WHERE status = ? ORDER BY registered_at DESC",
+                        (status_filter,),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT * FROM registered_devices ORDER BY registered_at DESC"
+                    ).fetchall()
+                return [
+                    RegisteredDevice(
+                        device_id=r["device_id"],
+                        name=r["name"],
+                        device_type=r["device_type"],
+                        status=r["status"],
+                        registered_at=r["registered_at"],
+                        last_seen=r["last_seen"],
+                        metadata=json.loads(r["metadata_json"]),
+                    )
+                    for r in rows
+                ]
+
+        return await asyncio.to_thread(_list)
 
     async def get_device(self, device_id: str) -> RegisteredDevice | None:
-        async with self._lock:
-            return self._devices.get(device_id)
+        def _get() -> RegisteredDevice | None:
+            with closing(self._get_conn()) as conn:
+                row = conn.execute(
+                    "SELECT * FROM registered_devices WHERE device_id = ?",
+                    (device_id,),
+                ).fetchone()
+                if not row:
+                    return None
+                return RegisteredDevice(
+                    device_id=row["device_id"],
+                    name=row["name"],
+                    device_type=row["device_type"],
+                    status=row["status"],
+                    registered_at=row["registered_at"],
+                    last_seen=row["last_seen"],
+                    metadata=json.loads(row["metadata_json"]),
+                )
+
+        return await asyncio.to_thread(_get)
 
     async def revoke_device(self, device_id: str) -> bool:
-        async with self._lock:
-            device = self._devices.get(device_id)
-            if not device:
-                return False
-            device.status = "revoked"
-            device.last_seen = datetime.now(UTC).isoformat()
-            return True
+        now_iso = datetime.now(UTC).isoformat()
+
+        def _revoke() -> bool:
+            with closing(self._get_conn()) as conn:
+                with conn:
+                    cursor = conn.execute(
+                        "UPDATE registered_devices SET status = 'revoked', last_seen = ? WHERE device_id = ?",
+                        (now_iso, device_id),
+                    )
+                    return cursor.rowcount > 0
+
+        return await asyncio.to_thread(_revoke)
 
 
 class RegisteredNode:
@@ -322,16 +526,20 @@ class RegisteredNode:
         hostname: str,
         capabilities: list[str],
         labels: dict[str, str] | None = None,
+        status: str = "online",
+        registered_at: str | None = None,
+        last_heartbeat: float | None = None,
+        active_tasks: list[str] | None = None,
     ) -> None:
         now_iso = datetime.now(UTC).isoformat()
         self.node_id = node_id
         self.hostname = hostname
         self.capabilities = capabilities
         self.labels = labels or {}
-        self.status = "online"  # "online", "busy", "offline"
-        self.registered_at = now_iso
-        self.last_heartbeat = time.time()
-        self.active_tasks: list[str] = []
+        self.status = status
+        self.registered_at = registered_at or now_iso
+        self.last_heartbeat = last_heartbeat or time.time()
+        self.active_tasks = active_tasks or []
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -347,12 +555,18 @@ class RegisteredNode:
 
 
 class NodeRegistry:
-    """Maintains active cluster nodes and their live connections (Invariants I-55 & I-56)."""
+    """Maintains active cluster nodes with SQLite persistence and live WebSocket handles."""
 
-    def __init__(self) -> None:
-        self._lock = asyncio.Lock()
-        self._nodes: dict[str, RegisteredNode] = {}
+    def __init__(self, db_path: Path | str | None = None) -> None:
+        self.db_path = Path(db_path) if db_path else DEFAULT_CLOUD_DISPATCH_DB
+        init_cloud_dispatch_db(self.db_path)
         self._connections: dict[str, WebSocket] = {}
+        self._lock = asyncio.Lock()
+
+    def _get_conn(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     async def register_node(
         self,
@@ -362,54 +576,124 @@ class NodeRegistry:
         labels: dict[str, str] | None = None,
         websocket: WebSocket | None = None,
     ) -> RegisteredNode:
-        async with self._lock:
-            node = self._nodes.get(node_id)
-            if node:
-                node.hostname = hostname
-                node.capabilities = capabilities
-                node.labels = labels or {}
-                node.status = "online"
-                node.last_heartbeat = time.time()
-            else:
-                node = RegisteredNode(
-                    node_id=node_id,
-                    hostname=hostname,
-                    capabilities=capabilities,
-                    labels=labels,
-                )
-                self._nodes[node_id] = node
+        now_iso = datetime.now(UTC).isoformat()
+        now_ts = time.time()
+        caps_json = json.dumps(capabilities)
+        labels_json = json.dumps(labels or {})
 
+        def _write() -> None:
+            with closing(self._get_conn()) as conn:
+                with conn:
+                    conn.execute(
+                        """
+                        INSERT INTO registered_nodes (
+                            node_id, hostname, capabilities_json, labels_json,
+                            status, registered_at, last_heartbeat, active_tasks_json
+                        ) VALUES (?, ?, ?, ?, 'online', ?, ?, '[]')
+                        ON CONFLICT(node_id) DO UPDATE SET
+                            hostname = excluded.hostname,
+                            capabilities_json = excluded.capabilities_json,
+                            labels_json = excluded.labels_json,
+                            status = 'online',
+                            last_heartbeat = excluded.last_heartbeat
+                        """,
+                        (node_id, hostname, caps_json, labels_json, now_iso, now_ts),
+                    )
+
+        await asyncio.to_thread(_write)
+        async with self._lock:
             if websocket:
                 self._connections[node_id] = websocket
-            return node
+
+        return RegisteredNode(
+            node_id=node_id,
+            hostname=hostname,
+            capabilities=capabilities,
+            labels=labels or {},
+            status="online",
+            registered_at=now_iso,
+            last_heartbeat=now_ts,
+            active_tasks=[],
+        )
 
     async def record_heartbeat(
         self, node_id: str, load: float = 0.0, active_tasks: list[str] | None = None
     ) -> bool:
-        async with self._lock:
-            node = self._nodes.get(node_id)
-            if not node:
-                return False
-            node.last_heartbeat = time.time()
-            node.status = "busy" if (active_tasks and len(active_tasks) > 0) else "online"
-            if active_tasks is not None:
-                node.active_tasks = active_tasks
-            return True
+        now_ts = time.time()
+        new_status = "busy" if (active_tasks and len(active_tasks) > 0) else "online"
+        tasks_json = json.dumps(active_tasks if active_tasks is not None else [])
+
+        def _write() -> bool:
+            with closing(self._get_conn()) as conn:
+                with conn:
+                    cursor = conn.execute(
+                        """
+                        UPDATE registered_nodes
+                        SET last_heartbeat = ?, status = ?, active_tasks_json = ?
+                        WHERE node_id = ?
+                        """,
+                        (now_ts, new_status, tasks_json, node_id),
+                    )
+                    return cursor.rowcount > 0
+
+        return await asyncio.to_thread(_write)
 
     async def mark_offline(self, node_id: str) -> None:
+        def _write() -> None:
+            with closing(self._get_conn()) as conn:
+                with conn:
+                    conn.execute(
+                        "UPDATE registered_nodes SET status = 'offline' WHERE node_id = ?",
+                        (node_id,),
+                    )
+
+        await asyncio.to_thread(_write)
         async with self._lock:
-            node = self._nodes.get(node_id)
-            if node:
-                node.status = "offline"
             self._connections.pop(node_id, None)
 
     async def get_node(self, node_id: str) -> RegisteredNode | None:
-        async with self._lock:
-            return self._nodes.get(node_id)
+        def _read() -> RegisteredNode | None:
+            with closing(self._get_conn()) as conn:
+                row = conn.execute(
+                    "SELECT * FROM registered_nodes WHERE node_id = ?",
+                    (node_id,),
+                ).fetchone()
+                if not row:
+                    return None
+                return RegisteredNode(
+                    node_id=row["node_id"],
+                    hostname=row["hostname"],
+                    capabilities=json.loads(row["capabilities_json"]),
+                    labels=json.loads(row["labels_json"]),
+                    status=row["status"],
+                    registered_at=row["registered_at"],
+                    last_heartbeat=row["last_heartbeat"],
+                    active_tasks=json.loads(row["active_tasks_json"]),
+                )
+
+        return await asyncio.to_thread(_read)
 
     async def list_online_nodes(self) -> list[RegisteredNode]:
-        async with self._lock:
-            return [n for n in self._nodes.values() if n.status in ("online", "busy")]
+        def _read() -> list[RegisteredNode]:
+            with closing(self._get_conn()) as conn:
+                rows = conn.execute(
+                    "SELECT * FROM registered_nodes WHERE status IN ('online', 'busy')"
+                ).fetchall()
+                return [
+                    RegisteredNode(
+                        node_id=r["node_id"],
+                        hostname=r["hostname"],
+                        capabilities=json.loads(r["capabilities_json"]),
+                        labels=json.loads(r["labels_json"]),
+                        status=r["status"],
+                        registered_at=r["registered_at"],
+                        last_heartbeat=r["last_heartbeat"],
+                        active_tasks=json.loads(r["active_tasks_json"]),
+                    )
+                    for r in rows
+                ]
+
+        return await asyncio.to_thread(_read)
 
 
 class BroadcastStreamHub:
@@ -546,16 +830,24 @@ def require_founder_role(principal: AuthPrincipal) -> None:
 )
 async def provision_session(
     req: ProvisionSessionRequest | None = None,
+    principal: AuthPrincipal = Depends(require_api_principal),
     store: ProvisioningSessionStore = Depends(get_provisioning_store),
 ) -> ProvisionSessionResponse:
     """
     Creates an ephemeral pairing session with strict 300s TTL (Invariant I-52).
+    Requires authenticated Founder/Admin principal to prevent privilege escalation (Finding 1).
     """
+    require_founder_role(principal)
+
     metadata = req.metadata if req else {}
     if req and req.client_name:
         metadata["client_name"] = req.client_name
 
-    session = await store.create_session(ttl_seconds=300, metadata=metadata)
+    session = await store.create_session(
+        created_by=principal.subject,
+        ttl_seconds=300,
+        metadata=metadata,
+    )
 
     qr_payload = json.dumps(
         {
@@ -595,31 +887,29 @@ async def claim_session(
 ) -> ClaimSessionResponse:
     """
     Atomically claims an ephemeral provisioning session and binds the device to
-    the Founder identity (Invariants I-52 & I-53).
+    the Founder identity (Invariants I-52 & I-53) using timing-safe token checks (Finding 3).
     """
-    if not req.session_id and not req.pairing_code and not req.provision_token:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Must provide session_id, pairing_code, or provision_token",
-        )
-
-    # Atomically claim session in store (Invariant I-53)
+    # Atomically claim session in SQLite store (Invariants I-52 & I-53)
     session = await store.claim_session(
-        session_id=req.session_id,
-        pairing_code=req.pairing_code,
         provision_token=req.provision_token,
         device_id=req.device_id,
+        session_id=req.session_id,
+        pairing_code=req.pairing_code,
     )
 
-    # Register device into DeviceRegistry (Invariant I-54)
+    # Register device into persistent SQLite DeviceRegistry (Finding 2 & Invariant I-54)
     device = await devices.register_device(
         device_id=req.device_id,
         name=req.device_name,
         device_type=req.device_type,
-        metadata={**req.metadata, "session_id": session.session_id},
+        metadata={
+            **req.metadata,
+            "session_id": session.session_id,
+            "provisioned_by": session.created_by,
+        },
     )
 
-    # Generate long-lived Founder Session Token (86400s / 24h)
+    # Generate long-lived Founder Session Token bound to the device (86400s / 24h)
     ttl_seconds = 86400
     session_token = create_scoped_principal_token(
         subject=f"founder:{req.device_id}",
@@ -710,9 +1000,10 @@ async def revoke_device_post(
 
 
 def _authenticate_node_token(token: str | None) -> str | None:
-    """Validates node authentication token against signing secrets or worker key."""
+    """Validates node authentication token with timing-safe comparison (Finding 3)."""
     if not token:
         return None
+
     # 1. Check worker identity token
     worker_claims = verify_worker_identity_token(token)
     if worker_claims and "worker_id" in worker_claims:
@@ -723,13 +1014,13 @@ def _authenticate_node_token(token: str | None) -> str | None:
     if principal and principal.subject:
         return principal.subject
 
-    # 3. Check worker API secret key
+    # 3. Check worker API secret key with constant-time comparison (Finding 3)
     expected_worker_key = getattr(settings, "ALPHA_WORKER_KEY", None)
-    if expected_worker_key and token == expected_worker_key:
+    if expected_worker_key and secrets.compare_digest(token, expected_worker_key):
         return "authenticated_worker"
 
     expected_signing_secret = getattr(settings, "ALPHA_SIGNING_SECRET", None)
-    if expected_signing_secret and token == expected_signing_secret:
+    if expected_signing_secret and secrets.compare_digest(token, expected_signing_secret):
         return "authenticated_node"
 
     return None
@@ -748,7 +1039,6 @@ async def register_node_wss(
     # Authenticate node (Invariant I-55)
     auth_token = token
     if not auth_token:
-        # Check Authorization header if present
         auth_header = websocket.headers.get("Authorization") or websocket.headers.get(
             "authorization"
         )
@@ -792,7 +1082,7 @@ async def register_node_wss(
         capabilities = list(msg.get("capabilities", []))
         labels = dict(msg.get("labels", {}))
 
-        # Register in NodeRegistry (Invariant I-55)
+        # Register in persistent SQLite NodeRegistry (Finding 2 & Invariant I-55)
         await nodes.register_node(
             node_id=current_node_id,
             hostname=hostname,
@@ -916,6 +1206,7 @@ async def dispatch_task_lease(
     # Update node active tasks
     node.active_tasks.append(task_id)
     node.status = "busy"
+    await nodes.record_heartbeat(target_node_id, active_tasks=node.active_tasks)
 
     return DispatchLeaseResponse(
         status="leased",
@@ -933,7 +1224,7 @@ async def dispatch_task_lease(
 
 
 def _authenticate_stream_token(token: str | None, task_id: str) -> bool:
-    """Verifies stream authorization for given task_id (Invariant I-58)."""
+    """Verifies stream authorization with timing-safe comparisons (Finding 3 & Invariant I-58)."""
     if not token:
         return False
 
@@ -959,10 +1250,13 @@ def _authenticate_stream_token(token: str | None, task_id: str) -> bool:
     if worker_claims:
         return True
 
-    # 5. Fallback server secrets
-    if token == getattr(settings, "ALPHA_WORKER_KEY", None) or token == getattr(
-        settings, "ALPHA_SIGNING_SECRET", None
-    ):
+    # 5. Fallback server secrets using constant-time comparison (Finding 3)
+    expected_worker = getattr(settings, "ALPHA_WORKER_KEY", None)
+    if expected_worker and secrets.compare_digest(token, expected_worker):
+        return True
+
+    expected_signing = getattr(settings, "ALPHA_SIGNING_SECRET", None)
+    if expected_signing and secrets.compare_digest(token, expected_signing):
         return True
 
     return False
