@@ -72,6 +72,8 @@ Gemini 3.1 Pro High.
 
 - [x] P14.2-DESKTOP: Tauri 2.0 Rust Core Mac App & 4 Locomotive Screens (M-01 to M-04) (`commit 5f65b44`, `tsk_eva_cbc068ce5324`).
 
+- [x] P14.2-DESKTOP: Tauri 2.0 build.rs and telemetry isolation (`commit ab1734a`, `tsk_eva_2a24f57b7758`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
