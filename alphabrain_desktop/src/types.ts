@@ -34,7 +34,13 @@ export type ScreenId =
   | 'M01_NodeSetup'
   | 'M02_PairingStation'
   | 'M03_CommandNode'
-  | 'M04_SecurityEnclave';
+  | 'M04_SecurityEnclave'
+  | 'EvaMeeting'
+  | 'Projects'
+  | 'ModelRouter'
+  | 'TriageQueue'
+  | 'Departments'
+  | 'EmergencyStop';
 
 export interface DependencyReport {
   git_version: string;
@@ -116,4 +122,63 @@ export interface ApiVaultItem {
   masked_value: string;
   last_used: string;
   in_keychain: boolean;
+}
+
+export interface EvaMeetingState {
+  room_name: string;
+  connected: boolean;
+  participant_count: number;
+  audio_active: boolean;
+  video_active: boolean;
+  eva_speaking: boolean;
+  rtt_ms: number;
+  packet_loss_percent: number;
+}
+
+export interface EmergencyStopState {
+  active: boolean;
+  locked_at: number | null;
+  lock_file: string;
+  reason: string;
+  triggered_by: string;
+}
+
+export interface TaskSummary {
+  task_id: string;
+  title: string;
+  category: string;
+  status: string;
+  priority: string;
+  risk_class: string;
+  created_at: number;
+  updated_at: number;
+  author: string;
+  allowed_paths: string[];
+  acceptance_commands: string[];
+}
+
+export interface TaskDetail extends TaskSummary {
+  description: string;
+  branch_name?: string;
+  worktree_path?: string;
+  review_notes?: string;
+  gate_results: Record<string, any>;
+  checkpoints: Array<{ step: string; status: string; timestamp?: number }>;
+}
+
+export interface ModelUtilityScore {
+  account_name: string;
+  email: string;
+  tier: string;
+  utility_score: number;
+  weekly_quota_percent: number;
+  five_hour_quota_percent: number;
+  recommended_model: string;
+}
+
+export interface ProjectItem {
+  name: string;
+  path: string;
+  mtime: number;
+  is_active: boolean;
 }
