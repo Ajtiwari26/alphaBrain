@@ -17,30 +17,59 @@ export function getApiBaseUrl(): string {
   return 'http://localhost:8000/api/v1/mobile';
 }
 
-export function getAuthToken(): string {
+export async function getAuthToken(): Promise<string> {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('alpha_api_token') || (import.meta.env?.VITE_DEFAULT_AUTH_TOKEN ?? '');
+    try {
+      if ((window as any).__TAURI_INTERNALS__) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const key = await invoke<string>('read_identity_key');
+        if (key) return key;
+      }
+    } catch {
+      // Non-tauri or keychain fallback
+    }
+    return sessionStorage.getItem('alpha_api_token') || localStorage.getItem('alpha_api_token') || '';
   }
   return '';
 }
 
-async function safeFetch<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
+async function safeFetch<T = any>(endpoint: string, options?: RequestInit, timeoutMs = 8000): Promise<T> {
   const baseUrl = getApiBaseUrl();
-  const token = getAuthToken();
-  const res = await fetch(`${baseUrl}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status}: ${errText || res.statusText || 'Request failed'}`);
+  const token = await getAuthToken();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(`${baseUrl}${endpoint}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options?.headers,
+      },
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${errText || res.statusText || 'Request failed'}`);
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return await res.json();
+    }
+    return (await res.text()) as unknown as T;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timeout (${timeoutMs}ms) connecting to ${endpoint}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return await res.json();
 }
+
 
 export const desktopApi = {
   getProjects: async (): Promise<ProjectItem[]> => {
