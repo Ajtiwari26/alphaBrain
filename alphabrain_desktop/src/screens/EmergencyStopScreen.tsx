@@ -24,6 +24,12 @@ export const EmergencyStopScreen: React.FC = () => {
   }, []);
 
   const handleToggle = async (enable: boolean) => {
+    const message = enable
+      ? 'HALT FLEET CONFIRMATION:\nAre you sure you want to engage the Emergency Stop?\nThis will immediately halt all autonomous workers, worktrees, and cloud leases.'
+      : 'RESUME FLEET CONFIRMATION:\nAre you sure you want to resume cluster operations?';
+    if (typeof window !== 'undefined' && !window.confirm(message)) {
+      return;
+    }
     setToggleLoading(true);
     try {
       const updated = await desktopApi.toggleEmergencyStop(

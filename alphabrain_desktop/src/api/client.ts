@@ -36,7 +36,8 @@ async function safeFetch<T = any>(endpoint: string, options?: RequestInit): Prom
     },
   });
   if (!res.ok) {
-    throw new Error(`HTTP error! status: ${res.status}`);
+    const errText = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}: ${errText || res.statusText || 'Request failed'}`);
   }
   return await res.json();
 }

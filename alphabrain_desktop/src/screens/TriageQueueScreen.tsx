@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { desktopApi } from '../api/client';
 import { TaskSummary } from '../types';
-import { RefreshCw, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface Props {
   onSelectTask?: (taskId: string) => void;
@@ -11,7 +11,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchTasks = () => {
     setLoading(true);
@@ -41,14 +41,17 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
           ? 'Approved by Founder Ajay from Mac Command Node'
           : 'Rejected by Founder Ajay'
       );
-      setFeedbackMessage(`Task ${taskId} successfully ${action}d.`);
+      setFeedback({ type: 'success', message: `Task ${taskId} successfully ${action}d.` });
       fetchTasks();
     } catch (err) {
       console.error(`Failed to ${action} task:`, err);
-      setFeedbackMessage(`Action completed locally for ${taskId}.`);
+      setFeedback({
+        type: 'error',
+        message: `Failed to ${action} task ${taskId}. Backend service unreachable.`,
+      });
     } finally {
       setReviewingId(null);
-      setTimeout(() => setFeedbackMessage(null), 4000);
+      setTimeout(() => setFeedback(null), 5000);
     }
   };
 
@@ -85,12 +88,23 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
         </div>
       </div>
 
-      {feedbackMessage && (
-        <div className="p-3 border border-[#0A0A0A] bg-emerald-50 text-emerald-800 font-mono text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          <span>{feedbackMessage}</span>
+      {feedback && (
+        <div
+          className={`p-3 border border-[#0A0A0A] font-mono text-xs flex items-center gap-2 ${
+            feedback.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800'
+              : 'bg-red-50 text-red-800'
+          }`}
+        >
+          {feedback.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-[#E6391E] shrink-0" />
+          )}
+          <span>{feedback.message}</span>
         </div>
       )}
+
 
       {/* Task List Table */}
       <div className="border border-[#0A0A0A] bg-white">
