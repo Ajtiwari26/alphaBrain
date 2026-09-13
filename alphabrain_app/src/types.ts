@@ -17,6 +17,10 @@ export type ScreenId =
   | 'deployments'
   | 'projects'
   | 'settings'
+  | 'enrollment'
+  | 'qr_provisioning'
+  | 'sas_verification'
+  | 'eva_meeting'
   | 'task_detail'
   | 'code_diff'
   | 'voice_briefing'
@@ -27,6 +31,25 @@ export type ScreenId =
   | 'privacy_compliance'
   | 'audit_trail'
   | 'emergency_stop';
+
+export interface EvaMeetingState {
+  room_name: string;
+  connected: boolean;
+  participant_count: number;
+  audio_active: boolean;
+  video_active: boolean;
+  eva_speaking: boolean;
+  rtt_ms: number;
+  packet_loss_percent: number;
+}
+
+export interface ProvisioningPayload {
+  device_serial: string;
+  tunnel_port: number;
+  daemon_version: string;
+  sas_token: string;
+  status: 'scanning' | 'verifying' | 'paired';
+}
 
 export interface HardwareTelemetry {
   host_cpu_percent: number;

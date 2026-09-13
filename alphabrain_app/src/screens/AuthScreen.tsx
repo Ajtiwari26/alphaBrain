@@ -1,151 +1,273 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface Props {
   onAuthenticated?: () => void;
+  onNavigateEnroll?: () => void;
 }
 
-export const AuthScreen: React.FC<Props> = ({ onAuthenticated }) => {
-  const [pin, setPin] = useState<string>('');
-  const [authed, setAuthed] = useState(false);
-  const [errorShake, setErrorShake] = useState(false);
+/**
+ * Computes a salted SHA-256 cryptographic hash of the input PIN.
+ */
+async function hashPin(pin: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`alphabrain_pin_salt_${pin}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
-  const handleKeyPress = (num: string) => {
+export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll }) => {
+  const [pin, setPin] = useState('');
+  const [authed, setAuthed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [biometricScanning, setBiometricScanning] = useState(false);
+
+  const timersRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
+  const triggerAuthSuccess = () => {
+    setAuthed(true);
+    setError(null);
+    const t = window.setTimeout(() => {
+      onAuthenticated?.();
+    }, 450);
+    timersRef.current.push(t);
+  };
+
+  const handleDigit = async (digit: string) => {
     if (authed) return;
+    if (error) setError(null);
+
     if (pin.length < 4) {
-      const nextPin = pin + num;
+      const nextPin = pin + digit;
       setPin(nextPin);
+
       if (nextPin.length === 4) {
-        // Any 4 digit PIN or 2026 succeeds for the founder
-        triggerSuccess();
+        try {
+          const inputHash = await hashPin(nextPin);
+          const storedHash = localStorage.getItem('alphabrain_master_pin_hash');
+
+          let isValid = false;
+          if (storedHash) {
+            isValid = inputHash === storedHash;
+          } else {
+            // Uninitialized fresh instance: verify against default initial hash
+            const defaultInitialHash = await hashPin('1337');
+            isValid = inputHash === defaultInitialHash;
+          }
+
+          if (isValid) {
+            triggerAuthSuccess();
+          } else {
+            setError('INVALID MASTER PIN // ACCESS DENIED');
+            const t = window.setTimeout(() => {
+              setPin('');
+              setError(null);
+            }, 1200);
+            timersRef.current.push(t);
+          }
+        } catch {
+          setError('CRYPTO VERIFICATION ERROR');
+        }
       }
     }
   };
 
   const handleBackspace = () => {
     if (authed) return;
+    if (error) setError(null);
     setPin((prev) => prev.slice(0, -1));
   };
 
-  const triggerSuccess = () => {
-    setAuthed(true);
-    setTimeout(() => {
-      onAuthenticated?.();
-    }, 450);
+  const handleAuto = async () => {
+    if (authed) return;
+    const isDev = Boolean(import.meta.env?.DEV);
+    if (!isDev) {
+      setError('AUTO-FILL DISABLED IN PRODUCTION');
+      return;
+    }
+
+    // In DEV mode: auto-fill test PIN and verify cryptographic hash
+    const testPin = '1337';
+    setPin(testPin);
+    const testHash = await hashPin(testPin);
+    const storedHash = localStorage.getItem('alphabrain_master_pin_hash');
+
+    if (!storedHash || storedHash === testHash) {
+      triggerAuthSuccess();
+    } else {
+      setError('DEV AUTO-PIN MISMATCHES ENROLLED HASH');
+    }
+  };
+
+  const handleBiometricTouch = () => {
+    if (authed) return;
+    setBiometricScanning(true);
+    const t = window.setTimeout(() => {
+      setBiometricScanning(false);
+      triggerAuthSuccess();
+    }, 600);
+    timersRef.current.push(t);
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[80vh] px-2">
+    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
       {/* Header */}
-      <div className="border-b border-[#0A0A0A] pb-3 flex items-center justify-between">
-        <div>
+      <div className="border-b border-[#0A0A0A] pb-4">
+        <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-            02 // ACCESS GATE
+            01 — ACCESS
           </span>
-          <h2 className="text-2xl font-headline font-bold mt-1 leading-tight text-[#0A0A0A]">
-            Founder Access
-          </h2>
+          <span className="font-mono text-[10px] text-zinc-500 uppercase">
+            MC-02B // ACCESS GATE
+          </span>
         </div>
-        <span className="font-mono text-[10px] font-bold px-2 py-0.5 border border-[#0A0A0A] bg-zinc-50 text-[#E6391E]">
-          STAGE 2/3
-        </span>
+        <h2 className="text-4xl font-headline font-bold mt-2 leading-tight text-[#0A0A0A]">
+          Founder
+          <br />
+          Access
+        </h2>
       </div>
 
-      {/* Main PIN & Biometric Visual */}
-      <div className="flex-1 flex flex-col items-center justify-center py-4">
-        {/* Biometric Fingerprint Box */}
+      {/* Middle Section: Touch ID Box & 4 Square PIN Boxes */}
+      <div className="flex-1 flex flex-col items-center justify-center py-4 space-y-4">
+        {/* Touch ID Box */}
         <div
-          onClick={triggerSuccess}
-          className={`w-24 h-24 border-2 border-[#0A0A0A] p-3 flex flex-col items-center justify-center mb-5 cursor-pointer transition-all duration-300 card-tactile ${
-            authed ? 'bg-black text-white border-black scale-105' : 'bg-white hover:bg-zinc-50'
+          onClick={handleBiometricTouch}
+          className={`w-24 h-24 border-2 p-3 flex flex-col items-center justify-center cursor-pointer transition-all ${
+            authed
+              ? 'border-[#E6391E] bg-red-50/20 scale-105'
+              : biometricScanning
+              ? 'border-[#E6391E] bg-zinc-50 scale-95'
+              : 'border-[#0A0A0A] hover:bg-zinc-50 active:scale-95'
           }`}
+          title="Touch ID Sensor // Click to simulate biometric recognition"
         >
           <svg
-            className={`w-12 h-12 transition-transform ${authed ? 'scale-110 stroke-[#E6391E]' : 'stroke-[#0A0A0A]'}`}
+            className={`w-12 h-12 transition-colors ${
+              authed || biometricScanning ? 'text-[#E6391E]' : 'text-[#0A0A0A]'
+            }`}
             viewBox="0 0 24 24"
             fill="none"
+            stroke="currentColor"
             strokeWidth="1.5"
           >
             <path
               d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"
               strokeLinecap="square"
             />
-            <circle cx="9" cy="9" r="1.5" fill={authed ? '#E6391E' : '#0A0A0A'} />
-            <circle cx="15" cy="9" r="1.5" fill={authed ? '#E6391E' : '#0A0A0A'} />
-            <path d="M12 11v3M9 16c1 .67 2 .67 3 .67s2 0 3-.67" />
+            {/* Fingerprint ridges */}
+            <path d="M12 7c-2.76 0-5 2.24-5 5 0 2.2 1.42 4.07 3.4 4.74" />
+            <path d="M12 10a2 2 0 0 0-2 2c0 1.5 1 2.5 2 3" />
+            <path d="M15 12c0-1.66-1.34-3-3-3" />
+            <path d="M12 17v2" />
+            <path d="M17 12c0 2.5-1.5 4.5-3.5 5" />
           </svg>
-          <span className="font-mono text-[8px] mt-1 text-zinc-400 font-semibold tracking-wider">
-            TOUCH ID
+        </div>
+
+        <div className="text-center">
+          <span className="font-mono text-[10px] text-zinc-500 tracking-wider uppercase block">
+            {authed
+              ? 'FOUNDER VERIFIED // ACCESS GRANTED'
+              : biometricScanning
+              ? 'TOUCH ID SCANNING...'
+              : 'TOUCH ID SENSOR // BIOMETRIC EMULATION'}
           </span>
         </div>
 
-        {/* PIN Indicators */}
-        <div className="flex items-center gap-3 mb-6">
-          {[0, 1, 2, 3].map((idx) => {
-            const isFilled = pin.length > idx || authed;
+        {/* 4 Square PIN Boxes */}
+        <div className="flex items-center justify-center gap-3 pt-2">
+          {[0, 1, 2, 3].map((index) => {
+            const hasValue = pin.length > index;
+            const isCurrent = pin.length === index && !authed;
             return (
               <div
-                key={idx}
-                className={`w-3.5 h-3.5 border border-[#0A0A0A] transition-all duration-200 ${
-                  isFilled
-                    ? 'bg-[#E6391E] border-[#E6391E] scale-110'
-                    : 'bg-white'
+                key={index}
+                className={`w-14 h-14 border-2 flex items-center justify-center font-mono text-2xl font-bold transition-all ${
+                  authed
+                    ? 'border-[#E6391E] bg-red-50/30 text-[#E6391E]'
+                    : isCurrent
+                    ? 'border-[#E6391E] bg-zinc-50'
+                    : hasValue
+                    ? 'border-[#0A0A0A] bg-white text-[#0A0A0A]'
+                    : 'border-zinc-300 bg-white text-zinc-300'
                 }`}
-              />
+              >
+                {hasValue ? (
+                  authed ? pin[index] : '●'
+                ) : (
+                  <span className="text-zinc-300 text-sm">_</span>
+                )}
+              </div>
             );
           })}
         </div>
 
-        <span className="font-mono text-[11px] text-zinc-500 tracking-wider text-center">
-          {authed
-            ? 'FOUNDER VERIFIED // ACCESS GRANTED'
-            : 'ENTER 4-DIGIT PIN OR TAP TOUCH ID'}
-        </span>
+        {error && (
+          <div className="font-mono text-xs text-[#E6391E] font-bold tracking-wider animate-pulse">
+            {error}
+          </div>
+        )}
+      </div>
 
-        {/* Tactile Keypad */}
-        <div className="w-full max-w-[260px] grid grid-cols-3 gap-2 mt-6">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+      {/* Keypad with [AUTO], [0], [⌫] */}
+      <div className="space-y-2">
+        <div className="grid grid-cols-3 gap-2">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
             <button
-              key={num}
-              onClick={() => handleKeyPress(num)}
-              className="h-12 border border-[#0A0A0A] font-headline font-bold text-lg flex items-center justify-center hover:bg-black hover:text-white transition-colors btn-tactile bg-white"
+              key={digit}
+              onClick={() => handleDigit(digit)}
+              disabled={authed}
+              className="h-12 border border-[#0A0A0A] font-headline text-lg font-bold hover:bg-[#0A0A0A] hover:text-white active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {num}
+              {digit}
             </button>
           ))}
           <button
-            onClick={triggerSuccess}
-            className="h-12 border border-[#0A0A0A] font-mono text-[9px] text-[#E6391E] font-bold flex items-center justify-center hover:bg-black hover:text-white transition-colors btn-tactile bg-white"
+            onClick={handleAuto}
+            disabled={authed}
+            className="h-12 border border-[#0A0A0A] font-mono text-xs font-bold text-[#E6391E] hover:bg-[#E6391E] hover:text-white active:scale-95 transition-all flex items-center justify-center tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
           >
             AUTO
           </button>
           <button
-            onClick={() => handleKeyPress('0')}
-            className="h-12 border border-[#0A0A0A] font-headline font-bold text-lg flex items-center justify-center hover:bg-black hover:text-white transition-colors btn-tactile bg-white"
+            onClick={() => handleDigit('0')}
+            disabled={authed}
+            className="h-12 border border-[#0A0A0A] font-headline text-lg font-bold hover:bg-[#0A0A0A] hover:text-white active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
           >
             0
           </button>
           <button
             onClick={handleBackspace}
-            className="h-12 border border-[#0A0A0A] font-mono text-xs text-zinc-500 font-bold flex items-center justify-center hover:bg-black hover:text-white transition-colors btn-tactile bg-white"
+            disabled={authed}
+            className="h-12 border border-[#0A0A0A] font-mono text-sm font-bold text-zinc-700 hover:bg-[#0A0A0A] hover:text-white active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ⌫
           </button>
         </div>
-      </div>
 
-      {/* Instant Unlock Bar */}
-      <div className="pt-3 border-t border-[#0A0A0A]">
-        <button
-          onClick={triggerSuccess}
-          className="w-full border border-[#0A0A0A] p-3.5 flex items-center justify-between hover:bg-black hover:text-white cursor-pointer transition-colors group btn-tactile bg-white"
-        >
-          <span className="font-mono text-xs font-bold text-[#0A0A0A] group-hover:text-white">
-            {authed ? 'Identity Verified // Unlocking...' : 'Instant Founder Biometric Unlock'}
-          </span>
-          <span className="text-base text-[#E6391E] font-bold group-hover:text-white group-hover:translate-x-1 transition-transform">
-            ↗
-          </span>
-        </button>
+        {/* Action Footers */}
+        <div className="flex items-center justify-between pt-1">
+          {onNavigateEnroll && (
+            <button
+              onClick={onNavigateEnroll}
+              className="font-mono text-[10px] text-zinc-500 hover:text-[#E6391E] transition-colors uppercase tracking-wider"
+            >
+              Enroll Master PIN (MC-02A) ↗
+            </button>
+          )}
+          <button
+            onClick={handleBiometricTouch}
+            className="font-mono text-[10px] text-zinc-500 hover:text-[#0A0A0A] transition-colors uppercase tracking-wider ml-auto"
+          >
+            Touch ID Fallback ↗
+          </button>
+        </div>
       </div>
     </div>
   );
