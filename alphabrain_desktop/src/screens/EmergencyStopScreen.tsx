@@ -40,10 +40,31 @@ export const EmergencyStopScreen: React.FC = () => {
     }
   };
 
-  if (loading || !stopState) {
+  if (loading) {
     return (
       <div className="p-16 text-center font-mono text-xs text-neutral-400">
         Querying emergency stop tombstone status...
+      </div>
+    );
+  }
+
+  if (!stopState) {
+    return (
+      <div className="max-w-7xl mx-auto p-8 space-y-6">
+        <div className="border border-[#0A0A0A] bg-neutral-50 p-8 text-center space-y-3">
+          <div className="font-mono text-xs text-[#E6391E] font-bold uppercase tracking-widest">
+            OFFLINE // BACKEND SERVICE UNREACHABLE
+          </div>
+          <p className="font-mono text-xs text-neutral-600">
+            Cannot reach emergency tombstone service. Local safe state active.
+          </p>
+          <button
+            onClick={loadState}
+            className="px-4 py-2 border border-[#0A0A0A] bg-white font-mono text-xs font-bold hover:bg-neutral-100"
+          >
+            RETRY CONNECTION
+          </button>
+        </div>
       </div>
     );
   }
