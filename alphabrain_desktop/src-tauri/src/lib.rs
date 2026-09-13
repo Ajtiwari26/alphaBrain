@@ -333,55 +333,61 @@ pub mod log_streamer {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemMetrics {
-    pub cpu_usage: f32,
-    pub memory_used_mb: u64,
-    pub memory_total_mb: u64,
-    pub disk_used_gb: f32,
-    pub disk_total_gb: f32,
-    pub uptime_seconds: u64,
-    pub active_workers: u32,
-}
+pub mod telemetry {
+    use super::*;
 
-#[tauri::command]
-pub fn get_system_metrics() -> SystemMetrics {
-    use sysinfo::{Disks, System};
-
-    let mut sys = System::new_all();
-    // Dual refresh cycle with small sampling delay for accurate CPU calculation
-    sys.refresh_cpu_usage();
-    std::thread::sleep(std::time::Duration::from_millis(60));
-    sys.refresh_cpu_usage();
-    sys.refresh_memory();
-
-    let cpu_usage = sys.global_cpu_info().cpu_usage();
-    let memory_used_mb = sys.used_memory() / (1024 * 1024);
-    let memory_total_mb = sys.total_memory() / (1024 * 1024);
-
-    let disks = Disks::new_with_refreshed_list();
-    let mut disk_used_gb = 0.0;
-    let mut disk_total_gb = 0.0;
-    if let Some(disk) = disks.first() {
-        let total = disk.total_space() as f64;
-        let available = disk.available_space() as f64;
-        let used = total - available;
-        disk_used_gb = (used / (1024.0 * 1024.0 * 1024.0)) as f32;
-        disk_total_gb = (total / (1024.0 * 1024.0 * 1024.0)) as f32;
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct SystemMetrics {
+        pub cpu_usage: f32,
+        pub memory_used_mb: u64,
+        pub memory_total_mb: u64,
+        pub disk_used_gb: f32,
+        pub disk_total_gb: f32,
+        pub uptime_seconds: u64,
+        pub active_workers: u32,
     }
 
-    let uptime_seconds = System::uptime();
+    #[tauri::command]
+    pub fn get_system_metrics() -> SystemMetrics {
+        use sysinfo::{Disks, System};
 
-    SystemMetrics {
-        cpu_usage,
-        memory_used_mb,
-        memory_total_mb,
-        disk_used_gb,
-        disk_total_gb,
-        uptime_seconds,
-        active_workers: 1,
+        let mut sys = System::new_all();
+        // Dual refresh cycle with small sampling delay for accurate CPU calculation
+        sys.refresh_cpu_usage();
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        sys.refresh_cpu_usage();
+        sys.refresh_memory();
+
+        let cpu_usage = sys.global_cpu_info().cpu_usage();
+        let memory_used_mb = sys.used_memory() / (1024 * 1024);
+        let memory_total_mb = sys.total_memory() / (1024 * 1024);
+
+        let disks = Disks::new_with_refreshed_list();
+        let mut disk_used_gb = 0.0;
+        let mut disk_total_gb = 0.0;
+        if let Some(disk) = disks.first() {
+            let total = disk.total_space() as f64;
+            let available = disk.available_space() as f64;
+            let used = total - available;
+            disk_used_gb = (used / (1024.0 * 1024.0 * 1024.0)) as f32;
+            disk_total_gb = (total / (1024.0 * 1024.0 * 1024.0)) as f32;
+        }
+
+        let uptime_seconds = System::uptime();
+
+        SystemMetrics {
+            cpu_usage,
+            memory_used_mb,
+            memory_total_mb,
+            disk_used_gb,
+            disk_total_gb,
+            uptime_seconds,
+            active_workers: 1,
+        }
     }
 }
+
+pub use telemetry::{get_system_metrics, SystemMetrics};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -396,7 +402,7 @@ pub fn run() {
             task_executor::spawn_worker_daemon,
             task_executor::execute_task,
             log_streamer::stream_task_logs,
-            get_system_metrics
+            telemetry::get_system_metrics
         ])
         .run(tauri::generate_context!())
         .expect("error while running AlphaBrain desktop application");
