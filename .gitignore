@@ -79,3 +79,9 @@ test*.html
 target/
 **/target/
 Cargo.lock
+
+# Node & Frontend
+node_modules/
+**/node_modules/
+package-lock.json
+**/package-lock.json
