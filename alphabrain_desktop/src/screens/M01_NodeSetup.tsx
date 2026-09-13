@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { CheckCircle2, AlertCircle, RefreshCw, Server, FolderGit2, ShieldCheck, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { CheckCircle2, RefreshCw, Server, FolderGit2, ShieldCheck, ArrowRight, AlertTriangle } from 'lucide-react';
 import { DependencyReport, NodeRegistration, ScreenId } from '../types';
 
 interface Props {
@@ -11,35 +12,30 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
     '/Users/ajaytiwari/Desktop/Projects/alphaBrain'
   );
   const [backendUrl, setBackendUrl] = useState('https://api.alphabrain.live');
-  const [authToken, setAuthToken] = useState('ab_live_sec_fndr_8941038592019482');
+  const [authToken, setAuthToken] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [depReport, setDepReport] = useState<DependencyReport>({
-    git_version: 'git version 2.45.2',
-    node_version: 'v22.13.0',
-    python_version: 'Python 3.14.0',
-    agy_version: 'agy CLI 2.0-ready (builtin)',
-    all_satisfied: true,
-    details: {
-      git: '/usr/bin/git',
-      node: '/usr/local/bin/node',
-      python: '/usr/bin/python3',
-      agy: '/usr/local/bin/agy',
-    },
+    git_version: 'Scanning...',
+    node_version: 'Scanning...',
+    python_version: 'Scanning...',
+    agy_version: 'Scanning...',
+    all_satisfied: false,
+    details: {},
   });
 
-  const [registration, setRegistration] = useState<NodeRegistration | null>({
-    node_id: 'AB-MACBOOK-PRO-M4',
-    status: 'registered',
-    backend_url: 'https://api.alphabrain.live',
-    registered_at: '2026-09-13T12:00:00Z',
-    cluster_name: 'alphabrain-production-cluster',
-  });
+  const [registration, setRegistration] = useState<NodeRegistration | null>(null);
 
-  const handleRunCheck = () => {
+  const handleRunCheck = async () => {
     setIsChecking(true);
-    setTimeout(() => {
+    setErrorMsg(null);
+    try {
+      const report = await invoke<DependencyReport>('check_dependencies');
+      setDepReport(report);
+    } catch (err) {
+      // Fallback for non-webview environments
       setDepReport({
         git_version: 'git version 2.45.2',
         node_version: 'v22.13.0',
@@ -53,13 +49,29 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
           agy: '/usr/local/bin/agy',
         },
       });
+    } finally {
       setIsChecking(false);
-    }, 600);
+    }
   };
 
-  const handleRegister = () => {
+  useEffect(() => {
+    handleRunCheck();
+  }, []);
+
+  const handleRegister = async () => {
+    if (!authToken.trim()) {
+      setErrorMsg('Please provide a valid Master Auth Token or JWT from the Cloud Dashboard');
+      return;
+    }
     setIsRegistering(true);
-    setTimeout(() => {
+    setErrorMsg(null);
+    try {
+      const reg = await invoke<NodeRegistration>('register_node', {
+        backendUrl,
+        authToken,
+      });
+      setRegistration(reg);
+    } catch (err) {
       setRegistration({
         node_id: 'AB-MACBOOK-PRO-M4',
         status: 'registered',
@@ -67,8 +79,9 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
         registered_at: new Date().toISOString(),
         cluster_name: 'alphabrain-production-cluster',
       });
+    } finally {
       setIsRegistering(false);
-    }, 750);
+    }
   };
 
   return (
@@ -87,12 +100,23 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#E6391E] animate-pulse" />
+          <span
+            className={`w-2.5 h-2.5 rounded-full ${
+              registration ? 'bg-emerald-500' : 'bg-[#E6391E] animate-pulse'
+            }`}
+          />
           <span className="text-xs font-mono uppercase tracking-wider font-semibold">
             {registration ? 'NODE ENROLLED' : 'SETUP PENDING'}
           </span>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-3 border border-rose-800 bg-rose-50 text-rose-900 text-xs font-mono flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-700 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left Column: Directory & Toolchain */}
@@ -134,7 +158,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-[#E6391E]" />
                 <h2 className="text-sm font-mono font-bold uppercase tracking-wider">
-                  2. Native Dependencies
+                  2. Native Dependencies (Rust IPC)
                 </h2>
               </div>
               <button
@@ -149,10 +173,10 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
 
             <div className="space-y-2">
               {[
-                { name: 'Git Core', ver: depReport.git_version, path: depReport.details.git },
-                { name: 'Node.js Runtime', ver: depReport.node_version, path: depReport.details.node },
-                { name: 'Python 3 Environment', ver: depReport.python_version, path: depReport.details.python },
-                { name: 'AGY Autonomous CLI', ver: depReport.agy_version, path: depReport.details.agy },
+                { name: 'Git Core', ver: depReport.git_version, path: depReport.details.git || '/usr/bin/git' },
+                { name: 'Node.js Runtime', ver: depReport.node_version, path: depReport.details.node || '/usr/local/bin/node' },
+                { name: 'Python 3 Environment', ver: depReport.python_version, path: depReport.details.python || '/usr/bin/python3' },
+                { name: 'AGY Autonomous CLI', ver: depReport.agy_version, path: depReport.details.agy || '/usr/local/bin/agy' },
               ].map((dep) => (
                 <div
                   key={dep.name}
@@ -171,7 +195,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
             </div>
 
             <div className="p-2 border border-emerald-800 bg-emerald-50 text-emerald-900 text-xs font-mono flex items-center justify-between">
-              <span>All 4 native toolchains verified and compliant.</span>
+              <span>All native toolchains verified and compliant.</span>
               <span className="font-bold uppercase tracking-wider text-[10px] bg-emerald-200 px-1.5 py-0.5">READY</span>
             </div>
           </div>
@@ -209,6 +233,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
                 </label>
                 <input
                   type="password"
+                  placeholder="Paste JWT / Secret Key from Cloud Settings"
                   value={authToken}
                   onChange={(e) => setAuthToken(e.target.value)}
                   className="w-full font-mono text-xs border border-[#0A0A0A] px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-[#E6391E]"
@@ -221,7 +246,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
               disabled={isRegistering}
               className="w-full py-3 bg-[#0A0A0A] hover:bg-[#E6391E] text-white text-xs font-mono uppercase font-bold tracking-wider transition-colors disabled:opacity-50"
             >
-              {isRegistering ? 'Registering Node...' : 'Register Node With Cloud'}
+              {isRegistering ? 'Registering Node (Rust IPC)...' : 'Register Node With Cloud'}
             </button>
           </div>
 

@@ -1,16 +1,18 @@
 //! AlphaBrain Mac Desktop App — Tauri 2.0 Rust Core
 //!
-//! Exposes native platform operations to React 19 frontend:
-//! - Dependency checker (git, node, python3, agy)
-//! - macOS Keychain Ed25519 identity key storage
-//! - Central Cloud node registration
-//! - Provisioning QR generation (v2 protocol with SAS code)
-//! - Subprocess task executor & worker daemon spawning
-//! - Log streaming bridge
-//! - Real-time system telemetry (CPU, RAM, Disk)
+//! Native platform bridge implementing:
+//! - Real Ed25519 identity key generation & macOS Keychain vault (§14.2.2.1)
+//! - Cryptographic Cloud Provisioning v2 QR payloads with CSPRNG SAS codes (§14.2.5)
+//! - Outbound Node registration to Central Cloud Backend (§14.2.7)
+//! - Subprocess management with path sanitization and lease binding (§14.2.2.2)
+//! - Dual-sample system telemetry and event streaming
 
+use base64::Engine;
+use ed25519_dalek::{Signer, SigningKey};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 pub mod deps_checker {
     use super::*;
@@ -79,28 +81,44 @@ pub mod keychain {
     const SERVICE_NAME: &str = "com.alphabrain.desktop.identity";
     const ACCOUNT_NAME: &str = "founder_ed25519_key";
 
-    #[tauri::command]
-    pub fn read_identity_key() -> Result<Vec<u8>, String> {
-        // macOS Keychain access via security-framework or fallback simulation
+    /// Reads existing key from Keychain or generates a fresh random Ed25519 keypair.
+    /// Strictly eliminates hardcoded fallback seeds.
+    pub fn get_or_create_identity_key() -> Result<[u8; 32], String> {
         #[cfg(target_os = "macos")]
         {
-            use security_framework::passwords::get_generic_password;
+            use security_framework::passwords::{get_generic_password, set_generic_password};
             match get_generic_password(SERVICE_NAME, ACCOUNT_NAME) {
-                Ok(bytes) => Ok(bytes),
-                Err(_) => {
-                    // Generate deterministic local seed if not found
-                    Ok(b"alphabrain_default_ed25519_seed_key_32b!".to_vec())
+                Ok(bytes) if bytes.len() == 32 => {
+                    let mut key = [0u8; 32];
+                    key.copy_from_slice(&bytes);
+                    Ok(key)
+                }
+                _ => {
+                    // Generate fresh cryptographically secure random keypair
+                    let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
+                    let key_bytes = signing_key.to_bytes();
+                    let _ = set_generic_password(SERVICE_NAME, ACCOUNT_NAME, &key_bytes);
+                    Ok(key_bytes)
                 }
             }
         }
         #[cfg(not(target_os = "macos"))]
         {
-            Ok(b"alphabrain_default_ed25519_seed_key_32b!".to_vec())
+            let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
+            Ok(signing_key.to_bytes())
         }
     }
 
     #[tauri::command]
+    pub fn read_identity_key() -> Result<Vec<u8>, String> {
+        get_or_create_identity_key().map(|k| k.to_vec())
+    }
+
+    #[tauri::command]
     pub fn store_identity_key(key: Vec<u8>) -> Result<(), String> {
+        if key.len() != 32 {
+            return Err("Ed25519 private key must be exactly 32 bytes".to_string());
+        }
         #[cfg(target_os = "macos")]
         {
             use security_framework::passwords::set_generic_password;
@@ -131,14 +149,22 @@ pub mod node_registry {
 
     #[tauri::command]
     pub async fn register_node(backend_url: String, auth_token: String) -> Result<NodeRegistration, String> {
-        if backend_url.is_empty() {
+        if backend_url.trim().is_empty() {
             return Err("Backend URL cannot be empty".to_string());
         }
-        if auth_token.is_empty() {
+        if auth_token.trim().is_empty() {
             return Err("Auth token cannot be empty".to_string());
         }
 
-        let node_id = "AB-MACBOOK-PRO-M4".to_string();
+        // Derive node ID dynamically from system hostname or default to Mac node ID
+        let hostname = sysinfo::System::host_name().unwrap_or_else(|| "MAC-NODE".to_string());
+        let node_id = format!("AB-{}", hostname.to_uppercase().replace([' ', '.'], "-"));
+
+        // Validate backend URL protocol
+        if !backend_url.starts_with("http://") && !backend_url.starts_with("https://") {
+            return Err("Invalid backend URL scheme. Must start with http:// or https://".to_string());
+        }
+
         let registration = NodeRegistration {
             node_id,
             status: "registered".to_string(),
@@ -174,12 +200,26 @@ pub mod qr_generator {
         let now = Utc::now();
         let expires = now + Duration::seconds(120); // 120s rotation window
 
-        // Simulated Ed25519 public key and signature
-        let pubkey_base64 = "MCowBQYDK2VwAyEA2r4F/AB9y9nJzZ1sH9E6x2T61bKk8V9q7f5d3a1b0c=".to_string();
-        let sig_base64 = "MEQCIB8Z3s9gK8lY1bH/vP5s9kL3d7f9a1b0c8e2g4i6k8mAAiB6v8x2z4b6=".to_string();
-        
-        // 4-digit SAS confirmation code (Short Authentication String)
-        let sas_code = format!("{:04}", (now.timestamp_subsec_millis() % 9000) + 1000);
+        // Retrieve actual Ed25519 keypair from Keychain
+        let key_bytes = keychain::get_or_create_identity_key()?;
+        let signing_key = SigningKey::from_bytes(&key_bytes);
+        let verifying_key = signing_key.verifying_key();
+
+        // Base64 encode the verifying public key
+        let pubkey_base64 = base64::engine::general_purpose::STANDARD.encode(verifying_key.to_bytes());
+
+        // Generate cryptographically secure random 4-digit SAS confirmation code (TOFU §14.2.5)
+        let sas_code = format!("{:04}", rand::thread_rng().gen_range(1000..=9999));
+
+        // Construct canonical string to sign
+        let canonical_message = format!(
+            "v=2&type=CLOUD_PROVISION&backend=https://api.alphabrain.live&node={}&token={}&exp={}&sas={}",
+            node_id, session_token, expires.to_rfc3339(), sas_code
+        );
+
+        // Sign with real Ed25519 signing key
+        let signature = signing_key.sign(canonical_message.as_bytes());
+        let sig_base64 = base64::engine::general_purpose::STANDARD.encode(signature.to_bytes());
 
         let payload = QrPayload {
             v: 2,
@@ -211,13 +251,24 @@ pub mod task_executor {
         pub lease_id: String,
     }
 
+    /// Validates and canonicalizes the workspace path to prevent path traversal
+    fn sanitize_workspace_path(raw_path: &str) -> Result<PathBuf, String> {
+        let p = PathBuf::from(raw_path);
+        if !p.exists() {
+            return Err(format!("Workspace path does not exist: {}", raw_path));
+        }
+        p.canonicalize().map_err(|e| format!("Cannot resolve canonical path: {}", e))
+    }
+
     #[tauri::command]
     pub fn spawn_worker_daemon(workspace: String) -> Result<u32, String> {
+        let canonical = sanitize_workspace_path(&workspace)?;
+
         let child = Command::new("python3")
             .arg("-m")
             .arg("alpha_worker.daemon")
             .arg("--workspace")
-            .arg(&workspace)
+            .arg(&canonical)
             .spawn()
             .map_err(|e| format!("Failed to spawn worker daemon: {}", e))?;
 
@@ -226,9 +277,12 @@ pub mod task_executor {
 
     #[tauri::command]
     pub fn execute_task(task_id: String, workspace: String, lease_id: String) -> Result<TaskResult, String> {
+        let canonical = sanitize_workspace_path(&workspace)?;
+
+        // Execute task status and worktree verification for the requested task ID
         let output = Command::new("git")
             .arg("-C")
-            .arg(&workspace)
+            .arg(&canonical)
             .arg("status")
             .arg("--short")
             .output();
@@ -265,15 +319,17 @@ pub mod log_streamer {
     }
 
     #[tauri::command]
-    pub async fn stream_task_logs(task_id: String, ws_url: String) -> Result<(), String> {
-        let _event = LogStreamEvent {
+    pub async fn stream_task_logs(task_id: String, ws_url: String) -> Result<String, String> {
+        if task_id.is_empty() {
+            return Err("task_id is required".to_string());
+        }
+        let event = LogStreamEvent {
             task_id: task_id.clone(),
             timestamp: Utc::now().to_rfc3339(),
             stream: "stdout".to_string(),
             message: format!("Log streamer attached to {} at {}", task_id, ws_url),
         };
-        // Background WebSocket pipe established
-        Ok(())
+        Ok(event.message)
     }
 }
 
@@ -293,7 +349,11 @@ pub fn get_system_metrics() -> SystemMetrics {
     use sysinfo::{Disks, System};
 
     let mut sys = System::new_all();
-    sys.refresh_all();
+    // Dual refresh cycle with small sampling delay for accurate CPU calculation
+    sys.refresh_cpu_usage();
+    std::thread::sleep(std::time::Duration::from_millis(60));
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
 
     let cpu_usage = sys.global_cpu_info().cpu_usage();
     let memory_used_mb = sys.used_memory() / (1024 * 1024);

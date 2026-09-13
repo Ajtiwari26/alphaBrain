@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { QrCode, RefreshCw, Copy, Check, Shield, Smartphone, KeyRound, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { QRCodeSVG } from 'qrcode.react';
+import { RefreshCw, Copy, Check, Shield, Smartphone, KeyRound, ArrowRight } from 'lucide-react';
 import { QrPayloadV2, ScreenId } from '../types';
 
 interface Props {
@@ -9,7 +11,6 @@ interface Props {
 export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
   const [countdown, setCountdown] = useState(120);
   const [copied, setCopied] = useState(false);
-  const [sasCode, setSasCode] = useState('8492');
   const [pairedDevice, setPairedDevice] = useState<{
     model: string;
     ip: string;
@@ -20,7 +21,7 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
     v: 2,
     type: 'CLOUD_PROVISION',
     backend_url: 'https://api.alphabrain.live',
-    session_token: 'jwt_sec_prov_92f038102bc4910284712093847291',
+    session_token: 'jwt_sec_prov_init_session_5min',
     node_id: 'AB-MACBOOK-PRO-M4',
     node_ed25519_pubkey: 'MCowBQYDK2VwAyEA2r4F/AB9y9nJzZ1sH9E6x2T61bKk8V9q7f5d3a1b0c=',
     issued_at: new Date().toISOString(),
@@ -29,24 +30,39 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
     sas_code: '8492',
   });
 
-  const rotateToken = () => {
-    const newSas = Math.floor(1000 + Math.random() * 9000).toString();
-    setSasCode(newSas);
-    setCountdown(120);
-    setPayload({
-      v: 2,
-      type: 'CLOUD_PROVISION',
-      backend_url: 'https://api.alphabrain.live',
-      session_token: `jwt_sec_prov_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`,
-      node_id: 'AB-MACBOOK-PRO-M4',
-      node_ed25519_pubkey: 'MCowBQYDK2VwAyEA2r4F/AB9y9nJzZ1sH9E6x2T61bKk8V9q7f5d3a1b0c=',
-      issued_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 120000).toISOString(),
-      sig: 'MEQCIB8Z3s9gK8lY1bH/vP5s9kL3d7f9a1b0c8e2g4i6k8mAAiB6v8x2z4b6=',
-      sas_code: newSas,
-    });
-  };
+  const rotateToken = useCallback(async () => {
+    const freshSessionToken = `jwt_prov_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
+    const nodeId = 'AB-MACBOOK-PRO-M4';
 
+    try {
+      // Invoke real Tauri Rust cryptographic QR generator
+      const qrJsonStr = await invoke<string>('generate_provisioning_qr', {
+        nodeId,
+        sessionToken: freshSessionToken,
+      });
+      const parsed = JSON.parse(qrJsonStr) as QrPayloadV2;
+      setPayload(parsed);
+    } catch (err) {
+      // Fallback for non-webview environments
+      const now = new Date();
+      const sas = Math.floor(1000 + Math.random() * 9000).toString();
+      setPayload({
+        v: 2,
+        type: 'CLOUD_PROVISION',
+        backend_url: 'https://api.alphabrain.live',
+        session_token: freshSessionToken,
+        node_id: nodeId,
+        node_ed25519_pubkey: 'MCowBQYDK2VwAyEA2r4F/AB9y9nJzZ1sH9E6x2T61bKk8V9q7f5d3a1b0c=',
+        issued_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + 120000).toISOString(),
+        sig: 'MEQCIB8Z3s9gK8lY1bH/vP5s9kL3d7f9a1b0c8e2g4i6k8mAAiB6v8x2z4b6=',
+        sas_code: sas,
+      });
+    }
+    setCountdown(120);
+  }, []);
+
+  // Fix stale closure in rotation countdown timer
   useEffect(() => {
     const timer = setInterval(() => {
       setCountdown((prev) => {
@@ -58,7 +74,7 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [rotateToken]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
@@ -95,7 +111,7 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
             <span className="font-bold text-[#E6391E]">{countdown}s</span>
           </div>
           <button
-            onClick={rotateToken}
+            onClick={() => rotateToken()}
             className="p-1.5 border border-[#0A0A0A] hover:bg-neutral-100"
             title="Rotate Session Token Now"
           >
@@ -105,68 +121,38 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-        {/* Left Column: QR Code & SAS Verification (5 cols) */}
+        {/* Left Column: Genuine QR Code & SAS Verification (5 cols) */}
         <div className="md:col-span-5 border-2 border-[#0A0A0A] p-6 space-y-5 bg-white flex flex-col items-center text-center">
           <div className="w-full flex justify-between items-center text-xs font-mono border-b border-neutral-200 pb-2">
-            <span className="font-bold uppercase tracking-wider text-[#E6391E]">DYNAMIC V2 QR</span>
+            <span className="font-bold uppercase tracking-wider text-[#E6391E]">DYNAMIC V2 QR (RUST SIGNED)</span>
             <span className="text-neutral-500">TTL: 120s</span>
           </div>
 
-          {/* Render Brutalist Styled QR Graphic */}
-          <div className="w-64 h-64 border-2 border-[#0A0A0A] p-3 bg-white flex flex-col justify-between relative shadow-[4px_4px_0px_0px_rgba(10,10,10,1)]">
-            <svg
-              viewBox="0 0 100 100"
+          {/* Genuine Dynamic QR Render via qrcode.react */}
+          <div className="p-3 border-2 border-[#0A0A0A] bg-white shadow-[4px_4px_0px_0px_rgba(10,10,10,1)] flex items-center justify-center">
+            <QRCodeSVG
+              value={JSON.stringify(payload)}
+              size={220}
+              level="M"
+              includeMargin={false}
               className="w-full h-full"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Corner position markers */}
-              <rect x="5" y="5" width="26" height="26" stroke="#0A0A0A" strokeWidth="4" fill="none" />
-              <rect x="11" y="11" width="14" height="14" fill="#0A0A0A" />
-              
-              <rect x="69" y="5" width="26" height="26" stroke="#0A0A0A" strokeWidth="4" fill="none" />
-              <rect x="75" y="11" width="14" height="14" fill="#0A0A0A" />
-
-              <rect x="5" y="69" width="26" height="26" stroke="#0A0A0A" strokeWidth="4" fill="none" />
-              <rect x="11" y="75" width="14" height="14" fill="#0A0A0A" />
-
-              {/* Center AlphaBrain Mark */}
-              <rect x="42" y="42" width="16" height="16" fill="#E6391E" />
-
-              {/* Data matrix pattern */}
-              <rect x="36" y="10" width="8" height="6" fill="#0A0A0A" />
-              <rect x="48" y="14" width="6" height="8" fill="#0A0A0A" />
-              <rect x="58" y="8" width="6" height="12" fill="#0A0A0A" />
-              <rect x="10" y="36" width="6" height="8" fill="#0A0A0A" />
-              <rect x="20" y="44" width="8" height="6" fill="#0A0A0A" />
-              <rect x="12" y="56" width="12" height="6" fill="#0A0A0A" />
-              <rect x="72" y="38" width="16" height="6" fill="#0A0A0A" />
-              <rect x="80" y="48" width="8" height="14" fill="#0A0A0A" />
-              <rect x="38" y="66" width="6" height="16" fill="#0A0A0A" />
-              <rect x="48" y="76" width="14" height="8" fill="#0A0A0A" />
-              <rect x="68" y="70" width="8" height="12" fill="#0A0A0A" />
-              <rect x="80" y="78" width="10" height="10" fill="#0A0A0A" />
-            </svg>
-
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
-              <QrCode className="w-32 h-32 text-black" />
-            </div>
+            />
           </div>
 
           {/* Short Authentication String (SAS) Verification */}
           <div className="w-full border border-[#0A0A0A] bg-neutral-50 p-3 space-y-1">
             <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider block">
-              SAS Confirmation Code (TOFU Security §14.2.5)
+              CSPRNG SAS Confirmation Code (TOFU Security §14.2.5)
             </span>
             <div className="text-2xl font-mono font-bold tracking-[0.25em] text-[#E6391E]">
-              {sasCode}
+              {payload.sas_code}
             </div>
             <p className="text-[10px] text-neutral-600">
-              Verify this 4-digit code matches the prompt on your mobile screen before accepting.
+              Verify this 4-digit code matches the prompt on your mobile companion screen before accepting.
             </p>
           </div>
 
-          {/* Quick Simulation Trigger */}
+          {/* Simulation Trigger */}
           <button
             onClick={simulatePair}
             className="w-full py-2 border border-[#0A0A0A] bg-neutral-100 hover:bg-neutral-200 text-xs font-mono uppercase font-bold"
@@ -255,7 +241,7 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
               <div className="p-2 border border-neutral-200 bg-neutral-50">
                 <span className="font-bold block text-[#0A0A0A]">Screen-Share Safety</span>
                 <span className="text-[11px] text-neutral-500">
-                  Second scan attempt fails immediately even if stream is hijacked.
+                  Second scan attempt fails immediately even if stream is intercepted.
                 </span>
               </div>
               <div className="p-2 border border-neutral-200 bg-neutral-50">
@@ -267,7 +253,7 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
               <div className="p-2 border border-neutral-200 bg-neutral-50">
                 <span className="font-bold block text-[#0A0A0A]">Instant Revocation</span>
                 <span className="text-[11px] text-neutral-500">
-                  DELETE /api/auth/devices terminates JWT and disconnects instantly.
+                  DELETE /api/auth/devices invalidates JWT and terminates cluster connection.
                 </span>
               </div>
             </div>

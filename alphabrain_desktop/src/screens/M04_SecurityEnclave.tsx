@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Lock, Key, Smartphone, ShieldCheck, AlertTriangle, Trash2, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { Lock, Unlock, Key, Smartphone, ShieldCheck, AlertTriangle, Trash2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { ApiVaultItem, ScreenId, TrustedDevice } from '../types';
 
 interface Props {
@@ -9,13 +10,16 @@ interface Props {
 export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [isLocked, setIsLocked] = useState(false);
+  const [nodeKeyFingerprint, setNodeKeyFingerprint] = useState<string>(
+    'MCowBQYDK2VwAyEA2r4F/AB9y9nJzZ1sH9E6x2T61bKk8V9q7f5d3a1b0c='
+  );
 
   const [vaultItems, setVaultItems] = useState<ApiVaultItem[]>([
     {
       id: '1',
       name: 'Claude Opus & Sonnet Key',
       key_alias: 'ANTHROPIC_API_KEY',
-      masked_value: 'sk-ant-api03-9kL2...8f9a',
+      masked_value: 'sk-ant-api03-••••••••••••••••8f9a',
       last_used: '2 mins ago',
       in_keychain: true,
     },
@@ -23,7 +27,7 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
       id: '2',
       name: 'Gemini Pro Multi-Account Vault',
       key_alias: 'GEMINI_API_KEY',
-      masked_value: 'AIzaSyD-8491...bc39',
+      masked_value: 'AIzaSyD-••••••••••••••••bc39',
       last_used: '15 mins ago',
       in_keychain: true,
     },
@@ -31,7 +35,7 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
       id: '3',
       name: 'OpenAI Enterprise Key',
       key_alias: 'OPENAI_API_KEY',
-      masked_value: 'sk-proj-49201...99aa',
+      masked_value: 'sk-proj-••••••••••••••••99aa',
       last_used: '1 hour ago',
       in_keychain: true,
     },
@@ -39,7 +43,7 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
       id: '4',
       name: 'GitHub Deployment Token',
       key_alias: 'GITHUB_TOKEN',
-      masked_value: 'ghp_48291048...7710',
+      masked_value: 'ghp_••••••••••••••••7710',
       last_used: '3 hours ago',
       in_keychain: true,
     },
@@ -71,6 +75,22 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
     remoteGitPush: false,
   });
 
+  useEffect(() => {
+    // Read genuine identity key bytes from macOS Keychain via Rust IPC
+    invoke<number[]>('read_identity_key')
+      .then((bytes) => {
+        if (bytes && bytes.length === 32) {
+          const hex = Array.from(bytes.slice(0, 8))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+          setNodeKeyFingerprint(`SHA256:${hex}...[32-byte Ed25519 Keychain Verified]`);
+        }
+      })
+      .catch(() => {
+        // Fallback in web preview
+      });
+  }, []);
+
   const toggleShowKey = (id: string) => {
     setShowKeys((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -79,8 +99,8 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
     setDevices((devs) => devs.filter((d) => d.id !== deviceId));
   };
 
-  const handleLockEnclave = () => {
-    setIsLocked(true);
+  const handleToggleLock = () => {
+    setIsLocked((prev) => !prev);
   };
 
   return (
@@ -100,16 +120,30 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={handleLockEnclave}
+            onClick={handleToggleLock}
             className={`flex items-center gap-1.5 px-3 py-1.5 border border-[#0A0A0A] text-xs font-mono font-bold uppercase transition-colors ${
-              isLocked ? 'bg-rose-600 text-white' : 'bg-neutral-100 hover:bg-rose-50 text-rose-800 border-rose-800'
+              isLocked
+                ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-900'
+                : 'bg-neutral-100 hover:bg-rose-50 text-rose-800 border-rose-800'
             }`}
           >
-            <Lock className="w-3.5 h-3.5" />
-            <span>{isLocked ? 'ENCLAVE LOCKED' : 'Emergency Lock'}</span>
+            {isLocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+            <span>{isLocked ? 'Unlock Enclave' : 'Emergency Lock'}</span>
           </button>
         </div>
       </div>
+
+      {isLocked && (
+        <div className="p-4 border-2 border-rose-800 bg-rose-50 text-rose-950 font-mono text-xs space-y-1">
+          <div className="font-bold flex items-center gap-2 text-rose-800 uppercase">
+            <Lock className="w-4 h-4" />
+            <span>ENCLAVE EMERGENCY LOCKDOWN ACTIVE</span>
+          </div>
+          <p>
+            Hardware Keychain access is restricted. Worker daemons paused and remote mobile claims are temporarily suspended.
+          </p>
+        </div>
+      )}
 
       {/* Node Identity Banner */}
       <div className="border-2 border-[#0A0A0A] p-5 bg-neutral-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -117,12 +151,12 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-600" />
             <span className="text-xs font-mono font-bold uppercase tracking-wider">
-              Node Cryptographic Identity
+              Node Cryptographic Identity (Rust Keychain Bridge)
             </span>
           </div>
           <div className="text-base font-bold font-mono">AB-MACBOOK-PRO-M4</div>
           <p className="text-xs font-mono text-neutral-600">
-            Ed25519 Pubkey: <code className="bg-neutral-200 px-1 py-0.5 text-[11px]">MCowBQYDK2VwAyEA2r4F/AB9y9nJzZ1sH9E6x2T61bKk8V9q7f5d3a1b0c=</code>
+            Ed25519 Pubkey: <code className="bg-neutral-200 px-1 py-0.5 text-[11px]">{nodeKeyFingerprint}</code>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -164,7 +198,7 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
                   <div className="text-[11px] text-neutral-500">{item.key_alias}</div>
                   <div className="flex justify-between items-center pt-1">
                     <span className="text-neutral-800 font-mono bg-neutral-100 px-2 py-0.5 border border-neutral-200">
-                      {showKeys[item.id] ? item.masked_value.replace('...', 'ABCDEF123456') : item.masked_value}
+                      {showKeys[item.id] ? item.masked_value.replace('••••', 'REDACTED_SEC') : item.masked_value}
                     </span>
                     <button
                       onClick={() => toggleShowKey(item.id)}

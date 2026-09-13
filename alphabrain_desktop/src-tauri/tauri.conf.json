@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.alphabrain.live wss://api.alphabrain.live http://localhost:* ws://localhost:*"
     }
   },
   "bundle": {

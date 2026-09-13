@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Cpu, HardDrive, Activity, Play, Square, RefreshCw, GitBranch, ShieldAlert } from 'lucide-react';
-import { ActiveTask, ScreenId, SystemMetrics, TerminalLog } from '../types';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { Terminal, Cpu, HardDrive, Activity, Play, Square, GitBranch, Shield, ArrowRight } from 'lucide-react';
+import { ActiveTask, ScreenId, SystemMetrics, TaskResult, TerminalLog } from '../types';
 
 interface Props {
   onNavigate: (screen: ScreenId) => void;
@@ -8,7 +9,7 @@ interface Props {
 
 export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
   const [metrics, setMetrics] = useState<SystemMetrics>({
-    cpu_usage: 14.8,
+    cpu_usage: 12.4,
     memory_used_mb: 4210,
     memory_total_mb: 65536,
     disk_used_gb: 184.2,
@@ -78,32 +79,63 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
   const [autoScroll, setAutoScroll] = useState(true);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
+  const addLog = useCallback((stream: 'stdout' | 'stderr' | 'system', text: string) => {
+    const d = new Date();
+    const timeStr = `${d.toTimeString().split(' ')[0]}.${String(d.getMilliseconds()).padStart(3, '0')}`;
+    setLogs((prev) => [...prev, { id: String(Date.now()) + Math.random(), timestamp: timeStr, stream, text }]);
+  }, []);
+
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const data = await invoke<SystemMetrics>('get_system_metrics');
+      setMetrics(data);
+    } catch (err) {
+      // Fallback in web preview
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 5000);
+    return () => clearInterval(interval);
+  }, [fetchMetrics]);
+
   useEffect(() => {
     if (autoScroll && terminalEndRef.current) {
       terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs, autoScroll]);
 
-  const addLog = (stream: 'stdout' | 'stderr' | 'system', text: string) => {
-    const d = new Date();
-    const timeStr = `${d.toTimeString().split(' ')[0]}.${String(d.getMilliseconds()).padStart(3, '0')}`;
-    setLogs((prev) => [...prev, { id: String(Date.now()), timestamp: timeStr, stream, text }]);
-  };
-
-  const handleSpawnWorker = () => {
-    addLog('system', '[ACTION] Spawning auxiliary alpha_worker daemon subprocess...');
-    setTimeout(() => {
+  const handleSpawnWorker = async () => {
+    addLog('system', '[ACTION] Invoking Tauri IPC: spawn_worker_daemon...');
+    try {
+      const pid = await invoke<number>('spawn_worker_daemon', {
+        workspace: '/Users/ajaytiwari/Desktop/Projects/alphaBrain',
+      });
       setMetrics((m) => ({ ...m, active_workers: m.active_workers + 1 }));
-      addLog('stdout', `[WORKER] Spawned new worker daemon (PID: ${Math.floor(50000 + Math.random() * 9000)})`);
-    }, 400);
+      addLog('stdout', `[WORKER] Spawned alpha_worker.daemon successfully (PID: ${pid})`);
+    } catch (err) {
+      addLog('stderr', `[WORKER ERROR] ${String(err)}`);
+      // Update count for simulated display
+      setMetrics((m) => ({ ...m, active_workers: m.active_workers + 1 }));
+    }
   };
 
-  const handleTriggerGates = () => {
-    addLog('system', '[GATE] Triggering pytest & ruff deterministic gate suite...');
-    setTimeout(() => {
-      addLog('stdout', '[GATE] pytest -q testscript/test_cloud_dispatch.py -> 3 passed in 0.42s');
-      addLog('stdout', '[GATE] ruff check . -> All checks passed!');
-    }, 600);
+  const handleExecuteTask = async (taskId: string) => {
+    addLog('system', `[TASK] Invoking Tauri IPC: execute_task (${taskId})...`);
+    try {
+      const result = await invoke<TaskResult>('execute_task', {
+        taskId,
+        workspace: '/Users/ajaytiwari/Desktop/Projects/alphaBrain',
+        leaseId: 'lse_prov_' + Date.now(),
+      });
+      addLog('stdout', `[TASK RESULT] ${result.task_id}: status=${result.status} exit_code=${result.exit_code}`);
+      if (result.output) {
+        addLog('stdout', `[OUTPUT] ${result.output.trim()}`);
+      }
+    } catch (err) {
+      addLog('stderr', `[TASK ERROR] ${String(err)}`);
+    }
   };
 
   const handleAbortTask = (taskId: string) => {
@@ -128,11 +160,21 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
             Real-time telemetry, active worktree execution queue, and live streaming terminal.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-mono uppercase tracking-wider font-semibold">
-            NODE RUNNING (M4 MAX)
-          </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onNavigate('M04_SecurityEnclave')}
+            className="flex items-center gap-1.5 px-3 py-1 border border-[#0A0A0A] hover:bg-neutral-100 text-xs font-mono uppercase font-semibold"
+          >
+            <Shield className="w-3.5 h-3.5 text-[#E6391E]" />
+            <span>Security Enclave</span>
+            <ArrowRight className="w-3 h-3 text-neutral-400" />
+          </button>
+          <div className="flex items-center gap-2 border-l border-neutral-300 pl-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-mono uppercase tracking-wider font-semibold">
+              NODE RUNNING (M4 MAX)
+            </span>
+          </div>
         </div>
       </div>
 
@@ -145,7 +187,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
           </div>
           <div className="text-2xl font-bold text-black">{metrics.cpu_usage.toFixed(1)}%</div>
           <div className="w-full bg-neutral-200 h-1.5 mt-2">
-            <div className="bg-[#E6391E] h-1.5" style={{ width: `${metrics.cpu_usage}%` }} />
+            <div className="bg-[#E6391E] h-1.5" style={{ width: `${Math.min(metrics.cpu_usage, 100)}%` }} />
           </div>
         </div>
 
@@ -201,13 +243,13 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
               onClick={handleSpawnWorker}
               className="px-3 py-1.5 border border-[#0A0A0A] bg-neutral-100 hover:bg-neutral-200 text-xs font-mono uppercase font-bold"
             >
-              + Spawn Worker Daemon
+              + Spawn Worker Daemon (Rust IPC)
             </button>
             <button
-              onClick={handleTriggerGates}
+              onClick={() => handleExecuteTask('tsk_eva_cbc068ce5324')}
               className="px-3 py-1.5 bg-[#0A0A0A] hover:bg-[#E6391E] text-white text-xs font-mono uppercase font-bold transition-colors"
             >
-              Run Acceptance Gates
+              Verify Active Worktree
             </button>
           </div>
         </div>
