@@ -112,11 +112,10 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
     const t = window.setTimeout(async () => {
       setBiometricScanning(false);
       const storedHash = localStorage.getItem('alphabrain_master_pin_hash');
-      const defaultHash = await hashPin('1337');
-      if (storedHash || defaultHash) {
+      if (storedHash) {
         triggerAuthSuccess();
       } else {
-        setError('NO MASTER PIN ENROLLED');
+        setError('NO MASTER PIN ENROLLED // ENROLL VIA MC-02A');
       }
     }, 600);
     timersRef.current.push(t);

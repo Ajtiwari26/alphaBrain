@@ -16,7 +16,6 @@ import {
 import { SplashScreen } from './screens/SplashScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { EnrollmentScreen } from './screens/EnrollmentScreen';
-import { InstanceSyncScreen } from './screens/InstanceSyncScreen';
 import { QRProvisioningScreen, SASVerificationScreen } from './screens/QRProvisioningScreen';
 import { EvaMeetingScreen } from './screens/EvaMeetingScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
