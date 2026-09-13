@@ -402,7 +402,7 @@ pub fn run() {
             task_executor::spawn_worker_daemon,
             task_executor::execute_task,
             log_streamer::stream_task_logs,
-            telemetry::get_system_metrics
+            get_system_metrics
         ])
         .run(tauri::generate_context!())
         .expect("error while running AlphaBrain desktop application");
