@@ -1,5 +1,4 @@
-import React from 'react';
-import { Building2, Users, CheckCircle2 } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 interface Props {
   onSelectDept?: (dept: string) => void;

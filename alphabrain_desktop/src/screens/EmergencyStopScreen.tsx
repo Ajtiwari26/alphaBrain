@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { desktopApi } from '../api/client';
 import { EmergencyStopState } from '../types';
-import { AlertOctagon, ShieldAlert, ShieldCheck, RefreshCw, FileText } from 'lucide-react';
+import { AlertOctagon, FileText } from 'lucide-react';
 
 export const EmergencyStopScreen: React.FC = () => {
   const [stopState, setStopState] = useState<EmergencyStopState | null>(null);

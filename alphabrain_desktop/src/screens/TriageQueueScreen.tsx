@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { desktopApi } from '../api/client';
 import { TaskSummary } from '../types';
-import { ListTodo, RefreshCw, CheckCircle2, XCircle, Play, AlertCircle } from 'lucide-react';
+import { RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   onSelectTask?: (taskId: string) => void;

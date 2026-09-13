@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { desktopApi } from '../api/client';
 import { ModelUtilityScore } from '../types';
-import { Cpu, RefreshCw, Zap, Award, CheckCircle } from 'lucide-react';
+import { RefreshCw, Zap } from 'lucide-react';
 
 export const ModelRouterScreen: React.FC = () => {
   const [scores, setScores] = useState<ModelUtilityScore[]>([]);
