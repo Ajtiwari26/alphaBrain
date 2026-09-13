@@ -57,6 +57,7 @@ logger = logging.getLogger("alpha_core.api.cloud_dispatch")
 router = APIRouter(tags=["cloud_dispatch"])
 
 DEFAULT_CLOUD_DISPATCH_DB = Path.home() / ".alphabrain" / "cloud_dispatch.db"
+DEFAULT_HANDSHAKE_TIMEOUT_SECONDS = 10.0
 
 
 def init_cloud_dispatch_db(db_path: Path) -> None:
@@ -771,12 +772,45 @@ class BroadcastStreamHub:
 
     async def broadcast_emergency_stop(self, task_id: str, reason: str) -> None:
         """Broadcasts emergency stop to both broadcasters and subscribers (Invariant I-60)."""
-        await self.broadcast(
-            task_id=task_id,
-            message_type="EMERGENCY_STOP",
-            payload={"reason": reason, "halt_immediately": True},
-            sender="control_plane",
-        )
+        async with self._lock:
+            seq = self._sequences.get(task_id, 0) + 1
+            self._sequences[task_id] = seq
+            subs = list(self._subscribers.get(task_id, set()))
+            broadcasters = list(self._broadcasters.get(task_id, set()))
+
+        now_iso = datetime.now(UTC).isoformat()
+        envelope = {
+            "task_id": task_id,
+            "seq": seq,
+            "type": "EMERGENCY_STOP",
+            "sender": "control_plane",
+            "timestamp": now_iso,
+            "payload": {"reason": reason, "halt_immediately": True},
+        }
+        text_data = json.dumps(envelope)
+
+        dead_subs: list[WebSocket] = []
+        for ws in subs:
+            try:
+                await ws.send_text(text_data)
+            except Exception:
+                dead_subs.append(ws)
+
+        dead_broadcasters: list[WebSocket] = []
+        for ws in broadcasters:
+            try:
+                await ws.send_text(text_data)
+            except Exception:
+                dead_broadcasters.append(ws)
+
+        if dead_subs or dead_broadcasters:
+            async with self._lock:
+                for ws in dead_subs:
+                    if task_id in self._subscribers:
+                        self._subscribers[task_id].discard(ws)
+                for ws in dead_broadcasters:
+                    if task_id in self._broadcasters:
+                        self._broadcasters[task_id].discard(ws)
 
 
 # Global singletons
@@ -1054,8 +1088,18 @@ async def register_node_wss(
     current_node_id: str | None = None
 
     try:
-        # Wait for initial registration message
-        initial_raw = await websocket.receive_text()
+        # Wait for initial registration message with 10.0s handshake timeout (Directive 3)
+        try:
+            initial_raw = await asyncio.wait_for(
+                websocket.receive_text(), timeout=DEFAULT_HANDSHAKE_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            await websocket.send_text(
+                json.dumps({"error": "Registration handshake timed out", "type": "error"})
+            )
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
         try:
             msg = json.loads(initial_raw)
         except Exception:
@@ -1160,18 +1204,32 @@ async def register_node_wss(
 async def dispatch_task_lease(
     req: DispatchLeaseRequest | None = None,
     node_id: str | None = Query(default=None),
+    principal: AuthPrincipal = Depends(require_api_principal),
     nodes: NodeRegistry = Depends(get_node_registry),
     queue: TaskTriageQueue = Depends(get_triage_queue),
 ) -> DispatchLeaseResponse:
     """
     Leases next approved task to an active, registered execution node (Invariant I-57).
     Honors Emergency Stop and guarantees atomic assignment.
+    Requires authenticated principal (Worker or Founder/Admin).
     """
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN, PrincipalRole.WORKER}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Principal lacks required role for task leasing",
+        )
+
     target_node_id = (req.node_id if req else None) or node_id
     if not target_node_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Must provide node_id in request body or query parameter",
+        )
+
+    if principal.role == PrincipalRole.WORKER and principal.subject != target_node_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Worker principal '{principal.subject}' does not match target node_id '{target_node_id}'",
         )
 
     # Invariant I-57: Verify node is registered and active
@@ -1328,15 +1386,29 @@ async def broadcast_stream_hub(
         try:
             while True:
                 await asyncio.sleep(5.0)
-                await websocket.send_text(
-                    json.dumps(
-                        {
-                            "type": "heartbeat",
-                            "task_id": task_id,
-                            "timestamp": datetime.now(UTC).isoformat(),
-                        }
+                if queue.is_emergency_stopped():
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "type": "EMERGENCY_STOP",
+                                "task_id": task_id,
+                                "payload": {
+                                    "reason": "Emergency stop is active",
+                                    "halt_immediately": True,
+                                },
+                            }
+                        )
                     )
-                )
+                else:
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "type": "heartbeat",
+                                "task_id": task_id,
+                                "timestamp": datetime.now(UTC).isoformat(),
+                            }
+                        )
+                    )
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1348,6 +1420,22 @@ async def broadcast_stream_hub(
     try:
         while True:
             raw = await websocket.receive_text()
+            if queue.is_emergency_stopped():
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "EMERGENCY_STOP",
+                            "task_id": task_id,
+                            "payload": {
+                                "reason": "Emergency stop is active",
+                                "halt_immediately": True,
+                            },
+                        }
+                    )
+                )
+                if is_broadcaster:
+                    break
+
             try:
                 msg = json.loads(raw)
             except Exception:

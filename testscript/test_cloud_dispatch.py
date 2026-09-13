@@ -12,14 +12,16 @@ import json
 import time
 from collections.abc import Generator
 from pathlib import Path
+from typing import cast
 
 import pytest
-from fastapi import WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, status
 from fastapi.testclient import TestClient
 
 import alpha_core.api.cloud_dispatch as cd_mod
 from alpha_core.api.app import app
 from alpha_core.api.cloud_dispatch import (
+    BroadcastStreamHub,
     DeviceRegistry,
     NodeRegistry,
     ProvisioningSessionStore,
@@ -453,6 +455,93 @@ def test_node_register_wss_lifecycle(clean_stores: dict[str, object], client: Te
 # ---------------------------------------------------------------------------
 
 
+def test_dispatch_lease_unauthenticated(clean_stores: dict[str, object]) -> None:
+    """Lease request without authentication returns 401 Unauthorized (Directive 1 & 4)."""
+    orig = app.dependency_overrides.pop(require_api_principal, None)
+    try:
+        with TestClient(app) as tc:
+            resp = tc.post("/api/dispatch/lease", json={"node_id": "test-node"})
+            assert resp.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
+    finally:
+        if orig:
+            app.dependency_overrides[require_api_principal] = orig
+
+
+def test_dispatch_lease_client_role_forbidden(clean_stores: dict[str, object]) -> None:
+    """Client role cannot lease tasks (requires founder, admin, or worker)."""
+    orig = app.dependency_overrides.get(require_api_principal)
+    app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+        subject="client-user",
+        role=PrincipalRole.CLIENT,
+    )
+    try:
+        with TestClient(app) as tc:
+            resp = tc.post("/api/dispatch/lease", json={"node_id": "test-node"})
+            assert resp.status_code == status.HTTP_403_FORBIDDEN
+            assert "Principal lacks required role" in resp.json()["detail"]
+    finally:
+        if orig:
+            app.dependency_overrides[require_api_principal] = orig
+        else:
+            app.dependency_overrides.pop(require_api_principal, None)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_lease_worker_identity_mismatch(
+    clean_stores: dict[str, object],
+) -> None:
+    """Worker role attempting to lease for a different node_id is rejected with 403 Forbidden."""
+    node_registry = clean_stores["node_registry"]
+    assert isinstance(node_registry, NodeRegistry)
+    await node_registry.register_node(
+        node_id="node-other", hostname="host-other", capabilities=["python3.12"]
+    )
+
+    orig = app.dependency_overrides.get(require_api_principal)
+    app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+        subject="node-worker-A",
+        role=PrincipalRole.WORKER,
+    )
+    try:
+        with TestClient(app) as tc:
+            resp = tc.post("/api/dispatch/lease", json={"node_id": "node-other"})
+            assert resp.status_code == status.HTTP_403_FORBIDDEN
+            assert "does not match target node_id" in resp.json()["detail"]
+    finally:
+        if orig:
+            app.dependency_overrides[require_api_principal] = orig
+        else:
+            app.dependency_overrides.pop(require_api_principal, None)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_lease_worker_identity_matching(
+    clean_stores: dict[str, object],
+) -> None:
+    """Worker role leasing for its own matching node_id succeeds."""
+    node_registry = clean_stores["node_registry"]
+    assert isinstance(node_registry, NodeRegistry)
+    await node_registry.register_node(
+        node_id="node-worker-A", hostname="host-worker-a", capabilities=["python3.12"]
+    )
+
+    orig = app.dependency_overrides.get(require_api_principal)
+    app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+        subject="node-worker-A",
+        role=PrincipalRole.WORKER,
+    )
+    try:
+        with TestClient(app) as tc:
+            resp = tc.post("/api/dispatch/lease", json={"node_id": "node-worker-A"})
+            assert resp.status_code == status.HTTP_200_OK
+            assert resp.json()["status"] == "no_tasks"
+    finally:
+        if orig:
+            app.dependency_overrides[require_api_principal] = orig
+        else:
+            app.dependency_overrides.pop(require_api_principal, None)
+
+
 @pytest.mark.asyncio
 async def test_dispatch_lease_unregistered_node(client: TestClient) -> None:
     """Lease request from unregistered node fails with 403 Forbidden (Invariant I-57)."""
@@ -695,3 +784,81 @@ def test_stream_hub_emergency_stop_announcement(
         frame = json.loads(ws.receive_text())
         assert frame["type"] == "EMERGENCY_STOP"
         assert frame["task_id"] == task_id
+
+
+@pytest.mark.asyncio
+async def test_broadcast_stream_hub_emergency_stop_notifies_both() -> None:
+    """BroadcastStreamHub sends emergency stop frame to both broadcasters and subscribers (Directive 2)."""
+    hub = BroadcastStreamHub()
+    task_id = "tsk_unit_stop_001"
+
+    class MockWebSocket:
+        def __init__(self) -> None:
+            self.sent_messages: list[str] = []
+
+        async def send_text(self, text: str) -> None:
+            self.sent_messages.append(text)
+
+    sub_ws = MockWebSocket()
+    broad_ws = MockWebSocket()
+
+    await hub.register_subscriber(task_id, cast(WebSocket, sub_ws))
+    await hub.register_broadcaster(task_id, cast(WebSocket, broad_ws))
+
+    await hub.broadcast_emergency_stop(task_id, reason="Unit test stop")
+
+    assert len(sub_ws.sent_messages) == 1
+    sub_msg = json.loads(sub_ws.sent_messages[0])
+    assert sub_msg["type"] == "EMERGENCY_STOP"
+    assert sub_msg["payload"]["reason"] == "Unit test stop"
+
+    assert len(broad_ws.sent_messages) == 1
+    broad_msg = json.loads(broad_ws.sent_messages[0])
+    assert broad_msg["type"] == "EMERGENCY_STOP"
+    assert broad_msg["payload"]["reason"] == "Unit test stop"
+
+
+def test_stream_hub_dynamic_emergency_stop(
+    clean_stores: dict[str, object], client: TestClient
+) -> None:
+    """Active stream dynamically detects emergency stop and halts broadcaster (Directive 2)."""
+    queue = clean_stores["queue"]
+    assert isinstance(queue, TaskTriageQueue)
+
+    task_id = "tsk_dyn_stop_001"
+    token = create_scoped_stream_token(f"stream:{task_id}", ttl_seconds=3600)
+
+    with client.websocket_connect(
+        f"/api/stream/broadcast/{task_id}?token={token}&role=broadcaster"
+    ) as broad_ws:
+        ack = json.loads(broad_ws.receive_text())
+        assert ack["type"] == "connected"
+
+        # Trigger emergency stop while broadcaster is active
+        queue.emergency_stop(reason="Mid-stream operator kill")
+
+        # Broadcaster sends a message; receiver loop checks queue and responds with EMERGENCY_STOP
+        broad_ws.send_text(json.dumps({"type": "progress", "payload": {}}))
+        stop_frame = json.loads(broad_ws.receive_text())
+        assert stop_frame["type"] == "EMERGENCY_STOP"
+        assert "Emergency stop is active" in stop_frame["payload"]["reason"]
+
+
+def test_node_register_handshake_timeout(
+    clean_stores: dict[str, object],
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nodes that stall during initial registration handshake are disconnected (Directive 3)."""
+    monkeypatch.setattr(cd_mod, "DEFAULT_HANDSHAKE_TIMEOUT_SECONDS", 0.05)
+    token = create_scoped_stream_token("worker-token", ttl_seconds=3600)
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with client.websocket_connect(f"/api/nodes/register?token={token}") as ws:
+            # Client connects but does not send initial registration frame
+            err_frame = json.loads(ws.receive_text())
+            assert err_frame["type"] == "error"
+            assert "Registration handshake timed out" in err_frame["error"]
+            # After sending error frame, server closes with WS_1008_POLICY_VIOLATION
+            ws.receive_text()
+    assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
