@@ -1228,6 +1228,7 @@ Emit a single-line JSON manifest before termination exactly matching this format
 10. TOOL CALL CONSTRAINTS (CRITICAL):
 - When calling tools, NEVER wrap arguments in double quotes. Pass them as raw strings.
 - All integer parameters in tool calls MUST be passed as JSON integers, NEVER as strings.
+- When calling run_command for gate or test commands, ALWAYS pass WaitMsBeforeAsync: 10000 (10 seconds) so the command executes synchronously and returns output directly.
 
 11. CONCURRENCY CONSTRAINT (CRITICAL):
 - NEVER call multiple run_command tools concurrently. You MUST wait for the result of the first command before calling another command.
