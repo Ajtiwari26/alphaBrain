@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlphaBrain — Mac Desktop Native Suite (Tauri 2.0)</title>
+  <!-- Google Fonts with local fallback -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       DeployMate Locomotive Minimalist Design System — 100% Pure Inlined CSS
+       Zero CDN Script Dependencies • Bulletproof Local File Protocol (file://)
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #E9E9EB;
+      color: #0A0A0A;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .header-banner {
+      text-align: center;
+      max-width: 800px;
+      margin-bottom: 48px;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background-color: #0A0A0A;
+      color: #FFFFFF;
+      font-family: "Fira Code", SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      border: 1px solid #0A0A0A;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #E6391E;
+      display: inline-block;
+    }
+
+    .page-title {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #0A0A0A;
+      margin-bottom: 6px;
+    }
+
+    .page-subtitle {
+      font-family: "Fira Code", monospace;
+      font-size: 12px;
+      color: #555555;
+    }
+
+    .screen-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 56px;
+      width: 100%;
+      max-width: 980px;
+    }
+
+    .screen-label {
+      font-family: "Fira Code", monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #555555;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+      align-self: flex-start;
+    }
+
+    /* Mac Desktop Window Frame */
+    .mac-window {
+      width: 100%;
+      height: 580px;
+      background-color: #FFFFFF;
+      border: 1px solid #0A0A0A;
+      box-shadow: 0 20px 45px -10px rgba(0,0,0,0.18), 0 0 0 1px #0A0A0A;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .mac-titlebar {
+      height: 40px;
+      background-color: #FFFFFF;
+      border-bottom: 1px solid #0A0A0A;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      font-weight: 600;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 8px;
+    }
+
+    .traffic-dot {
+      width: 10px;
+      height: 10px;
+      border: 1px solid #0A0A0A;
+      border-radius: 50%;
+    }
+
+    .traffic-red { background-color: #E6391E; }
+    .traffic-white { background-color: #FFFFFF; }
+    .traffic-black { background-color: #0A0A0A; }
+
+    .window-title {
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+
+    .window-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .window-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      overflow: hidden;
+    }
+
+    .col-7 { grid-column: span 7; }
+    .col-5 { grid-column: span 5; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-4 { grid-column: span 4; }
+
+    .pane-p8 {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .border-r-1 { border-right: 1px solid #0A0A0A; }
+    .border-b-1 { border-bottom: 1px solid #0A0A0A; }
+    .border-t-1 { border-top: 1px solid #0A0A0A; }
+
+    .eyebrow {
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: #E6391E;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .pane-headline {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: #0A0A0A;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-family: "Fira Code", monospace;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666666;
+      margin-bottom: 4px;
+    }
+
+    .form-box {
+      border: 1px solid #0A0A0A;
+      padding: 10px 14px;
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #FFFFFF;
+    }
+
+    .btn-black {
+      background-color: #0A0A0A;
+      color: #FFFFFF;
+      border: 1px solid #0A0A0A;
+      padding: 14px 20px;
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn-black:hover {
+      background-color: #E6391E;
+      border-color: #E6391E;
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      color: #0A0A0A;
+      border: 1px solid #0A0A0A;
+      padding: 10px 16px;
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+    }
+
+    .btn-outline:hover {
+      background-color: #0A0A0A;
+      color: #FFFFFF;
+    }
+
+    .table-list {
+      border-top: 1px solid #0A0A0A;
+      border-bottom: 1px solid #0A0A0A;
+      margin-bottom: 20px;
+    }
+
+    .table-row {
+      padding: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      border-bottom: 1px solid #0A0A0A;
+    }
+
+    .table-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-callout {
+      border: 1px solid #0A0A0A;
+      padding: 14px;
+      background-color: #FAFAFA;
+    }
+
+    .info-callout-title {
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #E6391E;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .info-callout-body {
+      font-family: "Fira Code", monospace;
+      font-size: 10px;
+      color: #444444;
+      line-height: 1.5;
+    }
+
+    /* QR Viewfinder Styling */
+    .qr-viewfinder {
+      width: 220px;
+      height: 220px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 10px auto;
+    }
+
+    .qr-corner {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-color: #E6391E;
+      border-style: solid;
+    }
+
+    .qr-tl { top: 0; left: 0; border-width: 4px 0 0 4px; }
+    .qr-tr { top: 0; right: 0; border-width: 4px 4px 0 0; }
+    .qr-bl { bottom: 0; left: 0; border-width: 0 0 4px 4px; }
+    .qr-br { bottom: 0; right: 0; border-width: 0 4px 4px 0; }
+
+    .qr-inner {
+      width: 170px;
+      height: 170px;
+      border: 1px solid #0A0A0A;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background-color: #FFFFFF;
+    }
+
+    .qr-target {
+      width: 38px;
+      height: 38px;
+      border: 3px solid #0A0A0A;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qr-target-center {
+      width: 16px;
+      height: 16px;
+      background-color: #0A0A0A;
+    }
+
+    .sas-box {
+      border: 1px solid #0A0A0A;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .sas-digits {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: #E6391E;
+      margin: 4px 0 10px;
+    }
+
+    .emoji-tag {
+      display: inline-block;
+      padding: 4px 10px;
+      background-color: #F0F0F0;
+      border: 1px solid #0A0A0A;
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+
+    /* Terminal Stream */
+    .terminal-pane {
+      background-color: #FFFFFF;
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      padding: 16px;
+      line-height: 1.6;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .log-line {
+      margin-bottom: 6px;
+    }
+
+    .log-time { color: #888888; }
+    .log-agent { color: #E6391E; font-weight: 700; }
+    .log-sys { color: #0A0A0A; font-weight: 700; }
+
+    .sub-bar {
+      padding: 10px 24px;
+      border-bottom: 1px solid #0A0A0A;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      background-color: #FFFFFF;
+      flex-shrink: 0;
+    }
+
+    .gauge-bar {
+      width: 100%;
+      height: 10px;
+      border: 1px solid #0A0A0A;
+      padding: 1px;
+      margin-top: 4px;
+    }
+
+    .gauge-fill-red { height: 100%; background-color: #E6391E; width: 14.8%; }
+    .gauge-fill-black { height: 100%; background-color: #0A0A0A; width: 34.4%; }
+
+    .pulse {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #E6391E;
+      margin-right: 6px;
+      animation: blink 1.4s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Banner -->
+  <div class="header-banner">
+    <div class="badge-pill">
+      <span class="badge-dot"></span>
+      DeployMate Locomotive Design System // Mac Desktop Native Suite
+    </div>
+    <h1 class="page-title">AlphaBrain Mac Desktop Core (Tauri 2.0)</h1>
+    <p class="page-subtitle">
+      Minimalist Swiss Architecture • Stark White (#FFFFFF) • Ink Black (#0A0A0A) • Structural 1px Rules • Red-Orange (#E6391E) Accents
+    </p>
+  </div>
+
+  <!-- SCREEN M-01: Node Setup -->
+  <div class="screen-wrapper">
+    <div class="screen-label">M-01 — NODE SETUP & DEPENDENCY INTEGRITY</div>
+    <div class="mac-window">
+      <div class="mac-titlebar">
+        <div class="traffic-lights">
+          <span class="traffic-dot traffic-red"></span>
+          <span class="traffic-dot traffic-white"></span>
+          <span class="traffic-dot traffic-black"></span>
+        </div>
+        <div class="window-title">ALPHABRAIN // NODE_01 // SETUP</div>
+        <div class="window-status">
+          <span class="badge-dot"></span>
+          <span>STANDALONE</span>
+        </div>
+      </div>
+
+      <div class="window-body">
+        <!-- Left Pane: Configuration -->
+        <div class="col-7 pane-p8 border-r-1">
+          <div>
+            <div class="eyebrow">01 — INITIALIZATION</div>
+            <h2 class="pane-headline">Execution Node</h2>
+
+            <div class="form-group">
+              <label class="form-label">Workspace Directory</label>
+              <div class="form-box">
+                <span>/Users/ajaytiwari/Desktop/Projects/alphaBrain</span>
+                <span style="color: #E6391E; font-weight: 700;">LOCKED</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Central Production Backend</label>
+              <div class="form-box">
+                <span>https://api.alphabrain.live</span>
+                <span style="color: #E6391E; font-weight: 700;">WSS ↗</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Execution Worktree Storage</label>
+              <div class="form-box">
+                <span>~/Library/Application Support/AlphaBrain/worktrees</span>
+                <span style="color: #666666;">ISOLATED</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-black">
+            <span>INITIALIZE DAEMON NODE</span>
+            <span style="font-family: Fira Code; font-size: 11px;">READY ↗</span>
+          </button>
+        </div>
+
+        <!-- Right Pane: Diagnostics -->
+        <div class="col-5 pane-p8">
+          <div>
+            <div class="eyebrow" style="color: #666666;">DIAGNOSTICS</div>
+            <h3 style="font-family: Space Grotesk; font-size: 22px; font-weight: 700; margin-bottom: 16px;">Runtime Integrity</h3>
+
+            <div class="table-list">
+              <div class="table-row">
+                <span>GIT BINARY</span>
+                <span style="font-weight: 700;">2.43.0 [ OK ]</span>
+              </div>
+              <div class="table-row">
+                <span>PYTHON CORE</span>
+                <span style="font-weight: 700;">3.14.6 [ OK ]</span>
+              </div>
+              <div class="table-row">
+                <span>NODE RUNTIME</span>
+                <span style="font-weight: 700;">v22.14.0 [ OK ]</span>
+              </div>
+              <div class="table-row">
+                <span>AGY CLI HARNESS</span>
+                <span style="font-weight: 700; color: #E6391E;">2.0.4 [ LINKED ]</span>
+              </div>
+              <div class="table-row">
+                <span>KEYCHAIN VAULT</span>
+                <span style="font-weight: 700;">SECURE [ ACTIVE ]</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-callout">
+            <div class="info-callout-title">INVARIANT I-52 VERIFIED</div>
+            <div class="info-callout-body">
+              Worker executes exclusively inside isolated Git worktrees. Zero direct manual mutations permitted on main repository tree.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN M-02: Pairing Station -->
+  <div class="screen-wrapper">
+    <div class="screen-label">M-02 — PAIRING STATION & ROTATING QR GATEWAY</div>
+    <div class="mac-window">
+      <div class="mac-titlebar">
+        <div class="traffic-lights">
+          <span class="traffic-dot traffic-red"></span>
+          <span class="traffic-dot traffic-white"></span>
+          <span class="traffic-dot traffic-black"></span>
+        </div>
+        <div class="window-title">ALPHABRAIN // STATION // PAIRING</div>
+        <div class="window-status">
+          <span class="pulse"></span>
+          <span>PAIRING BROADCAST</span>
+        </div>
+      </div>
+
+      <div class="window-body">
+        <!-- Left Pane: Dynamic QR Viewfinder -->
+        <div class="col-6 pane-p8 border-r-1" style="align-items: center;">
+          <div style="width: 100%;">
+            <div class="eyebrow">02 — AUTHORIZATION</div>
+            <h2 class="pane-headline" style="font-size: 28px; margin-bottom: 6px;">Provision Companion</h2>
+            <p style="font-family: Fira Code; font-size: 11px; color: #666666;">Scan via Mobile Companion App (Screen MC-03) to bind account.</p>
+          </div>
+
+          <div class="qr-viewfinder">
+            <div class="qr-corner qr-tl"></div>
+            <div class="qr-corner qr-tr"></div>
+            <div class="qr-corner qr-bl"></div>
+            <div class="qr-corner qr-br"></div>
+
+            <div class="qr-inner">
+              <div style="display: flex; justify-content: space-between;">
+                <div class="qr-target"><div class="qr-target-center"></div></div>
+                <div class="qr-target"><div class="qr-target-center"></div></div>
+              </div>
+              <div style="text-align: center; font-family: Fira Code; font-size: 11px; font-weight: 700; color: #E6391E; letter-spacing: 0.1em;">
+                ED25519 ROTATING
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div class="qr-target"><div class="qr-target-center"></div></div>
+                <span style="font-family: Fira Code; font-size: 9px; color: #777777;">TTL 120S</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="width: 100%; display: flex; justify-content: space-between; font-family: Fira Code; font-size: 11px; padding-top: 14px; border-top: 1px solid #0A0A0A;">
+            <span style="color: #666666;">TOKEN ROTATION IN:</span>
+            <span style="font-weight: 700; color: #E6391E;">01:52 MIN</span>
+          </div>
+        </div>
+
+        <!-- Right Pane: Out-of-band Verification -->
+        <div class="col-6 pane-p8">
+          <div>
+            <div class="eyebrow" style="color: #666666;">VERIFICATION</div>
+            <h3 style="font-family: Space Grotesk; font-size: 22px; font-weight: 700; margin-bottom: 12px;">Short Auth String (SAS)</h3>
+
+            <div class="sas-box">
+              <div style="font-family: Fira Code; font-size: 10px; color: #666666; text-transform: uppercase;">Verify Code on Mobile Screen:</div>
+              <div class="sas-digits">749 - 281</div>
+              <div>
+                <span class="emoji-tag">🛡️ SHIELD</span>
+                <span class="emoji-tag">⚡ BOLT</span>
+                <span class="emoji-tag">🔑 KEY</span>
+              </div>
+            </div>
+
+            <div style="font-family: Fira Code; font-size: 10px; font-weight: 700; color: #666666; text-transform: uppercase; margin-bottom: 6px;">Authorized Companion Devices</div>
+            <div class="table-list" style="margin-bottom: 0;">
+              <div class="table-row" style="padding: 10px;">
+                <div>
+                  <div style="font-weight: 700;">iQOO 12 Flagship</div>
+                  <div style="font-size: 9px; color: #777777;">10BF5P2AZF0010T // USB CONNECTED</div>
+                </div>
+                <span style="color: #E6391E; font-weight: 700;">ACTIVE</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="border: 1px solid #0A0A0A; padding: 12px; font-family: Fira Code; font-size: 11px; display: flex; justify-content: space-between;">
+            <span>PAIRING PROTOCOL</span>
+            <span style="font-weight: 700;">VERSION 2.0 (SECTION 14.2.5)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN M-03: Command Node -->
+  <div class="screen-wrapper">
+    <div class="screen-label">M-03 — COMMAND NODE & LIVE EXECUTION MONITOR</div>
+    <div class="mac-window">
+      <div class="mac-titlebar">
+        <div class="traffic-lights">
+          <span class="traffic-dot traffic-red"></span>
+          <span class="traffic-dot traffic-white"></span>
+          <span class="traffic-dot traffic-black"></span>
+        </div>
+        <div class="window-title">ALPHABRAIN // NODE_01 // LIVE_MONITOR</div>
+        <div class="window-status">
+          <span class="badge-dot"></span>
+          <span style="font-weight: 700;">LEASE_HELD</span>
+        </div>
+      </div>
+
+      <!-- Sub-Bar -->
+      <div class="sub-bar">
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <span style="color: #E6391E; font-weight: 700;">TASK_ACTIVE:</span>
+          <span style="font-weight: 700;">TSK_EVA_7775F157F872</span>
+          <span style="color: #999999;">|</span>
+          <span style="color: #555555;">alpha/tsk_eva_7775f157f872</span>
+        </div>
+        <div>
+          <span style="color: #666666;">GATES: <b style="color: #0A0A0A;">1107 PASS / 0 FAIL</b></span>
+          <span style="margin: 0 8px; color: #CCCCCC;">|</span>
+          <span style="color: #666666;">BRANCH: <b style="color: #E6391E;">CERTIFIED</b></span>
+        </div>
+      </div>
+
+      <div class="window-body">
+        <!-- Terminal Stream -->
+        <div class="col-8 border-r-1" style="display: flex; flex-direction: column; justify-content: space-between; padding: 20px;">
+          <div class="terminal-pane">
+            <div class="log-line"><span class="log-time">[08:55:46]</span> <span class="log-sys">SYSTEM:</span> Spawning AGY worker in worktree tsk_eva_7775f157f872</div>
+            <div class="log-line"><span class="log-time">[08:56:10]</span> <span class="log-agent">WORKER:</span> Applied cloud_dispatch.py RBAC lease gate and emergency broadcast</div>
+            <div class="log-line"><span class="log-time">[08:57:26]</span> <span class="log-agent">GATES:</span> 1107 passed, 11 skipped in 98.63s</div>
+            <div class="log-line"><span class="log-time">[08:58:45]</span> <span class="log-sys">REVIEW_ROUND_1:</span> Gemini 3.1 Pro High rendered APPROVE</div>
+            <div class="log-line"><span class="log-time">[09:03:24]</span> <span class="log-sys">REVIEW_ROUND_2:</span> Claude Opus 4.6 Thinking rendered FINAL_APPROVAL</div>
+            <div class="log-line"><span class="log-time">[09:03:24]</span> <span class="log-agent">ATTESTATION:</span> Nonce signed by alpha_production_v1. Verdict: APPROVED</div>
+            <div style="color: #E6391E; font-weight: 700; margin-top: 6px;">_</div>
+          </div>
+
+          <div style="border-top: 1px solid #0A0A0A; padding-top: 14px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: Fira Code; font-size: 11px; color: #666666;">BROADCAST TO HUB: ACTIVE (WSS)</span>
+            <div style="display: flex; gap: 8px;">
+              <button style="padding: 6px 12px; border: 1px solid #0A0A0A; background: transparent; font-family: Fira Code; font-size: 11px; font-weight: 700; cursor: pointer;">PAUSE</button>
+              <button style="padding: 6px 12px; border: 1px solid #E6391E; background: #E6391E; color: white; font-family: Fira Code; font-size: 11px; font-weight: 700; cursor: pointer;">EMERGENCY STOP</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry -->
+        <div class="col-4 pane-p8">
+          <div>
+            <div class="eyebrow" style="color: #666666;">TELEMETRY</div>
+            <h3 style="font-family: Space Grotesk; font-size: 22px; font-weight: 700; margin-bottom: 16px;">Hardware Vitals</h3>
+
+            <div style="margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; font-family: Fira Code; font-size: 11px;">
+                <span>HOST CPU LOAD</span>
+                <span style="color: #E6391E; font-weight: 700;">14.8%</span>
+              </div>
+              <div class="gauge-bar"><div class="gauge-fill-red"></div></div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; font-family: Fira Code; font-size: 11px;">
+                <span>HOST RAM USAGE</span>
+                <span style="font-weight: 700;">12.4 GB / 36.0 GB</span>
+              </div>
+              <div class="gauge-bar"><div class="gauge-fill-black"></div></div>
+            </div>
+
+            <div class="table-row">
+              <span>THERMAL PRESSURE</span>
+              <span style="font-weight: 700;">NOMINAL [ COOL ]</span>
+            </div>
+
+            <div class="table-row">
+              <span>USB COMPANION</span>
+              <span style="color: #E6391E; font-weight: 700;">10BF5P2AZF0010T</span>
+            </div>
+          </div>
+
+          <div class="info-callout">
+            <span style="color: #666666; font-size: 10px; display: block;">NODE LEASE EXPIRES:</span>
+            <span style="font-weight: 700; font-size: 11px;">300s (AUTO-HEARTBEAT)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN M-04: Security Enclave -->
+  <div class="screen-wrapper">
+    <div class="screen-label">M-04 — SECURITY ENCLAVE & KEYCHAIN VAULT</div>
+    <div class="mac-window">
+      <div class="mac-titlebar">
+        <div class="traffic-lights">
+          <span class="traffic-dot traffic-red"></span>
+          <span class="traffic-dot traffic-white"></span>
+          <span class="traffic-dot traffic-black"></span>
+        </div>
+        <div class="window-title">ALPHABRAIN // ENCLAVE // KEYCHAIN</div>
+        <div class="window-status">
+          <span style="display: inline-block; width: 8px; height: 8px; background: #0A0A0A;"></span>
+          <span style="font-weight: 700;">VAULT_UNLOCKED</span>
+        </div>
+      </div>
+
+      <div class="window-body">
+        <!-- Left: Key Vault -->
+        <div class="col-6 pane-p8 border-r-1">
+          <div>
+            <div class="eyebrow">04 — ENCLAVE VAULT</div>
+            <h2 class="pane-headline" style="font-size: 28px; margin-bottom: 16px;">macOS Keychain Vault</h2>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; font-family: Fira Code; font-size: 11px;">
+              <div class="form-box">
+                <div>
+                  <div style="font-weight: 700;">ANTHROPIC_API_KEY</div>
+                  <div style="font-size: 9px; color: #777777;">Claude 3.5 Sonnet / Opus 4.6</div>
+                </div>
+                <span style="color: #E6391E; font-weight: 700;">KEYCHAIN [ OK ]</span>
+              </div>
+
+              <div class="form-box">
+                <div>
+                  <div style="font-weight: 700;">GOOGLE_CLOUD_CODE_AUTH</div>
+                  <div style="font-size: 9px; color: #777777;">6 Multi-Account Quota Pool</div>
+                </div>
+                <span style="font-weight: 700;">ROTATING [ OK ]</span>
+              </div>
+
+              <div class="form-box">
+                <div>
+                  <div style="font-weight: 700;">ED25519_NODE_IDENTITY</div>
+                  <div style="font-size: 9px; color: #777777;">Node Hardware Signature Key</div>
+                </div>
+                <span style="font-weight: 700;">SECURE ENCLAVE</span>
+              </div>
+
+              <div class="form-box">
+                <div>
+                  <div style="font-weight: 700;">GITHUB_ACCESS_TOKEN</div>
+                  <div style="font-size: 9px; color: #777777;">Repo Worktree & Fast-Forward</div>
+                </div>
+                <span style="font-weight: 700;">VAULTED</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-outline">ROTATE IDENTITY KEYPAIR ↗</button>
+        </div>
+
+        <!-- Right: Trust Management -->
+        <div class="col-6 pane-p8">
+          <div>
+            <div class="eyebrow" style="color: #666666;">TRUST MANAGEMENT</div>
+            <h3 style="font-family: Space Grotesk; font-size: 22px; font-weight: 700; margin-bottom: 12px;">Paired Companion Nodes</h3>
+
+            <div class="table-list" style="margin-bottom: 18px;">
+              <div class="table-row" style="background-color: #F8F8F8; padding: 6px 10px; font-weight: 700; font-size: 10px;">
+                <span>DEVICE ID // IDENTITY</span>
+                <span>STATUS</span>
+              </div>
+              <div class="table-row" style="padding: 10px;">
+                <div>
+                  <div style="font-weight: 700;">iQOO 12 Flagship</div>
+                  <div style="font-size: 9px; color: #777777;">Fingerprint: 10BF5P2AZF0010T</div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <span style="color: #E6391E; font-weight: 700;">TRUSTED</span>
+                  <button style="border: none; background: none; color: #999999; cursor: pointer; font-family: Fira Code; font-size: 10px;">[ REVOKE ]</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-family: Fira Code; font-size: 10px; font-weight: 700; color: #666666; text-transform: uppercase; margin-bottom: 6px;">Enclave Access Audit</div>
+            <div style="border: 1px solid #0A0A0A; padding: 12px; font-family: Fira Code; font-size: 10px; line-height: 1.6; color: #444444; background: #FAFAFA;">
+              <div>[14:28:45] agy-switch plan accessed Google Cloud Code telemetry</div>
+              <div>[14:28:55] SeniorReviewEngine requested ed25519 signature key</div>
+              <div>[14:33:24] Attestation signed for commit 352ff19034db664f5800b8a38</div>
+            </div>
+          </div>
+
+          <div style="border: 1px solid #0A0A0A; padding: 12px; font-family: Fira Code; font-size: 11px; display: flex; justify-content: space-between;">
+            <span>AUDIT PROVENANCE</span>
+            <span style="font-weight: 700; color: #E6391E;">SLSA LEVEL 3 COMPLIANT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
