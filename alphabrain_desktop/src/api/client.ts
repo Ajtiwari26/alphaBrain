@@ -105,5 +105,9 @@ export const desktopApi = {
       body: JSON.stringify({ enable_stop: enable, reason }),
     });
   },
+
+  getEvaMeetingToken: async (room: string): Promise<{ token: string; room_name?: string }> => {
+    return await safeFetch(`/meet/token?room=${encodeURIComponent(room)}`);
+  },
 };
 

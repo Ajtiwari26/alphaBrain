@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { desktopApi } from '../api/client';
 import { TaskSummary } from '../types';
 import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -12,6 +12,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
   const [loading, setLoading] = useState(true);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const feedbackTimerRef = useRef<number | null>(null);
 
   const fetchTasks = () => {
     setLoading(true);
@@ -29,6 +30,11 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
 
   useEffect(() => {
     fetchTasks();
+    return () => {
+      if (feedbackTimerRef.current !== null) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+    };
   }, []);
 
   const handleReview = async (taskId: string, action: 'approve' | 'reject') => {
@@ -51,7 +57,13 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
       });
     } finally {
       setReviewingId(null);
-      setTimeout(() => setFeedback(null), 5000);
+      if (feedbackTimerRef.current !== null) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+      feedbackTimerRef.current = window.setTimeout(() => {
+        setFeedback(null);
+        feedbackTimerRef.current = null;
+      }, 5000);
     }
   };
 

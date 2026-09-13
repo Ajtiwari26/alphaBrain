@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EvaMeetingState } from '../types';
+import { desktopApi } from '../api/client';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Radio, Sparkles, Volume2 } from 'lucide-react';
 
 interface Props {
@@ -79,14 +80,11 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             eva_speaking: true,
           }));
 
-          // Room token handshake
+          // Room token handshake via centralized desktopApi client
           try {
-            const tokenRes = await fetch('/api/meet/token?room=alphabrain-executive-briefing');
-            if (tokenRes.ok) {
-              const data = await tokenRes.json();
-              if (data?.token) {
-                setMeetingState((prev) => ({ ...prev, room_name: 'alphabrain-executive-briefing (LiveKit SFU)' }));
-              }
+            const data = await desktopApi.getEvaMeetingToken('alphabrain-executive-briefing');
+            if (data?.token) {
+              setMeetingState((prev) => ({ ...prev, room_name: 'alphabrain-executive-briefing (LiveKit SFU)' }));
             }
           } catch {
             // Local dev fallback
