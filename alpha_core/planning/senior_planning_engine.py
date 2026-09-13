@@ -565,6 +565,7 @@ Opus Critique & Required Repairs:
 {opus_assessment.findings}
 
 Instructions:
+- You MUST preserve and build upon all substantive fields from the Original Blueprint. Do NOT return empty arrays or zero-valued fields.
 - Address all items in the Opus critique (including deleting or modifying any flagged entries in security_decisions).
 - Ensure gates include unit tests and linting.
 - Ensure security decisions address the specific security requirements of the task.
@@ -584,16 +585,16 @@ Instructions:
                     base_sha=research_snapshot.base_sha,
                     input_request_digest=research_snapshot.request_digest,
                     research_snapshot_digest=hashlib.sha256(request_json.encode()).hexdigest(),
-                    requirements=pro_repair_response.get("requirements", []),
-                    alternatives_considered=pro_repair_response.get("alternatives_considered", []),
-                    chosen_design=pro_repair_response.get("chosen_design", "No design provided"),
-                    contracts=pro_repair_response.get("contracts", []),
-                    file_scope=repair_scope,
-                    dependency_dag_changes=pro_repair_response.get("dependency_dag_changes", []),
-                    gates=pro_repair_response.get("gates", []),
-                    security_decisions=pro_repair_response.get("security_decisions", []),
-                    rollback_plan=pro_repair_response.get("rollback_plan"),
-                    token_budgets=pro_repair_response.get("token_budgets", {}),
+                    requirements=pro_repair_response.get("requirements") or blueprint.requirements,
+                    alternatives_considered=pro_repair_response.get("alternatives_considered") or blueprint.alternatives_considered,
+                    chosen_design=pro_repair_response.get("chosen_design") or blueprint.chosen_design,
+                    contracts=pro_repair_response.get("contracts") or blueprint.contracts,
+                    file_scope=repair_scope or blueprint.file_scope,
+                    dependency_dag_changes=pro_repair_response.get("dependency_dag_changes") or blueprint.dependency_dag_changes,
+                    gates=pro_repair_response.get("gates") or blueprint.gates,
+                    security_decisions=pro_repair_response.get("security_decisions") or blueprint.security_decisions,
+                    rollback_plan=pro_repair_response.get("rollback_plan") or blueprint.rollback_plan,
+                    token_budgets=pro_repair_response.get("token_budgets") or blueprint.token_budgets,
                 )
                 blueprint_digest = blueprint.compute_digest()
                 pro_assessment = PlanAssessment(
