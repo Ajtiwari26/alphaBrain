@@ -66,6 +66,8 @@ Gemini 3.1 Pro High.
 
 - [x] P14.1: Mount Founder Companion Mobile Bridge into Main AlphaBrain Backend (alpha_core.api.app) (`commit c9fe9c6`, `tsk_eva_b099b480c6da`).
 
+- [x] P14.2-BACKEND: Cloud-First Provisioning & Node Registry API (`commit ca32697`, `tsk_eva_7775f157f872`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).

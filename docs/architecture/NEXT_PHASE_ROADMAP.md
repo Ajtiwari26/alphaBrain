@@ -85,6 +85,10 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit c9fe9c6`, `tsk_eva_b099b480c6da`)
 - **Objective**: P14.1: Mount Founder Companion Mobile Bridge into Main AlphaBrain Backend (alpha_core.api.app)
 
+### P14.2-BACKEND: Cloud-First Provisioning & Node Registry API
+- **Status**: `[x] COMPLETED & MERGED` (`commit ca32697`, `tsk_eva_7775f157f872`)
+- **Objective**: P14.2-BACKEND: Cloud-First Provisioning & Node Registry API
+
 ---
 
 ## Active Parallel Development Pipeline (Current)
