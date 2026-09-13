@@ -51,6 +51,17 @@ export interface ProvisioningPayload {
   status: 'scanning' | 'verifying' | 'paired';
 }
 
+/**
+ * Computes a salted SHA-256 cryptographic hash of a PIN string.
+ */
+export async function hashPin(pin: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`alphabrain_pin_salt_${pin}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export interface HardwareTelemetry {
   host_cpu_percent: number;
   host_ram_percent: number;

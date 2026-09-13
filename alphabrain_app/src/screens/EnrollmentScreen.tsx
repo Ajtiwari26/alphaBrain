@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { hashPin } from '../types';
 
 interface Props {
   onCompleted?: (pin: string) => void;
   onCancel?: () => void;
-}
-
-/**
- * Computes a salted SHA-256 cryptographic hash of the PIN.
- */
-async function hashPin(pin: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`alphabrain_pin_salt_${pin}`);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const EnrollmentScreen: React.FC<Props> = ({ onCompleted, onCancel }) => {

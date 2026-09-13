@@ -31,6 +31,8 @@ import { DeploymentsScreen } from './screens/DeploymentsScreen';
 import { ProjectsScreen } from './screens/ProjectsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 
+type SessionStage = 'splash' | 'auth' | 'instance_sync' | 'authenticated';
+
 const ALL_SCREENS: Array<{ id: ScreenId; num: string; title: string; category: string }> = [
   { id: 'splash', num: '01', title: 'Splash Screen', category: 'Brand' },
   { id: 'auth', num: '02', title: 'Founder Access', category: 'Security' },
@@ -50,47 +52,105 @@ const ALL_SCREENS: Array<{ id: ScreenId; num: string; title: string; category: s
 ];
 
 export function App() {
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>('overview');
+  const [sessionStage, setSessionStage] = useState<SessionStage>(() => {
+    try {
+      const saved = sessionStorage.getItem('alphabrain_session_token');
+      return saved ? 'authenticated' : 'splash';
+    } catch {
+      return 'splash';
+    }
+  });
+
+  const [currentScreen, setCurrentScreen] = useState<ScreenId>(() => {
+    try {
+      const saved = sessionStorage.getItem('alphabrain_session_token');
+      return saved ? 'overview' : 'splash';
+    } catch {
+      return 'splash';
+    }
+  });
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [overview, setOverview] = useState<ExecutiveOverview | null>(null);
 
   useEffect(() => {
+    if (sessionStage !== 'authenticated') return;
+
     mobileApi
       .getOverview()
       .then(setOverview)
       .catch((err) => {
-        console.warn('Backend overview fetch warning (using fallback state):', err);
+        console.warn('Backend overview fetch warning (using honest OFFLINE state):', err);
         setOverview({
           app_version: '1.0.0',
-          system_status: 'HEALTHY',
+          system_status: 'OFFLINE',
           emergency_stop: {
             active: false,
             locked_at: null,
             lock_file: '',
-            reason: '',
+            reason: 'Backend offline // connection refused',
             triggered_by: '',
           },
           telemetry: {
-            host_cpu_percent: 18.4,
-            host_ram_percent: 42.1,
-            host_ram_used_gb: 6.7,
-            host_ram_total_gb: 16.0,
-            thermal_pressure: 'nominal',
-            battery_level_percent: 94,
-            battery_charging: true,
-            usb_device_connected: true,
-            usb_device_serial: '10BF5P2AZF0010T',
-            usb_device_name: 'Android Device',
+            host_cpu_percent: 0,
+            host_ram_percent: 0,
+            host_ram_used_gb: 0,
+            host_ram_total_gb: 0,
+            thermal_pressure: 'offline',
+            battery_level_percent: 0,
+            battery_charging: false,
+            usb_device_connected: false,
+            usb_device_serial: 'DISCONNECTED',
+            usb_device_name: 'None',
           },
-          triage_backlog_count: 1,
-          active_sprint_workers: 4,
-          recent_deployments_count: 3,
-          eva_status: 'READY',
+          triage_backlog_count: 0,
+          active_sprint_workers: 0,
+          recent_deployments_count: 0,
+          eva_status: 'OFFLINE',
         });
       });
-  }, [currentScreen]);
+  }, [currentScreen, sessionStage]);
+
+  const handleSplashContinue = () => {
+    setSessionStage('auth');
+    setCurrentScreen('auth');
+  };
+
+  const handleAuthenticated = () => {
+    setSessionStage('instance_sync');
+    setCurrentScreen('instance_sync');
+  };
+
+  const handleSynced = () => {
+    setSessionStage('authenticated');
+    setCurrentScreen('overview');
+    try {
+      sessionStorage.setItem('alphabrain_session_token', 'active_founder_session');
+    } catch {
+      // Ignore storage restrictions in sandboxed runs
+    }
+  };
 
   const navigateTo = (screen: ScreenId) => {
+    // Before authentication, only access gate screens are permitted
+    if (sessionStage !== 'authenticated') {
+      const allowedPreAuth: ScreenId[] = [
+        'splash',
+        'auth',
+        'enrollment',
+        'instance_sync',
+        'qr_provisioning',
+        'sas_verification',
+      ];
+      if (allowedPreAuth.includes(screen)) {
+        setCurrentScreen(screen);
+      } else {
+        setCurrentScreen('auth');
+      }
+      setMenuOpen(false);
+      return;
+    }
+
     setCurrentScreen(screen);
     setMenuOpen(false);
   };
@@ -122,17 +182,19 @@ export function App() {
             <span className="font-semibold">10BF5P2AZF0010T</span>
           </div>
 
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="w-8 h-8 bg-white border border-[#0A0A0A] flex items-center justify-center text-[#0A0A0A] hover:bg-zinc-100 transition-colors"
-          >
-            {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-          </button>
+          {sessionStage === 'authenticated' && (
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-8 h-8 bg-white border border-[#0A0A0A] flex items-center justify-center text-[#0A0A0A] hover:bg-zinc-100 transition-colors"
+            >
+              {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Screen Drawer Overlay (14-Screen Locomotive Directory) */}
-      {menuOpen && (
+      {/* Screen Drawer Overlay (Only when Authenticated) */}
+      {menuOpen && sessionStage === 'authenticated' && (
         <div className="absolute inset-0 z-50 bg-white/98 backdrop-blur p-5 pt-[max(env(safe-area-inset-top),2.5rem)] overflow-y-auto space-y-4">
           <div className="flex items-center justify-between border-b border-[#0A0A0A] pb-3">
             <div>
@@ -187,36 +249,43 @@ export function App() {
         </div>
       )}
 
-      {/* Main Screen Content Viewport */}
-      <main className="flex-1 p-4 pb-24 overflow-y-auto flex flex-col bg-white">
+      {/* Main Screen Content Viewport with Proper Padding */}
+      <main
+        className={`flex-1 overflow-y-auto flex flex-col bg-white ${
+          currentScreen === 'splash' ? 'p-0' : 'p-4'
+        } ${sessionStage === 'authenticated' ? 'pb-24' : 'pb-6'}`}
+      >
         {currentScreen === 'splash' && (
-          <SplashScreen onContinue={() => navigateTo('overview')} />
+          <SplashScreen onContinue={handleSplashContinue} />
         )}
         {currentScreen === 'enrollment' && (
           <EnrollmentScreen
-            onCompleted={() => navigateTo('auth')}
-            onCancel={() => navigateTo('auth')}
+            onCompleted={() => setCurrentScreen('auth')}
+            onCancel={() => setCurrentScreen('auth')}
           />
         )}
         {currentScreen === 'auth' && (
           <AuthScreen
-            onAuthenticated={() => navigateTo('overview')}
-            onNavigateEnroll={() => navigateTo('enrollment')}
+            onAuthenticated={handleAuthenticated}
+            onNavigateEnroll={() => setCurrentScreen('enrollment')}
           />
         )}
         {currentScreen === 'instance_sync' && (
-          <InstanceSyncScreen onSynced={() => navigateTo('overview')} />
+          <QRProvisioningScreen
+            onSynced={handleSynced}
+            onNavigateSAS={() => setCurrentScreen('sas_verification')}
+          />
         )}
         {currentScreen === 'qr_provisioning' && (
           <QRProvisioningScreen
-            onSynced={() => navigateTo('overview')}
-            onNavigateSAS={() => navigateTo('sas_verification')}
+            onSynced={handleSynced}
+            onNavigateSAS={() => setCurrentScreen('sas_verification')}
           />
         )}
         {currentScreen === 'sas_verification' && (
           <SASVerificationScreen
-            onVerified={() => navigateTo('overview')}
-            onNavigateQR={() => navigateTo('qr_provisioning')}
+            onVerified={handleSynced}
+            onNavigateQR={() => setCurrentScreen('qr_provisioning')}
           />
         )}
         {currentScreen === 'overview' && overview && (
@@ -247,80 +316,82 @@ export function App() {
         )}
       </main>
 
-      {/* Bottom Sticky Locomotive Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-[#0A0A0A] px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-center justify-around z-30">
-        <button
-          onClick={() => navigateTo('overview')}
-          className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
-            currentScreen === 'overview'
-              ? 'text-[#E6391E] font-bold'
-              : 'text-zinc-500 hover:text-[#0A0A0A]'
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          <span>Radar</span>
-        </button>
+      {/* Bottom Sticky Locomotive Navigation (Only when Authenticated) */}
+      {sessionStage === 'authenticated' && (
+        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-[#0A0A0A] px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-center justify-around z-30">
+          <button
+            onClick={() => navigateTo('overview')}
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+              currentScreen === 'overview'
+                ? 'text-[#E6391E] font-bold'
+                : 'text-zinc-500 hover:text-[#0A0A0A]'
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Radar</span>
+          </button>
 
-        <button
-          onClick={() => navigateTo('triage')}
-          className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
-            currentScreen === 'triage'
-              ? 'text-[#E6391E] font-bold'
-              : 'text-zinc-500 hover:text-[#0A0A0A]'
-          }`}
-        >
-          <Inbox className="w-4 h-4" />
-          <span>Triage</span>
-        </button>
+          <button
+            onClick={() => navigateTo('triage')}
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+              currentScreen === 'triage'
+                ? 'text-[#E6391E] font-bold'
+                : 'text-zinc-500 hover:text-[#0A0A0A]'
+            }`}
+          >
+            <Inbox className="w-4 h-4" />
+            <span>Triage</span>
+          </button>
 
-        <button
-          onClick={() => navigateTo('worktrees')}
-          className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
-            currentScreen === 'worktrees'
-              ? 'text-[#E6391E] font-bold'
-              : 'text-zinc-500 hover:text-[#0A0A0A]'
-          }`}
-        >
-          <GitBranch className="w-4 h-4" />
-          <span>Git</span>
-        </button>
+          <button
+            onClick={() => navigateTo('worktrees')}
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+              currentScreen === 'worktrees'
+                ? 'text-[#E6391E] font-bold'
+                : 'text-zinc-500 hover:text-[#0A0A0A]'
+            }`}
+          >
+            <GitBranch className="w-4 h-4" />
+            <span>Git</span>
+          </button>
 
-        <button
-          onClick={() => navigateTo('model_router')}
-          className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
-            currentScreen === 'model_router'
-              ? 'text-[#E6391E] font-bold'
-              : 'text-zinc-500 hover:text-[#0A0A0A]'
-          }`}
-        >
-          <Cpu className="w-4 h-4" />
-          <span>Quotas</span>
-        </button>
+          <button
+            onClick={() => navigateTo('model_router')}
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+              currentScreen === 'model_router'
+                ? 'text-[#E6391E] font-bold'
+                : 'text-zinc-500 hover:text-[#0A0A0A]'
+            }`}
+          >
+            <Cpu className="w-4 h-4" />
+            <span>Quotas</span>
+          </button>
 
-        <button
-          onClick={() => navigateTo('live_stream')}
-          className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
-            currentScreen === 'live_stream'
-              ? 'text-[#E6391E] font-bold'
-              : 'text-zinc-500 hover:text-[#0A0A0A]'
-          }`}
-        >
-          <Terminal className="w-4 h-4" />
-          <span>Logs</span>
-        </button>
+          <button
+            onClick={() => navigateTo('live_stream')}
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+              currentScreen === 'live_stream'
+                ? 'text-[#E6391E] font-bold'
+                : 'text-zinc-500 hover:text-[#0A0A0A]'
+            }`}
+          >
+            <Terminal className="w-4 h-4" />
+            <span>Logs</span>
+          </button>
 
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
-            menuOpen
-              ? 'text-[#E6391E] font-bold'
-              : 'text-zinc-500 hover:text-[#0A0A0A]'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>{ALL_SCREENS.length} Screens</span>
-        </button>
-      </nav>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+              menuOpen
+                ? 'text-[#E6391E] font-bold'
+                : 'text-zinc-500 hover:text-[#0A0A0A]'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>{ALL_SCREENS.length} Screens</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

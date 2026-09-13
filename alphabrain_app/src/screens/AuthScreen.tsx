@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { hashPin } from '../types';
 
 interface Props {
   onAuthenticated?: () => void;
   onNavigateEnroll?: () => void;
-}
-
-/**
- * Computes a salted SHA-256 cryptographic hash of the input PIN.
- */
-async function hashPin(pin: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`alphabrain_pin_salt_${pin}`);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll }) => {
@@ -107,10 +97,27 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
 
   const handleBiometricTouch = () => {
     if (authed) return;
+    const isDev = Boolean(import.meta.env?.DEV);
     setBiometricScanning(true);
-    const t = window.setTimeout(() => {
+
+    if (!isDev) {
+      const t = window.setTimeout(() => {
+        setBiometricScanning(false);
+        setError('HARDWARE BIOMETRIC REGISTRATION REQUIRED // ENTER PIN');
+      }, 600);
+      timersRef.current.push(t);
+      return;
+    }
+
+    const t = window.setTimeout(async () => {
       setBiometricScanning(false);
-      triggerAuthSuccess();
+      const storedHash = localStorage.getItem('alphabrain_master_pin_hash');
+      const defaultHash = await hashPin('1337');
+      if (storedHash || defaultHash) {
+        triggerAuthSuccess();
+      } else {
+        setError('NO MASTER PIN ENROLLED');
+      }
     }, 600);
     timersRef.current.push(t);
   };
