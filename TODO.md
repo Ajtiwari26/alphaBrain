@@ -74,6 +74,8 @@ Gemini 3.1 Pro High.
 
 - [x] P14.2-DESKTOP: Tauri 2.0 build.rs and telemetry isolation (`commit ab1734a`, `tsk_eva_2a24f57b7758`).
 
+- [x] P14.3-PARITY: Symmetrical Full Feature Parity for Mac Desktop & Mobile Companion (`commit 4181c70`, `tsk_eva_c1b1b4ca54ca`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
