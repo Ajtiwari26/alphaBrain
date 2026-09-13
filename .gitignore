@@ -74,3 +74,8 @@ test*.html
 .agents/
 .alphabrain-sandbox/
 *.apk
+
+# Rust & Cargo
+target/
+**/target/
+Cargo.lock
