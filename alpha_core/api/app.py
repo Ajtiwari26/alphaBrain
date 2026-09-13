@@ -31,6 +31,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Founder Companion Mobile Bridge (Depends imported on line 16, require_api_principal imported on line 64)
+from alpha_core.api.cloud_dispatch import router as cloud_dispatch_router
 from alpha_core.commentary import LiveCommentaryEngine
 from alpha_core.config import settings
 from alpha_core.db.connection import get_db_session, get_session_factory, init_db
@@ -44,8 +46,6 @@ from alpha_core.db.models import (
     WorkerRecord,
     utc_now,
 )
-
-# Founder Companion Mobile Bridge (Depends imported on line 16, require_api_principal imported on line 64)
 from alpha_core.mobile_bridge import router as mobile_bridge_router
 from alpha_core.privacy.router import privacy_router
 from alpha_core.queue.triage_queue import (
@@ -227,6 +227,8 @@ app.add_middleware(
 app.include_router(privacy_router)
 # Mount Founder Companion Mobile Bridge with verified require_api_principal auth dependency
 app.include_router(mobile_bridge_router, dependencies=[Depends(require_api_principal)])
+# Mount Cloud-First Provisioning, Node Registry, and Dispatch Stream Hub
+app.include_router(cloud_dispatch_router)
 
 MEETING_CONTENT_SECURITY_POLICY = "; ".join(
     (
