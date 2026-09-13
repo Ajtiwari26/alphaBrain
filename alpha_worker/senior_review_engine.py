@@ -97,14 +97,14 @@ class SeniorReviewEngine:
                     capture_output=True,
                 )
                 stat_res = subprocess.run(
-                    ["git", "diff", "--stat", f"main..{branch_name}"],
+                    ["git", "diff", "--stat", f"main...{branch_name}"],
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
                     timeout=30,
                 )
                 res = subprocess.run(
-                    ["git", "diff", f"main..{branch_name}"],
+                    ["git", "diff", f"main...{branch_name}"],
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
