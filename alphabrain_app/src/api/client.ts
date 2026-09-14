@@ -161,4 +161,8 @@ export const mobileApi = {
       return [];
     }
   },
+
+  getEvaMeetingToken: async (room: string): Promise<{ token: string; room_name?: string }> => {
+    return await safeFetch(`/meet/token?room=${encodeURIComponent(room)}`);
+  },
 };
