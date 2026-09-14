@@ -135,6 +135,66 @@ export interface EvaMeetingState {
   packet_loss_percent: number;
 }
 
+export interface CommandNodeMetrics {
+  cpu_usage: number;
+  memory_used_mb: number;
+  memory_total_mb: number;
+  disk_used_gb: number;
+  disk_total_gb: number;
+  uptime_seconds: number;
+  active_workers: number;
+}
+
+export interface CommandNodeTask {
+  id: string;
+  title: string;
+  priority: string;
+  branch: string;
+  status: string;
+  duration: string;
+}
+
+export interface CommandNodeLog {
+  id: string;
+  timestamp: string;
+  stream: string;
+  text: string;
+}
+
+export interface CommandNodeScreenData {
+  node_id: string;
+  hostname: string;
+  cluster_name: string;
+  status: string;
+  metrics: CommandNodeMetrics;
+  active_tasks: CommandNodeTask[];
+  logs: CommandNodeLog[];
+}
+
+export interface SecurityEnclaveScreenData {
+  node_key_fingerprint: string;
+  is_locked: boolean;
+  vault_items: ApiVaultItem[];
+  devices: TrustedDevice[];
+}
+
+export interface MeetingSetupScreenData {
+  room_name: string;
+  participant_identity: string;
+  livekit_url: string;
+  token: string;
+  audio_codec: string;
+  sample_rate: number;
+  audio_active: boolean;
+  status: string;
+}
+
+export interface MeetingTokenResponse {
+  room_name: string;
+  token: string;
+  expires_in_seconds: number;
+}
+
 export interface EmergencyStopState {
   active: boolean;
   locked_at: number | null;

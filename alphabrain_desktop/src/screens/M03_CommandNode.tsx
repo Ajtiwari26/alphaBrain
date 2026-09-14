@@ -2,79 +2,28 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Terminal, Cpu, HardDrive, Activity, Play, Square, GitBranch, Shield, ArrowRight } from 'lucide-react';
 import { ActiveTask, ScreenId, SystemMetrics, TaskResult, TerminalLog } from '../types';
+import { desktopApi } from '../api/client';
 
 interface Props {
   onNavigate: (screen: ScreenId) => void;
 }
 
 export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
+  const [nodeId, setNodeId] = useState<string>('');
+  const [clusterName, setClusterName] = useState<string>('');
+  const [nodeStatus, setNodeStatus] = useState<string>('connecting');
   const [metrics, setMetrics] = useState<SystemMetrics>({
-    cpu_usage: 12.4,
-    memory_used_mb: 4210,
-    memory_total_mb: 65536,
-    disk_used_gb: 184.2,
-    disk_total_gb: 994.6,
-    uptime_seconds: 384920,
-    active_workers: 1,
+    cpu_usage: 0.0,
+    memory_used_mb: 0.0,
+    memory_total_mb: 0.0,
+    disk_used_gb: 0.0,
+    disk_total_gb: 0.0,
+    uptime_seconds: 0.0,
+    active_workers: 0,
   });
 
-  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([
-    {
-      id: 'tsk_eva_cbc068ce5324',
-      title: 'P14.2-DESKTOP: Tauri 2.0 Rust Core & 4 Locomotive Screens',
-      priority: 'P0',
-      branch: 'alpha/tsk_eva_cbc068ce5324',
-      status: 'running',
-      duration: '04m 12s',
-    },
-    {
-      id: 'tsk_cld_492018ea3021',
-      title: 'Cloud Dispatch Bridge & LiveKit WebSocket Pipe',
-      priority: 'P1',
-      branch: 'alpha/tsk_cld_492018ea3021',
-      status: 'queued',
-      duration: '--',
-    },
-  ]);
-
-  const [logs, setLogs] = useState<TerminalLog[]>([
-    {
-      id: '1',
-      timestamp: '18:10:02.102',
-      stream: 'system',
-      text: '[SYS] AlphaBrain Command Node v2.0 initialized on Apple M4 Max',
-    },
-    {
-      id: '2',
-      timestamp: '18:10:02.340',
-      stream: 'stdout',
-      text: '[NODE] Central Cloud connection active -> https://api.alphabrain.live',
-    },
-    {
-      id: '3',
-      timestamp: '18:10:03.012',
-      stream: 'stdout',
-      text: '[WORKER] Spawned alpha_worker.daemon with lease_id=lse_94820194 (PID: 48921)',
-    },
-    {
-      id: '4',
-      timestamp: '18:10:04.580',
-      stream: 'stdout',
-      text: '[DISPATCH] Claimed task tsk_eva_cbc068ce5324 in isolated worktree',
-    },
-    {
-      id: '5',
-      timestamp: '18:10:06.120',
-      stream: 'stdout',
-      text: '[GATE] Baseline acceptance suite: 1102 passed, 16 skipped in 270s',
-    },
-    {
-      id: '6',
-      timestamp: '18:10:08.450',
-      stream: 'system',
-      text: '[TAURI] Native Rust core channels active: deps_checker, keychain, qr_generator',
-    },
-  ]);
+  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
+  const [logs, setLogs] = useState<TerminalLog[]>([]);
 
   const [autoScroll, setAutoScroll] = useState(true);
   const terminalEndRef = useRef<HTMLDivElement>(null);
@@ -85,20 +34,52 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
     setLogs((prev) => [...prev, { id: String(Date.now()) + Math.random(), timestamp: timeStr, stream, text }]);
   }, []);
 
-  const fetchMetrics = useCallback(async () => {
+  const fetchNodeData = useCallback(async () => {
     try {
-      const data = await invoke<SystemMetrics>('get_system_metrics');
-      setMetrics(data);
+      const data = await desktopApi.getCommandNode();
+      if (data) {
+        if (data.metrics) setMetrics(data.metrics);
+        if (data.active_tasks) {
+          setActiveTasks(
+            data.active_tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              priority: (t.priority as 'P0' | 'P1' | 'P2') || 'P0',
+              branch: t.branch,
+              status: (t.status as 'running' | 'queued' | 'passed' | 'failed') || 'running',
+              duration: t.duration,
+            }))
+          );
+        }
+        if (data.logs && data.logs.length > 0) {
+          setLogs(
+            data.logs.map((l) => ({
+              id: l.id,
+              timestamp: l.timestamp,
+              stream: (l.stream as 'stdout' | 'stderr' | 'system') || 'system',
+              text: l.text,
+            }))
+          );
+        }
+        if (data.node_id) setNodeId(data.node_id);
+        if (data.cluster_name) setClusterName(data.cluster_name);
+        if (data.status) setNodeStatus(data.status);
+      }
     } catch (err) {
-      // Fallback in web preview
+      try {
+        const tauriMetrics = await invoke<SystemMetrics>('get_system_metrics');
+        setMetrics(tauriMetrics);
+      } catch {
+        // Fallback in web preview when offline
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchMetrics();
-    const interval = setInterval(fetchMetrics, 5000);
+    fetchNodeData();
+    const interval = setInterval(fetchNodeData, 5000);
     return () => clearInterval(interval);
-  }, [fetchMetrics]);
+  }, [fetchNodeData]);
 
   useEffect(() => {
     if (autoScroll && terminalEndRef.current) {
@@ -170,9 +151,9 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
             <ArrowRight className="w-3 h-3 text-neutral-400" />
           </button>
           <div className="flex items-center gap-2 border-l border-neutral-300 pl-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className={`w-2.5 h-2.5 rounded-full ${nodeStatus === 'operational' ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
             <span className="text-xs font-mono uppercase tracking-wider font-semibold">
-              NODE RUNNING (M4 MAX)
+              {nodeId} ({clusterName} // {nodeStatus.toUpperCase()})
             </span>
           </div>
         </div>
@@ -255,7 +236,12 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
         </div>
 
         <div className="space-y-3">
-          {activeTasks.map((task) => (
+          {activeTasks.length === 0 ? (
+            <div className="border border-dashed border-neutral-300 p-6 text-center text-xs font-mono text-neutral-500 bg-neutral-50">
+              No tasks currently active in triage queue. Autonomous worker daemons standing by.
+            </div>
+          ) : (
+            activeTasks.map((task) => (
             <div
               key={task.id}
               className="border border-[#0A0A0A] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white"
@@ -299,7 +285,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
                 )}
               </div>
             </div>
-          ))}
+          )))}
         </div>
       </div>
 

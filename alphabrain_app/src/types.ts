@@ -94,6 +94,37 @@ export interface ExecutiveOverview {
   eva_status: string;
 }
 
+export interface DashboardScreenData {
+  system_status: string;
+  emergency_stop: EmergencyStopState;
+  telemetry: HardwareTelemetry;
+  hardware_sync_serial: string;
+  ai_quotas_summary: string;
+  ai_quotas_percent: number;
+  active_projects_count: number;
+  tech_dept_agents_count: number;
+  triage_pending_count: number;
+  worktrees_count: number;
+  worktrees_summary: string;
+}
+
+export interface MeetingSetupScreenData {
+  room_name: string;
+  participant_identity: string;
+  livekit_url: string;
+  token: string;
+  audio_codec: string;
+  sample_rate: number;
+  audio_active: boolean;
+  status: string;
+}
+
+export interface MeetingTokenResponse {
+  room_name: string;
+  token: string;
+  expires_in_seconds: number;
+}
+
 export interface TaskSummary {
   task_id: string;
   title: string;

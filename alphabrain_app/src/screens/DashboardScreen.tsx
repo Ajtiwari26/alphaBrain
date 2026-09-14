@@ -1,13 +1,34 @@
-import React from 'react';
-import { ExecutiveOverview, ScreenId } from '../types';
+import React, { useState, useEffect } from 'react';
+import { DashboardScreenData, ExecutiveOverview, ScreenId } from '../types';
+import { mobileApi } from '../api/client';
 
 interface Props {
   overview: ExecutiveOverview;
+  dashboardData?: DashboardScreenData | null;
   onNavigate: (screenId: ScreenId) => void;
 }
 
-export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
-  const { emergency_stop, triage_backlog_count, active_sprint_workers, telemetry } = overview;
+export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: initialDashboard, onNavigate }) => {
+  const [dashboard, setDashboard] = useState<DashboardScreenData | null>(initialDashboard || null);
+
+  useEffect(() => {
+    if (initialDashboard) {
+      setDashboard(initialDashboard);
+    }
+    mobileApi
+      .getDashboard()
+      .then((data) => setDashboard(data))
+      .catch((err) => console.warn('Production dashboard API fetch notice:', err));
+  }, [initialDashboard]);
+
+  const emergencyStopActive = dashboard ? dashboard.emergency_stop.active : overview.emergency_stop.active;
+  const telemetry = dashboard ? dashboard.telemetry : overview.telemetry;
+  const quotasSummary = dashboard ? dashboard.ai_quotas_summary : `${overview.system_status === 'operational' ? '85%' : '0%'} AVAILABLE`;
+  const activeProjects = dashboard ? `${dashboard.active_projects_count} ACTIVE` : '0 ACTIVE';
+  const techDeptAgents = dashboard ? `${dashboard.tech_dept_agents_count} AGENTS` : `${overview.active_sprint_workers} AGENTS`;
+  const triagePending = dashboard ? `${dashboard.triage_pending_count} PENDING` : `${overview.triage_backlog_count} PENDING`;
+  const worktreesSummary = dashboard ? dashboard.worktrees_summary : '0 ACTIVE WORKTREES';
+  const hardwareSerial = dashboard ? dashboard.hardware_sync_serial : (overview.telemetry.usb_device_serial || '');
 
   return (
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A]">
@@ -21,10 +42,10 @@ export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
           </h2>
           <span
             className={`font-mono text-[10px] font-bold px-2 py-0.5 border border-[#0A0A0A] ${
-              emergency_stop.active ? 'bg-[#E6391E] text-white' : 'bg-white text-[#0A0A0A]'
+              emergencyStopActive ? 'bg-[#E6391E] text-white' : 'bg-white text-[#0A0A0A]'
             }`}
           >
-            {emergency_stop.active ? 'LOCKED' : 'SYSTEM LIVE'}
+            {emergencyStopActive ? 'LOCKED' : (dashboard?.system_status ? dashboard.system_status.toUpperCase() : 'SYSTEM LIVE')}
           </span>
         </div>
       </div>
@@ -59,7 +80,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs font-bold text-[#E6391E] group-hover:text-white">
-              85% LEFT
+              {quotasSummary}
             </span>
             <span className="text-sm font-bold text-[#E6391E] group-hover:text-white">↗</span>
           </div>
@@ -76,7 +97,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-zinc-500 group-hover:text-zinc-300">
-              3 ACTIVE
+              {activeProjects}
             </span>
             <span className="text-sm font-bold text-[#E6391E] group-hover:text-white">↗</span>
           </div>
@@ -93,7 +114,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-zinc-500 group-hover:text-zinc-300">
-              {active_sprint_workers} AGENTS
+              {techDeptAgents}
             </span>
             <span className="text-sm font-bold text-[#E6391E] group-hover:text-white">↗</span>
           </div>
@@ -110,7 +131,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs font-bold text-[#E6391E] group-hover:text-white">
-              {triage_backlog_count} PENDING
+              {triagePending}
             </span>
             <span className="text-sm font-bold text-[#E6391E] group-hover:text-white">↗</span>
           </div>
@@ -127,7 +148,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-zinc-500 group-hover:text-zinc-300">
-              P14.1 MERGED
+              {worktreesSummary}
             </span>
             <span className="text-sm font-bold text-[#E6391E] group-hover:text-white">↗</span>
           </div>
@@ -138,7 +159,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, onNavigate }) => {
       <div className="mt-4 p-4 border border-[#0A0A0A] bg-zinc-50 flex items-center justify-between">
         <span className="font-mono text-xs font-bold text-[#0A0A0A]">HARDWARE SYNC</span>
         <span className="font-mono text-xs font-bold text-[#E6391E]">
-          CONNECTED ({telemetry.usb_device_serial || '10BF5P2AZF0010T'})
+          CONNECTED ({hardwareSerial})
         </span>
       </div>
     </div>

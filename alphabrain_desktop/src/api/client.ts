@@ -1,7 +1,11 @@
 import {
+  CommandNodeScreenData,
   EmergencyStopState,
+  MeetingSetupScreenData,
+  MeetingTokenResponse,
   ModelUtilityScore,
   ProjectItem,
+  SecurityEnclaveScreenData,
   TaskDetail,
   TaskSummary,
 } from '../types';
@@ -157,6 +161,19 @@ export const desktopApi = {
       invite_token: 'client_invite_token',
       invite_url: `/meet#invite=${encodeURIComponent(room)}`,
     };
+  },
+
+  getCommandNode: async (): Promise<CommandNodeScreenData> => {
+    return await safeFetch('/command-node');
+  },
+
+  getSecurityEnclave: async (): Promise<SecurityEnclaveScreenData> => {
+    return await safeFetch('/security-enclave');
+  },
+
+  getMeetingSetup: async (room = 'alphabrain-executive-briefing'): Promise<MeetingSetupScreenData> => {
+    return await safeFetch(`/meet/setup?room=${encodeURIComponent(room)}`);
+  }
   },
 };
 

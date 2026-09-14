@@ -899,7 +899,9 @@ class MobileBridgeService:
             val = os.environ.get(env_var) or getattr(settings, env_var, None)
             is_configured = bool(val)
             if val:
-                masked = f"{val[:8]}••••••••{val[-4:]}" if len(val) >= 12 else f"{prefix}••••••••"
+                # Expose only safe constant prefix and at most 3 suffix chars only if length >= 24
+                suffix = val[-3:] if len(val) >= 24 else ""
+                masked = f"{prefix}••••••••{suffix}"
             else:
                 masked = f"{prefix}••••••••[UNCONFIGURED]"
             vault_items.append(
@@ -965,6 +967,7 @@ class MobileBridgeService:
         self,
         room_name: str = "alphabrain-executive-briefing",
         participant: str = "Ajay (Founder)",
+        role: str = "founder",
     ) -> MeetingSetupScreenData:
         from alpha_core.config import settings
 
@@ -977,7 +980,7 @@ class MobileBridgeService:
                 token = LiveKitTokenGenerator().generate_token(
                     room_name=room_name,
                     participant_identity=participant,
-                    role="founder",
+                    role=role,
                     valid_minutes=60,
                 )
             except Exception as e:
@@ -987,7 +990,7 @@ class MobileBridgeService:
             try:
                 from alpha_core.security import create_meeting_invite
 
-                token = create_meeting_invite(room_name, participant, role="founder", ttl_seconds=3600)
+                token = create_meeting_invite(room_name, participant, role=role, ttl_seconds=3600)
             except Exception:
                 token = f"mtg_token_{uuid.uuid4().hex}"
 
@@ -1007,6 +1010,7 @@ class MobileBridgeService:
         self,
         room_name: str = "alphabrain-executive-briefing",
         participant: str = "Ajay (Founder)",
+        role: str = "founder",
     ) -> MeetingTokenResponse:
         from alpha_core.config import settings
 
@@ -1018,7 +1022,7 @@ class MobileBridgeService:
                 token = LiveKitTokenGenerator().generate_token(
                     room_name=room_name,
                     participant_identity=participant,
-                    role="founder",
+                    role=role,
                     valid_minutes=60,
                 )
             except Exception as e:
@@ -1028,7 +1032,7 @@ class MobileBridgeService:
             try:
                 from alpha_core.security import create_meeting_invite
 
-                token = create_meeting_invite(room_name, participant, role="founder", ttl_seconds=3600)
+                token = create_meeting_invite(room_name, participant, role=role, ttl_seconds=3600)
             except Exception:
                 token = f"mtg_token_{uuid.uuid4().hex}"
 

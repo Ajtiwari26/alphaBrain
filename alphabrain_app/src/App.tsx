@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenId, ExecutiveOverview } from './types';
+import { ScreenId, ExecutiveOverview, DashboardScreenData } from './types';
 import { mobileApi } from './api/client';
 import {
   LayoutDashboard,
@@ -71,9 +71,15 @@ export function App() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [overview, setOverview] = useState<ExecutiveOverview | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardScreenData | null>(null);
 
   useEffect(() => {
     if (sessionStage !== 'authenticated') return;
+
+    mobileApi
+      .getDashboard()
+      .then(setDashboardData)
+      .catch((err) => console.warn('Dashboard fetch warning:', err));
 
     mobileApi
       .getOverview()
@@ -288,7 +294,7 @@ export function App() {
           />
         )}
         {currentScreen === 'overview' && overview && (
-          <DashboardScreen overview={overview} onNavigate={navigateTo} />
+          <DashboardScreen overview={overview} dashboardData={dashboardData} onNavigate={navigateTo} />
         )}
         {currentScreen === 'model_router' && <ModelRouterScreen />}
         {currentScreen === 'departments' && (

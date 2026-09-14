@@ -1,9 +1,12 @@
 import {
   AuditLogEntry,
+  DashboardScreenData,
   DeploymentTarget,
   EmergencyStopState,
   ExecutiveOverview,
   HardwareTelemetry,
+  MeetingSetupScreenData,
+  MeetingTokenResponse,
   ModelUtilityScore,
   PrivacyConsentStats,
   SelfHealingRadar,
@@ -57,6 +60,15 @@ async function safeFetch<T = any>(endpoint: string, options?: RequestInit): Prom
 export const mobileApi = {
   getOverview: (): Promise<ExecutiveOverview> =>
     safeFetch('/overview'),
+
+  getDashboard: (): Promise<DashboardScreenData> =>
+    safeFetch('/dashboard'),
+
+  getMeetingSetup: (room = 'alphabrain-executive-briefing'): Promise<MeetingSetupScreenData> =>
+    safeFetch(`/meet/setup?room=${encodeURIComponent(room)}`),
+
+  getMeetingToken: (room = 'alphabrain-executive-briefing'): Promise<MeetingTokenResponse> =>
+    safeFetch(`/meet/token?room=${encodeURIComponent(room)}`),
 
   listTriage: async (status?: string): Promise<TaskSummary[]> => {
     try {

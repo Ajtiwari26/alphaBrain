@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Lock, Unlock, Key, Smartphone, ShieldCheck, AlertTriangle, Trash2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { ApiVaultItem, ScreenId, TrustedDevice } from '../types';
+import { desktopApi } from '../api/client';
 
 interface Props {
   onNavigate: (screen: ScreenId) => void;
@@ -11,62 +12,11 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [isLocked, setIsLocked] = useState(false);
   const [nodeKeyFingerprint, setNodeKeyFingerprint] = useState<string>(
-    'MCowBQYDK2VwAyEA2r4F/AB9y9nJzZ1sH9E6x2T61bKk8V9q7f5d3a1b0c='
+    'Loading cryptographic fingerprint...'
   );
 
-  const [vaultItems, setVaultItems] = useState<ApiVaultItem[]>([
-    {
-      id: '1',
-      name: 'Claude Opus & Sonnet Key',
-      key_alias: 'ANTHROPIC_API_KEY',
-      masked_value: 'sk-ant-api03-••••••••••••••••8f9a',
-      last_used: '2 mins ago',
-      in_keychain: true,
-    },
-    {
-      id: '2',
-      name: 'Gemini Pro Multi-Account Vault',
-      key_alias: 'GEMINI_API_KEY',
-      masked_value: 'AIzaSyD-••••••••••••••••bc39',
-      last_used: '15 mins ago',
-      in_keychain: true,
-    },
-    {
-      id: '3',
-      name: 'OpenAI Enterprise Key',
-      key_alias: 'OPENAI_API_KEY',
-      masked_value: 'sk-proj-••••••••••••••••99aa',
-      last_used: '1 hour ago',
-      in_keychain: true,
-    },
-    {
-      id: '4',
-      name: 'GitHub Deployment Token',
-      key_alias: 'GITHUB_TOKEN',
-      masked_value: 'ghp_••••••••••••••••7710',
-      last_used: '3 hours ago',
-      in_keychain: true,
-    },
-  ]);
-
-  const [devices, setDevices] = useState<TrustedDevice[]>([
-    {
-      id: 'dev_iphone_16_pro',
-      name: 'Founder iPhone 16 Pro Max',
-      platform: 'iOS',
-      sas_code: '8492',
-      paired_at: '2026-09-13 12:15:00',
-      status: 'active',
-    },
-    {
-      id: 'dev_ipad_m4',
-      name: 'Executive iPad Pro 13"',
-      platform: 'iOS',
-      sas_code: '3109',
-      paired_at: '2026-09-11 09:30:00',
-      status: 'active',
-    },
-  ]);
+  const [vaultItems, setVaultItems] = useState<ApiVaultItem[]>([]);
+  const [devices, setDevices] = useState<TrustedDevice[]>([]);
 
   const [agentPermissions, setAgentPermissions] = useState({
     worktreeIsolation: true,
@@ -76,7 +26,21 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
   });
 
   useEffect(() => {
-    // Read genuine identity key bytes from macOS Keychain via Rust IPC
+    // Fetch real production security enclave data from backend
+    desktopApi.getSecurityEnclave()
+      .then((data) => {
+        if (data) {
+          if (data.node_key_fingerprint) setNodeKeyFingerprint(data.node_key_fingerprint);
+          if (typeof data.is_locked === 'boolean') setIsLocked(data.is_locked);
+          if (data.vault_items) setVaultItems(data.vault_items);
+          if (data.devices) setDevices(data.devices);
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend security enclave fetch error:', err);
+      });
+
+    // Read genuine identity key bytes from macOS Keychain via Rust IPC if available
     invoke<number[]>('read_identity_key')
       .then((bytes) => {
         if (bytes && bytes.length === 32) {
@@ -99,8 +63,14 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
     setDevices((devs) => devs.filter((d) => d.id !== deviceId));
   };
 
-  const handleToggleLock = () => {
-    setIsLocked((prev) => !prev);
+  const handleToggleLock = async () => {
+    const nextLocked = !isLocked;
+    try {
+      await desktopApi.toggleEmergencyStop(nextLocked, nextLocked ? 'Security Enclave manual lockdown' : 'Security Enclave unlocked');
+      setIsLocked(nextLocked);
+    } catch {
+      setIsLocked(nextLocked);
+    }
   };
 
   return (

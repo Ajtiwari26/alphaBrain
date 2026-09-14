@@ -12,7 +12,7 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -44,6 +44,7 @@ from alpha_core.mobile_bridge.schemas import (
     VoiceBriefing,
 )
 from alpha_core.mobile_bridge.service import MobileBridgeService
+from alpha_core.security import AuthPrincipal, PrincipalRole, require_api_principal
 
 logger = logging.getLogger("alphabrain.mobile_bridge.api")
 
@@ -263,19 +264,21 @@ async def get_security_enclave() -> SecurityEnclaveScreenData:
 @router.get("/meet/setup", response_model=MeetingSetupScreenData)
 async def get_meeting_setup(
     room: str = Query(default="alphabrain-executive-briefing", description="Meeting room identifier"),
-    participant: str = Query(default="Ajay (Founder)", description="Participant identity"),
+    principal: AuthPrincipal = Depends(require_api_principal),
 ) -> MeetingSetupScreenData:
     """Meeting Setup Screen: Real LiveKit WebRTC room setup and authentication parameters."""
-    return get_service().get_meeting_setup_data(room_name=room, participant=participant)
+    role = "founder" if principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN} else "client"
+    return get_service().get_meeting_setup_data(room_name=room, participant=principal.subject, role=role)
 
 
 @router.get("/meet/token", response_model=MeetingTokenResponse)
 async def get_meeting_token(
     room: str = Query(default="alphabrain-executive-briefing", description="Meeting room identifier"),
-    participant: str = Query(default="Ajay (Founder)", description="Participant identity"),
+    principal: AuthPrincipal = Depends(require_api_principal),
 ) -> MeetingTokenResponse:
     """Meeting Token Endpoint: Direct LiveKit SFU access token generation for companion and desktop."""
-    return get_service().get_meeting_token(room_name=room, participant=participant)
+    role = "founder" if principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN} else "client"
+    return get_service().get_meeting_token(room_name=room, participant=principal.subject, role=role)
 
 
 def create_mobile_bridge_app() -> FastAPI:

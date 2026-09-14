@@ -165,6 +165,11 @@ def test_security_enclave_screen_production_api(client: TestClient) -> None:
         assert "••••••••" in item["masked_value"]
         assert item["in_keychain"] is True
         assert isinstance(item["is_configured"], bool)
+        # Verify zero entropy leakage: suffix exposed is at most 3 chars
+        masked_val = item["masked_value"]
+        if not masked_val.endswith("[UNCONFIGURED]"):
+            suffix_after_dots = masked_val.split("••••••••")[-1]
+            assert len(suffix_after_dots) <= 3, f"Leaked too much secret entropy: {masked_val}"
 
     # Trusted Devices
     devices = data["devices"]
@@ -173,13 +178,15 @@ def test_security_enclave_screen_production_api(client: TestClient) -> None:
 
 
 def test_meeting_setup_screen_production_api(client: TestClient) -> None:
-    """Acceptance Test: Meeting Setup screen loads room config, LiveKit URL, and valid token."""
-    resp = client.get("/api/v1/mobile/meet/setup?room=briefing-room-prod&participant=Ajay+Founder")
+    """Acceptance Test: Meeting Setup screen loads room config, LiveKit URL, and derives identity from principal."""
+    # Attempting to pass spoofed participant in query param is ignored in favor of authenticated principal
+    resp = client.get("/api/v1/mobile/meet/setup?room=briefing-room-prod&participant=SpoofedAttacker")
     assert resp.status_code == 200
     data = resp.json()
 
     assert data["room_name"] == "briefing-room-prod"
-    assert data["participant_identity"] == "Ajay Founder"
+    # Identity must be bound to authenticated subject ("founder"), not "SpoofedAttacker"
+    assert data["participant_identity"] == "founder"
     assert "livekit" in data["livekit_url"] or "ws://" in data["livekit_url"] or "wss://" in data["livekit_url"] or "http" in data["livekit_url"]
     assert len(data["token"]) > 10
     assert data["audio_codec"] == "opus"
@@ -189,14 +196,38 @@ def test_meeting_setup_screen_production_api(client: TestClient) -> None:
 
 
 def test_meeting_token_endpoint(client: TestClient) -> None:
-    """Acceptance Test: Direct /meet/token returns valid room token for desktop and companion."""
-    resp = client.get("/api/v1/mobile/meet/token?room=alphabrain-live-briefing")
+    """Acceptance Test: Direct /meet/token returns valid room token bound to principal."""
+    resp = client.get("/api/v1/mobile/meet/token?room=alphabrain-live-briefing&participant=SpoofedUser")
     assert resp.status_code == 200
     data = resp.json()
 
     assert data["room_name"] == "alphabrain-live-briefing"
     assert len(data["token"]) > 10
     assert data["expires_in_seconds"] == 3600
+
+
+def test_meeting_setup_client_role_binding(monkeypatch: pytest.MonkeyPatch, temp_service: MobileBridgeService) -> None:
+    """Security Boundary: Non-founder principal receives client-scoped meeting setup."""
+    import alpha_core.mobile_bridge.api as api_mod
+
+    monkeypatch.setattr(api_mod, "get_service", lambda: temp_service)
+
+    def override_client_principal() -> AuthPrincipal:
+        return AuthPrincipal(
+            subject="client_contractor_01",
+            role=PrincipalRole.CLIENT,
+        )
+
+    app.dependency_overrides[require_api_principal] = override_client_principal
+    try:
+        c = TestClient(app)
+        resp = c.get("/api/v1/mobile/meet/setup?room=client-collab-room")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["participant_identity"] == "client_contractor_01"
+        assert len(data["token"]) > 10
+    finally:
+        app.dependency_overrides.pop(require_api_principal, None)
 
 
 def test_screens_unauthorized_without_principal() -> None:
