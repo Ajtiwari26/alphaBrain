@@ -540,12 +540,38 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const participantCount = (connected ? 1 : 0) + 1 + (hasRemoteClient ? 1 : 0);
 
   return (
-    <div className={`h-full w-full flex flex-col justify-between overflow-hidden ${darkMode ? 'bg-neutral-950 text-white' : 'bg-white text-black'}`}>
+    <div className={}>
+      {/* Co-Branding Banner */}
+      <div className="flex items-center justify-between border-b border-[#0A0A0A] bg-neutral-50 px-4 py-2.5 font-mono text-xs">
+        <div className="flex items-center gap-3">
+          <img
+            src="/alphabrain_logo.svg"
+            alt="AlphaBrain Logo"
+            className="w-5 h-5 object-contain"
+          />
+          <span className="font-bold text-[#0A0A0A] tracking-tight">
+            AlphaBrain is powered by DeployMate
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-neutral-500 uppercase tracking-widest hidden sm:inline">
+            CO-BRANDED SESSION
+          </span>
+          <img
+            src="/deploymate_logo.svg"
+            alt="DeployMate Logo"
+            className="h-4 object-contain"
+          />
+        </div>
+      </div>
+
       {/* Toast Notification */}
       {shareToast && (
         <div className="fixed top-16 right-8 z-50 bg-[#0A0A0A] text-white px-4 py-2 border border-black shadow-lg flex items-center gap-2 font-mono text-xs animate-bounce">
           <Check className="w-4 h-4 text-emerald-400" />
           <span>{shareToast}</span>
+        </div>
+      )}
         </div>
       )}
 
@@ -854,6 +880,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                     </div>
                   ))}
                 </div>
+
 
                 {/* Chat / Prompt Input Form */}
                 <div className={`p-3 border-t ${darkMode ? 'border-neutral-800 bg-neutral-950' : 'border-black bg-neutral-50'}`}>

@@ -170,7 +170,7 @@ export function App() {
               AlphaBrain
             </div>
             <div className="font-mono text-[9px] text-zinc-500 tracking-widest mt-0.5 uppercase">
-              DeployMate Locomotive
+              Powered by DeployMate
             </div>
           </div>
         </div>

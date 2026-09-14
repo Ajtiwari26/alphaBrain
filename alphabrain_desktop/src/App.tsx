@@ -44,12 +44,14 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-white text-[#0A0A0A] flex flex-col font-sans selection:bg-[#E6391E] selection:text-white">
       {/* Top Application Bar */}
       <header className="border-b border-[#0A0A0A] bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="w-full px-6 h-14 flex items-center justify-between">
           {/* Brand Mark */}
           <div className="flex items-center gap-3 shrink-0 mr-4">
-            <div className="w-7 h-7 bg-[#0A0A0A] flex items-center justify-center text-white font-mono font-bold text-sm">
-              α
-            </div>
+            <img
+              src="/alpha_symbol.svg"
+              alt="AlphaBrain Logo"
+              className="w-7 h-7 object-contain"
+            />
             <div className="flex items-baseline gap-2">
               <span className="font-mono font-bold tracking-tight text-sm uppercase">
                 AlphaBrain
@@ -60,32 +62,17 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Symmetrical Parity Navigation Tabs */}
-          <nav className="flex h-14 font-mono text-xs overflow-x-auto no-scrollbar">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentScreen === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentScreen(item.id)}
-                  className={`flex items-center gap-1.5 px-3 h-full border-l border-[#0A0A0A] transition-colors relative whitespace-nowrap ${
-                    isActive
-                      ? 'bg-neutral-100 font-bold text-black border-b-2 border-b-[#E6391E]'
-                      : 'hover:bg-neutral-50 text-neutral-600'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#E6391E]' : 'text-neutral-400'}`} />
-                  <span className="text-[9px] text-neutral-400 uppercase">{item.code}</span>
-                  <span className="uppercase tracking-wider text-[11px]">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Quick Telemetry & Status Pill */}
-          <div className="hidden lg:flex items-center gap-3 border-l border-[#0A0A0A] pl-4 h-14 shrink-0">
-            <div className="flex items-center gap-1.5 font-mono text-xs">
+          {/* Symmetrical Parity Quick Links / Status */}
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-neutral-50 border border-[#0A0A0A] font-mono text-xs">
+              <span className="text-neutral-500">ENGINE:</span>
+              <img
+                src="/deploymate_logo.svg"
+                alt="DeployMate"
+                className="h-3.5 object-contain"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 font-mono text-xs border-l border-[#0A0A0A] pl-4">
               <Radio className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
               <span className="font-bold">CLOUD SYNCED</span>
             </div>
@@ -93,19 +80,122 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Screen Content View */}
-      <main className="flex-1 overflow-y-auto">
-        {currentScreen === 'M01_NodeSetup' && <M01_NodeSetup onNavigate={setCurrentScreen} />}
-        {currentScreen === 'M02_PairingStation' && <M02_PairingStation onNavigate={setCurrentScreen} />}
-        {currentScreen === 'M03_CommandNode' && <M03_CommandNode onNavigate={setCurrentScreen} />}
-        {currentScreen === 'M04_SecurityEnclave' && <M04_SecurityEnclave onNavigate={setCurrentScreen} />}
-        {currentScreen === 'EvaMeeting' && <EvaMeetingScreen onLeave={() => setCurrentScreen('M03_CommandNode')} />}
-        {currentScreen === 'Projects' && <ProjectsScreen />}
-        {currentScreen === 'ModelRouter' && <ModelRouterScreen />}
-        {currentScreen === 'TriageQueue' && <TriageQueueScreen onSelectTask={(id) => console.log('Selected task:', id)} />}
-        {currentScreen === 'Departments' && <DepartmentsScreen onSelectDept={(d) => console.log('Selected dept:', d)} />}
-        {currentScreen === 'EmergencyStop' && <EmergencyStopScreen />}
-      </main>
+      {/* Main macOS Application Frame with Left Sidebar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Mac App Sidebar */}
+        <aside className="w-72 border-r border-[#0A0A0A] bg-neutral-50/70 flex flex-col justify-between shrink-0 select-none overflow-y-auto">
+          {/* Sidebar Top: Prominent Co-Branding Banner */}
+          <div className="p-4 border-b border-[#0A0A0A] bg-white space-y-3">
+            <div className="flex items-center gap-3">
+              <img
+                src="/alpha_symbol.svg"
+                alt="AlphaBrain Logo"
+                className="w-8 h-8 object-contain"
+              />
+              <div>
+                <div className="font-mono font-bold text-sm tracking-tight text-[#0A0A0A] uppercase">
+                  AlphaBrain
+                </div>
+                <div className="font-mono text-[10px] text-neutral-400 uppercase tracking-wider">
+                  Mac Command Node
+                </div>
+              </div>
+            </div>
+
+            {/* Co-Branding Callout */}
+            <div className="border border-[#0A0A0A] bg-neutral-50 p-3 space-y-2">
+              <div className="font-mono text-[11px] font-bold text-[#0A0A0A] tracking-tight">
+                AlphaBrain is powered by DeployMate
+              </div>
+              <div className="flex items-center gap-2 pt-1 border-t border-neutral-200">
+                <span className="font-mono text-[9px] text-neutral-500 uppercase tracking-widest">
+                  ENGINE
+                </span>
+                <img
+                  src="/deploymate_logo.svg"
+                  alt="DeployMate"
+                  className="h-4 object-contain"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar Navigation Items */}
+          <nav className="flex-1 p-3 space-y-1 font-mono text-xs overflow-y-auto">
+            <div className="px-2 py-1 text-[10px] text-neutral-400 uppercase tracking-wider">
+              Workspaces & Nodes
+            </div>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentScreen === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentScreen(item.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 border transition-all text-left ${
+                    isActive
+                      ? 'bg-[#0A0A0A] text-white border-[#0A0A0A] font-bold shadow-sm'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:border-[#0A0A0A] hover:bg-neutral-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-[#E6391E]' : 'text-neutral-500'}`} />
+                    <span className="tracking-wide text-[12px]">{item.label}</span>
+                  </div>
+                  <span
+                    className={`text-[9px] uppercase px-1.5 py-0.5 font-mono ${
+                      isActive ? 'bg-[#E6391E] text-white' : 'bg-neutral-100 text-neutral-500'
+                    }`}
+                  >
+                    {item.code}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Sidebar Bottom: Co-Branding Status Enclave */}
+          <div className="p-4 border-t border-[#0A0A0A] bg-white space-y-2.5">
+            <div className="flex items-center justify-between font-mono text-[10px]">
+              <span className="text-neutral-400 uppercase tracking-widest">ECOSYSTEM</span>
+              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                ACTIVE
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 p-2 bg-neutral-50 border border-neutral-200">
+              <img
+                src="/alpha_symbol.svg"
+                alt="AlphaBrain Logo"
+                className="w-6 h-6 object-contain"
+              />
+              <span className="font-mono text-xs text-neutral-400 font-bold">+</span>
+              <img
+                src="/deploymate_logo.svg"
+                alt="DeployMate Logo"
+                className="h-4 object-contain"
+              />
+            </div>
+            <div className="font-mono text-[10px] text-neutral-600 text-center">
+              AlphaBrain is powered by DeployMate
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Screen Content View */}
+        <main className="flex-1 overflow-y-auto bg-white">
+          {currentScreen === 'M01_NodeSetup' && <M01_NodeSetup onNavigate={setCurrentScreen} />}
+          {currentScreen === 'M02_PairingStation' && <M02_PairingStation onNavigate={setCurrentScreen} />}
+          {currentScreen === 'M03_CommandNode' && <M03_CommandNode onNavigate={setCurrentScreen} />}
+          {currentScreen === 'M04_SecurityEnclave' && <M04_SecurityEnclave onNavigate={setCurrentScreen} />}
+          {currentScreen === 'EvaMeeting' && <EvaMeetingScreen onLeave={() => setCurrentScreen('M03_CommandNode')} />}
+          {currentScreen === 'Projects' && <ProjectsScreen />}
+          {currentScreen === 'ModelRouter' && <ModelRouterScreen />}
+          {currentScreen === 'TriageQueue' && <TriageQueueScreen onSelectTask={(id) => console.log('Selected task:', id)} />}
+          {currentScreen === 'Departments' && <DepartmentsScreen onSelectDept={(d) => console.log('Selected dept:', d)} />}
+          {currentScreen === 'EmergencyStop' && <EmergencyStopScreen />}
+        </main>
+      </div>
 
       {/* Bottom Status Bar */}
       <footer className="border-t border-[#0A0A0A] bg-neutral-50 py-2 px-6 font-mono text-[11px] text-neutral-600 flex justify-between items-center">

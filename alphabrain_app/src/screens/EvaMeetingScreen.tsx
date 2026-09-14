@@ -538,12 +538,33 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const participantCount = (connected ? 1 : 0) + 1 + (hasRemoteClient ? 1 : 0);
 
   return (
-    <div className={`h-full w-full flex flex-col justify-between overflow-hidden ${darkMode ? 'bg-neutral-950 text-white' : 'bg-white text-black'}`}>
+    <div className={}>
+      {/* Co-Branding Banner */}
+      <div className="flex items-center justify-between border-b border-[#0A0A0A] bg-zinc-50 px-3 py-2 font-mono text-[10px]">
+        <div className="flex items-center gap-2">
+          <img
+            src="/alphabrain_logo.svg"
+            alt="AlphaBrain Logo"
+            className="w-4 h-4 object-contain"
+          />
+          <span className="font-semibold text-[#0A0A0A]">
+            AlphaBrain is powered by DeployMate
+          </span>
+        </div>
+        <img
+          src="/deploymate_logo.svg"
+          alt="DeployMate"
+          className="h-3.5 object-contain"
+        />
+      </div>
+
       {/* Toast Notification */}
       {shareToast && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A] text-white px-4 py-2 border border-black shadow-lg flex items-center gap-2 font-mono text-xs animate-bounce">
           <Check className="w-4 h-4 text-emerald-400" />
           <span>{shareToast}</span>
+        </div>
+      )}
         </div>
       )}
 

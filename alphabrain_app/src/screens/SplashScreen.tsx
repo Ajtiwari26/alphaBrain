@@ -37,20 +37,25 @@ export const SplashScreen: React.FC<Props> = ({ onContinue }) => {
         </h1>
       </div>
 
-      {/* Bottom: POWERED BY DeployMate */}
-      <div className="flex flex-col items-center justify-center space-y-2 pb-2">
-        <span className="font-mono text-[9px] text-zinc-400 tracking-[0.35em] uppercase font-medium">
-          POWERED BY
-        </span>
+      {/* Bottom: Co-Branding with AlphaBrain is powered by DeployMate */}
+      <div className="flex flex-col items-center justify-center space-y-2 pb-2 text-center">
+        <div className="font-mono text-xs font-semibold text-[#0A0A0A] tracking-tight">
+          AlphaBrain is powered by DeployMate
+        </div>
 
-        <img
-          src="/deploymate_logo.png"
-          alt="DeployMate"
-          className="h-8 object-contain"
-        />
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9px] text-zinc-400 tracking-[0.35em] uppercase font-medium">
+            POWERED BY
+          </span>
+          <img
+            src="/deploymate_logo.svg"
+            alt="DeployMate"
+            className="h-7 object-contain"
+          />
+        </div>
 
         {/* Home Indicator Bar */}
-        <div className="w-32 h-1 bg-[#0A0A0A] rounded-full mt-4" />
+        <div className="w-32 h-1 bg-[#0A0A0A] rounded-full mt-3" />
       </div>
     </div>
   );
