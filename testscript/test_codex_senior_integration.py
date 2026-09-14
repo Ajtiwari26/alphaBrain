@@ -229,8 +229,8 @@ def test_senior_review_codex_exec_invocation(
     # Mock AGY for Pro and Opus
     def fake_invoke_agy(model: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         if "gemini" in model:
-            return {"response": 'Pro check passed.\n{"verdict": "APPROVE"}'}
-        return {"response": 'Opus check passed.\n{"verdict": "FINAL_APPROVAL"}'}
+            return {"response": 'Pro check passed.\n{"verdict": "APPROVE"}', "structured_output": {"verdict": "APPROVE"}}
+        return {"response": 'Opus check passed.\n{"verdict": "FINAL_APPROVAL"}', "structured_output": {"verdict": "FINAL_APPROVAL"}}
 
     monkeypatch.setattr(engine, "_invoke_agy", fake_invoke_agy)
 
@@ -287,7 +287,8 @@ def test_senior_review_codex_review_subcommand(
         engine,
         "_invoke_agy",
         lambda model, *a, **k: {
-            "response": '{"verdict": "APPROVE"}' if "gemini" in model else '{"verdict": "FINAL_APPROVAL"}'
+            "response": '{"verdict": "APPROVE"}' if "gemini" in model else '{"verdict": "FINAL_APPROVAL"}',
+            "structured_output": {"verdict": "APPROVE"} if "gemini" in model else {"verdict": "FINAL_APPROVAL"}
         },
     )
 
