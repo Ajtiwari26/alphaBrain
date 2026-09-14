@@ -162,7 +162,56 @@ export const mobileApi = {
     }
   },
 
-  getEvaMeetingToken: async (room: string): Promise<{ token: string; room_name?: string }> => {
-    return await safeFetch(`/meet/token?room=${encodeURIComponent(room)}`);
+  getEvaMeetingToken: async (
+    room: string,
+    identity = 'Ajay (Founder)',
+    token?: string
+  ): Promise<{ token: string; room_name?: string }> => {
+    const rootBase = getApiBaseUrl().replace('/api/v1/mobile', '');
+    const authToken = token || getAuthToken();
+    try {
+      const res = await fetch(`${rootBase}/api/meet/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ room_name: room, identity }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Local fallback
+    }
+    return { token: 'simulated_webrtc_token', room_name: room };
+  },
+
+  createMeetingInvite: async (
+    room: string,
+    identity = 'Client',
+    token?: string
+  ): Promise<{ invite_token: string; invite_url: string }> => {
+    const rootBase = getApiBaseUrl().replace('/api/v1/mobile', '');
+    const authToken = token || getAuthToken();
+    try {
+      const res = await fetch(`${rootBase}/api/meet/invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ room_name: room, identity }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Local fallback
+    }
+    return {
+      invite_token: 'client_invite_token',
+      invite_url: `/meet#invite=${encodeURIComponent(room)}`,
+    };
   },
 };

@@ -24,7 +24,7 @@ interface Props {
   onLeave?: () => void;
 }
 
-const LANGUAGES = [
+export const LANGUAGES = [
   { code: 'hi', name: 'Hindi (हिन्दी)' },
   { code: 'en', name: 'English' },
   { code: 'zh', name: 'Chinese (中文)' },
@@ -37,34 +37,118 @@ const LANGUAGES = [
   { code: 'pt', name: 'Portuguese (Português)' },
 ];
 
-const INITIAL_TRANSCRIPTS = [
+export const TRANSLATION_DICTIONARY: Record<string, Record<string, string>> = {
+  't-1': {
+    en: 'Good afternoon Founder Ajay. LiveKit WebRTC bridge is established at 18ms latency.',
+    hi: 'नमस्ते संस्थापक अजय। लाइवकिट वेबआरटीसी ब्रिज 18ms विलंबता पर स्थापित है।',
+    zh: '下午好，创始人 Ajay。LiveKit WebRTC 桥接已建立，延迟 18ms。',
+    ja: 'こんにちは、創業者 Ajay。LiveKit WebRTC ブリッジが 18ms のレイテンシで確立されました。',
+    ko: '안녕하세요 설립자 Ajay 님. LiveKit WebRTC 브리지가 18ms 지연율로 연결되었습니다.',
+    ar: 'مساء الخير أيها المؤسس أجاي. تم إنشاء جسر LiveKit WebRTC بزمن انتقال 18 مللي ثانية.',
+    es: 'Buenas tardes, Fundador Ajay. El puente LiveKit WebRTC está establecido con 18ms de latencia.',
+    fr: 'Bonjour Fondateur Ajay. La passerelle WebRTC LiveKit est établie avec une latence de 18ms.',
+    de: 'Guten Tag Gründer Ajay. Die LiveKit WebRTC-Bridge ist mit 18ms Latenz aufgebaut.',
+    pt: 'Boa tarde Fundador Ajay. Ponte LiveKit WebRTC estabelecida com latência de 18ms.',
+  },
+  't-2': {
+    en: 'Telemetry shows Android device 10BF5P2AZF0010T synced over USB ADB reverse proxy.',
+    hi: 'टेलीमेट्री दिखाती है कि एंड्रॉइड डिवाइस 10BF5P2AZF0010T यूएसबी एडीबी रिवर्स प्रॉक्सी पर समन्वयित है।',
+    zh: '遥测显示 Android 设备 10BF5P2AZF0010T 已通过 USB ADB 反向代理同步。',
+    ja: 'テレメトリにより Android デバイス 10BF5P2AZF0010T が USB ADB リバースプロキシ経由で同期されたことが示されています。',
+    ko: 'Android 기기 10BF5P2AZF0010T가 USB ADB 역방향 프록시를 통해 동기화되었습니다.',
+    ar: 'تُظهر القياسات عن بُعد مزامنة جهاز Android 10BF5P2AZF0010T عبر وكيل USB ADB العكسي.',
+    es: 'La telemetría muestra el dispositivo Android 10BF5P2AZF0010T sincronizado mediante proxy inverso USB ADB.',
+    fr: 'La télémétrie montre l\'appareil Android 10BF5P2AZF0010T synchronisé via proxy inverse USB ADB.',
+    de: 'Telemetrie zeigt Android-Gerät 10BF5P2AZF0010T über USB ADB synchronisiert.',
+    pt: 'Telemetria mostra dispositivo Android 10BF5P2AZF0010T sincronizado via proxy reverso USB ADB.',
+  },
+  't-3': {
+    en: 'All 14 departments and triage pipelines are healthy. Sprint fleet has active worker leases.',
+    hi: 'सभी 14 विभाग और ट्राइएज पाइपलाइन स्वस्थ हैं।',
+    zh: '全部 14 个部门和分类管线运行正常。冲刺集群拥有活跃的工作租约。',
+    ja: '14 の部門とトリアージパイプラインはすべて健全です。スプリントフリートにはアクティブなワーカーリースがあります。',
+    ko: '14개 모든 부서와 트리아지 파이프라인이 정상 상태입니다.',
+    ar: 'جميع الأقسام الـ 14 وخطوط الفرز تعمل بصحة جيدة.',
+    es: 'Los 14 departamentos y conductos de triaje están en buen estado.',
+    fr: 'Les 14 départements et pipelines de triage sont opérationnels.',
+    de: 'Alle 14 Abteilungen und Triage-Pipelines sind intakt.',
+    pt: 'Todos os 14 departamentos e pipelines de triagem estão operando perfeitamente.',
+  },
+  't-4': {
+    en: 'Ready for voice instructions or executive directive on mobile.',
+    hi: 'मोबाइल पर ध्वनि निर्देशों या कार्यकारी निर्देशों के लिए तैयार हैं।',
+    zh: '已就绪，可在移动端接收语音指令或高管指令。',
+    ja: 'モバイルでの音声指示またはエグゼクティブ指示の準備が整いました。',
+    ko: '모바일에서 음성 지시 또는 경영진 지침을 받을 준비가 되었습니다.',
+    ar: 'جاهز للتعليمات الصوتية أو التوجيهات التنفيذية على الهاتف المحمول.',
+    es: 'Listo para instrucciones de voz o directivas ejecutivas en el móvil.',
+    fr: 'Prêt pour les instructions vocales ou les directives exécutives sur mobile.',
+    de: 'Bereit für Sprachbefehle oder Führungsanweisungen auf Mobilgeräten.',
+    pt: 'Pronto para instruções de voz ou diretrizes executivas no mobile.',
+  },
+  'eva-summary': {
+    en: 'All 14 gates verified. Cloud dispatch running on api.alphabrain.live with zero regressions.',
+    hi: 'सभी 14 गेट्स सत्यापित हैं। शून्य प्रतिगमन के साथ क्लाउड प्रेषण चल रहा है।',
+    zh: '所有 14 个门禁已验证。云端调度在 api.alphabrain.live 上以零回归运行。',
+    ja: '14 のゲートすべてが検証されました。api.alphabrain.live でのリグレッションゼロのクラウドディスパッチ。',
+    ko: '14개 게이트 모두 검증되었습니다. 무결점으로 클라우드 디스패치 실행 중입니다.',
+    ar: 'تم التحقق من جميع البوابات الـ 14. الإرسال السحابي يعمل دون أي تراجع.',
+    es: 'Los 14 controles verificados. Despacho en la nube ejecutándose con zero regresiones.',
+    fr: 'Les 14 barrières sont vérifiées. Répartition cloud active avec zéro régression.',
+    de: 'Alle 14 Gates verifiziert. Cloud-Dispatch läuft ohne Regressionen.',
+    pt: 'Todos os 14 portões verificados. Despacho na nuvem ativo com zero regressões.',
+  },
+  'prompt-question': {
+    en: 'Eva, summarize current deployment status and active gates.',
+    hi: 'ईवा, वर्तमान परिनियोजन स्थिति और सक्रिय गेट्स का संक्षेप दें।',
+    zh: 'Eva，请总结当前的部署状态和活动门禁。',
+    ja: 'Eva、現在のデプロイステータスとアクティブなゲートの概要を説明してください。',
+    ko: 'Eva, 현재 배포 상태와 활성 게이트를 요약해 주세요.',
+    ar: 'إيفا، يرجى تلخيص حالة النشر الحالية والبوابات النشطة.',
+    es: 'Eva, resume el estado de despliegue actual y las compuertas activas.',
+    fr: 'Eva, résumez l\'état actuel du déploiement et les barrières actives.',
+    de: 'Eva, fassen Sie den aktuellen Bereitstellungsstatus und die aktiven Gates zusammen.',
+    pt: 'Eva, resuma o status atual de implantação e os portões ativos.',
+  },
+};
+
+interface TranscriptItem {
+  id: string;
+  speaker: string;
+  text: string;
+  time: string;
+  translationKey?: string;
+  customTranslation?: (lang: string) => string;
+}
+
+const INITIAL_TRANSCRIPTS: TranscriptItem[] = [
   {
     id: 't-1',
     speaker: 'Eva (AI Architect)',
     text: 'Good afternoon Founder Ajay. LiveKit WebRTC bridge is established at 18ms latency.',
-    translatedText: 'नमस्ते संस्थापक अजय। लाइवकिट वेबआरटीसी ब्रिज 18ms विलंबता पर स्थापित है।',
     time: '12:00:04',
+    translationKey: 't-1',
   },
   {
     id: 't-2',
     speaker: 'Eva (AI Architect)',
     text: 'Telemetry shows Android device 10BF5P2AZF0010T synced over USB ADB reverse proxy.',
-    translatedText: 'टेलीमेट्री दिखाती है कि एंड्रॉइड डिवाइस 10BF5P2AZF0010T यूएसबी एडीबी रिवर्स प्रॉक्सी पर समन्वयित है।',
     time: '12:00:12',
+    translationKey: 't-2',
   },
   {
     id: 't-3',
     speaker: 'Eva (AI Architect)',
     text: 'All 14 departments and triage pipelines are healthy. Sprint fleet has active worker leases.',
-    translatedText: 'सभी 14 विभाग और ट्राइएज पाइपलाइन स्वस्थ हैं।',
     time: '12:00:20',
+    translationKey: 't-3',
   },
   {
     id: 't-4',
     speaker: 'Eva (AI Architect)',
     text: 'Ready for voice instructions or executive directive on mobile.',
-    translatedText: 'मोबाइल पर ध्वनि निर्देशों या कार्यकारी निर्देशों के लिए तैयार हैं।',
     time: '12:00:28',
+    translationKey: 't-4',
   },
 ];
 
@@ -85,8 +169,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [evaSpeaking, setEvaSpeaking] = useState(true);
   const [hasRemoteClient, setHasRemoteClient] = useState(false);
-  const [remoteClientName, setRemoteClientName] = useState('Client (Inito)');
-  const [transcripts, setTranscripts] = useState(INITIAL_TRANSCRIPTS);
+  const [remoteClientName] = useState('Client (Inito)');
+  const [transcripts, setTranscripts] = useState<TranscriptItem[]>(INITIAL_TRANSCRIPTS);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [languageModalOpen, setLanguageModalOpen] = useState(false);
@@ -96,11 +180,28 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
 
   // Media references
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const interruptTimerRef = useRef<number | null>(null);
   const transcriptListRef = useRef<HTMLDivElement | null>(null);
+
+  // Managed Timer Tracking to prevent memory leaks on unmount
+  const timeoutsRef = useRef<Set<number>>(new Set());
+
+  const safeTimeout = (fn: () => void, ms: number): number => {
+    const id = window.setTimeout(() => {
+      timeoutsRef.current.delete(id);
+      fn();
+    }, ms);
+    timeoutsRef.current.add(id);
+    return id;
+  };
+
+  const clearAllTimeouts = () => {
+    timeoutsRef.current.forEach((id) => clearTimeout(id));
+    timeoutsRef.current.clear();
+  };
 
   // Session running timer
   useEffect(() => {
@@ -118,8 +219,31 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     }
   }, [transcripts]);
 
-  // Clean up streams when leaving
+  // Attach local camera stream reliably avoiding mounting race condition
+  useEffect(() => {
+    if (localVideoRef.current) {
+      if (cameraEnabled && mediaStreamRef.current) {
+        localVideoRef.current.srcObject = mediaStreamRef.current;
+      } else {
+        localVideoRef.current.srcObject = null;
+      }
+    }
+  }, [cameraEnabled]);
+
+  // Attach screen share stream to PIP preview reliably
+  useEffect(() => {
+    if (screenVideoRef.current) {
+      if (isScreenSharing && screenStreamRef.current) {
+        screenVideoRef.current.srcObject = screenStreamRef.current;
+      } else {
+        screenVideoRef.current.srcObject = null;
+      }
+    }
+  }, [isScreenSharing]);
+
+  // Clean up streams & timers when leaving or unmounting
   const cleanupMedia = () => {
+    clearAllTimeouts();
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
@@ -135,6 +259,9 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+    }
   };
 
   useEffect(() => {
@@ -145,21 +272,29 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     e.preventDefault();
     setJoinError(null);
 
+    // Persist API token if provided
+    if (apiToken) {
+      try {
+        localStorage.setItem('alpha_api_token', apiToken);
+      } catch {
+        // Storage restricted fallback
+      }
+    }
+
     try {
       try {
-        const tokenData = await mobileApi.getEvaMeetingToken(roomName);
+        const tokenData = await mobileApi.getEvaMeetingToken(roomName, identity, apiToken || undefined);
         if (tokenData?.token) {
           setConnected(true);
         }
       } catch {
-        // Local fallback
+        // Permissive local simulation fallback
         setConnected(true);
       }
 
       setInLobby(false);
       setTimerSeconds(0);
 
-      // Microphone permission request
       if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -169,7 +304,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         }
       }
     } catch (err: any) {
-      setJoinError(err?.message || 'Failed to join meeting room');
+      setJoinError(err?.message || 'Failed to join meeting');
     }
   };
 
@@ -195,14 +330,16 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     } else {
       try {
         if (navigator.mediaDevices?.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+          });
           if (mediaStreamRef.current) {
             stream.getVideoTracks().forEach((t) => mediaStreamRef.current?.addTrack(t));
           } else {
             mediaStreamRef.current = stream;
+          }
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = mediaStreamRef.current;
           }
           setCameraEnabled(true);
         }
@@ -218,15 +355,31 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         screenStreamRef.current.getTracks().forEach((t) => t.stop());
         screenStreamRef.current = null;
       }
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = null;
+      }
       setIsScreenSharing(false);
     } else {
       try {
         if (navigator.mediaDevices?.getDisplayMedia) {
           const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
           screenStreamRef.current = stream;
-          stream.getVideoTracks()[0].onended = () => {
-            setIsScreenSharing(false);
-          };
+          const videoTrack = stream.getVideoTracks()[0];
+          if (videoTrack) {
+            videoTrack.onended = () => {
+              if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach((t) => t.stop());
+                screenStreamRef.current = null;
+              }
+              if (screenVideoRef.current) {
+                screenVideoRef.current.srcObject = null;
+              }
+              setIsScreenSharing(false);
+            };
+          }
+          if (screenVideoRef.current) {
+            screenVideoRef.current.srcObject = stream;
+          }
           setIsScreenSharing(true);
         } else {
           setIsScreenSharing(true);
@@ -238,68 +391,110 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   };
 
   const handlePromptEva = () => {
-    if (interruptTimerRef.current !== null) {
-      clearTimeout(interruptTimerRef.current);
-    }
+    clearAllTimeouts();
     setEvaSpeaking(false);
 
-    const newTurn = {
+    const newTurn: TranscriptItem = {
       id: `t-${Date.now()}`,
       speaker: identity,
-      text: 'Eva, summarize sprint status for mobile companion.',
-      translatedText: 'ईवा, मोबाइल साथी के लिए स्प्रिंट स्थिति का संक्षेप दें।',
+      text: 'Eva, summarize current deployment status and active gates.',
+      translationKey: 'prompt-question',
       time: formatTime(timerSeconds),
     };
     setTranscripts((prev) => [...prev, newTurn]);
 
-    interruptTimerRef.current = window.setTimeout(() => {
+    safeTimeout(() => {
       setEvaSpeaking(true);
-      const evaReply = {
+      const evaReply: TranscriptItem = {
         id: `t-${Date.now() + 1}`,
         speaker: 'Eva (AI Architect)',
-        text: 'All 14 locomotive screens synchronized on device 10BF5P2AZF0010T. Parity at 100%.',
-        translatedText: 'डिवाइस 10BF5P2AZF0010T पर सभी 14 लोकोमोटिव स्क्रीन समन्वयित हैं। 100% समानता।',
+        text: 'All 14 gates verified. Cloud dispatch running on api.alphabrain.live with zero regressions.',
+        translationKey: 'eva-summary',
         time: formatTime(timerSeconds + 2),
       };
       setTranscripts((prev) => [...prev, evaReply]);
-      interruptTimerRef.current = null;
     }, 1500);
+  };
+
+  const getChatAckTranslation = (text: string, lang: string): string => {
+    switch (lang) {
+      case 'hi':
+        return `स्वीकृत: "${text}"। कार्यकारी बैठक की कार्य सूची में जोड़ा गया।`;
+      case 'zh':
+        return `已确认：“${text}”。已添加到执行会议行动项。`;
+      case 'ja':
+        return `確認しました：「${text}」。エグゼクティブ会議のアクションアイテムに追加されました。`;
+      case 'ko':
+        return `확인됨: "${text}". 회의 조치 항목에 추가되었습니다.`;
+      case 'ar':
+        return `تم التأكيد: "${text}". تمت إضافتها إلى بنود عمل الاجتماع التنفيذي.`;
+      case 'es':
+        return `Reconocido: "${text}". Agregado a los puntos de acción de la reunión ejecutiva.`;
+      case 'fr':
+        return `Reçu : "${text}". Ajouté aux éléments d'action de la réunion.`;
+      case 'de':
+        return `Bestätigt: "${text}". Zu den Aktionspunkten des Meetings hinzugefügt.`;
+      case 'pt':
+        return `Reconhecido: "${text}". Adicionado aos itens de ação da reunião executiva.`;
+      default:
+        return `Acknowledged: "${text}". Added to executive meeting action items.`;
+    }
   };
 
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    const userTurn = {
+    const userText = chatInput.trim();
+    const userTurn: TranscriptItem = {
       id: `t-${Date.now()}`,
       speaker: identity,
-      text: chatInput.trim(),
+      text: userText,
       time: formatTime(timerSeconds),
     };
     setTranscripts((prev) => [...prev, userTurn]);
     setChatInput('');
 
-    window.setTimeout(() => {
-      setTranscripts((prev) => [
-        ...prev,
-        {
-          id: `t-${Date.now() + 1}`,
-          speaker: 'Eva (AI Architect)',
-          text: `Acknowledged: "${userTurn.text}". Recorded via mobile data channel.`,
-          translatedText: `स्वीकृत: "${userTurn.text}"। मोबाइल डेटा चैनल के माध्यम से दर्ज किया गया।`,
-          time: formatTime(timerSeconds + 1),
-        },
-      ]);
+    safeTimeout(() => {
+      const ackItem: TranscriptItem = {
+        id: `t-${Date.now() + 1}`,
+        speaker: 'Eva (AI Architect)',
+        text: `Acknowledged: "${userText}". Added to executive meeting action items.`,
+        customTranslation: (lang: string) => getChatAckTranslation(userText, lang),
+        time: formatTime(timerSeconds + 1),
+      };
+      setTranscripts((prev) => [...prev, ackItem]);
     }, 1000);
   };
 
-  const copyInviteLink = () => {
-    const inviteUrl = `${window.location.origin}/meet#invite=${encodeURIComponent(roomName)}`;
+  const copyInviteLink = async () => {
+    let inviteUrl = `${window.location.origin}/meet#invite=${encodeURIComponent(roomName)}`;
+    try {
+      const inviteData = await mobileApi.createMeetingInvite(roomName, 'Client', apiToken || undefined);
+      if (inviteData?.invite_url) {
+        inviteUrl = inviteData.invite_url.startsWith('http')
+          ? inviteData.invite_url
+          : `${window.location.origin}${inviteData.invite_url.startsWith('/') ? '' : '/'}${inviteData.invite_url}`;
+      }
+    } catch {
+      // Fallback
+    }
+
     if (navigator.clipboard) {
       navigator.clipboard.writeText(inviteUrl);
     }
     setShareToast('Invite link copied!');
-    setTimeout(() => setShareToast(null), 3000);
+    safeTimeout(() => setShareToast(null), 2500);
+  };
+
+  const toggleDarkMode = () => {
+    setDarkMode((prev) => {
+      const next = !prev;
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', next);
+      }
+      return next;
+    });
   };
 
   const handleEndCall = () => {
@@ -319,6 +514,16 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const getTranslatedLine = (item: TranscriptItem, lang: string): string => {
+    if (item.translationKey && TRANSLATION_DICTIONARY[item.translationKey]) {
+      return TRANSLATION_DICTIONARY[item.translationKey][lang] || TRANSLATION_DICTIONARY[item.translationKey]['en'] || item.text;
+    }
+    if (item.customTranslation) {
+      return item.customTranslation(lang);
+    }
+    return item.text;
+  };
+
   // Determine stage grid layout: layout-1 (solo hero), layout-2 (local + Eva 50/50), layout-3 (with remote stack)
   const getStageLayoutClass = () => {
     if (hasRemoteClient) {
@@ -336,17 +541,18 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     <div className={`h-full w-full flex flex-col justify-between overflow-hidden ${darkMode ? 'bg-neutral-950 text-white' : 'bg-white text-black'}`}>
       {/* Toast Notification */}
       {shareToast && (
-        <div className="fixed top-14 right-4 z-50 bg-[#0A0A0A] text-white px-3 py-1.5 border border-black shadow-lg flex items-center gap-1.5 font-mono text-xs animate-bounce">
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A] text-white px-4 py-2 border border-black shadow-lg flex items-center gap-2 font-mono text-xs animate-bounce">
+          <Check className="w-4 h-4 text-emerald-400" />
           <span>{shareToast}</span>
         </div>
       )}
 
       {/* Lobby Join Modal */}
       {inLobby ? (
-        <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleJoin} className="bg-white w-full max-w-sm border-2 border-black p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-2.5 pb-2 border-b border-black">
+        <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <form onSubmit={handleJoin} className="bg-white w-full max-w-sm border-2 border-black p-6 space-y-4 shadow-xl">
+            <div className="flex items-center gap-3 pb-3 border-b border-black">
+              {/* AlphaBrain Neural Logo SVG */}
               <svg className="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="6" cy="20" r="2.5" fill="#000000"/>
                 <circle cx="15" cy="11" r="2.5" fill="#000000"/>
@@ -370,7 +576,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
 
             <div>
               <h1 className="font-headline text-base font-bold text-black">Join Meeting</h1>
-              <p className="text-[11px] text-neutral-500 mt-0.5">LiveKit WebRTC meeting with Eva voice assistant.</p>
+              <p className="text-xs text-neutral-500 mt-1">LiveKit WebRTC meeting room with Eva voice participant.</p>
             </div>
 
             <label className="block text-xs font-semibold text-neutral-700">
@@ -401,7 +607,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               <input
                 id="api-token-input"
                 type="password"
-                placeholder="Founder token"
+                placeholder="Founder bearer token"
                 value={apiToken}
                 onChange={(e) => setApiToken(e.target.value)}
                 className="mt-1 w-full border border-black px-3 py-1.5 text-xs text-black focus:outline-none focus:ring-1 focus:ring-black"
@@ -438,7 +644,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             </label>
 
             {joinError && (
-              <p id="join-error" className="text-xs text-[#E6391E] border border-[#E6391E] p-1.5" role="alert">
+              <p id="join-error" className="text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert">
                 {joinError}
               </p>
             )}
@@ -454,46 +660,23 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         </div>
       ) : (
         <>
-          {/* Top Header Navigation */}
+          {/* Top Header Navigation (Mobile Compact) */}
           <header className={`h-14 border-b ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-4 shrink-0 z-30`}>
-            {/* Left Logo & Title */}
             <div className="flex items-center gap-2">
-              <svg className="w-6 h-6" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="6" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="15" cy="11" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="15" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="15" cy="29" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="25" cy="14" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="25" cy="26" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
-                <line x1="6" y1="20" x2="15" y2="11" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="6" y1="20" x2="15" y2="20" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="6" y1="20" x2="15" y2="29" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="11" x2="25" y2="14" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="20" x2="25" y2="14" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="20" x2="25" y2="26" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="29" x2="25" y2="26" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
-                <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
-              </svg>
-              <span className={`font-headline text-lg font-bold tracking-tight ${darkMode ? 'text-white' : 'text-black'}`}>AlphaBrain</span>
+              <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse"></span>
+              <span className="font-headline font-bold text-sm tracking-tight">AlphaBrain</span>
             </div>
 
-            {/* Right Status & Actions */}
             <div className="flex items-center gap-3">
-              <div className="font-mono text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
-                <span>LIVE</span>
-              </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5 text-xs font-mono">
                 <Users className="w-3.5 h-3.5" />
-                <span id="participant-count" className="font-mono text-xs font-semibold">{participantCount}</span>
+                <span id="participant-count">{participantCount}</span>
               </div>
               <button
                 id="header-invite-btn"
                 type="button"
                 onClick={copyInviteLink}
-                className="p-1 hover:bg-neutral-100 transition-colors"
+                className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                 title="Share Invite"
               >
                 <Share2 className="w-4 h-4" />
@@ -501,139 +684,165 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             </div>
           </header>
 
-          {/* Main Stage Grid Area */}
-          <main className="flex-1 flex flex-col p-3 overflow-hidden relative">
-            <div id="stage-grid" className={`${stageLayoutClass} flex-1`}>
-              {/* Tile 1: Founder (Local) */}
-              <div id="local-tile" className="video-tile-container relative flex items-center justify-center bg-black min-h-[160px]">
-                {cameraEnabled ? (
-                  <video ref={localVideoRef} id="local-video" className="w-full h-full object-cover" autoPlay playsInline muted />
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-white/50">
-                    <div className="w-14 h-14 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center">
-                      <Users className="w-7 h-7 text-white/60" />
+          {/* Main Stage */}
+          <main className="flex-1 flex flex-col overflow-hidden relative">
+            <div className="flex-1 p-3 overflow-hidden">
+              <div id="stage-grid" className={stageLayoutClass}>
+                {/* Tile 1: Founder (Local) */}
+                <div id="local-tile" className="video-tile-container relative flex items-center justify-center bg-black">
+                  <video
+                    ref={localVideoRef}
+                    id="local-video"
+                    className={`w-full h-full object-cover ${cameraEnabled ? 'block' : 'hidden'}`}
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                  {!cameraEnabled && (
+                    <div className="flex flex-col items-center justify-center text-white/50">
+                      <div className="w-14 h-14 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center">
+                        <Users className="w-7 h-7 text-white/60" />
+                      </div>
+                      <span className="font-mono text-[10px] mt-2 uppercase tracking-wider text-neutral-400">Camera Off</span>
                     </div>
-                    <span className="font-mono text-[10px] mt-2 uppercase tracking-wider text-neutral-400">Camera Off</span>
-                  </div>
-                )}
+                  )}
 
-                {/* Screen Share Floating PIP Card */}
-                {isScreenSharing && (
-                  <div id="screen-share-stage" className="absolute bottom-4 left-4 w-48 pip-share-card p-2 z-20">
-                    <div className="flex items-center justify-between border-b border-black/10 pb-1 mb-1">
-                      <span className="font-mono text-[8px] uppercase font-bold text-black">SCREEN SHARE</span>
-                      <span className="font-mono text-[8px] uppercase font-bold text-[#E6391E] flex items-center gap-0.5">
-                        <span className="w-1 h-1 rounded-full bg-[#E6391E] animate-ping"></span>
-                        LIVE
-                      </span>
+                  {/* Screen Share Floating PIP Card */}
+                  {isScreenSharing && (
+                    <div id="screen-share-stage" className="absolute bottom-4 left-4 w-48 pip-share-card p-2 z-20">
+                      <div className="flex items-center justify-between border-b border-black/10 pb-1 mb-1">
+                        <span className="font-mono text-[8px] uppercase font-bold text-black">SCREEN</span>
+                        <span className="font-mono text-[8px] uppercase font-bold text-[#E6391E] flex items-center gap-1">
+                          <span className="w-1 h-1 rounded-full bg-[#E6391E] animate-ping"></span>
+                          LIVE
+                        </span>
+                      </div>
+                      <div className="relative mb-1.5 w-full h-16 bg-black overflow-hidden border border-black/10">
+                        <video
+                          ref={screenVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div id="slide-content" className="flex items-center justify-between">
+                        <div className="text-[9px] font-mono text-black font-bold">Sharing</div>
+                        <button
+                          id="stage-screen-btn"
+                          type="button"
+                          onClick={toggleScreenShare}
+                          className="border border-black text-[7px] font-mono font-bold uppercase py-0.5 px-1.5 hover:bg-black hover:text-white"
+                        >
+                          STOP
+                        </button>
+                      </div>
                     </div>
-                    <div id="slide-content" className="flex items-center justify-between">
-                      <div className="text-[9px] font-mono text-black font-bold">Screen active</div>
-                      <button
-                        id="stage-screen-btn"
-                        type="button"
-                        onClick={toggleScreenShare}
-                        className="border border-black text-[7px] font-mono font-bold uppercase py-0.5 px-1.5 hover:bg-black hover:text-white"
-                      >
-                        STOP
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Speaker Name Tag */}
-                <div className="speaker-badge">
-                  <span className={`w-1.5 h-1.5 rounded-full ${micMuted ? 'bg-neutral-400' : 'bg-[#E6391E] animate-pulse'}`}></span>
-                  <span id="local-name">{identity}</span>
+                  <div className="speaker-badge">
+                    <span className={`w-1.5 h-1.5 rounded-full ${micMuted ? 'bg-neutral-400' : 'bg-[#E6391E] animate-pulse'}`}></span>
+                    <span id="local-name">{identity}</span>
+                  </div>
                 </div>
+
+                {/* Tile 2: Eva AI Architect */}
+                <div id="eva-tile" className="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center">
+                  {evaSpeaking && (
+                    <div id="eva-wave" className="absolute top-3 right-3 z-10">
+                      <div className="active-wave">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col items-center gap-2 text-neutral-400">
+                    <div className="w-12 h-12 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
+                      <Volume2 className="w-6 h-6 text-[#E6391E]" />
+                    </div>
+                    <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
+                      Gemini Live Voice Active
+                    </div>
+                  </div>
+
+                  <div className="speaker-badge">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
+                    <span id="eva-status-text">Eva (AI Architect)</span>
+                  </div>
+                </div>
+
+                {/* Remote Participants */}
+                {hasRemoteClient && (
+                  <div id="remote-stack" className="flex flex-col gap-2 h-full">
+                    <div id="remote-human-tile" className="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+                      <div id="remote-human-placeholder" className="text-white/40 flex flex-col items-center">
+                        <Users className="w-8 h-8" />
+                      </div>
+                      <div className="speaker-badge">
+                        <span id="remote-human-name">{remoteClientName}</span>
+                        <Mic className="w-2.5 h-2.5 text-white/60 ml-1" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Tile 2: Eva AI Architect */}
-              <div id="eva-tile" className="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center min-h-[160px]">
-                {/* Active Waveform Indicator */}
-                {evaSpeaking && (
-                  <div id="eva-wave" className="absolute top-3 right-3 z-10">
-                    <div className="active-wave">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-col items-center gap-2 text-neutral-400">
-                  <div className="w-12 h-12 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
-                    <Volume2 className="w-6 h-6 text-[#E6391E]" />
-                  </div>
-                  <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
-                    Gemini Live Voice Active
-                  </div>
-                </div>
-
-                <div className="speaker-badge">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
-                  <span id="eva-status-text">Eva (AI Architect)</span>
-                </div>
-              </div>
-
-              {/* Remote Participants Stack */}
-              {hasRemoteClient && (
-                <div id="remote-stack" className="flex flex-col gap-2">
-                  <div id="remote-human-tile" className="video-tile-container relative bg-neutral-900 flex items-center justify-center min-h-[100px]">
-                    <Users className="w-8 h-8 text-white/40" />
-                    <div className="speaker-badge">
-                      <span id="remote-human-name">{remoteClientName}</span>
-                      <Mic className="w-2.5 h-2.5 text-white/60 ml-1" />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Live Notes / Drawer Overlay for Mobile */}
+            {/* Mobile Drawer (Slide-up Overlay) */}
             {drawerOpen && (
-              <div className="absolute inset-0 z-40 bg-white flex flex-col border-t-2 border-black animate-screen-enter">
-                <div className="p-3 border-b border-black flex items-center justify-between bg-neutral-50">
-                  <h2 className="font-mono text-xs uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <div className="absolute inset-x-0 bottom-0 top-1/4 z-40 bg-white dark:bg-neutral-900 border-t-2 border-black flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
+                <div className="p-3 border-b border-black dark:border-neutral-800 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-[#E6391E]" />
-                    <span>LIVE NOTES // PCM 24kHz</span>
-                  </h2>
-                  <button onClick={() => setDrawerOpen(false)} className="p-1 hover:bg-neutral-200">
-                    <X className="w-4 h-4" />
-                  </button>
+                    <span className="font-mono text-xs uppercase font-bold tracking-wider">LIVE NOTES</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[9px] text-neutral-400">PCM 24kHz</span>
+                    <button onClick={() => setDrawerOpen(false)} className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div ref={transcriptListRef} id="transcript-list" className="flex-1 overflow-y-auto divide-y divide-black/10 p-3 space-y-2 text-xs">
                   {transcripts.map((item) => (
                     <div key={item.id} className="pt-2 text-left space-y-1">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
+                      <div className="flex items-center justify-between text-[9px] font-mono text-neutral-400">
                         <span className="font-bold text-[#E6391E]">{item.speaker}</span>
                         <span>{item.time}</span>
                       </div>
-                      <p className="font-sans leading-relaxed text-[#0A0A0A] font-medium">{item.text}</p>
-                      {liveTranslateEnabled && item.translatedText && (
-                        <p className="font-mono text-[10px] text-neutral-500 italic bg-neutral-50 p-1 border border-neutral-200">
-                          {item.translatedText}
+                      <p className={`font-sans leading-relaxed font-medium ${darkMode ? 'text-neutral-100' : 'text-[#0A0A0A]'}`}>{item.text}</p>
+                      {liveTranslateEnabled && (
+                        <p className={`font-mono text-[10px] italic p-1 border ${
+                          darkMode ? 'bg-neutral-800 border-neutral-700 text-neutral-300' : 'bg-neutral-50 border-neutral-200 text-neutral-600'
+                        }`}>
+                          {getTranslatedLine(item, selectedLanguage)}
                         </p>
                       )}
                     </div>
                   ))}
                 </div>
 
-                <div className="p-2 border-t border-black bg-neutral-50">
-                  <form onSubmit={handleSendChat} id="chat-form" className="flex gap-1.5">
+                <div className="p-3 border-t border-black dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950">
+                  <form onSubmit={handleSendChat} id="chat-form" className="flex gap-2">
                     <input
                       id="chat-input"
                       type="text"
-                      placeholder="Type message or ask Eva..."
+                      placeholder="Ask Eva..."
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      className="flex-1 border border-black px-2.5 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black bg-white"
+                      className={`flex-1 border px-2.5 py-1 text-xs font-mono focus:outline-none ${
+                        darkMode ? 'border-neutral-700 bg-neutral-900 text-white' : 'border-black bg-white text-black'
+                      }`}
                     />
                     <button
                       type="submit"
-                      className="border border-black px-3 py-1.5 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800"
+                      className={`border px-3 py-1 text-xs font-mono font-bold transition-colors ${
+                        darkMode ? 'border-neutral-700 bg-neutral-800 text-white' : 'border-black bg-black text-white'
+                      }`}
                     >
                       ADD
                     </button>
@@ -643,16 +852,15 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             )}
           </main>
 
-          {/* Bottom Bar Control Strip */}
+          {/* Bottom Bar Controls Strip (Mobile Optimized) */}
           <footer className={`h-16 border-t ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-3 shrink-0 z-30`}>
-            {/* Scrollable / Compact Control Button Group */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
               <button
                 id="mic-btn"
                 type="button"
                 onClick={toggleMic}
-                className={`control-btn-circle !w-9 !h-9 ${micMuted ? 'active' : ''}`}
-                title="Mute / Unmute Mic"
+                className={`control-btn-circle ${micMuted ? 'active' : ''}`}
+                title="Mute / Unmute"
               >
                 {micMuted ? <MicOff className="w-4 h-4 text-neutral-600" /> : <Mic className="w-4 h-4" />}
               </button>
@@ -661,8 +869,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 id="cam-btn"
                 type="button"
                 onClick={toggleCamera}
-                className={`control-btn-circle !w-9 !h-9 ${cameraEnabled ? 'active' : ''}`}
-                title="Turn Camera On / Off"
+                className={`control-btn-circle ${cameraEnabled ? 'active' : ''}`}
+                title="Toggle Camera"
               >
                 {cameraEnabled ? <Video className="w-4 h-4 text-[#E6391E]" /> : <VideoOff className="w-4 h-4" />}
               </button>
@@ -671,8 +879,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 id="transcript-btn"
                 type="button"
                 onClick={() => setDrawerOpen(!drawerOpen)}
-                className={`control-btn-circle !w-9 !h-9 ${drawerOpen ? 'active' : ''}`}
-                title="Live Notes Drawer"
+                className={`control-btn-circle ${drawerOpen ? 'active' : ''}`}
+                title="Toggle Notes"
               >
                 <MessageSquare className="w-4 h-4" />
               </button>
@@ -681,8 +889,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 id="prompt-eva-btn"
                 type="button"
                 onClick={handlePromptEva}
-                className="control-btn-circle !w-9 !h-9 hover:text-[#E6391E]"
-                title="Ask Eva"
+                className="control-btn-circle hover:text-[#E6391E]"
+                title="Prompt Eva"
               >
                 <Hand className="w-4 h-4" />
               </button>
@@ -691,8 +899,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 id="screen-btn"
                 type="button"
                 onClick={toggleScreenShare}
-                className={`control-btn-circle !w-9 !h-9 ${isScreenSharing ? 'active' : ''}`}
-                title="Present Screen"
+                className={`control-btn-circle ${isScreenSharing ? 'active' : ''}`}
+                title="Share Screen"
               >
                 <MonitorUp className="w-4 h-4" />
               </button>
@@ -701,7 +909,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 id="footer-invite-btn"
                 type="button"
                 onClick={copyInviteLink}
-                className="control-btn-circle !w-9 !h-9"
+                className="control-btn-circle"
                 title="Invite"
               >
                 <Share2 className="w-4 h-4" />
@@ -710,9 +918,9 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               <button
                 id="dark-mode-btn"
                 type="button"
-                onClick={() => setDarkMode(!darkMode)}
-                className="control-btn-circle !w-9 !h-9"
-                title="Theme"
+                onClick={toggleDarkMode}
+                className="control-btn-circle"
+                title="Toggle Theme"
               >
                 {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
@@ -721,30 +929,26 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 id="language-btn"
                 type="button"
                 onClick={() => setLanguageModalOpen(!languageModalOpen)}
-                className="control-btn-circle !w-9 !h-9"
+                className="control-btn-circle"
                 title="Language"
               >
                 <Languages className="w-4 h-4" />
               </button>
 
-              {/* End Call Red Button */}
               <button
                 id="end-call-btn"
                 type="button"
                 onClick={handleEndCall}
-                className="control-btn-endcall !h-9 !px-3 !text-[10px]"
+                className="control-btn-endcall"
                 title="End Call"
               >
-                <PhoneOff className="w-3.5 h-3.5" />
-                <span>END</span>
+                <PhoneOff className="w-4 h-4" />
+                <span className="hidden sm:inline">END</span>
               </button>
             </div>
 
-            {/* Timer Right */}
-            <div className="flex items-center pl-2 shrink-0">
-              <div id="session-timer" className="font-mono text-xs font-semibold">
-                {formatTime(timerSeconds)}
-              </div>
+            <div id="session-timer" className="font-mono text-xs font-semibold pl-2 whitespace-nowrap">
+              {formatTime(timerSeconds)}
             </div>
           </footer>
 
@@ -753,8 +957,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white border-2 border-black p-5 w-full max-w-xs space-y-3 shadow-xl">
                 <div className="flex items-center justify-between border-b border-black pb-2">
-                  <h3 className="font-headline font-bold text-xs text-black">Select Audio Language</h3>
-                  <button onClick={() => setLanguageModalOpen(false)} className="text-neutral-500 hover:text-black">
+                  <h3 className="font-headline font-bold text-xs text-black">Audio Language</h3>
+                  <button onClick={() => setLanguageModalOpen(false)} className="text-neutral-500">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -766,10 +970,10 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                         setSelectedLanguage(lang.code);
                         setLanguageModalOpen(false);
                       }}
-                      className={`text-left px-2.5 py-1.5 text-xs font-mono flex items-center justify-between border transition-colors ${
+                      className={`text-left px-2.5 py-1.5 text-xs font-mono flex items-center justify-between border ${
                         selectedLanguage === lang.code
                           ? 'border-[#E6391E] bg-[#E6391E]/10 font-bold text-[#E6391E]'
-                          : 'border-neutral-200 hover:border-black text-black'
+                          : 'border-neutral-200 text-black'
                       }`}
                     >
                       <span>{lang.name}</span>
@@ -777,14 +981,14 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                     </button>
                   ))}
                 </div>
-                <label className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-700 pt-2 border-t border-neutral-200">
+                <label className="flex items-center gap-2 text-xs font-mono text-neutral-700 pt-2 border-t border-neutral-200">
                   <input
                     type="checkbox"
                     checked={liveTranslateEnabled}
                     onChange={(e) => setLiveTranslateEnabled(e.target.checked)}
                     className="accent-black"
                   />
-                  Live Translation Active
+                  Live Translation
                 </label>
               </div>
             </div>
