@@ -26,7 +26,7 @@ export const SplashScreen: React.FC<Props> = ({ onContinue }) => {
       <div className="flex flex-col items-center justify-center -mt-12">
         <div className="w-56 h-56 flex items-center justify-center mb-6">
           <img
-            src="/alpha_symbol.svg"
+            src="/alphabrain_logo.svg"
             alt="AlphaBrain 3D Neural Wireframe"
             className="w-52 h-52 object-contain animate-logo-breathe"
           />

@@ -48,7 +48,7 @@ export const App: React.FC = () => {
           {/* Brand Mark */}
           <div className="flex items-center gap-3 shrink-0 mr-4">
             <img
-              src="/alpha_symbol.svg"
+              src="/alphabrain_logo.svg"
               alt="AlphaBrain Logo"
               className="w-7 h-7 object-contain"
             />
@@ -88,7 +88,7 @@ export const App: React.FC = () => {
           <div className="p-4 border-b border-[#0A0A0A] bg-white space-y-3">
             <div className="flex items-center gap-3">
               <img
-                src="/alpha_symbol.svg"
+                src="/alphabrain_logo.svg"
                 alt="AlphaBrain Logo"
                 className="w-8 h-8 object-contain"
               />
@@ -165,7 +165,7 @@ export const App: React.FC = () => {
             </div>
             <div className="flex items-center justify-between gap-2 p-2 bg-neutral-50 border border-neutral-200">
               <img
-                src="/alpha_symbol.svg"
+                src="/alphabrain_logo.svg"
                 alt="AlphaBrain Logo"
                 className="w-6 h-6 object-contain"
               />
