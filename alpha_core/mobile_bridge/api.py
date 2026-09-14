@@ -242,7 +242,9 @@ async def sse_event_stream(request: Request) -> StreamingResponse:
 
 
 @router.get("/dashboard", response_model=DashboardScreenData)
-async def get_dashboard() -> DashboardScreenData:
+async def get_dashboard(
+    principal: AuthPrincipal = Depends(require_api_principal),
+) -> DashboardScreenData:
     """Dashboard Screen: Real production mission kernel and system metrics."""
     return get_service().get_dashboard_data()
 
@@ -250,13 +252,16 @@ async def get_dashboard() -> DashboardScreenData:
 @router.get("/command-node", response_model=CommandNodeScreenData)
 async def get_command_node(
     node_id: str | None = Query(default=None, description="Optional node ID filter"),
+    principal: AuthPrincipal = Depends(require_api_principal),
 ) -> CommandNodeScreenData:
     """Command Node Screen: Real production execution node telemetry, tasks, and system logs."""
     return get_service().get_command_node_data(node_id=node_id)
 
 
 @router.get("/security-enclave", response_model=SecurityEnclaveScreenData)
-async def get_security_enclave() -> SecurityEnclaveScreenData:
+async def get_security_enclave(
+    principal: AuthPrincipal = Depends(require_api_principal),
+) -> SecurityEnclaveScreenData:
     """Security Enclave Screen: Real production API key vault, trusted devices, and node fingerprint."""
     return get_service().get_security_enclave_data()
 
