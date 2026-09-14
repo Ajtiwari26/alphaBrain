@@ -9,6 +9,10 @@ edition = "2021"
 name = "alphabrain_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "alphabrain-desktop"
+path = "src/main.rs"
+
 # Tauri 2.0 compile-time build dependencies
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
