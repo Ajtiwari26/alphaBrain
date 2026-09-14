@@ -224,3 +224,99 @@ class ExecutiveOverview(BaseModel):
     active_sprint_workers: int
     recent_deployments_count: int
     eva_status: str = "active"
+
+
+class DashboardScreenData(BaseModel):
+    system_status: str = "operational"
+    emergency_stop: EmergencyStopState
+    telemetry: HardwareTelemetry
+    ai_quotas_summary: str = "100% AVAILABLE"
+    ai_quotas_percent: float = 100.0
+    active_projects_count: int = 0
+    tech_dept_agents_count: int = 0
+    triage_pending_count: int = 0
+    worktrees_count: int = 0
+    worktrees_summary: str = "Active"
+    hardware_sync_serial: str = "10BF5P2AZF0010T"
+
+
+class CommandNodeMetrics(BaseModel):
+    cpu_usage: float
+    memory_used_mb: float
+    memory_total_mb: float
+    disk_used_gb: float
+    disk_total_gb: float
+    uptime_seconds: float
+    active_workers: int
+
+
+class CommandNodeTask(BaseModel):
+    id: str
+    title: str
+    priority: str = "P0"
+    branch: str = ""
+    status: str = "running"
+    duration: str = "--"
+
+
+class CommandNodeLog(BaseModel):
+    id: str
+    timestamp: str
+    stream: str = "system"
+    text: str
+
+
+class CommandNodeScreenData(BaseModel):
+    node_id: str
+    hostname: str
+    cluster_name: str
+    status: str
+    metrics: CommandNodeMetrics
+    active_tasks: list[CommandNodeTask]
+    logs: list[CommandNodeLog]
+
+
+class ApiVaultItem(BaseModel):
+    id: str
+    name: str
+    key_alias: str
+    masked_value: str
+    last_used: str = "Active"
+    in_keychain: bool = True
+    is_configured: bool = True
+
+
+class TrustedDevice(BaseModel):
+    id: str
+    name: str
+    platform: str
+    sas_code: str
+    paired_at: str
+    status: str = "active"
+
+
+class SecurityEnclaveScreenData(BaseModel):
+    node_key_fingerprint: str
+    is_locked: bool = False
+    vault_items: list[ApiVaultItem]
+    devices: list[TrustedDevice]
+    emergency_stop_active: bool = False
+
+
+class MeetingSetupScreenData(BaseModel):
+    room_name: str
+    livekit_url: str
+    token: str
+    participant_identity: str
+    audio_codec: str = "opus"
+    sample_rate: int = 48000
+    audio_active: bool = True
+    video_active: bool = False
+    status: str = "ready"
+
+
+class MeetingTokenResponse(BaseModel):
+    token: str
+    room_name: str
+    expires_in_seconds: int = 3600
+

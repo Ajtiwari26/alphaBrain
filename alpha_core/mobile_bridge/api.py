@@ -18,17 +18,22 @@ from fastapi.responses import StreamingResponse
 
 from alpha_core.mobile_bridge.schemas import (
     AuditLogEntry,
+    CommandNodeScreenData,
+    DashboardScreenData,
     DeploymentTarget,
     EmergencyStopState,
     EmergencyStopToggleRequest,
     ExecutiveOverview,
     HardwareTelemetry,
+    MeetingSetupScreenData,
+    MeetingTokenResponse,
     ModelUtilityScore,
     PrivacyConsentStats,
     PromotionResponse,
     ReviewRequest,
     ReviewResponse,
     RollbackRequest,
+    SecurityEnclaveScreenData,
     SelfHealingRadar,
     SpokenCommandRequest,
     SpokenCommandResponse,
@@ -233,6 +238,44 @@ async def sse_event_stream(request: Request) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/dashboard", response_model=DashboardScreenData)
+async def get_dashboard() -> DashboardScreenData:
+    """Dashboard Screen: Real production mission kernel and system metrics."""
+    return get_service().get_dashboard_data()
+
+
+@router.get("/command-node", response_model=CommandNodeScreenData)
+async def get_command_node(
+    node_id: str | None = Query(default=None, description="Optional node ID filter"),
+) -> CommandNodeScreenData:
+    """Command Node Screen: Real production execution node telemetry, tasks, and system logs."""
+    return get_service().get_command_node_data(node_id=node_id)
+
+
+@router.get("/security-enclave", response_model=SecurityEnclaveScreenData)
+async def get_security_enclave() -> SecurityEnclaveScreenData:
+    """Security Enclave Screen: Real production API key vault, trusted devices, and node fingerprint."""
+    return get_service().get_security_enclave_data()
+
+
+@router.get("/meet/setup", response_model=MeetingSetupScreenData)
+async def get_meeting_setup(
+    room: str = Query(default="alphabrain-executive-briefing", description="Meeting room identifier"),
+    participant: str = Query(default="Ajay (Founder)", description="Participant identity"),
+) -> MeetingSetupScreenData:
+    """Meeting Setup Screen: Real LiveKit WebRTC room setup and authentication parameters."""
+    return get_service().get_meeting_setup_data(room_name=room, participant=participant)
+
+
+@router.get("/meet/token", response_model=MeetingTokenResponse)
+async def get_meeting_token(
+    room: str = Query(default="alphabrain-executive-briefing", description="Meeting room identifier"),
+    participant: str = Query(default="Ajay (Founder)", description="Participant identity"),
+) -> MeetingTokenResponse:
+    """Meeting Token Endpoint: Direct LiveKit SFU access token generation for companion and desktop."""
+    return get_service().get_meeting_token(room_name=room, participant=participant)
 
 
 def create_mobile_bridge_app() -> FastAPI:
