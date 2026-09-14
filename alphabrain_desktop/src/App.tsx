@@ -133,7 +133,7 @@ export const App: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => setCurrentScreen(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 border transition-all text-left ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 border transition-all text-left btn-tactile ${
                     isActive
                       ? 'bg-[#0A0A0A] text-white border-[#0A0A0A] font-bold shadow-sm'
                       : 'bg-white text-neutral-700 border-neutral-200 hover:border-[#0A0A0A] hover:bg-neutral-100'
@@ -184,7 +184,7 @@ export const App: React.FC = () => {
         </aside>
 
         {/* Main Screen Content View */}
-        <main className="flex-1 overflow-y-auto bg-white">
+        <main className="flex-1 overflow-y-auto bg-white transition-smooth">
           {currentScreen === 'M01_NodeSetup' && <M01_NodeSetup onNavigate={setCurrentScreen} />}
           {currentScreen === 'M02_PairingStation' && <M02_PairingStation onNavigate={setCurrentScreen} />}
           {currentScreen === 'M03_CommandNode' && <M03_CommandNode onNavigate={setCurrentScreen} />}

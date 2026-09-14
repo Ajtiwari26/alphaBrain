@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { mobileApi } from '../api/client';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonList } from '../components/ui/Skeleton';
 
 interface Props {
   onMergeSuccess?: (branch: string) => void;
@@ -30,7 +32,7 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess }) => {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
+    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh] animate-screen-enter">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
           GIT INTEGRATION // ISOLATED WORKTREES
@@ -42,8 +44,11 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess }) => {
 
       <div className="flex-1 flex flex-col divide-y divide-[#0A0A0A] my-4 overflow-y-auto max-h-[60vh]">
         {loading ? (
-          <div className="p-8 text-center font-mono text-xs text-zinc-400">
-            Querying active git worktrees...
+          <div className="space-y-4">
+            <div className="p-4 flex items-center justify-center bg-zinc-50 border border-zinc-200">
+              <LoadingSpinner size="md" label="Querying active git worktrees..." />
+            </div>
+            <SkeletonList rows={4} />
           </div>
         ) : worktrees.length === 0 ? (
           <div className="p-8 text-center font-mono text-xs text-zinc-400">
@@ -55,7 +60,7 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess }) => {
             return (
               <div
                 key={wt.path}
-                className="py-4 px-1 flex items-center justify-between hover:bg-zinc-50 transition-colors"
+                className="py-4 px-1 flex items-center justify-between hover:bg-zinc-50 card-tactile hover-lift transition-smooth cursor-pointer"
               >
                 <div className="flex-1 min-w-0 pr-3">
                   <span className="font-bold text-sm block truncate text-[#0A0A0A]">
@@ -71,7 +76,7 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess }) => {
                   </div>
                 </div>
                 <span
-                  className={`font-mono text-[10px] font-bold border px-2 py-0.5 whitespace-nowrap ${
+                  className={`font-mono text-[10px] font-bold border px-2 py-0.5 whitespace-nowrap transition-smooth ${
                     isMain
                       ? 'border-[#0A0A0A] text-zinc-600 bg-zinc-100'
                       : 'border-[#E6391E] text-[#E6391E] bg-white'

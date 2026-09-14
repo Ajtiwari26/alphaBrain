@@ -29,6 +29,8 @@ import { LiveStreamScreen } from './screens/LiveStreamScreen';
 import { DeploymentsScreen } from './screens/DeploymentsScreen';
 import { ProjectsScreen } from './screens/ProjectsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { LoadingSpinner } from './components/ui/LoadingSpinner';
+import { SkeletonCard, SkeletonList } from './components/ui/Skeleton';
 
 type SessionStage = 'splash' | 'auth' | 'instance_sync' | 'authenticated';
 
@@ -296,6 +298,15 @@ export function App() {
         {currentScreen === 'overview' && overview && (
           <DashboardScreen overview={overview} dashboardData={dashboardData} onNavigate={navigateTo} />
         )}
+        {currentScreen === 'overview' && !overview && (
+          <div className="space-y-4 animate-screen-enter">
+            <div className="p-4 border border-[#0A0A0A] bg-zinc-50 flex items-center justify-center">
+              <LoadingSpinner size="md" label="Initializing Mission Kernel..." />
+            </div>
+            <SkeletonCard />
+            <SkeletonList rows={4} />
+          </div>
+        )}
         {currentScreen === 'model_router' && <ModelRouterScreen />}
         {currentScreen === 'departments' && (
           <DepartmentsScreen onSelectDept={() => navigateTo('tech_dept')} />
@@ -326,7 +337,7 @@ export function App() {
         <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-[#0A0A0A] px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-center justify-around z-30">
           <button
             onClick={() => navigateTo('overview')}
-            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] btn-tactile hover-lift transition-smooth ${
               currentScreen === 'overview'
                 ? 'text-[#E6391E] font-bold'
                 : 'text-zinc-500 hover:text-[#0A0A0A]'
@@ -338,7 +349,7 @@ export function App() {
 
           <button
             onClick={() => navigateTo('triage')}
-            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] btn-tactile hover-lift transition-smooth ${
               currentScreen === 'triage'
                 ? 'text-[#E6391E] font-bold'
                 : 'text-zinc-500 hover:text-[#0A0A0A]'
@@ -350,7 +361,7 @@ export function App() {
 
           <button
             onClick={() => navigateTo('worktrees')}
-            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] btn-tactile hover-lift transition-smooth ${
               currentScreen === 'worktrees'
                 ? 'text-[#E6391E] font-bold'
                 : 'text-zinc-500 hover:text-[#0A0A0A]'
@@ -362,7 +373,7 @@ export function App() {
 
           <button
             onClick={() => navigateTo('model_router')}
-            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] btn-tactile hover-lift transition-smooth ${
               currentScreen === 'model_router'
                 ? 'text-[#E6391E] font-bold'
                 : 'text-zinc-500 hover:text-[#0A0A0A]'
@@ -374,7 +385,7 @@ export function App() {
 
           <button
             onClick={() => navigateTo('live_stream')}
-            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] btn-tactile hover-lift transition-smooth ${
               currentScreen === 'live_stream'
                 ? 'text-[#E6391E] font-bold'
                 : 'text-zinc-500 hover:text-[#0A0A0A]'
@@ -386,7 +397,7 @@ export function App() {
 
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex flex-col items-center gap-1 font-mono text-[10px] ${
+            className={`flex flex-col items-center gap-1 font-mono text-[10px] btn-tactile hover-lift transition-smooth ${
               menuOpen
                 ? 'text-[#E6391E] font-bold'
                 : 'text-zinc-500 hover:text-[#0A0A0A]'

@@ -319,3 +319,83 @@ body {
   0% { transform: scaleY(0.4); }
   100% { transform: scaleY(1); }
 }
+/* Smooth Transition Curves & Micro-Interactions */
+:root {
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(10, 10, 10, 0.08);
+}
+
+.hover-lift:active {
+  transform: translateY(0px) scale(0.98);
+}
+
+.hover-scale {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-scale:active {
+  transform: scale(0.97);
+}
+
+.hover-glow {
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-glow:hover {
+  border-color: #E6391E;
+  box-shadow: 0 0 0 1px #E6391E;
+}
+
+/* Skeleton Shimmer & Loading State Animations */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(240, 240, 240, 0.8) 0%,
+    rgba(250, 250, 250, 1) 50%,
+    rgba(240, 240, 240, 0.8) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s infinite ease-in-out;
+}
+
+/* Smooth Spinner Rotate Keyframes */
+@keyframes smooth-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-smooth {
+  animation: smooth-spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+

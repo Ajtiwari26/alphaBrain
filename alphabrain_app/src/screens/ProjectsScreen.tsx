@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { mobileApi } from '../api/client';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonList } from '../components/ui/Skeleton';
 
 interface ProjectItem {
   name: string;
@@ -26,7 +28,7 @@ export const ProjectsScreen: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
+    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh] animate-screen-enter">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
           PORTFOLIO // DESKTOP WORKSPACES
@@ -38,8 +40,11 @@ export const ProjectsScreen: React.FC = () => {
 
       <div className="flex-1 flex flex-col divide-y divide-[#0A0A0A] my-4 overflow-y-auto max-h-[60vh]">
         {loading ? (
-          <div className="p-8 text-center font-mono text-xs text-zinc-400">
-            Scanning local repositories...
+          <div className="space-y-4">
+            <div className="p-4 flex items-center justify-center bg-zinc-50 border border-zinc-200">
+              <LoadingSpinner size="md" label="Scanning local repositories..." />
+            </div>
+            <SkeletonList rows={4} />
           </div>
         ) : projects.length === 0 ? (
           <div className="p-8 text-center font-mono text-xs text-zinc-400">
@@ -58,14 +63,14 @@ export const ProjectsScreen: React.FC = () => {
             return (
               <div
                 key={p.name}
-                className="py-4 px-1 flex flex-col justify-between hover:bg-zinc-50 cursor-pointer transition-colors"
+                className="py-4 px-1 flex flex-col justify-between hover:bg-zinc-50 cursor-pointer card-tactile hover-lift transition-smooth"
               >
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-headline font-bold text-[#0A0A0A]">
                     {p.name}
                   </h3>
                   <span
-                    className={`w-2.5 h-2.5 rounded-full ${
+                    className={`w-2.5 h-2.5 rounded-full transition-transform duration-200 ${
                       p.is_active ? 'bg-[#E6391E] animate-pulse' : 'bg-zinc-300'
                     }`}
                   />

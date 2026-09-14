@@ -27,6 +27,16 @@ export default {
         display: ['"Space Grotesk"', 'sans-serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
+      transitionTimingFunction: {
+        'spring': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'bounce': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      },
+      animation: {
+        'shimmer': 'skeleton-shimmer 1.8s infinite ease-in-out',
+        'spin-smooth': 'smooth-spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+        'screen-enter': 'screen-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+      },
     },
   },
   plugins: [],

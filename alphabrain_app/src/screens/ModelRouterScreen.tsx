@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { mobileApi } from '../api/client';
 import { ModelUtilityScore } from '../types';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonCard, SkeletonList } from '../components/ui/Skeleton';
 
 export const ModelRouterScreen: React.FC = () => {
   const [scores, setScores] = useState<ModelUtilityScore[]>([]);
@@ -22,7 +24,7 @@ export const ModelRouterScreen: React.FC = () => {
   const activeAccount = scores.find((s) => s.account_name.includes('[ACTIVE]')) || scores[0];
 
   return (
-    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
+    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh] animate-screen-enter">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
           TELEMETRY // MULTI-ACCOUNT OC-EDS SCHEDULER
@@ -33,8 +35,10 @@ export const ModelRouterScreen: React.FC = () => {
       </div>
 
       {/* Active Account Overview Hero */}
-      {activeAccount && (
-        <div className="border border-[#0A0A0A] p-4 my-3 bg-zinc-50">
+      {loading ? (
+        <SkeletonCard />
+      ) : activeAccount ? (
+        <div className="border border-[#0A0A0A] p-4 my-3 bg-zinc-50 hover-lift transition-smooth">
           <div className="flex items-center justify-between font-mono text-[10px] text-zinc-500 uppercase">
             <span>ACTIVE PROFILE</span>
             <span className="text-[#E6391E] font-bold">LIVE TELEMETRY</span>
@@ -57,13 +61,16 @@ export const ModelRouterScreen: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* 8 Real Accounts List */}
       <div className="flex-1 flex flex-col divide-y divide-[#0A0A0A] my-2 overflow-y-auto max-h-[45vh]">
         {loading ? (
-          <div className="p-8 text-center font-mono text-xs text-zinc-400">
-            Querying Google Cloud Code quota summaries...
+          <div className="space-y-4">
+            <div className="p-4 flex items-center justify-center bg-zinc-50 border border-zinc-200">
+              <LoadingSpinner size="md" label="Querying Google Cloud Code quota summaries..." />
+            </div>
+            <SkeletonList rows={4} />
           </div>
         ) : (
           scores.map((s, idx) => {
@@ -73,7 +80,7 @@ export const ModelRouterScreen: React.FC = () => {
             return (
               <div
                 key={s.email}
-                className={`py-3 px-2 flex items-center justify-between transition-colors ${
+                className={`py-3 px-2 flex items-center justify-between card-tactile hover-lift transition-smooth ${
                   isActive ? 'bg-zinc-100' : 'hover:bg-zinc-50'
                 }`}
               >

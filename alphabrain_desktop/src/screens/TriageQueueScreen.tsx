@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { desktopApi } from '../api/client';
 import { TaskSummary } from '../types';
 import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 interface Props {
   onSelectTask?: (taskId: string) => void;
@@ -68,7 +70,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-8 space-y-6">
+    <div className="max-w-7xl mx-auto p-8 space-y-6 animate-screen-enter">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-[#0A0A0A] pb-4">
         <div>
@@ -92,7 +94,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
         <div className="flex items-center gap-3">
           <button
             onClick={fetchTasks}
-            className="flex items-center gap-2 px-4 py-2 border border-[#0A0A0A] bg-white font-mono text-xs font-bold hover:bg-neutral-100 transition-all"
+            className="flex items-center gap-2 px-4 py-2 border border-[#0A0A0A] bg-white font-mono text-xs font-bold btn-tactile hover-lift transition-smooth hover:border-[#E6391E]"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#E6391E]' : ''}`} />
             <span>REFRESH QUEUE</span>
@@ -129,8 +131,11 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
         </div>
 
         {loading ? (
-          <div className="p-12 text-center font-mono text-xs text-neutral-400">
-            Querying SQLite triage queue...
+          <div className="space-y-4">
+            <div className="p-4 border-b border-neutral-100 flex items-center justify-center bg-neutral-50/50">
+              <LoadingSpinner size="md" label="Querying SQLite triage queue..." />
+            </div>
+            <SkeletonTable rows={5} />
           </div>
         ) : tasks.length === 0 ? (
           <div className="p-12 text-center font-mono text-xs text-neutral-400">
@@ -142,11 +147,12 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
               const isExecuting = t.status.toLowerCase().includes('execut') || t.status.toLowerCase().includes('coding');
               const isPending = t.status.toLowerCase().includes('pending');
               const isApproved = t.status.toLowerCase().includes('approved') || t.status.toLowerCase().includes('ready');
+              const isCurrentReviewing = reviewingId === t.task_id;
 
               return (
                 <div
                   key={t.task_id}
-                  className="grid grid-cols-12 px-6 py-4 items-center hover:bg-neutral-50 transition-colors"
+                  className="grid grid-cols-12 px-6 py-4 items-center hover:bg-neutral-50 transition-smooth hover:translate-x-1"
                 >
                   <div className="col-span-3 pr-4">
                     <span
@@ -177,7 +183,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
 
                   <div className="col-span-2 text-center">
                     <span
-                      className={`font-mono text-[11px] font-bold uppercase px-2.5 py-1 inline-block border ${
+                      className={`font-mono text-[11px] font-bold uppercase px-2.5 py-1 inline-block border transition-smooth ${
                         isExecuting
                           ? 'bg-[#0A0A0A] text-white border-[#0A0A0A]'
                           : isPending
@@ -193,22 +199,28 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
 
                   <div className="col-span-2 flex items-center justify-end gap-2">
                     {isPending ? (
-                      <>
-                        <button
-                          disabled={reviewingId === t.task_id}
-                          onClick={() => handleReview(t.task_id, 'approve')}
-                          className="px-3 py-1.5 border border-[#0A0A0A] bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[11px] font-bold transition-all"
-                        >
-                          APPROVE
-                        </button>
-                        <button
-                          disabled={reviewingId === t.task_id}
-                          onClick={() => handleReview(t.task_id, 'reject')}
-                          className="px-3 py-1.5 border border-[#0A0A0A] bg-white hover:bg-neutral-100 text-[#0A0A0A] font-mono text-[11px] font-bold transition-all"
-                        >
-                          REJECT
-                        </button>
-                      </>
+                      isCurrentReviewing ? (
+                        <div className="flex items-center gap-2 py-1 px-3 bg-neutral-50 border border-neutral-200">
+                          <LoadingSpinner size="sm" label="SAVING..." />
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            disabled={reviewingId !== null}
+                            onClick={() => handleReview(t.task_id, 'approve')}
+                            className="px-3 py-1.5 border border-[#0A0A0A] bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[11px] font-bold btn-tactile hover-lift transition-smooth"
+                          >
+                            APPROVE
+                          </button>
+                          <button
+                            disabled={reviewingId !== null}
+                            onClick={() => handleReview(t.task_id, 'reject')}
+                            className="px-3 py-1.5 border border-[#0A0A0A] bg-white hover:bg-neutral-100 text-[#0A0A0A] font-mono text-[11px] font-bold btn-tactile hover-lift transition-smooth"
+                          >
+                            REJECT
+                          </button>
+                        </>
+                      )
                     ) : isExecuting ? (
                       <span className="font-mono text-[11px] text-[#E6391E] font-bold flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-ping" />

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { desktopApi } from '../api/client';
 import { ProjectItem } from '../types';
 import { FolderGit2, RefreshCw, CheckCircle2, Clock } from 'lucide-react';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonTable } from '../components/ui/Skeleton';
 
 export const ProjectsScreen: React.FC = () => {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
@@ -26,7 +28,7 @@ export const ProjectsScreen: React.FC = () => {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto p-8 space-y-6">
+    <div className="max-w-7xl mx-auto p-8 space-y-6 animate-screen-enter">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-[#0A0A0A] pb-4">
         <div>
@@ -50,7 +52,7 @@ export const ProjectsScreen: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={fetchProjects}
-            className="flex items-center gap-2 px-4 py-2 border border-[#0A0A0A] bg-white font-mono text-xs font-bold hover:bg-neutral-100 transition-all"
+            className="flex items-center gap-2 px-4 py-2 border border-[#0A0A0A] bg-white font-mono text-xs font-bold btn-tactile hover-lift transition-smooth hover:border-[#E6391E]"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#E6391E]' : ''}`} />
             <span>REFRESH</span>
@@ -68,8 +70,11 @@ export const ProjectsScreen: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="p-12 text-center font-mono text-xs text-neutral-400">
-            Scanning local filesystem for git workspaces...
+          <div className="space-y-4">
+            <div className="p-4 border-b border-neutral-100 flex items-center justify-center bg-neutral-50/50">
+              <LoadingSpinner size="md" label="Scanning local filesystem for git workspaces..." />
+            </div>
+            <SkeletonTable rows={4} />
           </div>
         ) : projects.length === 0 ? (
           <div className="p-12 text-center font-mono text-xs text-neutral-400">
@@ -89,10 +94,10 @@ export const ProjectsScreen: React.FC = () => {
               return (
                 <div
                   key={p.name}
-                  className="grid grid-cols-12 px-6 py-4 items-center hover:bg-neutral-50 transition-colors"
+                  className="grid grid-cols-12 px-6 py-4 items-center hover:bg-neutral-50 transition-smooth hover:translate-x-1 cursor-pointer"
                 >
                   <div className="col-span-5 flex items-center gap-3">
-                    <div className="w-8 h-8 border border-[#0A0A0A] bg-neutral-100 flex items-center justify-center">
+                    <div className="w-8 h-8 border border-[#0A0A0A] bg-neutral-100 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
                       <FolderGit2 className="w-4 h-4 text-[#E6391E]" />
                     </div>
                     <div>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { mobileApi } from '../api/client';
 import { TaskSummary } from '../types';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonList } from '../components/ui/Skeleton';
 
 interface Props {
   onSelectTask?: (taskId: string) => void;
@@ -24,7 +26,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
+    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh] animate-screen-enter">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
           EXECUTION QUEUE // SQLITE TRIAGE ENGINE
@@ -36,8 +38,11 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
 
       <div className="flex-1 flex flex-col divide-y divide-[#0A0A0A] my-4 overflow-y-auto max-h-[60vh]">
         {loading ? (
-          <div className="p-8 text-center font-mono text-xs text-zinc-400">
-            Querying SQLite triage queue...
+          <div className="space-y-4">
+            <div className="p-4 flex items-center justify-center bg-zinc-50 border border-zinc-200">
+              <LoadingSpinner size="md" label="Querying SQLite triage queue..." />
+            </div>
+            <SkeletonList rows={5} />
           </div>
         ) : tasks.length === 0 ? (
           <div className="p-8 text-center font-mono text-xs text-zinc-400">
@@ -53,10 +58,10 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
               <div
                 key={t.task_id}
                 onClick={() => onSelectTask?.(t.task_id)}
-                className="py-4 px-1 flex items-center justify-between hover:bg-zinc-50 cursor-pointer transition-colors group"
+                className="py-4 px-1 flex items-center justify-between hover:bg-zinc-50 cursor-pointer card-tactile hover-lift transition-smooth group"
               >
                 <div className="flex-1 min-w-0 pr-3">
-                  <span className="font-mono text-xs text-zinc-400 block uppercase">
+                  <span className="font-mono text-xs text-zinc-400 block uppercase group-hover:text-[#E6391E] transition-colors">
                     {t.task_id}
                   </span>
                   <span className="font-medium text-sm text-[#0A0A0A] mt-0.5 block truncate">
@@ -64,7 +69,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
                   </span>
                 </div>
                 <span
-                  className={`font-mono text-xs font-bold uppercase whitespace-nowrap ${
+                  className={`font-mono text-xs font-bold uppercase whitespace-nowrap transition-smooth ${
                     isPending
                       ? 'text-[#E6391E]'
                       : isExecuting

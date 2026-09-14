@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { desktopApi } from '../api/client';
 import { ModelUtilityScore } from '../types';
 import { RefreshCw, Zap } from 'lucide-react';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonCard, SkeletonTable } from '../components/ui/Skeleton';
 
 export const ModelRouterScreen: React.FC = () => {
   const [scores, setScores] = useState<ModelUtilityScore[]>([]);
@@ -28,7 +30,7 @@ export const ModelRouterScreen: React.FC = () => {
   const activeAccount = scores.find((s) => s.account_name.includes('[ACTIVE]')) || scores[0];
 
   return (
-    <div className="max-w-7xl mx-auto p-8 space-y-6">
+    <div className="max-w-7xl mx-auto p-8 space-y-6 animate-screen-enter">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-[#0A0A0A] pb-4">
         <div>
@@ -52,7 +54,7 @@ export const ModelRouterScreen: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={fetchScores}
-            className="flex items-center gap-2 px-4 py-2 border border-[#0A0A0A] bg-white font-mono text-xs font-bold hover:bg-neutral-100 transition-all"
+            className="flex items-center gap-2 px-4 py-2 border border-[#0A0A0A] bg-white font-mono text-xs font-bold btn-tactile hover-lift transition-smooth hover:border-[#E6391E]"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#E6391E]' : ''}`} />
             <span>REFRESH TELEMETRY</span>
@@ -61,8 +63,10 @@ export const ModelRouterScreen: React.FC = () => {
       </div>
 
       {/* Active Account Hero Spotlight */}
-      {activeAccount && (
-        <div className="border-2 border-[#0A0A0A] bg-white p-6 shadow-sm">
+      {loading ? (
+        <SkeletonCard />
+      ) : activeAccount ? (
+        <div className="border-2 border-[#0A0A0A] bg-white p-6 shadow-sm hover-lift transition-smooth">
           <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-[#E6391E]" />
@@ -112,7 +116,7 @@ export const ModelRouterScreen: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Account Pool Roster Table */}
       <div className="border border-[#0A0A0A] bg-white">
@@ -126,8 +130,11 @@ export const ModelRouterScreen: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="p-12 text-center font-mono text-xs text-neutral-400">
-            Querying Google Cloud Code quota summaries...
+          <div className="space-y-4">
+            <div className="p-4 border-b border-neutral-100 flex items-center justify-center bg-neutral-50/50">
+              <LoadingSpinner size="md" label="Querying Google Cloud Code quota summaries..." />
+            </div>
+            <SkeletonTable rows={4} />
           </div>
         ) : scores.length === 0 ? (
           <div className="p-12 text-center font-mono text-xs text-neutral-400">
@@ -142,8 +149,8 @@ export const ModelRouterScreen: React.FC = () => {
               return (
                 <div
                   key={s.email}
-                  className={`grid grid-cols-12 px-6 py-4 items-center transition-colors ${
-                    isActive ? 'bg-neutral-50' : 'hover:bg-neutral-50'
+                  className={`grid grid-cols-12 px-6 py-4 items-center transition-smooth hover:translate-x-1 ${
+                    isActive ? 'bg-neutral-50 font-semibold' : 'hover:bg-neutral-50'
                   }`}
                 >
                   <div className="col-span-1 font-mono text-xs font-bold text-neutral-400">

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { desktopApi } from '../api/client';
 import { EmergencyStopState } from '../types';
 import { AlertOctagon, FileText } from 'lucide-react';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonCard } from '../components/ui/Skeleton';
 
 export const EmergencyStopScreen: React.FC = () => {
   const [stopState, setStopState] = useState<EmergencyStopState | null>(null);
@@ -48,8 +50,10 @@ export const EmergencyStopScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-16 text-center font-mono text-xs text-neutral-400">
-        Querying emergency stop tombstone status...
+      <div className="max-w-7xl mx-auto p-8 space-y-6 animate-screen-enter">
+        <div className="p-16 text-center border border-[#0A0A0A] bg-white flex flex-col items-center justify-center gap-4">
+          <LoadingSpinner size="lg" label="Querying emergency stop tombstone status..." />
+        </div>
       </div>
     );
   }
@@ -76,7 +80,7 @@ export const EmergencyStopScreen: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-8 space-y-6">
+    <div className="max-w-7xl mx-auto p-8 space-y-6 animate-screen-enter">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-[#0A0A0A] pb-4">
         <div>
@@ -99,9 +103,9 @@ export const EmergencyStopScreen: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <span
-            className={`font-mono text-xs px-3 py-1.5 font-bold uppercase border ${
+            className={`font-mono text-xs px-3 py-1.5 font-bold uppercase border transition-smooth ${
               stopState.active
-                ? 'bg-red-50 text-[#E6391E] border-red-300'
+                ? 'bg-red-50 text-[#E6391E] border-red-300 animate-pulse'
                 : 'bg-emerald-50 text-emerald-800 border-emerald-300'
             }`}
           >
@@ -112,14 +116,14 @@ export const EmergencyStopScreen: React.FC = () => {
 
       {/* Main Status Callout Hero */}
       <div
-        className={`border-2 p-8 text-center space-y-4 ${
+        className={`border-2 p-8 text-center space-y-4 transition-smooth hover-lift ${
           stopState.active
             ? 'border-[#E6391E] bg-red-50/30'
             : 'border-[#0A0A0A] bg-white'
         }`}
       >
         <div
-          className={`w-20 h-20 border-2 flex items-center justify-center mx-auto ${
+          className={`w-20 h-20 border-2 flex items-center justify-center mx-auto transition-transform duration-300 hover:scale-105 ${
             stopState.active
               ? 'border-[#E6391E] bg-red-100 text-[#E6391E]'
               : 'border-[#0A0A0A] bg-neutral-100 text-[#0A0A0A]'
@@ -144,17 +148,31 @@ export const EmergencyStopScreen: React.FC = () => {
             <button
               disabled={toggleLoading}
               onClick={() => handleToggle(false)}
-              className="w-full py-4 border border-emerald-700 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-bold transition-all uppercase tracking-wider"
+              className="w-full py-4 border border-emerald-700 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-bold transition-smooth btn-tactile hover-lift active:scale-95 uppercase tracking-wider flex items-center justify-center gap-2"
             >
-              {toggleLoading ? 'RESUMING...' : 'DISENGAGE EMERGENCY STOP & RESUME ALL FLEET WORKERS'}
+              {toggleLoading ? (
+                <>
+                  <LoadingSpinner size="sm" color="#FFFFFF" />
+                  <span>RESUMING...</span>
+                </>
+              ) : (
+                'DISENGAGE EMERGENCY STOP & RESUME ALL FLEET WORKERS'
+              )}
             </button>
           ) : (
             <button
               disabled={toggleLoading}
               onClick={() => handleToggle(true)}
-              className="w-full py-4 border border-[#E6391E] bg-[#E6391E] hover:bg-red-700 text-white font-mono text-xs font-bold transition-all uppercase tracking-wider shadow-sm"
+              className="w-full py-4 border border-[#E6391E] bg-[#E6391E] hover:bg-red-700 text-white font-mono text-xs font-bold transition-smooth btn-tactile hover-lift active:scale-95 uppercase tracking-wider shadow-sm flex items-center justify-center gap-2"
             >
-              {toggleLoading ? 'ENGAGING...' : 'ENGAGE FOUNDER EMERGENCY STOP'}
+              {toggleLoading ? (
+                <>
+                  <LoadingSpinner size="sm" color="#FFFFFF" />
+                  <span>ENGAGING...</span>
+                </>
+              ) : (
+                'ENGAGE FOUNDER EMERGENCY STOP'
+              )}
             </button>
           )}
         </div>

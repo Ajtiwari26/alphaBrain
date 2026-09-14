@@ -35,7 +35,7 @@ export const DepartmentsScreen: React.FC<Props> = ({ onSelectDept }) => {
   const activeCount = departments.filter((d) => d.active).length;
 
   return (
-    <div className="max-w-7xl mx-auto p-8 space-y-6">
+    <div className="max-w-7xl mx-auto p-8 space-y-6 animate-screen-enter">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-[#0A0A0A] pb-4">
         <div>
@@ -69,7 +69,7 @@ export const DepartmentsScreen: React.FC<Props> = ({ onSelectDept }) => {
           <div
             key={dept.name}
             onClick={() => onSelectDept?.(dept.name)}
-            className="border border-[#0A0A0A] bg-white p-5 hover:bg-neutral-50 cursor-pointer transition-colors flex flex-col justify-between"
+            className="border border-[#0A0A0A] bg-white p-5 hover:bg-neutral-50 cursor-pointer transition-smooth hover-lift active:scale-[0.98] hover:border-[#E6391E] flex flex-col justify-between"
           >
             <div>
               <div className="flex items-center justify-between">

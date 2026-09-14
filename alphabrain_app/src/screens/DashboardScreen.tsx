@@ -27,7 +27,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
   const hardwareSerial = dashboard ? dashboard.hardware_sync_serial : (overview?.telemetry?.usb_device_serial || '---');
 
   return (
-    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A]">
+    <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] animate-screen-enter">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
           MISSION KERNEL
@@ -37,8 +37,8 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
             Command Center
           </h2>
           <span
-            className={`font-mono text-[10px] font-bold px-2 py-0.5 border border-[#0A0A0A] ${
-              emergencyStopActive ? 'bg-[#E6391E] text-white' : 'bg-white text-[#0A0A0A]'
+            className={`font-mono text-[10px] font-bold px-2 py-0.5 border border-[#0A0A0A] transition-smooth ${
+              emergencyStopActive ? 'bg-[#E6391E] text-white animate-pulse' : 'bg-white text-[#0A0A0A]'
             }`}
           >
             {emergencyStopActive ? 'LOCKED' : (dashboard?.system_status ? dashboard.system_status.toUpperCase() : 'CONNECTING...')}
@@ -50,7 +50,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
         {/* Row 01: System Live */}
         <div
           onClick={() => onNavigate('overview')}
-          className="py-4 px-1 flex items-center justify-between hover:bg-black hover:text-white transition-colors cursor-pointer group"
+          className="py-4 px-1 flex items-center justify-between hover:bg-black hover:text-white card-tactile hover-lift transition-smooth cursor-pointer group"
         >
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-zinc-400 group-hover:text-zinc-300">01</span>
