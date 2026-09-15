@@ -540,7 +540,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const participantCount = (connected ? 1 : 0) + 1 + (hasRemoteClient ? 1 : 0);
 
   return (
-    <div className={}>
+    <div className={`h-full w-full flex flex-col justify-between overflow-hidden ${darkMode ? 'bg-neutral-950 text-white' : 'bg-white text-black'}`}>
       {/* Co-Branding Banner */}
       <div className="flex items-center justify-between border-b border-[#0A0A0A] bg-neutral-50 px-4 py-2.5 font-mono text-xs">
         <div className="flex items-center gap-3">
@@ -570,8 +570,6 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         <div className="fixed top-16 right-8 z-50 bg-[#0A0A0A] text-white px-4 py-2 border border-black shadow-lg flex items-center gap-2 font-mono text-xs animate-bounce">
           <Check className="w-4 h-4 text-emerald-400" />
           <span>{shareToast}</span>
-        </div>
-      )}
         </div>
       )}
 
