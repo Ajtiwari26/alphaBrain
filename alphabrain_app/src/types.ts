@@ -20,17 +20,8 @@ export type ScreenId =
   | 'enrollment'
   | 'qr_provisioning'
   | 'sas_verification'
-  | 'eva_meeting'
-  | 'task_detail'
-  | 'code_diff'
-  | 'voice_briefing'
-  | 'sprint_fleet'
-  | 'pr_promotion'
-  | 'hardware_telemetry'
-  | 'self_healing'
-  | 'privacy_compliance'
-  | 'audit_trail'
-  | 'emergency_stop';
+  | 'eva_meeting';
+
 
 export interface EvaMeetingState {
   room_name: string;
@@ -139,60 +130,6 @@ export interface TaskSummary {
   acceptance_commands: string[];
 }
 
-export interface TaskDetail extends TaskSummary {
-  description: string;
-  branch_name?: string;
-  worktree_path?: string;
-  review_notes?: string;
-  gate_results: Record<string, any>;
-  checkpoints: Array<{ step: string; status: string; timestamp?: number }>;
-}
-
-export interface DiffFile {
-  file_path: string;
-  status: string;
-  additions: number;
-  deletions: number;
-  patch: string;
-}
-
-export interface TaskDiffResponse {
-  task_id: string;
-  base_commit: string;
-  head_commit: string;
-  files: DiffFile[];
-  total_additions: number;
-  total_deletions: number;
-}
-
-export interface VoiceBriefing {
-  briefing_id: string;
-  timestamp: number;
-  speaker: string;
-  audio_active: boolean;
-  executive_summary: string;
-  recommended_actions: string[];
-  active_room: string;
-}
-
-export interface WorkerSlot {
-  worker_id: string;
-  status: string;
-  current_task_id: string | null;
-  worktree_slug: string | null;
-  uptime_seconds: number;
-  turn_count: number;
-}
-
-export interface SprintFleetOverview {
-  fleet_name: string;
-  max_workers: number;
-  active_workers: number;
-  slots: WorkerSlot[];
-  queue_backlog: number;
-  adaptive_throttle_factor: number;
-}
-
 export interface DeploymentTarget {
   id: string;
   service_name: string;
@@ -203,31 +140,6 @@ export interface DeploymentTarget {
   last_deployed_at: number;
   commit_sha: string;
   rollback_available: boolean;
-}
-
-export interface CircuitBreakerStatus {
-  name: string;
-  state: string;
-  failure_count: number;
-  threshold: number;
-  last_failure_at: number | null;
-}
-
-export interface SelfHealingRadar {
-  daemon_running: boolean;
-  active_healers: number;
-  recent_repairs_count: number;
-  circuit_breakers: CircuitBreakerStatus[];
-  last_incident: string | null;
-}
-
-export interface PrivacyConsentStats {
-  total_records: number;
-  retention_days_limit: number;
-  redaction_enabled: boolean;
-  gdpr_status: string;
-  pending_purges: number;
-  last_purge_at: number | null;
 }
 
 export interface ModelUtilityScore {

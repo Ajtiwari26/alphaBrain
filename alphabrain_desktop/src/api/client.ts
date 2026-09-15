@@ -88,16 +88,13 @@ export const desktopApi = {
     return await safeFetch(status ? `/triage?status=${status}` : '/triage');
   },
 
-  getTaskDetail: async (taskId: string): Promise<TaskDetail> => {
-    return await safeFetch(`/tasks/${taskId}`);
-  },
-
   reviewTask: async (taskId: string, action: 'approve' | 'reject', notes: string) => {
     return await safeFetch(`/triage/${taskId}/review`, {
       method: 'POST',
       body: JSON.stringify({ action, founder_notes: notes }),
     });
   },
+
 
   getEmergencyStop: async (): Promise<EmergencyStopState> => {
     return await safeFetch('/emergency-stop');
