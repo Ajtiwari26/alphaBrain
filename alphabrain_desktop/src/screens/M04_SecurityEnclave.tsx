@@ -68,8 +68,8 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
     try {
       await desktopApi.toggleEmergencyStop(nextLocked, nextLocked ? 'Security Enclave manual lockdown' : 'Security Enclave unlocked');
       setIsLocked(nextLocked);
-    } catch {
-      setIsLocked(nextLocked);
+    } catch (err) {
+      console.warn('Failed to toggle emergency stop:', err);
     }
   };
 

@@ -15,10 +15,6 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
     if (initialDashboard) {
       setDashboard(initialDashboard);
     }
-    mobileApi
-      .getDashboard()
-      .then((data) => setDashboard(data))
-      .catch((err) => console.warn('Production dashboard API fetch notice:', err));
   }, [initialDashboard]);
 
   const emergencyStopActive = dashboard ? dashboard.emergency_stop.active : overview.emergency_stop.active;

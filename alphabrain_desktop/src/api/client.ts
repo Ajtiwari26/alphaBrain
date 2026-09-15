@@ -174,6 +174,5 @@ export const desktopApi = {
   getMeetingSetup: async (room = 'alphabrain-executive-briefing'): Promise<MeetingSetupScreenData> => {
     return await safeFetch(`/meet/setup?room=${encodeURIComponent(room)}`);
   }
-  },
 };
 
