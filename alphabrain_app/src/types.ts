@@ -9,6 +9,7 @@ export type ScreenId =
   | 'overview'
   | 'model_router'
   | 'departments'
+  | 'env_vault'
   | 'agent_comms'
   | 'tech_dept'
   | 'worktrees'
@@ -239,6 +240,16 @@ export interface ModelUtilityScore {
   weekly_quota_percent: number;
   five_hour_quota_percent: number;
   recommended_model: string;
+  gemini_5h_percent?: number;
+  gemini_weekly_percent?: number;
+  gemini_5h_desc?: string;
+  gemini_weekly_desc?: string;
+  claude_5h_percent?: number;
+  claude_weekly_percent?: number;
+  claude_5h_desc?: string;
+  claude_weekly_desc?: string;
+  token_status?: string;
+  is_active?: boolean;
 }
 
 export interface AuditLogEntry {
@@ -250,3 +261,132 @@ export interface AuditLogEntry {
   sha256_hash: string;
   details: Record<string, any>;
 }
+
+// =====================================================================
+// Amazon-Style Delivery Board Types
+// =====================================================================
+
+export interface DeliveryMilestone {
+  id: string;
+  step_number: number;
+  title: string;
+  status: 'completed' | 'in_transit' | 'pending';
+  summary: string;
+  timestamp_label: string;
+  actor: string;
+  checkpoint_badge: string;
+}
+
+export interface DeliveryMapResponse {
+  project_id: string;
+  project_name: string;
+  overall_progress_percent: number;
+  active_step: number;
+  total_steps: number;
+  stages: DeliveryMilestone[];
+  inflight_task: {
+    id?: string;
+    title?: string;
+    status?: string;
+    branch?: string;
+    worker?: string;
+    elapsed_seconds?: number;
+    required_reviewers?: string[];
+  };
+  metrics: {
+    total_tasks_tracked?: number;
+    merged_count?: number;
+    active_worktrees?: number;
+    safety_pass_rate?: number;
+    current_git_head?: string;
+  };
+}
+
+// =====================================================================
+// Executive Architecture Reading Room Types
+// =====================================================================
+
+export interface ExecutiveDocSummary {
+  doc_id: string;
+  title: string;
+  category: 'architecture' | 'senior_plan' | 'tech_stack' | 'meeting_spec';
+  file_path: string;
+  summary: string;
+  word_count: number;
+  last_modified: number;
+  author: string;
+}
+
+export interface ExecutiveDocDetail {
+  doc_id: string;
+  title: string;
+  category: string;
+  file_path: string;
+  content_markdown: string;
+  sections: string[];
+  last_modified: number;
+  author: string;
+}
+
+// =====================================================================
+// Client & Delegate Types (Admin Delegation)
+// =====================================================================
+
+export interface DelegateCredential {
+  delegate_id: string;
+  member_name: string;
+  role: 'client_viewer' | 'team_delegate' | 'delegated_admin' | string;
+  passcode: string;
+  created_at: number;
+  is_active: boolean;
+  can_admin_verdict: boolean;
+}
+
+export interface DelegateInviteRequest {
+  member_name: string;
+  role?: string;
+  notes?: string;
+  grant_admin_access?: boolean;
+}
+
+export interface DelegateAuthResponse {
+  authenticated: boolean;
+  token: string;
+  member_name: string;
+  role: string;
+  can_admin_verdict: boolean;
+  message: string;
+}
+
+// =====================================================================
+// Feedback, Problem Tickets & Admin Triage Handover
+// =====================================================================
+
+export interface FeedbackItem {
+  id: string;
+  project_id: string;
+  author_name: string;
+  author_role: string;
+  problem_title: string;
+  problem_description: string;
+  created_at: number;
+  status: 'pending_admin' | 'handed_over' | 'rejected' | 'resolved';
+  eva_analysis?: string | null;
+  eva_proposed_task?: Record<string, any> | null;
+  admin_notes?: string | null;
+  admitted_task_id?: string | null;
+}
+
+export interface FeedbackCreateRequest {
+  author_name: string;
+  author_role?: string;
+  problem_title: string;
+  problem_description: string;
+}
+
+export interface AdminFeedbackVerdictRequest {
+  action: 'handover_pipeline' | 'dismiss_rejected' | 'resolve_direct';
+  admin_notes?: string;
+  reviewer_name?: string;
+}
+

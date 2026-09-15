@@ -15,6 +15,15 @@ import {
   TaskDiffResponse,
   TaskSummary,
   VoiceBriefing,
+  DeliveryMapResponse,
+  ExecutiveDocSummary,
+  ExecutiveDocDetail,
+  DelegateCredential,
+  DelegateInviteRequest,
+  DelegateAuthResponse,
+  FeedbackItem,
+  FeedbackCreateRequest,
+  AdminFeedbackVerdictRequest,
 } from '../types';
 
 export function getApiBaseUrl(): string {
@@ -226,4 +235,68 @@ export const mobileApi = {
       invite_url: `/meet#invite=${encodeURIComponent(room)}`,
     };
   },
+
+  // =========================================================================
+  // Amazon-Style Delivery Board
+  // =========================================================================
+  getDeliveryMap: async (projectId = 'alphabrain_dogfood'): Promise<DeliveryMapResponse> => {
+    return safeFetch<DeliveryMapResponse>(`/delivery-map?project_id=${encodeURIComponent(projectId)}`);
+  },
+
+  // =========================================================================
+  // Executive Architecture Reading Room
+  // =========================================================================
+  listExecutiveDocs: async (): Promise<ExecutiveDocSummary[]> => {
+    return safeFetch<ExecutiveDocSummary[]>('/docs/index');
+  },
+
+  getExecutiveDoc: async (docId: string): Promise<ExecutiveDocDetail> => {
+    return safeFetch<ExecutiveDocDetail>(`/docs/${encodeURIComponent(docId)}`);
+  },
+
+  // =========================================================================
+  // Delegates & Access Control
+  // =========================================================================
+  listDelegates: async (): Promise<DelegateCredential[]> => {
+    return safeFetch<DelegateCredential[]>('/delegates/list');
+  },
+
+  createDelegateInvite: async (req: DelegateInviteRequest): Promise<DelegateCredential> => {
+    return safeFetch<DelegateCredential>('/delegates/invite', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  },
+
+  authenticateDelegate: async (req: { delegate_id: string; passcode: string }): Promise<DelegateAuthResponse> => {
+    return safeFetch<DelegateAuthResponse>('/delegates/auth', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  },
+
+  // =========================================================================
+  // Problem Tickets, Opinions & Admin Handover
+  // =========================================================================
+  listFeedback: async (projectId = 'alphabrain_dogfood'): Promise<FeedbackItem[]> => {
+    return safeFetch<FeedbackItem[]>(`/feedback?project_id=${encodeURIComponent(projectId)}`);
+  },
+
+  submitFeedback: async (req: FeedbackCreateRequest, projectId = 'alphabrain_dogfood'): Promise<FeedbackItem> => {
+    return safeFetch<FeedbackItem>(`/feedback?project_id=${encodeURIComponent(projectId)}`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  },
+
+  adminVerdictOnFeedback: async (
+    feedbackId: string,
+    verdict: AdminFeedbackVerdictRequest
+  ): Promise<FeedbackItem> => {
+    return safeFetch<FeedbackItem>(`/feedback/${encodeURIComponent(feedbackId)}/admin-verdict`, {
+      method: 'POST',
+      body: JSON.stringify(verdict),
+    });
+  },
 };
+

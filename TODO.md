@@ -90,6 +90,8 @@ Gemini 3.1 Pro High.
 
 - [x] Android Production Build Release (`commit ffe5a71`, `tsk_eva_45eb2a966f9a`).
 
+- [x] P14.6: Implement Real QR Camera Scanner, Purge Leaked UI Comments, and Render Canonical AlphaMeet Stage (`commit 4610aa1`, `tsk_eva_18da93761264`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).

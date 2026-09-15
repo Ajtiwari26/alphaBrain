@@ -54,7 +54,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
           if (isValid) {
             triggerAuthSuccess();
           } else {
-            setError('INVALID MASTER PIN • ACCESS DENIED');
+            setError('Incorrect PIN. Please try again.');
             const t = window.setTimeout(() => {
               setPin('');
               setError(null);
@@ -62,7 +62,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
             timersRef.current.push(t);
           }
         } catch {
-          setError('CRYPTO VERIFICATION ERROR');
+          setError('Authentication error. Please try again.');
         }
       }
     }
@@ -74,26 +74,6 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
     setPin((prev) => prev.slice(0, -1));
   };
 
-  const handleAuto = async () => {
-    if (authed) return;
-    const isDev = Boolean(import.meta.env?.DEV);
-    if (!isDev) {
-      setError('AUTO-FILL DISABLED IN PRODUCTION');
-      return;
-    }
-
-    // In DEV mode: auto-fill test PIN and verify cryptographic hash
-    const testPin = '1337';
-    setPin(testPin);
-    const testHash = await hashPin(testPin);
-    const storedHash = localStorage.getItem('alphabrain_master_pin_hash');
-
-    if (!storedHash || storedHash === testHash) {
-      triggerAuthSuccess();
-    } else {
-      setError('DEV AUTO-PIN MISMATCHES ENROLLED HASH');
-    }
-  };
 
   const handleBiometricTouch = () => {
     if (authed) return;
@@ -103,7 +83,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
     if (!isDev) {
       const t = window.setTimeout(() => {
         setBiometricScanning(false);
-        setError('HARDWARE BIOMETRIC REGISTRATION REQUIRED • ENTER PIN');
+        setError('Biometrics not registered. Enter PIN.');
       }, 600);
       timersRef.current.push(t);
       return;
@@ -115,7 +95,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
       if (storedHash) {
         triggerAuthSuccess();
       } else {
-        setError('NO MASTER PIN ENROLLED • ENROLL VIA MC-02A');
+        setError('Master PIN required. Please set up PIN.');
       }
     }, 600);
     timersRef.current.push(t);
@@ -125,37 +105,30 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-            01 — ACCESS
-          </span>
-          <span className="font-mono text-[10px] text-zinc-500 uppercase">
-            MC-02B • ACCESS GATE
-          </span>
-        </div>
-        <h2 className="text-4xl font-headline font-bold mt-2 leading-tight text-[#0A0A0A]">
-          Founder
-          <br />
-          Access
+        <h2 className="text-3xl font-headline font-bold mt-2 leading-tight text-[#0A0A0A]">
+          Founder Access
         </h2>
+        <p className="font-mono text-[11px] text-zinc-500 mt-1">
+          Secure. Simple. For what's next.
+        </p>
       </div>
 
-      {/* Middle Section: Touch ID Box & 4 Square PIN Boxes */}
+      {/* Middle Section: Circular Biometric Sensor & 4 Square PIN Boxes */}
       <div className="flex-1 flex flex-col items-center justify-center py-4 space-y-4">
-        {/* Touch ID Box */}
+        {/* Circular Biometric Button */}
         <div
           onClick={handleBiometricTouch}
-          className={`w-24 h-24 border-2 p-3 flex flex-col items-center justify-center cursor-pointer transition-all ${
+          className={`w-24 h-24 rounded-full border-2 p-3 flex flex-col items-center justify-center cursor-pointer transition-all ${
             authed
-              ? 'border-[#E6391E] bg-red-50/20 scale-105'
+              ? 'border-[#E6391E] bg-red-50/20 scale-105 shadow-[0_0_15px_rgba(230,57,30,0.25)]'
               : biometricScanning
-              ? 'border-[#E6391E] bg-zinc-50 scale-95'
-              : 'border-[#0A0A0A] hover:bg-zinc-50 active:scale-95'
+              ? 'border-[#E6391E] bg-zinc-50 scale-95 animate-pulse'
+              : 'border-[#0A0A0A] hover:border-[#E6391E] hover:bg-zinc-50 active:scale-95'
           }`}
-          title="Touch ID Sensor • Click to simulate biometric recognition"
+          title="Tap to authenticate"
         >
           <svg
-            className={`w-12 h-12 transition-colors ${
+            className={`w-10 h-10 transition-colors ${
               authed || biometricScanning ? 'text-[#E6391E]' : 'text-[#0A0A0A]'
             }`}
             viewBox="0 0 24 24"
@@ -165,24 +138,24 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
           >
             <path
               d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"
-              strokeLinecap="square"
+              strokeLinecap="round"
             />
-            {/* Fingerprint ridges */}
-            <path d="M12 7c-2.76 0-5 2.24-5 5 0 2.2 1.42 4.07 3.4 4.74" />
-            <path d="M12 10a2 2 0 0 0-2 2c0 1.5 1 2.5 2 3" />
-            <path d="M15 12c0-1.66-1.34-3-3-3" />
-            <path d="M12 17v2" />
-            <path d="M17 12c0 2.5-1.5 4.5-3.5 5" />
+            <circle cx="9" cy="10" r="1" fill="currentColor" />
+            <circle cx="15" cy="10" r="1" fill="currentColor" />
+            <path d="M10 14c.8 1 2.2 1 3 0" strokeLinecap="round" />
           </svg>
         </div>
 
         <div className="text-center">
-          <span className="font-mono text-[10px] text-zinc-500 tracking-wider uppercase block">
+          <span className="font-headline text-sm font-bold text-[#0A0A0A] block">
             {authed
-              ? 'FOUNDER VERIFIED • ACCESS GRANTED'
+              ? 'Founder Verified'
               : biometricScanning
-              ? 'TOUCH ID SCANNING...'
-              : 'TOUCH ID SENSOR • BIOMETRIC EMULATION'}
+              ? 'Authenticating...'
+              : 'Tap to authenticate'}
+          </span>
+          <span className="font-mono text-[9px] text-zinc-400 tracking-widest uppercase block mt-0.5">
+            USE FACE ID OR PIN
           </span>
         </div>
 
@@ -235,11 +208,24 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
             </button>
           ))}
           <button
-            onClick={handleAuto}
+            onClick={handleBiometricTouch}
             disabled={authed}
-            className="h-12 border border-[#0A0A0A] font-mono text-xs font-bold text-[#E6391E] hover:bg-[#E6391E] hover:text-white active:scale-95 transition-all flex items-center justify-center tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-12 border border-[#0A0A0A] font-mono text-xs font-bold text-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Biometric Authentication"
           >
-            AUTO
+            <svg
+              className="w-5 h-5 text-current"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path d="M12 7c-2.76 0-5 2.24-5 5 0 2.2 1.42 4.07 3.4 4.74" />
+              <path d="M12 10a2 2 0 0 0-2 2c0 1.5 1 2.5 2 3" />
+              <path d="M15 12c0-1.66-1.34-3-3-3" />
+              <path d="M12 17v2" />
+              <path d="M17 12c0 2.5-1.5 4.5-3.5 5" />
+            </svg>
           </button>
           <button
             onClick={() => handleDigit('0')}
@@ -254,24 +240,6 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
             className="h-12 border border-[#0A0A0A] font-mono text-sm font-bold text-zinc-700 hover:bg-[#0A0A0A] hover:text-white active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ⌫
-          </button>
-        </div>
-
-        {/* Action Footers */}
-        <div className="flex items-center justify-between pt-1">
-          {onNavigateEnroll && (
-            <button
-              onClick={onNavigateEnroll}
-              className="font-mono text-[10px] text-zinc-500 hover:text-[#E6391E] transition-colors uppercase tracking-wider"
-            >
-              Enroll Master PIN (MC-02A) ↗
-            </button>
-          )}
-          <button
-            onClick={handleBiometricTouch}
-            className="font-mono text-[10px] text-zinc-500 hover:text-[#0A0A0A] transition-colors uppercase tracking-wider ml-auto"
-          >
-            Touch ID Fallback ↗
           </button>
         </div>
       </div>

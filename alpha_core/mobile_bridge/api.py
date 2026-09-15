@@ -17,13 +17,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from alpha_core.mobile_bridge.schemas import (
+    # Amazon-style delivery, reading room, delegates, feedback schemas
+    AdminFeedbackVerdictRequest,
     AuditLogEntry,
     CommandNodeScreenData,
     DashboardScreenData,
+    DelegateAuthRequest,
+    DelegateAuthResponse,
+    DelegateCredential,
+    DelegateInviteRequest,
+    DeliveryMapResponse,
     DeploymentTarget,
     EmergencyStopState,
     EmergencyStopToggleRequest,
+    ExecutiveDocDetail,
+    ExecutiveDocSummary,
     ExecutiveOverview,
+    FeedbackCreateRequest,
+    FeedbackItem,
     HardwareTelemetry,
     MeetingSetupScreenData,
     MeetingTokenResponse,
@@ -284,6 +295,102 @@ async def get_meeting_token(
     """Meeting Token Endpoint: Direct LiveKit SFU access token generation for companion and desktop."""
     role = "founder" if principal.role in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN} else "client"
     return get_service().get_meeting_token(room_name=room, participant=principal.subject, role=role)
+
+
+# =====================================================================
+# Amazon-Style Delivery Board Endpoints
+# =====================================================================
+
+@router.get("/delivery-map", response_model=DeliveryMapResponse)
+async def get_delivery_map(
+    project_id: str = Query(default="alphabrain_dogfood", description="Project identifier"),
+) -> DeliveryMapResponse:
+    """Amazon-style project completion and delivery board with 7 sequential milestones."""
+    return get_service().get_delivery_map(project_id=project_id)
+
+
+# =====================================================================
+# Executive Architecture Reading Room Endpoints
+# =====================================================================
+
+@router.get("/docs/index", response_model=list[ExecutiveDocSummary])
+async def list_executive_docs() -> list[ExecutiveDocSummary]:
+    """Catalog of all key architectural, roadmap, and meeting specifications."""
+    return get_service().list_executive_docs()
+
+
+@router.get("/docs/{doc_id}", response_model=ExecutiveDocDetail)
+async def get_executive_doc(doc_id: str) -> ExecutiveDocDetail:
+    """Detailed markdown content and section headers for a specific architectural doc."""
+    try:
+        return get_service().get_executive_doc(doc_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Document '{doc_id}' not found.") from None
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Document file for '{doc_id}' not found on disk.") from None
+
+
+# =====================================================================
+# Client & Delegate Access Control Endpoints
+# =====================================================================
+
+@router.get("/delegates/list", response_model=list[DelegateCredential])
+async def list_delegates() -> list[DelegateCredential]:
+    """List all registered client viewers and team delegates."""
+    return get_service().list_delegates()
+
+
+@router.post("/delegates/invite", response_model=DelegateCredential)
+async def create_delegate_invite(req: DelegateInviteRequest) -> DelegateCredential:
+    """Generate a shareable Client/Delegate ID & Passcode, optionally delegating admin access."""
+    return get_service().create_delegate_invite(req)
+
+
+@router.post("/delegates/auth", response_model=DelegateAuthResponse)
+async def authenticate_delegate(req: DelegateAuthRequest) -> DelegateAuthResponse:
+    """Authenticate with Delegate ID & Passcode."""
+    return get_service().authenticate_delegate(req)
+
+
+# =====================================================================
+# Client Problem Tickets, Opinions & Admin Handover Endpoints
+# =====================================================================
+
+@router.get("/feedback", response_model=list[FeedbackItem])
+async def list_feedback(
+    project_id: str = Query(default="alphabrain_dogfood", description="Project identifier"),
+) -> list[FeedbackItem]:
+    """List all queries, tickets, and verdicts raised by clients or delegates."""
+    return get_service().list_feedback(project_id=project_id)
+
+
+@router.post("/feedback", response_model=FeedbackItem)
+async def submit_feedback(
+    req: FeedbackCreateRequest,
+    project_id: str = Query(default="alphabrain_dogfood", description="Project identifier"),
+) -> FeedbackItem:
+    """Raise a problem ticket, opinion, or verdict request. Eva performs immediate diagnostic analysis."""
+    return get_service().submit_feedback(req, project_id=project_id)
+
+
+@router.post("/feedback/{feedback_id}/admin-verdict", response_model=FeedbackItem)
+async def admin_verdict_on_feedback(
+    feedback_id: str,
+    verdict: AdminFeedbackVerdictRequest,
+) -> FeedbackItem:
+    """
+    STRICT ADMIN PERMISSION INVARIANT:
+    Founder or authorized Delegated Admin decides whether to:
+    1. 'handover_pipeline': Enqueues a real remediation task into TaskTriageQueue!
+    2. 'dismiss_rejected': Dismisses the issue as out-of-scope or duplicate.
+    3. 'resolve_direct': Directly marks resolved with clarification notes.
+    """
+    try:
+        return get_service().admin_verdict_on_feedback(feedback_id, verdict)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Feedback item '{feedback_id}' not found.") from None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
 
 def create_mobile_bridge_app() -> FastAPI:

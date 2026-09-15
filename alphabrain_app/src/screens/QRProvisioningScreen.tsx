@@ -100,7 +100,6 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
 
   useEffect(() => {
     isMountedRef.current = true;
-    startCamera();
     return () => {
       isMountedRef.current = false;
       stopCamera();
@@ -129,39 +128,33 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-            MC-03 • PROVISIONING
-          </span>
-          <span className="font-mono text-[10px] text-zinc-500 uppercase">
-            PORT {payload.tunnel_port} • TUNNEL
-          </span>
-        </div>
-        <h2 className="text-4xl font-headline font-bold mt-2 leading-tight text-[#0A0A0A]">
-          QR Remote
-          <br />
-          Provisioning
+        <h2 className="text-3xl font-headline font-bold mt-1 leading-tight text-[#0A0A0A]">
+          Connect Instance
         </h2>
         <p className="font-mono text-[11px] text-zinc-500 mt-1">
-          Scan desktop terminal QR to establish end-to-end encrypted remote bridge
+          Scan the QR code from your local instance to securely connect your workspace.
         </p>
       </div>
 
-      {/* QR Scanner Viewfinder with red-orange corner brackets */}
-      <div className="flex-1 flex flex-col items-center justify-center py-6">
-        <div className="w-64 h-64 relative flex flex-col items-center justify-center border border-dashed border-zinc-200 bg-zinc-50/50 overflow-hidden">
+      {/* QR Scanner Viewfinder with orange corner brackets */}
+      <div className="flex-1 flex flex-col items-center justify-center py-4">
+        <div
+          onClick={handleSimulateScan}
+          className="w-64 h-64 relative rounded-2xl flex flex-col items-center justify-center border border-zinc-200 bg-zinc-50/70 overflow-hidden shadow-sm cursor-pointer hover:border-zinc-400 transition-colors"
+          title="Tap to scan or pair"
+        >
           {/* 4 Corner brackets */}
-          <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-[#E6391E] z-10" />
-          <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-[#E6391E] z-10" />
-          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-[#E6391E] z-10" />
-          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-[#E6391E] z-10" />
+          <div className="absolute top-2 left-2 w-9 h-9 border-t-2 border-l-2 border-[#E6391E] rounded-tl-lg z-10" />
+          <div className="absolute top-2 right-2 w-9 h-9 border-t-2 border-r-2 border-[#E6391E] rounded-tr-lg z-10" />
+          <div className="absolute bottom-2 left-2 w-9 h-9 border-b-2 border-l-2 border-[#E6391E] rounded-bl-lg z-10" />
+          <div className="absolute bottom-2 right-2 w-9 h-9 border-b-2 border-r-2 border-[#E6391E] rounded-br-lg z-10" />
 
           {/* Animated Scanning Beam */}
           {scanning && (
-            <div className="absolute inset-x-0 top-0 h-1 bg-[#E6391E] shadow-[0_0_8px_#E6391E] animate-bounce z-20" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-[#E6391E] shadow-[0_0_12px_#E6391E] animate-bounce z-20" />
           )}
 
-          {/* Video Viewfinder - always mounted so videoRef is always valid */}
+          {/* Video Viewfinder */}
           <video 
             ref={videoRef}
             className={`absolute inset-0 w-full h-full object-cover z-0 ${cameraActive && !isPaired ? 'block' : 'hidden'}`}
@@ -170,78 +163,76 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
           />
 
           {(!cameraActive || isPaired) && (
-            <div className="w-36 h-36 border border-[#0A0A0A] bg-white p-2.5 grid grid-cols-4 gap-1 items-center justify-items-center mb-2 z-0 opacity-30">
-              <div className="w-6 h-6 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#E6391E]" />
-              <div className="w-6 h-6 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-4 h-4 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#E6391E]" />
-              <div className="w-4 h-4 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-6 h-6 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-3 h-3 bg-[#0A0A0A]" />
-              <div className="w-6 h-6 bg-[#0A0A0A]" />
+            <div className="flex flex-col items-center justify-center z-0 p-4 text-center">
+              <svg className="w-16 h-16 text-zinc-300 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <path d="M7 7h.01M17 7h.01M7 17h.01M17 17h.01" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              <span className="font-mono text-[10px] text-zinc-400">
+                Position the QR code within the frame
+              </span>
             </div>
           )}
 
           {cameraError && !isPaired && (
             <div className="absolute inset-x-0 bottom-4 text-center z-10">
-              <span className="bg-red-500 text-white text-[9px] px-2 py-1 uppercase">{cameraError}</span>
+              <span className="bg-[#E6391E] text-white text-[9px] px-2 py-1 uppercase font-mono">{cameraError}</span>
             </div>
           )}
 
-          <div className="absolute inset-x-0 bottom-4 text-center z-10 flex flex-col items-center">
-            <span className="font-mono text-[9px] text-white bg-black/60 px-1 tracking-widest uppercase">
-              {isPaired ? `DEVICE PAIRED: ${payload.device_serial}` : 'WAITING FOR SCAN • ALIGN QR'}
-            </span>
-            <span className="font-mono text-[10px] text-[#E6391E] bg-white/90 px-1 font-bold mt-0.5">
-              {isPaired ? 'TUNNEL ACTIVE • ADB REVERSE' : 'READY FOR HANDSHAKE'}
+          <div className="absolute inset-x-0 bottom-3 text-center z-10 flex flex-col items-center">
+            <span className="font-mono text-[9px] text-white bg-black/70 px-2 py-0.5 rounded tracking-widest uppercase">
+              {isPaired ? `DEVICE PAIRED: ${payload.device_serial}` : 'SCANNING • ALIGN QR'}
             </span>
           </div>
         </div>
 
-        {/* Security Parameters Badge */}
-        <div className="w-full mt-4 border border-[#0A0A0A] p-3 divide-y divide-zinc-200">
-          <div className="flex items-center justify-between pb-1.5 font-mono text-[10px]">
-            <span className="text-zinc-500">PEER SERIAL</span>
-            <span className="font-bold text-[#0A0A0A]">{payload.device_serial}</span>
-          </div>
-          <div className="flex items-center justify-between py-1.5 font-mono text-[10px]">
-            <span className="text-zinc-500">ENCRYPTION</span>
-            <span className="font-bold text-[#0A0A0A]">ECDH P-256 + AES-GCM</span>
-          </div>
-          <div className="flex items-center justify-between pt-1.5 font-mono text-[10px]">
-            <span className="text-zinc-500">BRIDGE PORT</span>
-            <span className="font-bold text-[#E6391E]">127.0.0.1:{payload.tunnel_port}</span>
-          </div>
+        {/* OR Divider */}
+        <div className="w-full flex items-center justify-center gap-3 my-4">
+          <div className="flex-1 h-[1px] bg-zinc-200" />
+          <span className="font-mono text-[10px] text-zinc-400 font-bold uppercase tracking-widest">
+            OR
+          </span>
+          <div className="flex-1 h-[1px] bg-zinc-200" />
         </div>
-      </div>
 
-      {/* Action Footer */}
-      <div className="space-y-2">
-        <button
-          onClick={handleSimulateScan}
-          className="w-full border border-[#0A0A0A] p-4 bg-[#0A0A0A] text-white font-headline text-sm font-bold flex items-center justify-between hover:bg-zinc-800 active:scale-[0.99] transition-all"
-        >
-          <span>{scanning ? 'Pairing Hardware Tunnel...' : isPaired ? 'Re-verify Hardware Tunnel' : 'Confirm Hardware Pairing'}</span>
-          <span className="text-[#E6391E] font-mono text-base">↗</span>
-        </button>
-
+        {/* Enter Sync ID manually Pill Button */}
         {onNavigateSAS && (
           <button
             onClick={onNavigateSAS}
-            className="w-full border border-zinc-300 p-3 bg-white text-[#0A0A0A] font-mono text-xs font-semibold flex items-center justify-between hover:border-[#0A0A0A] transition-colors"
+            className="w-full py-3 px-4 border border-[#0A0A0A] bg-white text-[#0A0A0A] font-headline text-xs font-bold rounded-xl flex items-center justify-between hover:bg-zinc-50 active:scale-[0.99] transition-all shadow-sm"
           >
-            <span>Switch to SAS Verification (MC-03B)</span>
-            <span className="text-zinc-500">↗</span>
+            <div className="flex items-center gap-2.5">
+              <svg className="w-4 h-4 text-[#E6391E]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10" />
+              </svg>
+              <span>Enter Sync ID manually</span>
+            </div>
+            <span className="text-[#0A0A0A] font-mono text-xs">›</span>
           </button>
         )}
+
+        {/* Security Reassurance Card */}
+        <div className="w-full mt-3 border border-zinc-200 bg-zinc-50/80 p-3 rounded-xl flex items-center gap-3">
+          <div className="w-7 h-7 border border-zinc-300 rounded-full flex items-center justify-center shrink-0 text-[#0A0A0A] bg-white">
+            <svg className="w-3.5 h-3.5 text-[#0A0A0A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <div>
+            <div className="font-headline text-xs font-bold text-[#0A0A0A]">
+              Secure Connection
+            </div>
+            <div className="font-mono text-[10px] text-zinc-500">
+              Your data stays on your local instance.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -284,19 +275,19 @@ export const SASVerificationScreen: React.FC<SASProps> = ({ onVerified, onNaviga
       <div className="border-b border-[#0A0A0A] pb-4">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-            MC-03B • SAS VERIFICATION
+            SECURITY CONFIRMATION
           </span>
           <span className="font-mono text-[10px] text-zinc-500 uppercase">
-            DIFFIE-HELLMAN KEY
+            SECURITY CODE
           </span>
         </div>
         <h2 className="text-4xl font-headline font-bold mt-2 leading-tight text-[#0A0A0A]">
-          Short Auth
+          Security Code
           <br />
-          String (SAS)
+          Confirmation
         </h2>
         <p className="font-mono text-[11px] text-zinc-500 mt-1">
-          Verify cryptographic short authentication string with desktop terminal
+          Confirm that the code below matches the code displayed on your desktop screen.
         </p>
       </div>
 

@@ -23,6 +23,7 @@ import { ModelRouterScreen } from './screens/ModelRouterScreen';
 import { DepartmentsScreen } from './screens/DepartmentsScreen';
 import { AgentCommsScreen } from './screens/AgentCommsScreen';
 import { TechDeptScreen } from './screens/TechDeptScreen';
+import { EnvVaultScreen } from './screens/EnvVaultScreen';
 import { WorktreesScreen } from './screens/WorktreesScreen';
 import { TriageQueueScreen } from './screens/TriageQueueScreen';
 import { LiveStreamScreen } from './screens/LiveStreamScreen';
@@ -42,12 +43,12 @@ const ALL_SCREENS: Array<{ id: ScreenId; num: string; title: string; category: s
   { id: 'model_router', num: '05', title: 'AI Quotas', category: 'Models' },
   { id: 'departments', num: '06', title: 'Departments', category: 'Structure' },
   { id: 'agent_comms', num: '07', title: 'Agent Comms', category: 'Mesh' },
-  { id: 'tech_dept', num: '08', title: 'Tech Dept', category: 'Tech' },
+  { id: 'env_vault', num: '08', title: '.env Secrets Vault', category: 'Security' },
   { id: 'worktrees', num: '09', title: 'Worktrees', category: 'Git' },
   { id: 'triage', num: '10', title: 'Triage Board', category: 'Intake' },
   { id: 'live_stream', num: '11', title: 'Live Stream', category: 'Logs' },
   { id: 'deployments', num: '12', title: 'Vercel Console', category: 'Deploy' },
-  { id: 'projects', num: '13', title: 'Project Portfolio', category: 'Portfolio' },
+  { id: 'projects', num: '13', title: 'Delivery Board', category: 'Delivery' },
   { id: 'settings', num: '14', title: 'Global Settings', category: 'Founder' },
   { id: 'eva_meeting', num: '15', title: 'Eva Meeting', category: 'Telephony' },
 ];
@@ -119,8 +120,15 @@ export function App() {
   }, [currentScreen, sessionStage]);
 
   const handleSplashContinue = () => {
-    setSessionStage('auth');
-    setCurrentScreen('auth');
+    // First-time onboarding sequence: Set Master PIN -> Connect Instance
+    const hasExistingPin = Boolean(localStorage.getItem('alphabrain_master_pin_hash'));
+    if (hasExistingPin) {
+      setSessionStage('auth');
+      setCurrentScreen('auth');
+    } else {
+      setSessionStage('auth');
+      setCurrentScreen('enrollment');
+    }
   };
 
   const handleAuthenticated = () => {
@@ -164,41 +172,35 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-white text-[#0A0A0A] flex flex-col font-sans max-w-md mx-auto relative border-x border-[#0A0A0A] selection:bg-[#E6391E] selection:text-white">
-      {/* Top Header Bar with Safe-Area Notch Inset */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#0A0A0A] px-4 pt-[max(env(safe-area-inset-top),2.5rem)] pb-3 flex items-center justify-between">
-        <div
-          onClick={() => navigateTo('splash')}
-          className="flex items-center gap-2.5 cursor-pointer"
-        >
-          <div className="w-7 h-7 bg-[#0A0A0A] flex items-center justify-center font-headline font-bold text-white text-xs">
-            <span className="text-[#E6391E] font-mono mr-0.5">α</span>B
-          </div>
-          <div>
-            <div className="font-headline font-bold text-sm tracking-tight leading-none text-[#0A0A0A]">
+      {/* Top Header Bar with Safe-Area Notch Inset (Hidden on Splash) */}
+      {currentScreen !== 'splash' && (
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#0A0A0A] px-4 pt-[max(env(safe-area-inset-top),2.5rem)] pb-3 flex items-center justify-between">
+          <div
+            onClick={() => navigateTo('splash')}
+            className="flex items-center gap-2.5 cursor-pointer"
+          >
+            <img
+              src="/alphabrain_logo.svg"
+              alt="AlphaBrain Logo"
+              className="w-7 h-7 object-contain"
+            />
+            <div className="font-headline font-bold text-base tracking-tight leading-none text-[#0A0A0A]">
               AlphaBrain
             </div>
-            <div className="font-mono text-[9px] text-zinc-500 tracking-widest mt-0.5 uppercase">
-              Powered by DeployMate
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="font-mono text-[10px] text-[#0A0A0A] bg-zinc-100 border border-[#0A0A0A] px-2 py-0.5 flex items-center gap-1">
-            <Smartphone className="w-3 h-3 text-[#E6391E]" />
-            <span className="font-semibold">10BF5P2AZF0010T</span>
           </div>
 
-          {sessionStage === 'authenticated' && (
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="w-8 h-8 bg-white border border-[#0A0A0A] flex items-center justify-center text-[#0A0A0A] hover:bg-zinc-100 transition-colors"
-            >
-              {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-            </button>
-          )}
-        </div>
-      </header>
+          <div className="flex items-center gap-2">
+            {sessionStage === 'authenticated' && (
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="w-8 h-8 bg-white border border-[#0A0A0A] flex items-center justify-center text-[#0A0A0A] hover:bg-zinc-100 transition-colors"
+              >
+                {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       {/* Screen Drawer Overlay (Only when Authenticated) */}
       {menuOpen && sessionStage === 'authenticated' && (
@@ -260,15 +262,15 @@ export function App() {
       <main
         className={`flex-1 overflow-y-auto flex flex-col bg-white ${
           currentScreen === 'splash' ? 'p-0' : 'p-4'
-        } ${sessionStage === 'authenticated' ? 'pb-24' : 'pb-6'}`}
+        } ${sessionStage === 'authenticated' ? 'pb-24' : 'pb-[max(env(safe-area-inset-bottom),2.5rem)]'}`}
       >
         {currentScreen === 'splash' && (
           <SplashScreen onContinue={handleSplashContinue} />
         )}
         {currentScreen === 'enrollment' && (
           <EnrollmentScreen
-            onCompleted={() => setCurrentScreen('auth')}
-            onCancel={() => setCurrentScreen('auth')}
+            onCompleted={() => setCurrentScreen('instance_sync')}
+            onCancel={() => setCurrentScreen('splash')}
           />
         )}
         {currentScreen === 'auth' && (
@@ -309,9 +311,12 @@ export function App() {
         )}
         {currentScreen === 'model_router' && <ModelRouterScreen />}
         {currentScreen === 'departments' && (
-          <DepartmentsScreen onSelectDept={() => navigateTo('tech_dept')} />
+          <DepartmentsScreen onSelectDept={(screen) => navigateTo(screen)} />
         )}
-        {currentScreen === 'agent_comms' && <AgentCommsScreen />}
+        {currentScreen === 'env_vault' && <EnvVaultScreen />}
+        {currentScreen === 'agent_comms' && (
+          <AgentCommsScreen onNavigateEva={() => navigateTo('eva_meeting')} />
+        )}
         {currentScreen === 'tech_dept' && (
           <TechDeptScreen
             onNavigateTriage={() => navigateTo('triage')}
@@ -319,14 +324,18 @@ export function App() {
             onNavigateDeployments={() => navigateTo('deployments')}
           />
         )}
-        {currentScreen === 'worktrees' && <WorktreesScreen />}
+        {currentScreen === 'worktrees' && (
+          <WorktreesScreen onNavigateToTask={() => navigateTo('triage')} />
+        )}
         {currentScreen === 'triage' && (
           <TriageQueueScreen onSelectTask={() => navigateTo('live_stream')} />
         )}
         {currentScreen === 'live_stream' && <LiveStreamScreen />}
         {currentScreen === 'deployments' && <DeploymentsScreen />}
         {currentScreen === 'projects' && <ProjectsScreen />}
-        {currentScreen === 'settings' && <SettingsScreen />}
+        {currentScreen === 'settings' && (
+          <SettingsScreen onNavigateToScreen={(s) => navigateTo(s as ScreenId)} />
+        )}
         {currentScreen === 'eva_meeting' && (
           <EvaMeetingScreen onLeave={() => navigateTo('overview')} />
         )}

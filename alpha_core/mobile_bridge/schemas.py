@@ -190,6 +190,16 @@ class ModelUtilityScore(BaseModel):
     weekly_quota_percent: float
     five_hour_quota_percent: float
     recommended_model: str = "claude-opus-4-6-thinking"
+    gemini_5h_percent: float = 100.0
+    gemini_weekly_percent: float = 100.0
+    gemini_5h_desc: str = ""
+    gemini_weekly_desc: str = ""
+    claude_5h_percent: float = 100.0
+    claude_weekly_percent: float = 100.0
+    claude_5h_desc: str = ""
+    claude_weekly_desc: str = ""
+    token_status: str = "valid"
+    is_active: bool = False
 
 
 class AuditLogEntry(BaseModel):
@@ -319,4 +329,123 @@ class MeetingTokenResponse(BaseModel):
     token: str
     room_name: str
     expires_in_seconds: int = 3600
+
+
+# =====================================================================
+# Amazon-Style Delivery Board & Milestone Progress
+# =====================================================================
+
+class DeliveryMilestone(BaseModel):
+    id: str
+    step_number: int
+    title: str
+    status: str  # "completed", "in_transit", "pending"
+    summary: str
+    timestamp_label: str
+    actor: str
+    checkpoint_badge: str
+
+
+class DeliveryMapResponse(BaseModel):
+    project_id: str
+    project_name: str
+    overall_progress_percent: int
+    active_step: int
+    total_steps: int
+    stages: list[DeliveryMilestone]
+    inflight_task: dict[str, Any]
+    metrics: dict[str, Any]
+
+
+# =====================================================================
+# Executive Architecture Reading Room
+# =====================================================================
+
+class ExecutiveDocSummary(BaseModel):
+    doc_id: str
+    title: str
+    category: str  # "architecture", "senior_plan", "tech_stack", "meeting_spec"
+    file_path: str
+    summary: str
+    word_count: int
+    last_modified: float
+    author: str
+
+
+class ExecutiveDocDetail(BaseModel):
+    doc_id: str
+    title: str
+    category: str
+    file_path: str
+    content_markdown: str
+    sections: list[str]
+    last_modified: float
+    author: str
+
+
+# =====================================================================
+# Client & Delegate Access Control (Admin Delegation)
+# =====================================================================
+
+class DelegateCredential(BaseModel):
+    delegate_id: str
+    member_name: str
+    role: str  # "client_viewer", "team_delegate", "delegated_admin"
+    passcode: str
+    created_at: float
+    is_active: bool = True
+    can_admin_verdict: bool = False
+
+
+class DelegateInviteRequest(BaseModel):
+    member_name: str
+    role: str = "client_viewer"
+    notes: str = ""
+    grant_admin_access: bool = False
+
+
+class DelegateAuthRequest(BaseModel):
+    delegate_id: str
+    passcode: str
+
+
+class DelegateAuthResponse(BaseModel):
+    authenticated: bool
+    token: str
+    member_name: str
+    role: str
+    can_admin_verdict: bool
+    message: str
+
+
+# =====================================================================
+# Feedback, Problem Tickets & Admin Triage Handover
+# =====================================================================
+
+class FeedbackItem(BaseModel):
+    id: str
+    project_id: str
+    author_name: str
+    author_role: str
+    problem_title: str
+    problem_description: str
+    created_at: float
+    status: str  # "pending_admin", "handed_over", "rejected", "resolved"
+    eva_analysis: str | None = None
+    eva_proposed_task: dict[str, Any] | None = None
+    admin_notes: str | None = None
+    admitted_task_id: str | None = None
+
+
+class FeedbackCreateRequest(BaseModel):
+    author_name: str
+    author_role: str = "client"
+    problem_title: str
+    problem_description: str
+
+
+class AdminFeedbackVerdictRequest(BaseModel):
+    action: str  # "handover_pipeline", "dismiss_rejected", "resolve_direct"
+    admin_notes: str = ""
+    reviewer_name: str = "Founder"
 
