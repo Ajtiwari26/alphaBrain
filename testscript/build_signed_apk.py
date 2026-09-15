@@ -3,6 +3,7 @@ testscript/build_signed_apk.py
 Packages and signs the production Android APK using the production keystore and branding assets.
 """
 
+import os
 import subprocess
 import zipfile
 from pathlib import Path
@@ -13,7 +14,8 @@ SRC_MAIN = APP_DIR / "src" / "main"
 OUTPUT_DIR = APP_DIR / "build" / "outputs" / "apk" / "release"
 KEYSTORE_PATH = APP_DIR / "release.keystore"
 KEY_ALIAS = "alphabrain"
-KEY_PASS = "alphabrain2026"
+
+KEY_PASS = os.getenv("KEY_PASSWORD") or os.getenv("KEYSTORE_PASSWORD") or "alphabrain2026"
 JARSIGNER_BIN = Path("/opt/homebrew/opt/openjdk@17/bin/jarsigner")
 
 
