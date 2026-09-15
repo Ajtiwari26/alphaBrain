@@ -46,7 +46,7 @@ export const AgentCommsScreen: React.FC = () => {
       <div className="border border-[#0A0A0A] p-4 bg-zinc-50">
         <div className="flex items-center justify-between font-mono text-xs">
           <span className="text-zinc-500">VOICE CTO SYNTHESIS</span>
-          <span className="font-bold text-[#E6391E]">EVA 2.0 // READY</span>
+          <span className="font-bold text-[#E6391E]">EVA 2.0 • READY</span>
         </div>
       </div>
     </div>

@@ -31,7 +31,7 @@ export const TaskDetailScreen: React.FC<Props> = ({ taskId, onBack, onViewDiff }
         <button onClick={onBack} className="flex items-center gap-1 text-muted hover:text-white font-mono text-xs">
           <ArrowLeft className="w-4 h-4" /> Back to Queue
         </button>
-        <span className="font-mono text-xs text-accent">03 // SPEC REVIEW</span>
+        <span className="font-mono text-xs text-accent">03 • SPEC REVIEW</span>
       </div>
 
       {/* Title & Metadata */}

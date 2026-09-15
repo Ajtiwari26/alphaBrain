@@ -63,7 +63,7 @@ export const EnrollmentScreen: React.FC<Props> = ({ onCompleted, onCancel }) => 
             }, 600);
             timersRef.current.push(t);
           } else {
-            setError('PIN MISMATCH // PLEASE TRY AGAIN');
+            setError('PIN MISMATCH • PLEASE TRY AGAIN');
             const t = window.setTimeout(() => {
               setConfirmPin('');
               setError(null);
@@ -128,7 +128,7 @@ export const EnrollmentScreen: React.FC<Props> = ({ onCompleted, onCancel }) => 
       <div className="border-b border-[#0A0A0A] pb-4">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-            MC-02A // ENROLLMENT
+            MC-02A • ENROLLMENT
           </span>
           <span className="font-mono text-[10px] text-zinc-500 uppercase">
             {step === 'create' && 'STEP 01 / 02'}
@@ -185,7 +185,7 @@ export const EnrollmentScreen: React.FC<Props> = ({ onCompleted, onCancel }) => 
           <div className="font-mono text-[10px] text-zinc-400 tracking-widest uppercase">
             {step === 'create' && '4-DIGIT CRYPTOGRAPHIC PIN'}
             {step === 'confirm' && 'REPEAT PIN TO CONFIRM'}
-            {step === 'success' && 'MASTER PIN HASH STORED // SECURE'}
+            {step === 'success' && 'MASTER PIN HASH STORED • SECURE'}
           </div>
         )}
       </div>

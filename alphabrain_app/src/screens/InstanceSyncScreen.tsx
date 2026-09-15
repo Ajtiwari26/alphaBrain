@@ -38,7 +38,7 @@ export const InstanceSyncScreen: React.FC<Props> = ({ onSynced }) => {
       <div className="border-b border-[#0A0A0A] pb-3 flex items-center justify-between">
         <div>
           <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
-            03 // HARDWARE BRIDGE
+            03 • HARDWARE BRIDGE
           </span>
           <h2 className="text-2xl font-headline font-bold mt-1 leading-tight text-[#0A0A0A]">
             Instance Sync
@@ -63,7 +63,7 @@ export const InstanceSyncScreen: React.FC<Props> = ({ onSynced }) => {
 
           {/* Center Content */}
           <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
-            {syncStatus === 'probing' ? 'PROBING ADB TUNNEL...' : 'PAIRED // LIVE BRIDGE'}
+            {syncStatus === 'probing' ? 'PROBING ADB TUNNEL...' : 'PAIRED • LIVE BRIDGE'}
           </span>
 
           <span className="font-headline text-lg font-bold text-[#0A0A0A] mt-2">
@@ -71,13 +71,13 @@ export const InstanceSyncScreen: React.FC<Props> = ({ onSynced }) => {
           </span>
 
           <span className="font-mono text-[10px] text-[#E6391E] font-bold mt-1">
-            PORT 8000 // {latencyMs !== null ? `${latencyMs}ms LATENCY` : 'SYNCING...'}
+            PORT 8000 • {latencyMs !== null ? `${latencyMs}ms LATENCY` : 'SYNCING...'}
           </span>
 
           {telemetry && (
             <div className="mt-4 pt-3 border-t border-zinc-200 text-center font-mono text-[9px] text-zinc-500 space-y-0.5">
-              <div>HOST CPU: {telemetry.host_cpu_percent}% // RAM: {telemetry.host_ram_percent}%</div>
-              <div>BATTERY: {telemetry.battery_level_percent}% // USB CHARGE</div>
+              <div>HOST CPU: {telemetry.host_cpu_percent}% • RAM: {telemetry.host_ram_percent}%</div>
+              <div>BATTERY: {telemetry.battery_level_percent}% • USB CHARGE</div>
             </div>
           )}
         </div>

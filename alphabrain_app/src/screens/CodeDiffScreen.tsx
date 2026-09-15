@@ -34,7 +34,7 @@ export const CodeDiffScreen: React.FC<Props> = ({ taskId, onBack, onPromote }) =
         <button onClick={onBack} className="flex items-center gap-1 text-muted hover:text-white font-mono text-xs">
           <ArrowLeft className="w-4 h-4" /> Task Detail
         </button>
-        <span className="font-mono text-xs text-accent">04 // CODE DIFF</span>
+        <span className="font-mono text-xs text-accent">04 • CODE DIFF</span>
       </div>
 
       {/* Diff Stat Summary */}

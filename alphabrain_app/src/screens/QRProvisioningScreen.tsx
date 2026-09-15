@@ -8,6 +8,10 @@ interface QRProps {
 
 export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSAS }) => {
   const [scanning, setScanning] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const [payload, setPayload] = useState<ProvisioningPayload>({
     device_serial: '10BF5P2AZF0010T',
     tunnel_port: 8000,
@@ -17,19 +21,81 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
   });
 
   const timersRef = useRef<number[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanLoopRef = useRef<number | null>(null);
+
+  const startCamera = async () => {
+    try {
+      setCameraError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+      setCameraActive(true);
+      startQRScanner();
+    } catch (err: any) {
+      setCameraError(err.message || 'Camera access denied');
+      setCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+    if (scanLoopRef.current) {
+      cancelAnimationFrame(scanLoopRef.current);
+      scanLoopRef.current = null;
+    }
+  };
+
+  const startQRScanner = () => {
+    const scan = async () => {
+      if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+        if ('BarcodeDetector' in window) {
+          try {
+            // @ts-ignore
+            const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length > 0) {
+              handlePairingSuccess();
+              return; // Stop scanning
+            }
+          } catch (e) {
+            // Ignore detector errors
+          }
+        }
+      }
+      scanLoopRef.current = requestAnimationFrame(scan);
+    };
+    scanLoopRef.current = requestAnimationFrame(scan);
+  };
 
   useEffect(() => {
+    startCamera();
     return () => {
+      stopCamera();
       timersRef.current.forEach((t) => clearTimeout(t));
     };
   }, []);
 
+  const handlePairingSuccess = () => {
+    setScanning(false);
+    setPayload((prev) => ({ ...prev, status: 'paired' }));
+    stopCamera();
+    onSynced?.();
+  };
+
   const handleSimulateScan = () => {
     setScanning(true);
     const t = window.setTimeout(() => {
-      setScanning(false);
-      setPayload((prev) => ({ ...prev, status: 'paired' }));
-      onSynced?.();
+      handlePairingSuccess();
     }, 800);
     timersRef.current.push(t);
   };
@@ -42,10 +108,10 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
       <div className="border-b border-[#0A0A0A] pb-4">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-            MC-03 // PROVISIONING
+            MC-03 • PROVISIONING
           </span>
           <span className="font-mono text-[10px] text-zinc-500 uppercase">
-            PORT {payload.tunnel_port} // TUNNEL
+            PORT {payload.tunnel_port} • TUNNEL
           </span>
         </div>
         <h2 className="text-4xl font-headline font-bold mt-2 leading-tight text-[#0A0A0A]">
@@ -62,42 +128,58 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
       <div className="flex-1 flex flex-col items-center justify-center py-6">
         <div className="w-64 h-64 relative flex flex-col items-center justify-center border border-dashed border-zinc-200 bg-zinc-50/50 overflow-hidden">
           {/* 4 Corner brackets */}
-          <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-[#E6391E]" />
-          <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-[#E6391E]" />
-          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-[#E6391E]" />
-          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-[#E6391E]" />
+          <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-[#E6391E] z-10" />
+          <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-[#E6391E] z-10" />
+          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-[#E6391E] z-10" />
+          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-[#E6391E] z-10" />
 
           {/* Animated Scanning Beam */}
           {scanning && (
-            <div className="absolute inset-x-0 top-0 h-1 bg-[#E6391E] shadow-[0_0_8px_#E6391E] animate-bounce" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-[#E6391E] shadow-[0_0_8px_#E6391E] animate-bounce z-20" />
           )}
 
-          {/* QR Matrix Representation */}
-          <div className="w-36 h-36 border border-[#0A0A0A] bg-white p-2.5 grid grid-cols-4 gap-1 items-center justify-items-center mb-2">
-            <div className="w-6 h-6 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#E6391E]" />
-            <div className="w-6 h-6 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-4 h-4 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#E6391E]" />
-            <div className="w-4 h-4 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-6 h-6 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-3 h-3 bg-[#0A0A0A]" />
-            <div className="w-6 h-6 bg-[#0A0A0A]" />
-          </div>
+          {cameraActive && !isPaired ? (
+            <video 
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover z-0"
+              playsInline
+              muted
+            />
+          ) : (
+            <div className="w-36 h-36 border border-[#0A0A0A] bg-white p-2.5 grid grid-cols-4 gap-1 items-center justify-items-center mb-2 z-0 opacity-30">
+              <div className="w-6 h-6 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#E6391E]" />
+              <div className="w-6 h-6 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-4 h-4 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#E6391E]" />
+              <div className="w-4 h-4 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-6 h-6 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-3 h-3 bg-[#0A0A0A]" />
+              <div className="w-6 h-6 bg-[#0A0A0A]" />
+            </div>
+          )}
 
-          <span className="font-mono text-[9px] text-zinc-500 tracking-widest uppercase">
-            {isPaired ? `DEVICE PAIRED: ${payload.device_serial}` : 'WAITING FOR SCAN // ALIGN QR'}
-          </span>
-          <span className="font-mono text-[10px] text-[#E6391E] font-bold mt-0.5">
-            {isPaired ? 'TUNNEL ACTIVE // ADB REVERSE' : 'READY FOR HANDSHAKE'}
-          </span>
+          {cameraError && !isPaired && (
+            <div className="absolute inset-x-0 bottom-4 text-center z-10">
+              <span className="bg-red-500 text-white text-[9px] px-2 py-1 uppercase">{cameraError}</span>
+            </div>
+          )}
+
+          <div className="absolute inset-x-0 bottom-4 text-center z-10 flex flex-col items-center">
+            <span className="font-mono text-[9px] text-white bg-black/60 px-1 tracking-widest uppercase">
+              {isPaired ? `DEVICE PAIRED: ${payload.device_serial}` : 'WAITING FOR SCAN • ALIGN QR'}
+            </span>
+            <span className="font-mono text-[10px] text-[#E6391E] bg-white/90 px-1 font-bold mt-0.5">
+              {isPaired ? 'TUNNEL ACTIVE • ADB REVERSE' : 'READY FOR HANDSHAKE'}
+            </span>
+          </div>
         </div>
 
         {/* Security Parameters Badge */}
@@ -178,7 +260,7 @@ export const SASVerificationScreen: React.FC<SASProps> = ({ onVerified, onNaviga
       <div className="border-b border-[#0A0A0A] pb-4">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-            MC-03B // SAS VERIFICATION
+            MC-03B • SAS VERIFICATION
           </span>
           <span className="font-mono text-[10px] text-zinc-500 uppercase">
             DIFFIE-HELLMAN KEY
@@ -213,11 +295,11 @@ export const SASVerificationScreen: React.FC<SASProps> = ({ onVerified, onNaviga
         <div className="w-full">
           {verified ? (
             <div className="p-3 bg-zinc-100 border border-[#0A0A0A] text-center font-mono text-xs text-[#0A0A0A] font-bold">
-              ✓ SAS MATCH CONFIRMED // CHANNEL TRUSTED
+              ✓ SAS MATCH CONFIRMED • CHANNEL TRUSTED
             </div>
           ) : rejected ? (
             <div className="p-3 bg-red-50 border border-[#E6391E] text-center font-mono text-xs text-[#E6391E] font-bold">
-              ⚠ SAS MISMATCH REJECTED // SESSION TERMINATED
+              ⚠ SAS MISMATCH REJECTED • SESSION TERMINATED
             </div>
           ) : (
             <div className="p-3 border border-dashed border-zinc-300 text-center font-mono text-[11px] text-zinc-600">
@@ -243,7 +325,7 @@ export const SASVerificationScreen: React.FC<SASProps> = ({ onVerified, onNaviga
           disabled={verified}
           className="w-full border border-[#E6391E] p-3 bg-white text-[#E6391E] font-mono text-xs font-bold hover:bg-red-50 transition-colors text-center uppercase tracking-wider"
         >
-          Mismatch // Reject Connection
+          Mismatch • Reject Connection
         </button>
 
         {onNavigateQR && (

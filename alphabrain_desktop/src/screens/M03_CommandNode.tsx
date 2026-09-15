@@ -153,7 +153,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
           <div className="flex items-center gap-2 border-l border-neutral-300 pl-3">
             <span className={`w-2.5 h-2.5 rounded-full ${nodeStatus === 'operational' ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
             <span className="text-xs font-mono uppercase tracking-wider font-semibold">
-              {nodeId} ({clusterName} // {nodeStatus.toUpperCase()})
+              {nodeId} ({clusterName} • {nodeStatus.toUpperCase()})
             </span>
           </div>
         </div>

@@ -154,7 +154,7 @@ const INITIAL_TRANSCRIPTS: TranscriptItem[] = [
 
 export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   // Lobby State
-  const [inLobby, setInLobby] = useState(true);
+  const [inLobby, setInLobby] = useState(false);
   const [identity, setIdentity] = useState('Ajay (Founder)');
   const [roomName, setRoomName] = useState('alphabrain-executive-briefing');
   const [apiToken, setApiToken] = useState('');
@@ -180,7 +180,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   }, []);
 
   // Meeting State
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(true);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);

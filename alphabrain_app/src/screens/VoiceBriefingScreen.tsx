@@ -50,7 +50,7 @@ export const VoiceBriefingScreen: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-card-border pb-4">
         <div>
-          <span className="font-mono text-xs text-accent uppercase tracking-widest">05 // SPOKEN INTAKE</span>
+          <span className="font-mono text-xs text-accent uppercase tracking-widest">05 • SPOKEN INTAKE</span>
           <h1 className="font-display text-2xl font-bold text-white tracking-tight mt-1">Eva Voice CTO</h1>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent/10 border border-accent/40 font-mono text-xs text-accent">

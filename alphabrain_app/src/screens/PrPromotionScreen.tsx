@@ -41,7 +41,7 @@ export const PrPromotionScreen: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-card-border pb-4">
         <div>
-          <span className="font-mono text-xs text-accent uppercase tracking-widest">07 // PR HANDOFF</span>
+          <span className="font-mono text-xs text-accent uppercase tracking-widest">07 • PR HANDOFF</span>
           <h1 className="font-display text-2xl font-bold text-white tracking-tight mt-1">One-Tap PR Merge</h1>
         </div>
         <span className="font-mono text-xs px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">

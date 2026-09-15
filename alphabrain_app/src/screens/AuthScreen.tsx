@@ -54,7 +54,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
           if (isValid) {
             triggerAuthSuccess();
           } else {
-            setError('INVALID MASTER PIN // ACCESS DENIED');
+            setError('INVALID MASTER PIN • ACCESS DENIED');
             const t = window.setTimeout(() => {
               setPin('');
               setError(null);
@@ -103,7 +103,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
     if (!isDev) {
       const t = window.setTimeout(() => {
         setBiometricScanning(false);
-        setError('HARDWARE BIOMETRIC REGISTRATION REQUIRED // ENTER PIN');
+        setError('HARDWARE BIOMETRIC REGISTRATION REQUIRED • ENTER PIN');
       }, 600);
       timersRef.current.push(t);
       return;
@@ -115,7 +115,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
       if (storedHash) {
         triggerAuthSuccess();
       } else {
-        setError('NO MASTER PIN ENROLLED // ENROLL VIA MC-02A');
+        setError('NO MASTER PIN ENROLLED • ENROLL VIA MC-02A');
       }
     }, 600);
     timersRef.current.push(t);
@@ -130,7 +130,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
             01 — ACCESS
           </span>
           <span className="font-mono text-[10px] text-zinc-500 uppercase">
-            MC-02B // ACCESS GATE
+            MC-02B • ACCESS GATE
           </span>
         </div>
         <h2 className="text-4xl font-headline font-bold mt-2 leading-tight text-[#0A0A0A]">
@@ -152,7 +152,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
               ? 'border-[#E6391E] bg-zinc-50 scale-95'
               : 'border-[#0A0A0A] hover:bg-zinc-50 active:scale-95'
           }`}
-          title="Touch ID Sensor // Click to simulate biometric recognition"
+          title="Touch ID Sensor • Click to simulate biometric recognition"
         >
           <svg
             className={`w-12 h-12 transition-colors ${
@@ -179,10 +179,10 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
         <div className="text-center">
           <span className="font-mono text-[10px] text-zinc-500 tracking-wider uppercase block">
             {authed
-              ? 'FOUNDER VERIFIED // ACCESS GRANTED'
+              ? 'FOUNDER VERIFIED • ACCESS GRANTED'
               : biometricScanning
               ? 'TOUCH ID SCANNING...'
-              : 'TOUCH ID SENSOR // BIOMETRIC EMULATION'}
+              : 'TOUCH ID SENSOR • BIOMETRIC EMULATION'}
           </span>
         </div>
 

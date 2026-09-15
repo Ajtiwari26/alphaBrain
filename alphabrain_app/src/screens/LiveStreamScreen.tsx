@@ -34,7 +34,7 @@ export const LiveStreamScreen: React.FC = () => {
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-[#E6391E] font-bold tracking-widest uppercase">
-          LIVE AUDIT LOG // CRYPTOGRAPHIC TRAIL
+          LIVE AUDIT LOG • CRYPTOGRAPHIC TRAIL
         </span>
         <h2 className="text-3xl font-headline font-bold mt-1 text-[#0A0A0A]">
           Execution Log

@@ -23,7 +23,7 @@ export const SprintFleetScreen: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-card-border pb-4">
         <div>
-          <span className="font-mono text-xs text-accent uppercase tracking-widest">06 // WORKER SWARM</span>
+          <span className="font-mono text-xs text-accent uppercase tracking-widest">06 • WORKER SWARM</span>
           <h1 className="font-display text-2xl font-bold text-white tracking-tight mt-1">Autonomous Fleet</h1>
         </div>
         <div className="flex items-center gap-1 font-mono text-xs text-emerald-400 bg-emerald-950/60 px-2 py-1 rounded border border-emerald-800">

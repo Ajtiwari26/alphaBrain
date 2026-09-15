@@ -47,7 +47,7 @@ export const MeetingSetupScreen: React.FC<Props> = ({ onNavigate }) => {
       <div className="border-b border-[#0A0A0A] pb-4 flex justify-between items-end">
         <div>
           <span className="text-xs font-mono tracking-widest uppercase bg-[#0A0A0A] text-white px-2 py-0.5 font-bold">
-            Screen M-05 // MC-07
+            Screen M-05 • MC-07
           </span>
           <h1 className="text-3xl font-bold font-mono tracking-tight mt-2">
             MEETING SETUP & WEBRTC SFU

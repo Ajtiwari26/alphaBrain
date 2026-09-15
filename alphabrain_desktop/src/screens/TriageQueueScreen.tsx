@@ -76,7 +76,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-[#E6391E] font-bold uppercase tracking-widest">
-              EXECUTION QUEUE // SQLITE TRIAGE ENGINE
+              EXECUTION QUEUE • SQLITE TRIAGE ENGINE
             </span>
             <span className="text-neutral-300">•</span>
             <span className="font-mono text-xs text-neutral-500 uppercase">
@@ -162,7 +162,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
                       {t.task_id}
                     </span>
                     <span className="font-mono text-[10px] text-neutral-400 uppercase">
-                      {t.category || 'GENERAL'} // {t.risk_class || 'LOW'} RISK
+                      {t.category || 'GENERAL'} • {t.risk_class || 'LOW'} RISK
                     </span>
                   </div>
 

@@ -23,7 +23,7 @@ export const SelfHealingScreen: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-card-border pb-4">
         <div>
-          <span className="font-mono text-xs text-accent uppercase tracking-widest">09 // CI/CD RADAR</span>
+          <span className="font-mono text-xs text-accent uppercase tracking-widest">09 • CI/CD RADAR</span>
           <h1 className="font-display text-2xl font-bold text-white tracking-tight mt-1">Self-Healing Engine</h1>
         </div>
         <div className="flex items-center gap-1.5 font-mono text-xs text-emerald-400 bg-emerald-950/60 px-2 py-1 rounded border border-emerald-800">

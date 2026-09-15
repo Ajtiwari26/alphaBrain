@@ -63,7 +63,7 @@ export const EmergencyStopScreen: React.FC = () => {
       <div className="max-w-7xl mx-auto p-8 space-y-6">
         <div className="border border-[#0A0A0A] bg-neutral-50 p-8 text-center space-y-3">
           <div className="font-mono text-xs text-[#E6391E] font-bold uppercase tracking-widest">
-            OFFLINE // BACKEND SERVICE UNREACHABLE
+            OFFLINE • BACKEND SERVICE UNREACHABLE
           </div>
           <p className="font-mono text-xs text-neutral-600">
             Cannot reach emergency tombstone service. Local safe state active.
@@ -86,7 +86,7 @@ export const EmergencyStopScreen: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-[#E6391E] font-bold uppercase tracking-widest">
-              MC-14 // FOUNDER DIRECT CONTROL
+              MC-14 • FOUNDER DIRECT CONTROL
             </span>
             <span className="text-neutral-300">•</span>
             <span className="font-mono text-xs text-neutral-500 uppercase">

@@ -17,7 +17,7 @@ export const DeploymentsScreen: React.FC = () => {
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh]">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
-          12 // PRODUCTION TARGETS
+          12 • PRODUCTION TARGETS
         </span>
         <h2 className="text-3xl font-headline font-bold text-[#0A0A0A] mt-1">
           Deployments
@@ -39,7 +39,7 @@ export const DeploymentsScreen: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between text-zinc-500 text-[11px]">
-                <span>{dep.provider} // {dep.environment}</span>
+                <span>{dep.provider} • {dep.environment}</span>
                 <span className="text-[#E6391E] font-bold">{dep.commit_sha}</span>
               </div>
               <div className="text-zinc-400 text-[10px] truncate">

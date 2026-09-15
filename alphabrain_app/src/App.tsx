@@ -95,7 +95,7 @@ export function App() {
             active: false,
             locked_at: null,
             lock_file: '',
-            reason: 'Backend offline // connection refused',
+            reason: 'Backend offline • connection refused',
             triggered_by: '',
           },
           telemetry: {

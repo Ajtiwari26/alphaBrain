@@ -23,7 +23,7 @@ export const AuditTrailScreen: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-card-border pb-4">
         <div>
-          <span className="font-mono text-xs text-accent uppercase tracking-widest">13 // AUDIT TRAIL</span>
+          <span className="font-mono text-xs text-accent uppercase tracking-widest">13 • AUDIT TRAIL</span>
           <h1 className="font-display text-2xl font-bold text-white tracking-tight mt-1">Provenance Ledger</h1>
         </div>
         <span className="font-mono text-xs px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold">

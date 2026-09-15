@@ -34,7 +34,7 @@ export const ProjectsScreen: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-[#E6391E] font-bold uppercase tracking-widest">
-              PORTFOLIO // DESKTOP WORKSPACES
+              PORTFOLIO • DESKTOP WORKSPACES
             </span>
             <span className="text-neutral-300">•</span>
             <span className="font-mono text-xs text-neutral-500 uppercase">

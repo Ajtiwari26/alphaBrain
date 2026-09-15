@@ -47,7 +47,7 @@ export const EmergencyStopScreen: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-card-border pb-4">
         <div>
-          <span className="font-mono text-xs text-red-500 uppercase tracking-widest">14 // FOUNDER CONTROL</span>
+          <span className="font-mono text-xs text-red-500 uppercase tracking-widest">14 • FOUNDER CONTROL</span>
           <h1 className="font-display text-2xl font-bold text-white tracking-tight mt-1">Emergency Kill Switch</h1>
         </div>
         <span className={`font-mono text-xs px-2.5 py-1 rounded font-semibold uppercase ${

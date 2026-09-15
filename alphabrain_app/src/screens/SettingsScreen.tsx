@@ -162,7 +162,7 @@ export const SettingsScreen: React.FC = () => {
 
         <div className="flex items-center justify-between font-mono text-xs">
           <span className="text-zinc-500">SYSTEM VERSION</span>
-          <span className="font-bold text-[#0A0A0A]">V1.0.0 // LOCOMOTIVE LIVE</span>
+          <span className="font-bold text-[#0A0A0A]">V1.0.0 • LOCOMOTIVE LIVE</span>
         </div>
       </div>
     </div>

@@ -58,7 +58,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
           </div>
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-zinc-500 group-hover:text-zinc-300">
-              CPU {telemetry.host_cpu_percent}% // RAM {telemetry.host_ram_percent}%
+              CPU {telemetry.host_cpu_percent}% • RAM {telemetry.host_ram_percent}%
             </span>
             <span className="w-2.5 h-2.5 rounded-full bg-[#E6391E] animate-pulse" />
             <span className="text-sm font-bold text-[#E6391E] group-hover:text-white">↗</span>

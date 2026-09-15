@@ -35,7 +35,7 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess }) => {
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] min-h-[75vh] animate-screen-enter">
       <div className="border-b border-[#0A0A0A] pb-3">
         <span className="font-mono text-[10px] text-zinc-500 tracking-widest uppercase">
-          GIT INTEGRATION // ISOLATED WORKTREES
+          GIT INTEGRATION • ISOLATED WORKTREES
         </span>
         <h2 className="text-3xl font-headline font-bold mt-1 text-[#0A0A0A]">
           Worktrees
