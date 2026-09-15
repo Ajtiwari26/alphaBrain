@@ -187,6 +187,7 @@ export interface MeetingSetupScreenData {
   audio_codec: string;
   sample_rate: number;
   audio_active: boolean;
+  video_active?: boolean;
   status: string;
 }
 

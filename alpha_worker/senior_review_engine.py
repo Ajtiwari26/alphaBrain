@@ -113,6 +113,8 @@ class SeniorReviewEngine:
                 if res.returncode == 0 and res.stdout.strip():
                     stat_str = stat_res.stdout.strip() if stat_res.returncode == 0 else ""
                     diff_str = res.stdout.strip()
+                    if len(diff_str) > 60000:
+                        diff_str = diff_str[:60000] + "\n\n... [Diff truncated for senior review payload limit] ..."
                     return f"=== Diff Stat ===\n{stat_str}\n\n=== Git Diff ===\n{diff_str}"
             except Exception:
                 pass
