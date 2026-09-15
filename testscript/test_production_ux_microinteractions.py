@@ -15,11 +15,15 @@ def test_desktop_css_tokens_and_keyframes():
 
     assert "--ease-spring" in css_content
     assert ".transition-smooth" in css_content
+    assert ".transition-transform-smooth" in css_content
     assert ".hover-lift" in css_content
+    assert ".btn-tactile" in css_content
+    assert ".card-tactile" in css_content
     assert "skeleton-shimmer" in css_content
     assert ".animate-shimmer" in css_content
     assert "smooth-spin" in css_content
     assert ".animate-spin-smooth" in css_content
+    assert "@keyframes screen-enter" in css_content
     assert ".animate-screen-enter" in css_content
 
 
@@ -31,11 +35,16 @@ def test_mobile_css_tokens_and_keyframes():
 
     assert "--ease-spring" in css_content
     assert ".transition-smooth" in css_content
+    assert ".transition-transform-smooth" in css_content
     assert ".hover-lift" in css_content
+    assert ".btn-tactile" in css_content
+    assert ".card-tactile" in css_content
     assert "skeleton-shimmer" in css_content
     assert ".animate-shimmer" in css_content
     assert "smooth-spin" in css_content
     assert ".animate-spin-smooth" in css_content
+    assert "@keyframes screen-enter" in css_content
+    assert ".animate-screen-enter" in css_content
 
 
 def test_desktop_ui_primitives_exist():
@@ -106,27 +115,33 @@ def test_mobile_screens_loading_and_microinteractions():
     assert "LoadingSpinner" in projects_screen
     assert "SkeletonList" in projects_screen
     assert "hover-lift" in projects_screen
+    assert "card-tactile" in projects_screen
 
     triage_screen = (MOBILE_SRC / "screens" / "TriageQueueScreen.tsx").read_text()
     assert "LoadingSpinner" in triage_screen
     assert "SkeletonList" in triage_screen
     assert "hover-lift" in triage_screen
+    assert "card-tactile" in triage_screen
 
     model_router = (MOBILE_SRC / "screens" / "ModelRouterScreen.tsx").read_text()
     assert "LoadingSpinner" in model_router
     assert "SkeletonCard" in model_router
     assert "hover-lift" in model_router
+    assert "card-tactile" in model_router
 
     worktrees_screen = (MOBILE_SRC / "screens" / "WorktreesScreen.tsx").read_text()
     assert "LoadingSpinner" in worktrees_screen
     assert "SkeletonList" in worktrees_screen
     assert "hover-lift" in worktrees_screen
+    assert "card-tactile" in worktrees_screen
 
     dashboard_screen = (MOBILE_SRC / "screens" / "DashboardScreen.tsx").read_text()
     assert "hover-lift" in dashboard_screen
     assert "transition-smooth" in dashboard_screen
+    assert "card-tactile" in dashboard_screen
 
     app_tsx = (MOBILE_SRC / "App.tsx").read_text()
     assert "LoadingSpinner" in app_tsx
     assert "SkeletonCard" in app_tsx
     assert "hover-lift" in app_tsx
+    assert "btn-tactile" in app_tsx
