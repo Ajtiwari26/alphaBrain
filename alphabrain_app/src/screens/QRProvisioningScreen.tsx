@@ -23,6 +23,15 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
   const timersRef = useRef<number[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const scanLoopRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
+
+  // Bind stream to video element when cameraActive becomes true and ref is mounted
+  useEffect(() => {
+    if (cameraActive && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [cameraActive]);
 
   const startCamera = async () => {
     try {
@@ -30,6 +39,10 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' }
       });
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -38,8 +51,10 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
       setCameraActive(true);
       startQRScanner();
     } catch (err: any) {
-      setCameraError(err.message || 'Camera access denied');
-      setCameraActive(false);
+      if (isMountedRef.current) {
+        setCameraError(err.message || 'Camera access denied');
+        setCameraActive(false);
+      }
     }
   };
 
@@ -56,30 +71,38 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
   };
 
   const startQRScanner = () => {
+    // Instantiate detector once outside animation frame loop
+    // @ts-ignore
+    const detector = ('BarcodeDetector' in window) ? new window.BarcodeDetector({ formats: ['qr_code'] }) : null;
+
     const scan = async () => {
-      if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-        if ('BarcodeDetector' in window) {
+      if (!isMountedRef.current || !streamRef.current) return;
+      if (videoRef.current && videoRef.current.readyState >= 2) {
+        if (detector) {
           try {
-            // @ts-ignore
-            const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
             const barcodes = await detector.detect(videoRef.current);
+            if (!isMountedRef.current || !streamRef.current) return;
             if (barcodes.length > 0) {
               handlePairingSuccess();
-              return; // Stop scanning
+              return; // Stop scanning upon successful detection
             }
           } catch (e) {
-            // Ignore detector errors
+            // Ignore detector frame drop errors
           }
         }
       }
-      scanLoopRef.current = requestAnimationFrame(scan);
+      if (isMountedRef.current && streamRef.current) {
+        scanLoopRef.current = requestAnimationFrame(scan);
+      }
     };
     scanLoopRef.current = requestAnimationFrame(scan);
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     startCamera();
     return () => {
+      isMountedRef.current = false;
       stopCamera();
       timersRef.current.forEach((t) => clearTimeout(t));
     };
@@ -138,14 +161,15 @@ export const QRProvisioningScreen: React.FC<QRProps> = ({ onSynced, onNavigateSA
             <div className="absolute inset-x-0 top-0 h-1 bg-[#E6391E] shadow-[0_0_8px_#E6391E] animate-bounce z-20" />
           )}
 
-          {cameraActive && !isPaired ? (
-            <video 
-              ref={videoRef}
-              className="absolute inset-0 w-full h-full object-cover z-0"
-              playsInline
-              muted
-            />
-          ) : (
+          {/* Video Viewfinder - always mounted so videoRef is always valid */}
+          <video 
+            ref={videoRef}
+            className={`absolute inset-0 w-full h-full object-cover z-0 ${cameraActive && !isPaired ? 'block' : 'hidden'}`}
+            playsInline
+            muted
+          />
+
+          {(!cameraActive || isPaired) && (
             <div className="w-36 h-36 border border-[#0A0A0A] bg-white p-2.5 grid grid-cols-4 gap-1 items-center justify-items-center mb-2 z-0 opacity-30">
               <div className="w-6 h-6 bg-[#0A0A0A]" />
               <div className="w-3 h-3 bg-[#0A0A0A]" />
