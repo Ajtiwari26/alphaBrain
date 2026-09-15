@@ -16,8 +16,17 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            storeFile file('release.keystore')
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: 'alphabrain2026'
+            keyAlias System.getenv("KEY_ALIAS") ?: 'alphabrain'
+            keyPassword System.getenv("KEY_PASSWORD") ?: 'alphabrain2026'
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -48,12 +57,6 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-android {
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-}
 
 try {
     def servicesJSON = file('google-services.json')
