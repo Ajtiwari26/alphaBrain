@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">AlphaBrain Founder Companion</string>
-    <string name="title_activity_main">AlphaBrain Founder Companion</string>
+    <string name="app_name">AlphaBrain &amp; DeployMate</string>
+    <string name="title_activity_main">AlphaBrain &amp; DeployMate</string>
     <string name="package_name">com.deploymate.foundercompanion</string>
     <string name="custom_url_scheme">com.deploymate.foundercompanion</string>
 </resources>
