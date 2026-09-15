@@ -276,6 +276,16 @@ body {
   transform: translateY(0.5px) scale(0.97);
 }
 
+.card-tactile {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.card-tactile:active {
+  transform: scale(0.985);
+  background-color: rgba(10, 10, 10, 0.02);
+}
+
 /* Skeleton Shimmer & Loading State Animations */
 @keyframes skeleton-shimmer {
   0% {
@@ -312,7 +322,7 @@ body {
 }
 
 /* Screen Transition Animation */
-@keyframes screen-fade-in {
+@keyframes screen-enter {
   from {
     opacity: 0;
     transform: translateY(6px);
@@ -324,6 +334,6 @@ body {
 }
 
 .animate-screen-enter {
-  animation: screen-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: screen-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 

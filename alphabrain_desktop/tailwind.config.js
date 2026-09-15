@@ -35,7 +35,7 @@ export default {
       animation: {
         'shimmer': 'skeleton-shimmer 1.8s infinite ease-in-out',
         'spin-smooth': 'smooth-spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-        'screen-enter': 'screen-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'screen-enter': 'screen-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
     },
   },
