@@ -156,11 +156,28 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   // Lobby State
   const [inLobby, setInLobby] = useState(true);
   const [identity, setIdentity] = useState('Ajay (Founder)');
-  const [roomName, setRoomName] = useState('deploymate-main');
+  const [roomName, setRoomName] = useState('alphabrain-executive-briefing');
   const [apiToken, setApiToken] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('hi');
   const [liveTranslateEnabled, setLiveTranslateEnabled] = useState(true);
   const [joinError, setJoinError] = useState<string | null>(null);
+
+  useEffect(() => {
+    desktopApi
+      .getMeetingSetup('alphabrain-executive-briefing')
+      .then((setup) => {
+        if (setup) {
+          if (setup.room_name) setRoomName(setup.room_name);
+          if (setup.participant_identity) setIdentity(setup.participant_identity);
+          if (setup.token) setApiToken(setup.token);
+          if (typeof setup.audio_active === 'boolean') setMicMuted(!setup.audio_active);
+          if (typeof setup.video_active === 'boolean') setCameraEnabled(setup.video_active);
+        }
+      })
+      .catch((err) => {
+        console.warn('Production desktop meeting setup fetch notice:', err);
+      });
+  }, []);
 
   // Meeting State
   const [connected, setConnected] = useState(false);

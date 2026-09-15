@@ -4,6 +4,7 @@ import { M01_NodeSetup } from './screens/M01_NodeSetup';
 import { M02_PairingStation } from './screens/M02_PairingStation';
 import { M03_CommandNode } from './screens/M03_CommandNode';
 import { M04_SecurityEnclave } from './screens/M04_SecurityEnclave';
+import { M05_MeetingSetup } from './screens/M05_MeetingSetup';
 import { EvaMeetingScreen } from './screens/EvaMeetingScreen';
 import { ProjectsScreen } from './screens/ProjectsScreen';
 import { ModelRouterScreen } from './screens/ModelRouterScreen';

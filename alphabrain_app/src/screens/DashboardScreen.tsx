@@ -17,14 +17,14 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
     }
   }, [initialDashboard]);
 
-  const emergencyStopActive = dashboard ? dashboard.emergency_stop.active : overview.emergency_stop.active;
-  const telemetry = dashboard ? dashboard.telemetry : overview.telemetry;
-  const quotasSummary = dashboard ? dashboard.ai_quotas_summary : `${overview.system_status === 'operational' ? '85%' : '0%'} AVAILABLE`;
-  const activeProjects = dashboard ? `${dashboard.active_projects_count} ACTIVE` : '0 ACTIVE';
-  const techDeptAgents = dashboard ? `${dashboard.tech_dept_agents_count} AGENTS` : `${overview.active_sprint_workers} AGENTS`;
-  const triagePending = dashboard ? `${dashboard.triage_pending_count} PENDING` : `${overview.triage_backlog_count} PENDING`;
-  const worktreesSummary = dashboard ? dashboard.worktrees_summary : '0 ACTIVE WORKTREES';
-  const hardwareSerial = dashboard ? dashboard.hardware_sync_serial : (overview.telemetry.usb_device_serial || '');
+  const emergencyStopActive = dashboard ? dashboard.emergency_stop.active : (overview?.emergency_stop?.active ?? false);
+  const telemetry = dashboard ? dashboard.telemetry : (overview?.telemetry ?? { host_cpu_percent: 0, host_ram_percent: 0, host_ram_used_gb: 0, host_ram_total_gb: 0, thermal_pressure: 'nominal', battery_level_percent: 0, battery_charging: false, usb_device_connected: false, usb_device_serial: '---', usb_device_name: 'None' });
+  const quotasSummary = dashboard ? dashboard.ai_quotas_summary : '---';
+  const activeProjects = dashboard ? `${dashboard.active_projects_count} ACTIVE` : '---';
+  const techDeptAgents = dashboard ? `${dashboard.tech_dept_agents_count} AGENTS` : (overview?.active_sprint_workers ? `${overview.active_sprint_workers} AGENTS` : '---');
+  const triagePending = dashboard ? `${dashboard.triage_pending_count} PENDING` : (overview?.triage_backlog_count ? `${overview.triage_backlog_count} PENDING` : '---');
+  const worktreesSummary = dashboard ? dashboard.worktrees_summary : '---';
+  const hardwareSerial = dashboard ? dashboard.hardware_sync_serial : (overview?.telemetry?.usb_device_serial || '---');
 
   return (
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A]">
@@ -41,7 +41,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
               emergencyStopActive ? 'bg-[#E6391E] text-white' : 'bg-white text-[#0A0A0A]'
             }`}
           >
-            {emergencyStopActive ? 'LOCKED' : (dashboard?.system_status ? dashboard.system_status.toUpperCase() : 'SYSTEM LIVE')}
+            {emergencyStopActive ? 'LOCKED' : (dashboard?.system_status ? dashboard.system_status.toUpperCase() : 'CONNECTING...')}
           </span>
         </div>
       </div>

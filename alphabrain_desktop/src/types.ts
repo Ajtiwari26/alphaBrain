@@ -35,6 +35,7 @@ export type ScreenId =
   | 'M02_PairingStation'
   | 'M03_CommandNode'
   | 'M04_SecurityEnclave'
+  | 'M05_MeetingSetup'
   | 'EvaMeeting'
   | 'Projects'
   | 'ModelRouter'
