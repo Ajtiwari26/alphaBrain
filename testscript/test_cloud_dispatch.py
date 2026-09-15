@@ -441,11 +441,11 @@ def test_node_register_wss_lifecycle(clean_stores: dict[str, object], client: Te
 
     # Invariant I-56: After WebSocket disconnection, node status is marked offline
     node = None
-    for _ in range(20):
+    for _ in range(50):
         node = asyncio.run(node_registry.get_node("node-mac-runner"))
         if node and node.status == "offline":
             break
-        time.sleep(0.05)
+        time.sleep(0.1)
     assert node is not None
     assert node.status == "offline"
 

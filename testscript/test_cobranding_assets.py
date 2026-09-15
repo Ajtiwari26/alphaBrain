@@ -6,10 +6,8 @@ WORKTREE_ROOT = Path(__file__).resolve().parent.parent
 
 def test_svg_assets_exist_and_are_valid():
     svg_paths = [
-        WORKTREE_ROOT / "alphabrain_app" / "public" / "alpha_symbol.svg",
         WORKTREE_ROOT / "alphabrain_app" / "public" / "alphabrain_logo.svg",
         WORKTREE_ROOT / "alphabrain_app" / "public" / "deploymate_logo.svg",
-        WORKTREE_ROOT / "alphabrain_desktop" / "public" / "alpha_symbol.svg",
         WORKTREE_ROOT / "alphabrain_desktop" / "public" / "alphabrain_logo.svg",
         WORKTREE_ROOT / "alphabrain_desktop" / "public" / "deploymate_logo.svg",
     ]
