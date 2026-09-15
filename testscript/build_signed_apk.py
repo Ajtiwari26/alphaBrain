@@ -4,6 +4,7 @@ Packages and signs the production Android APK using the production keystore and 
 """
 
 import os
+import shutil
 import subprocess
 import zipfile
 from pathlib import Path
@@ -13,10 +14,10 @@ APP_DIR = PROJECT_ROOT / "alphabrain_app" / "android" / "app"
 SRC_MAIN = APP_DIR / "src" / "main"
 OUTPUT_DIR = APP_DIR / "build" / "outputs" / "apk" / "release"
 KEYSTORE_PATH = APP_DIR / "release.keystore"
-KEY_ALIAS = "alphabrain"
+KEY_ALIAS = os.getenv("KEY_ALIAS", "alphabrain")
 
 KEY_PASS = os.getenv("KEY_PASSWORD") or os.getenv("KEYSTORE_PASSWORD") or "alphabrain2026"
-JARSIGNER_BIN = Path("/opt/homebrew/opt/openjdk@17/bin/jarsigner")
+JARSIGNER_BIN = Path(shutil.which("jarsigner") or "/opt/homebrew/opt/openjdk@17/bin/jarsigner")
 
 
 def build_unsigned_apk(output_apk: Path) -> None:

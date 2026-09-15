@@ -18,10 +18,10 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file('release.keystore')
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: 'alphabrain2026'
+            storeFile file(System.getenv("KEYSTORE_PATH") ?: 'release.keystore')
+            storePassword System.getenv("KEYSTORE_PASSWORD")
             keyAlias System.getenv("KEY_ALIAS") ?: 'alphabrain'
-            keyPassword System.getenv("KEY_PASSWORD") ?: 'alphabrain2026'
+            keyPassword System.getenv("KEY_PASSWORD")
         }
     }
     buildTypes {
