@@ -218,6 +218,15 @@ export interface TaskSummary {
   acceptance_commands: string[];
 }
 
+export interface TaskDetail extends TaskSummary {
+  description: string;
+  branch_name?: string;
+  worktree_path?: string;
+  review_notes?: string;
+  gate_results: Record<string, any>;
+  checkpoints: Array<{ step: string; status: string; timestamp?: number }>;
+}
+
 export interface ModelUtilityScore {
   account_name: string;
   email: string;

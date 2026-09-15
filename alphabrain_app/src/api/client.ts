@@ -8,7 +8,13 @@ import {
   MeetingSetupScreenData,
   MeetingTokenResponse,
   ModelUtilityScore,
+  PrivacyConsentStats,
+  SelfHealingRadar,
+  SprintFleetOverview,
+  TaskDetail,
+  TaskDiffResponse,
   TaskSummary,
+  VoiceBriefing,
 } from '../types';
 
 export function getApiBaseUrl(): string {
@@ -79,8 +85,26 @@ export const mobileApi = {
       body: JSON.stringify({ action, founder_notes: notes }),
     }),
 
+  getTaskDetail: (taskId: string): Promise<TaskDetail> =>
+    safeFetch(`/tasks/${taskId}`),
+
+  getTaskDiff: (taskId: string): Promise<TaskDiffResponse> =>
+    safeFetch(`/tasks/${taskId}/diff`),
+
   promoteTask: (taskId: string) =>
     safeFetch(`/tasks/${taskId}/promote`, { method: 'POST' }),
+
+  getVoiceBriefing: (): Promise<VoiceBriefing> =>
+    safeFetch('/voice/briefing'),
+
+  sendSpokenCommand: (commandText: string) =>
+    safeFetch('/voice/command', {
+      method: 'POST',
+      body: JSON.stringify({ command_text: commandText }),
+    }),
+
+  getSprintFleet: (): Promise<SprintFleetOverview> =>
+    safeFetch('/sprint'),
 
   getDeployments: async (): Promise<DeploymentTarget[]> => {
     try {
@@ -94,8 +118,16 @@ export const mobileApi = {
   triggerRollback: (deploymentId: string) =>
     safeFetch(`/deployments/${deploymentId}/rollback`, { method: 'POST' }),
 
+  getSelfHealing: (): Promise<SelfHealingRadar> =>
+    safeFetch('/self-healing'),
+
   getTelemetry: (): Promise<HardwareTelemetry> =>
     safeFetch('/telemetry'),
+
+  getPrivacyStats: (): Promise<PrivacyConsentStats> =>
+    safeFetch('/privacy'),
+
+  purgePrivacy: () => safeFetch('/privacy/purge', { method: 'POST' }),
 
   getModelScores: async (): Promise<ModelUtilityScore[]> => {
     try {
