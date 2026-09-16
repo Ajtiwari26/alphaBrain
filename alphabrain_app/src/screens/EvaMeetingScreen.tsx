@@ -12,17 +12,12 @@ import {
   Check,
   Users,
   MessageSquare,
-  Languages,
-  ArrowLeft,
+  Hand,
   MonitorUp,
-  Lock,
-  ChevronDown,
-  Send,
-  Sliders,
+  Languages,
   Moon,
   Sun,
   X,
-  Radio,
 } from 'lucide-react';
 
 interface Props {
@@ -49,35 +44,71 @@ export const TRANSLATION_DICTIONARY: Record<string, Record<string, string>> = {
     zh: '下午好，创始人 Ajay。LiveKit WebRTC 桥接已建立，延迟 18ms。',
     ja: 'こんにちは、創業者 Ajay。LiveKit WebRTC ブリッジが 18ms のレイテンシで確立されました。',
     ko: '안녕하세요 설립자 Ajay 님. LiveKit WebRTC 브리지가 18ms 지연율로 연결되었습니다.',
-    ar: 'مساء الخير أيها المؤسस أجاي. تم إنشاء جسر LiveKit WebRTC بزمن انتقال 18 مللي ثانية.',
+    ar: 'مساء الخير أيها المؤسس أجاي. تم إنشاء جسر LiveKit WebRTC بزمن انتقال 18 مللي ثانية.',
     es: 'Buenas tardes, Fundador Ajay. El puente LiveKit WebRTC está establecido con 18ms de latencia.',
     fr: 'Bonjour Fondateur Ajay. La passerelle WebRTC LiveKit est établie avec une latence de 18ms.',
     de: 'Guten Tag Gründer Ajay. Die LiveKit WebRTC-Bridge ist mit 18ms Latenz aufgebaut.',
     pt: 'Boa tarde Fundador Ajay. Ponte LiveKit WebRTC estabelecida com latência de 18ms.',
   },
   't-2': {
-    en: 'Telemetry shows Android device 10BF5P2AZF0010T synced over USB ADB reverse proxy.',
-    hi: 'टेलीमेट्री दिखाती है कि एंड्रॉइड डिवाइस 10BF5P2AZF0010T यूएसबी एडीबी रिवर्स प्रॉक्सी पर समन्वयित है।',
-    zh: '遥测显示 Android 设备 10BF5P2AZF0010T 已通过 USB ADB 反向代理同步。',
-    ja: 'テレメトリにより Android デバイス 10BF5P2AZF0010T が USB ADB リバースプロキシ経由で同期されたことが示されています。',
-    ko: 'Android 기기 10BF5P2AZF0010T가 USB ADB 역방향 프록시를 통해 동기화되었습니다.',
-    ar: 'تُظهر القياسات عن بُعد مزامنة جهاز Android 10BF5P2AZF0010T عبر وكيل USB ADB العكسي.',
-    es: 'La telemetría muestra el dispositivo Android 10BF5P2AZF0010T sincronizado mediante proxy inverso USB ADB.',
-    fr: 'La télémétrie montre l\'appareil Android 10BF5P2AZF0010T synchronisé via proxy inverse USB ADB.',
-    de: 'Telemetrie zeigt Android-Gerät 10BF5P2AZF0010T über USB ADB synchronisiert.',
-    pt: 'Telemetria mostra dispositivo Android 10BF5P2AZF0010T sincronizado via proxy reverso USB ADB.',
+    en: 'Mobile Command Node v2.0 synchronized with cloud execution hub (api.alphabrain.live).',
+    hi: 'मोबाइल कमांड नोड v2.0 क्लाउड निष्पादन केंद्र के साथ समन्वयित है।',
+    zh: '移动命令节点 v2.0 与云端执行中心 (api.alphabrain.live) 同步。',
+    ja: 'モバイルコマンドノード v2.0 がクラウド実行ハブ (api.alphabrain.live) と同期されました。',
+    ko: '모바일 명령 노드 v2.0이 클라우드 허브(api.alphabrain.live)와 동기화되었습니다.',
+    ar: 'تمت مزامنة عقدة أوامر الهاتف المحمول v2.0 مع مركز التنفيذ السحابي (api.alphabrain.live).',
+    es: 'Nodo de comando móvil v2.0 sincronizado con el centro de ejecución en la nube (api.alphabrain.live).',
+    fr: 'Nœud de commande mobile v2.0 synchronisé avec le hub d\'exécution cloud (api.alphabrain.live).',
+    de: 'Mobiles Befehlsknoten v2.0 mit Cloud-Hub synchronisiert.',
+    pt: 'Nó de comando móvel v2.0 sincronizado com hub de nuvem (api.alphabrain.live).',
   },
   't-3': {
-    en: 'Architecture blueprint verified: Next.js edge gateway and LiveKit SFU topology ready for 15-gate deployment.',
-    hi: 'आर्किटेक्चर ब्लूप्रिंट सत्यापित: नेक्स्ट.जेएस एज गेटवे और लाइवकिट एसएफयू टोपोलॉजी तैयार है।',
-    zh: '架构蓝图已验证：Next.js 边缘网关与 LiveKit SFU 拓扑就绪，支持 15 个门禁部署。',
-    ja: 'アーキテクチャブループリント検証済み：Next.js エッジゲートウェイと LiveKit SFU トポロジの準備が完了しました。',
-    ko: '아키텍처 블루프린트 검증 완료: Next.js 에지 게이트웨이 및 LiveKit SFU 토폴로지 준비 완료.',
-    ar: 'تم التحقق من مخطط البنية المعمارية: جاهز لنشر بوابات LiveKit SFU.',
-    es: 'Plano de arquitectura verificado: puerta de enlace perimetral Next.js y topología LiveKit SFU listas.',
-    fr: 'Plan d\'architecture vérifié : passerelle Edge Next.js et topologie LiveKit SFU prêtes.',
-    de: 'Architektur-Blueprint verifiziert: Next.js Edge-Gateway und LiveKit SFU bereit.',
-    pt: 'Plano de arquitetura verificado: gateway de borda Next.js e topologia LiveKit SFU prontos.',
+    en: 'All 14 departments and triage pipelines are healthy. Sprint fleet has active worker leases.',
+    hi: 'सभी 14 विभाग और ट्राइएज पाइपलाइन स्वस्थ हैं।',
+    zh: '全部 14 个部门和分类管线运行正常。冲刺集群拥有活跃的工作租约。',
+    ja: '14 の部門とトリアージパイプラインはすべて健全です。スプリントフリートにはアクティブなワーカーリースがあります。',
+    ko: '14개 모든 부서와 트리아지 파이프라인이 정상 상태입니다.',
+    ar: 'جميع الأقسام الـ 14 وخطوط الفرز تعمل بصحة جيدة.',
+    es: 'Los 14 departamentos y conductos de triaje están en buen estado.',
+    fr: 'Les 14 départements et pipelines de triage sont opérationnels.',
+    de: 'Alle 14 Abteilungen und Triage-Pipelines sind intakt.',
+    pt: 'Todos os 14 departamentos e pipelines de triagem estão operando perfeitamente.',
+  },
+  't-4': {
+    en: 'Ready for voice instructions or executive directives on mobile.',
+    hi: 'मोबाइल पर ध्वनि निर्देशों या कार्यकारी निर्देशों के लिए तैयार हैं।',
+    zh: '已就绪，可在移动端接收语音指令或高管指令。',
+    ja: 'モバイル上での音声指示またはエグゼクティブ指示の準備が整いました。',
+    ko: '모바일에서 음성 지시 또는 경영진 지침을 받을 준비가 되었습니다.',
+    ar: 'جاهز للتعليمات الصوتية أو التوجيهات التنفيذية على الهاتف المحمول.',
+    es: 'Listo para instrucciones de voz o directivas ejecutivas en móvil.',
+    fr: 'Prêt pour les instructions vocales ou les directives exécutives sur mobile.',
+    de: 'Bereit für Sprachbefehle oder Führungsanweisungen auf dem Mobilgerät.',
+    pt: 'Pronto para instruções de voz ou diretrizes executivas no celular.',
+  },
+  'eva-summary': {
+    en: 'All 14 gates verified. Cloud dispatch running on api.alphabrain.live with zero regressions.',
+    hi: 'सभी 14 गेट्स सत्यापित हैं। शून्य प्रतिगमन के साथ क्लाउड प्रेषण चल रहा है।',
+    zh: '所有 14 个门禁已验证。云端调度在 api.alphabrain.live 上以零回归运行。',
+    ja: '14 のゲートすべてが検証されました。api.alphabrain.live でのリグレッションゼロのクラウドディスパッチ。',
+    ko: '14개 게이트 모두 검증되었습니다. 무결점으로 클라우드 디스패치 실행 중입니다.',
+    ar: 'تم التحقق من جميع البوابات الـ 14. الإرسال السحابي يعمل دون أي تراجع.',
+    es: 'Los 14 controles verificados. Despacho en la nube ejecutándose con cero regresiones.',
+    fr: 'Les 14 barrières sont vérifiées. Répartition cloud active avec zéro régression.',
+    de: 'Alle 14 Gates verifiziert. Cloud-Dispatch läuft ohne Regressionen.',
+    pt: 'Todos os 14 portões verificados. Despacho na nuvem ativo com zero regressões.',
+  },
+  'prompt-question': {
+    en: 'Eva, summarize current deployment status and active gates.',
+    hi: 'ईवा, वर्तमान परिनियोजन स्थिति और सक्रिय गेट्स का संक्षेप दें।',
+    zh: 'Eva，请总结当前的部署状态和活动门禁。',
+    ja: 'Eva、現在のデプロイステータスとアクティブなゲートの概要を説明してください。',
+    ko: 'Eva, 현재 배포 상태와 활성 게이트를 요약해 주세요.',
+    ar: 'إيفا، يرجى تلخيص حالة النشر الحالية والبوابات النشطة.',
+    es: 'Eva, resume el estado de despliegue actual y las compuertas activas.',
+    fr: 'Eva, résumez l\'état actuel du déploiement et les barrières actives.',
+    de: 'Eva, fassen Sie den aktuellen Bereitstellungsstatus und die aktiven Gates zusammen.',
+    pt: 'Eva, resuma o status atual de implantação e os portões ativos.',
   },
 };
 
@@ -86,39 +117,66 @@ interface TranscriptItem {
   speaker: string;
   text: string;
   time: string;
-  isAi: boolean;
-  avatar?: string;
+  translationKey?: string;
+  customTranslation?: (lang: string) => string;
 }
 
-const AJAY_PORTRAIT_URL =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCqXD3luIb9W8Z9iQf6ljJKKKQIQKW3j4JG0muKHow-Kc6ZlcWvCw94PimwcIv-_aGVaurNSa45wB8nfnsAapOCHLbqach518ZKDlR7SVvFC7r-H3Z4nG5AfSUva5EGb1O2pGHgm2ciNBxe52e4zi8h5ibJcso3MfWGyLqPvUkPWhsTij2jyPxHZVGp5p2K-4r2JWXa6QcI9eeBOKtIhcZpHEBwAcIfz_Ir7EQrldJlqV1g0yFoIYmUpdeOi0VOCd8TUTUoTpgQc_MH';
-
-const EVA_PORTRAIT_URL =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuA9QWv5ArvRic7dhEfnU_uXWRIM5Aw-3bgLg0DoFjxaheaUVud3dBu8mpmk28un1CHiiTbKvz82HmtWicnL4sjQrhOhTUUNpe0SI9a0wSj_k-UmMcqtowHHew7ECIi-1FXHJobpyNvQnRiafljqzVdhj4WDS5rPU_7Y90sRSIuWUABbM97U8zWbsGFH-QyuWg_Vzarlz-kO4md2b-BslJ0sniDuuvAnm5PwKpPkA6mRHbM5Ow6LfpqioqtgxtfDA84hBA5YgEwBY9zF';
+const INITIAL_TRANSCRIPTS: TranscriptItem[] = [
+  {
+    id: 't-1',
+    speaker: 'Eva (AI Architect)',
+    text: 'Good afternoon Founder Ajay. LiveKit WebRTC bridge is established at 18ms latency.',
+    time: '12:00:04',
+    translationKey: 't-1',
+  },
+  {
+    id: 't-2',
+    speaker: 'Eva (AI Architect)',
+    text: 'Mobile Command Node v2.0 synchronized with cloud execution hub (api.alphabrain.live).',
+    time: '12:00:12',
+    translationKey: 't-2',
+  },
+  {
+    id: 't-3',
+    speaker: 'Eva (AI Architect)',
+    text: 'All 14 departments and triage pipelines are healthy. Sprint fleet has active worker leases.',
+    time: '12:00:20',
+    translationKey: 't-3',
+  },
+  {
+    id: 't-4',
+    speaker: 'Eva (AI Architect)',
+    text: 'Ready for voice instructions or executive directives on mobile.',
+    time: '12:00:28',
+    translationKey: 't-4',
+  },
+];
 
 export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
-  // Lobby & Connection States
+  // Lobby State
   const [inLobby, setInLobby] = useState(false);
-  const [identity, setIdentity] = useState('Ajay');
+  const [identity, setIdentity] = useState('Ajay (Founder)');
   const [roomName, setRoomName] = useState('alphabrain-executive-briefing');
   const [apiToken, setApiToken] = useState('');
-  const [translateEnabled, setTranslateEnabled] = useState(true);
-  const [connected, setConnected] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState('hi');
+  const [liveTranslateEnabled, setLiveTranslateEnabled] = useState(true);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const [participantCount, setParticipantCount] = useState(2);
 
-  // AV & Interaction States
+  // Meeting State
+  const [connected, setConnected] = useState(true);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [currentLang, setCurrentLang] = useState('en');
-  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [showNotes, setShowNotes] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [inputText, setInputText] = useState('');
-  const [sessionSeconds, setSessionSeconds] = useState(868); // 00:14:28
-  const [isSpeaking, setIsSpeaking] = useState(true);
+  const [evaSpeaking, setEvaSpeaking] = useState(true);
+  const [hasRemoteClient, setHasRemoteClient] = useState(false);
+  const [remoteClientName] = useState('Client');
+  const [transcripts, setTranscripts] = useState<TranscriptItem[]>(INITIAL_TRANSCRIPTS);
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [languageModalOpen, setLanguageModalOpen] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [timerSeconds, setTimerSeconds] = useState(0);
 
   // Hardware Media References
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -145,34 +203,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     timeoutsRef.current.clear();
   };
 
-  const [transcripts, setTranscripts] = useState<TranscriptItem[]>([
-    {
-      id: 't-1',
-      speaker: 'Eva (CTO)',
-      text: TRANSLATION_DICTIONARY['t-1'].en,
-      time: '14:28:02',
-      isAi: true,
-      avatar: EVA_PORTRAIT_URL,
-    },
-    {
-      id: 't-2',
-      speaker: 'Eva (CTO)',
-      text: TRANSLATION_DICTIONARY['t-2'].en,
-      time: '14:28:15',
-      isAi: true,
-      avatar: EVA_PORTRAIT_URL,
-    },
-    {
-      id: 't-3',
-      speaker: 'Eva (CTO)',
-      text: TRANSLATION_DICTIONARY['t-3'].en,
-      time: '14:28:28',
-      isAi: true,
-      avatar: EVA_PORTRAIT_URL,
-    },
-  ]);
-
-  // Load meeting setup from backend mobileApi
+  // Load meeting setup from mobileApi
   useEffect(() => {
     mobileApi
       .getMeetingSetup('alphabrain-executive-briefing')
@@ -186,18 +217,25 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         }
       })
       .catch((err) => {
-        console.warn('Production mobile meeting setup notice:', err);
+        console.warn('Production mobile meeting setup fetch notice:', err);
       });
   }, []);
 
   // Session running timer
   useEffect(() => {
     if (inLobby) return;
-    const timer = setInterval(() => {
-      setSessionSeconds((prev) => prev + 1);
+    const interval = window.setInterval(() => {
+      setTimerSeconds((prev) => prev + 1);
     }, 1000);
-    return () => clearInterval(timer);
+    return () => clearInterval(interval);
   }, [inLobby]);
+
+  // Scroll transcript feed to bottom on new turn
+  useEffect(() => {
+    if (transcriptListRef.current) {
+      transcriptListRef.current.scrollTop = transcriptListRef.current.scrollHeight;
+    }
+  }, [transcripts]);
 
   // Attach local camera stream reliably
   useEffect(() => {
@@ -210,7 +248,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     }
   }, [cameraEnabled]);
 
-  // Attach screen share stream to presentation slide preview
+  // Attach screen share stream to PIP preview
   useEffect(() => {
     if (screenVideoRef.current) {
       if (isScreenSharing && screenStreamRef.current) {
@@ -221,7 +259,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     }
   }, [isScreenSharing]);
 
-  // Clean up hardware streams & audio context on unmount or end call
+  // Clean up streams & timers when leaving or unmounting
   const cleanupMedia = () => {
     clearAllTimeouts();
     if (mediaStreamRef.current) {
@@ -248,32 +286,15 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     return () => cleanupMedia();
   }, []);
 
-  // Graceful meeting exit handler preventing stream leaks
-  const handleEndCall = () => {
-    cleanupMedia();
-    if (onLeave) {
-      onLeave();
-    }
-  };
-
-  const formatTimer = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
-  };
-
-  // LiveKit / WebRTC Token Handshake & Join
-  const handleJoin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setJoinError(null);
 
     if (apiToken) {
       try {
-        localStorage.setItem('alpha_api_token', apiToken);
+        sessionStorage.setItem('alpha_api_token', apiToken);
       } catch {
-        // Fallback
+        // Storage fallback
       }
     }
 
@@ -288,18 +309,18 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
       }
 
       setInLobby(false);
-      setSessionSeconds(0);
+      setTimerSeconds(0);
 
       if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
           mediaStreamRef.current = stream;
         } catch {
-          // Fallback
+          // Permissive fallback
         }
       }
     } catch (err: any) {
-      setJoinError(err?.message || 'Failed to join meeting');
+      setJoinError(err?.message || 'Failed to join meeting room');
     }
   };
 
@@ -325,9 +346,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     } else {
       try {
         if (navigator.mediaDevices?.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
-          });
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           if (mediaStreamRef.current) {
             stream.getVideoTracks().forEach((t) => mediaStreamRef.current?.addTrack(t));
           } else {
@@ -357,41 +376,112 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     } else {
       try {
         if (navigator.mediaDevices?.getDisplayMedia) {
-          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
           screenStreamRef.current = stream;
+          const videoTrack = stream.getVideoTracks()[0];
+          if (videoTrack) {
+            videoTrack.onended = () => {
+              if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach((t) => t.stop());
+                screenStreamRef.current = null;
+              }
+              if (screenVideoRef.current) {
+                screenVideoRef.current.srcObject = null;
+              }
+              setIsScreenSharing(false);
+            };
+          }
           if (screenVideoRef.current) {
             screenVideoRef.current.srcObject = stream;
           }
           setIsScreenSharing(true);
-          stream.getVideoTracks()[0].onended = () => {
-            setIsScreenSharing(false);
-            if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
-          };
         } else {
-          setIsScreenSharing(false);
+          setIsScreenSharing(true);
         }
-      } catch (err) {
-        console.warn('Screen share cancelled or failed:', err);
+      } catch {
         setIsScreenSharing(false);
       }
     }
   };
 
-  const handleLanguageChange = (code: string) => {
-    setCurrentLang(code);
-    setIsLangMenuOpen(false);
-    setTranscripts((prev) =>
-      prev.map((item) => {
-        const dict = TRANSLATION_DICTIONARY[item.id];
-        if (dict && dict[code]) {
-          return { ...item, text: dict[code] };
-        }
-        return item;
-      })
-    );
+  const handlePromptEva = () => {
+    clearAllTimeouts();
+    setEvaSpeaking(false);
+
+    const newTurn: TranscriptItem = {
+      id: `t-${Date.now()}`,
+      speaker: identity,
+      text: 'Eva, summarize current deployment status and active gates.',
+      translationKey: 'prompt-question',
+      time: formatTime(timerSeconds),
+    };
+    setTranscripts((prev) => [...prev, newTurn]);
+
+    safeTimeout(() => {
+      setEvaSpeaking(true);
+      const evaReply: TranscriptItem = {
+        id: `t-${Date.now() + 1}`,
+        speaker: 'Eva (AI Architect)',
+        text: 'All 14 gates verified. Cloud dispatch running on api.alphabrain.live with zero regressions.',
+        translationKey: 'eva-summary',
+        time: formatTime(timerSeconds + 2),
+      };
+      setTranscripts((prev) => [...prev, evaReply]);
+    }, 1500);
   };
 
-  const handleShareInvite = async () => {
+  const getChatAckTranslation = (text: string, lang: string): string => {
+    switch (lang) {
+      case 'hi':
+        return `स्वीकृत: "${text}"। कार्यकारी बैठक की कार्य सूची में जोड़ा गया।`;
+      case 'zh':
+        return `已确认：“${text}”。已添加到执行会议行动项。`;
+      case 'ja':
+        return `確認しました：「${text}」。エグゼクティブ会議のアクションアイテムに追加されました。`;
+      case 'ko':
+        return `확인됨: "${text}". 회의 조치 항목에 추가되었습니다.`;
+      case 'ar':
+        return `تم التأكيد: "${text}". تمت إضافتها إلى بنود عمل الاجتماع التنفيذي.`;
+      case 'es':
+        return `Reconocido: "${text}". Agregado a los puntos de acción de la reunión ejecutiva.`;
+      case 'fr':
+        return `Reçu : "${text}". Ajouté aux éléments d'action de la réunion.`;
+      case 'de':
+        return `Bestätigt: "${text}". Zu den Aktionspunkten des Meetings hinzugefügt.`;
+      case 'pt':
+        return `Reconhecido: "${text}". Adicionado aos itens de ação da reunião executiva.`;
+      default:
+        return `Acknowledged: "${text}". Added to executive meeting action items.`;
+    }
+  };
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userText = chatInput.trim();
+    const userTurn: TranscriptItem = {
+      id: `t-${Date.now()}`,
+      speaker: identity,
+      text: userText,
+      time: formatTime(timerSeconds),
+    };
+    setTranscripts((prev) => [...prev, userTurn]);
+    setChatInput('');
+
+    safeTimeout(() => {
+      const ackItem: TranscriptItem = {
+        id: `t-${Date.now() + 1}`,
+        speaker: 'Eva (AI Architect)',
+        text: `Acknowledged: "${userText}". Added to executive meeting action items.`,
+        customTranslation: (lang: string) => getChatAckTranslation(userText, lang),
+        time: formatTime(timerSeconds + 1),
+      };
+      setTranscripts((prev) => [...prev, ackItem]);
+    }, 1000);
+  };
+
+  const copyInviteLink = async () => {
     let inviteUrl = `${window.location.origin}/meet#invite=${encodeURIComponent(roomName)}`;
     try {
       const inviteData = await mobileApi.createMeetingInvite(roomName, 'Client', apiToken || undefined);
@@ -407,12 +497,12 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(inviteUrl);
     }
-    setCopiedLink(true);
-    safeTimeout(() => setCopiedLink(false), 2000);
+    setShareToast('Invite link copied to clipboard!');
+    safeTimeout(() => setShareToast(null), 3000);
   };
 
   const toggleDarkMode = () => {
-    setIsDarkMode((prev) => {
+    setDarkMode((prev) => {
       const next = !prev;
       if (typeof document !== 'undefined') {
         document.documentElement.classList.toggle('dark', next);
@@ -421,632 +511,561 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     });
   };
 
-  const handleSendMessage = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputText.trim()) return;
-
-    const newMsg: TranscriptItem = {
-      id: `user-${Date.now()}`,
-      speaker: 'Ajay (Founder)',
-      text: inputText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      isAi: false,
-      avatar: AJAY_PORTRAIT_URL,
-    };
-
-    setTranscripts((prev) => [...prev, newMsg]);
-    setInputText('');
-
-    safeTimeout(() => {
-      setIsSpeaking(true);
-      const evaReply: TranscriptItem = {
-        id: `eva-${Date.now()}`,
-        speaker: 'Eva (CTO)',
-        text: `Directive acknowledged: "${newMsg.text}". Updating pipeline and generating plan artifact.`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        isAi: true,
-        avatar: EVA_PORTRAIT_URL,
-      };
-      setTranscripts((prev) => [...prev, evaReply]);
-      transcriptListRef.current?.scrollTo({ top: transcriptListRef.current.scrollHeight, behavior: 'smooth' });
-    }, 900);
+  const handleEndCall = () => {
+    cleanupMedia();
+    setInLobby(true);
+    setConnected(false);
+    setIsScreenSharing(false);
+    setCameraEnabled(false);
+    setMicMuted(false);
+    if (onLeave) onLeave();
   };
 
-  const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.05;
-      window.speechSynthesis.speak(utterance);
+  const formatTime = (totalSec: number) => {
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const getTranslatedLine = (item: TranscriptItem, lang: string): string => {
+    if (item.translationKey && TRANSLATION_DICTIONARY[item.translationKey]) {
+      return TRANSLATION_DICTIONARY[item.translationKey][lang] || TRANSLATION_DICTIONARY[item.translationKey]['en'] || item.text;
     }
+    if (item.customTranslation) {
+      return item.customTranslation(lang);
+    }
+    return item.text;
   };
+
+  const getStageLayoutClass = () => {
+    if (hasRemoteClient) {
+      return 'stage-grid layout-3';
+    }
+    if (connected || evaSpeaking) {
+      return 'stage-grid layout-2';
+    }
+    return 'stage-grid layout-1';
+  };
+  const stageLayoutClass = getStageLayoutClass();
+  const participantCount = (connected ? 1 : 0) + 1 + (hasRemoteClient ? 1 : 0);
 
   return (
-    <div className="bg-[#EAE7E1] text-[#1b1b1b] min-h-screen font-sans selection:bg-[#e8e2d5] relative flex flex-col justify-between overflow-x-hidden pb-28">
-      {/* Dynamic Keyframes & Stone-Glass styles */}
-      <style>{`
-        @keyframes pulse-subtle {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.15); }
-        }
-        .live-pulse {
-          animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
+    <div className={`h-full w-full flex flex-col justify-between overflow-hidden ${darkMode ? 'bg-neutral-950 text-white' : 'bg-white text-black font-sans'}`}>
+      {/* Co-Branding Banner */}
+      <div className="flex items-center justify-between border-b border-[#0A0A0A] bg-neutral-50 px-4 py-2 font-mono text-xs shrink-0">
+        <div className="flex items-center gap-2">
+          <img
+            src="/alphabrain_logo.svg"
+            alt="AlphaBrain Logo"
+            className="w-4 h-4 object-contain"
+          />
+          <span className="font-bold text-[#0A0A0A] tracking-tight text-[11px]">
+            AlphaBrain is powered by DeployMate
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <img
+            src="/deploymate_logo.svg"
+            alt="DeployMate Logo"
+            className="h-3.5 object-contain"
+          />
+        </div>
+      </div>
 
-        @keyframes waveform {
-          0%, 100% { height: 4px; }
-          50% { height: 16px; }
-        }
-        .waveform-bar-1 { animation: waveform 0.9s ease-in-out infinite 0.1s; }
-        .waveform-bar-2 { animation: waveform 0.7s ease-in-out infinite 0.3s; }
-        .waveform-bar-3 { animation: waveform 1.1s ease-in-out infinite 0.2s; }
-        .waveform-bar-4 { animation: waveform 0.8s ease-in-out infinite 0.4s; }
-
-        .stone-glass {
-          background: rgba(253, 249, 239, 0.72);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.65);
-        }
-        .stone-glass-card {
-          background: rgba(243, 243, 243, 0.78);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.8);
-          box-shadow: 0 10px 30px -10px rgba(98, 94, 84, 0.08);
-        }
-      `}</style>
-
-      {/* Accessible Lobby Form for LiveKit setup & keyboard submission */}
-      {inLobby && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <form
-            onSubmit={handleJoin}
-            className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-neutral-200"
-          >
-            <h2 className="text-lg font-bold text-center">Join Meeting</h2>
-            <input
-              id="identity-input"
-              type="text"
-              value={identity}
-              onChange={(e) => setIdentity(e.target.value)}
-              className="identity-input w-full p-2.5 border rounded-xl text-xs"
-              placeholder="Your Name"
-            />
-            <input
-              id="room-input"
-              type="text"
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              className="room-input w-full p-2.5 border rounded-xl text-xs"
-              placeholder="Room Name"
-            />
-            <input
-              id="api-token-input"
-              type="password"
-              value={apiToken}
-              onChange={(e) => setApiToken(e.target.value)}
-              className="api-token-input w-full p-2.5 border rounded-xl text-xs"
-              placeholder="API Token (Optional)"
-            />
-            <select
-              id="language-select"
-              value={currentLang}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              className="language-select w-full p-2.5 border rounded-xl text-xs"
-            >
-              <option value="en">English</option>
-              <option value="hi">Hindi</option>
-              <option value="zh">Chinese</option>
-              <option value="ja">Japanese</option>
-              <option value="ko">Korean</option>
-              <option value="ar">Arabic</option>
-              <option value="es">Spanish</option>
-              <option value="fr">French</option>
-              <option value="de">German</option>
-              <option value="pt">Portuguese</option>
-            </select>
-            <div className="flex items-center justify-between text-xs py-1">
-              <label htmlFor="translate-toggle">Enable AI Translation</label>
-              <input
-                id="translate-toggle"
-                type="checkbox"
-                checked={translateEnabled}
-                onChange={(e) => setTranslateEnabled(e.target.checked)}
-                className="translate-toggle"
-              />
-            </div>
-            {joinError && <p className="text-xs text-red-600 font-medium">{joinError}</p>}
-            <button
-              type="submit"
-              className="join-btn w-full py-2.5 bg-black text-white rounded-xl font-semibold text-xs active:scale-95 transition-all"
-            >
-              Join Meeting
-            </button>
-          </form>
+      {/* Toast Notification */}
+      {shareToast && (
+        <div className="fixed top-16 right-4 z-50 bg-[#0A0A0A] text-white px-4 py-2 border border-black shadow-lg flex items-center gap-2 font-mono text-xs animate-bounce">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>{shareToast}</span>
         </div>
       )}
 
-      {/* Outer Mobile Wrapper */}
-      <div className="max-w-md mx-auto w-full min-h-screen relative flex flex-col justify-between">
-        {/* Top App Header */}
-        <header className="sticky top-0 z-40 bg-[#fdf9ef]/85 backdrop-blur-md flex justify-between items-center w-full px-4 py-3 border-b border-white/60 transition-all duration-200">
-          <div className="flex items-center gap-2">
+      {/* Lobby Join Modal */}
+      {inLobby ? (
+        <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleJoin} className="bg-white w-full max-w-sm border-2 border-black p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 pb-3 border-b border-black">
+              {/* AlphaBrain Neural Logo SVG */}
+              <svg className="w-8 h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="6" cy="20" r="2.5" fill="#000000"/>
+                <circle cx="15" cy="11" r="2.5" fill="#000000"/>
+                <circle cx="15" cy="20" r="2.5" fill="#000000"/>
+                <circle cx="15" cy="29" r="2.5" fill="#000000"/>
+                <circle cx="25" cy="14" r="2.5" fill="#000000"/>
+                <circle cx="25" cy="26" r="2.5" fill="#000000"/>
+                <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
+                <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" strokeWidth="1.2"/>
+                <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" strokeWidth="1.2"/>
+                <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" strokeWidth="1.2"/>
+                <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" strokeWidth="1.2"/>
+                <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" strokeWidth="1.2"/>
+                <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" strokeWidth="1.2"/>
+                <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" strokeWidth="1.2"/>
+                <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
+                <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
+              </svg>
+              <span className="font-bold text-xl tracking-tight text-black">AlphaBrain</span>
+            </div>
+
+            <div>
+              <h1 className="text-base font-bold text-black">Join Meeting</h1>
+              <p className="text-xs text-neutral-500 mt-0.5">LiveKit WebRTC meeting room with Eva voice participant.</p>
+            </div>
+
+            <label className="block text-xs font-semibold text-neutral-700">
+              Your Name
+              <input
+                id="identity-input"
+                required
+                maxLength={128}
+                value={identity}
+                onChange={(e) => setIdentity(e.target.value)}
+                className="mt-1 w-full border border-black px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </label>
+
+            <label className="block text-xs font-semibold text-neutral-700">
+              Room ID
+              <input
+                id="room-input"
+                required
+                value={roomName}
+                onChange={(e) => setRoomName(e.target.value)}
+                className="mt-1 w-full border border-black px-3 py-2 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </label>
+
+            <label className="block text-xs font-semibold text-neutral-700">
+              Access Token
+              <input
+                id="api-token-input"
+                type="password"
+                placeholder="Founder bearer token"
+                value={apiToken}
+                onChange={(e) => setApiToken(e.target.value)}
+                className="mt-1 w-full border border-black px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </label>
+
+            {/* Language Selection */}
+            <label className="block text-xs font-semibold text-neutral-700">
+              Your Language
+              <select
+                id="language-select"
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="mt-1 w-full border border-black px-3 py-2 text-xs bg-white text-black"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Live Translate Toggle */}
+            <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700">
+              <input
+                id="translate-toggle"
+                type="checkbox"
+                checked={liveTranslateEnabled}
+                onChange={(e) => setLiveTranslateEnabled(e.target.checked)}
+                className="accent-black w-4 h-4 rounded-none border-black"
+              />
+              Enable Live Translation
+            </label>
+
+            {joinError && (
+              <p id="join-error" className="text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert">
+                {joinError}
+              </p>
+            )}
+
             <button
-              onClick={handleEndCall}
-              aria-label="Leave Meeting"
-              className="w-9 h-9 flex items-center justify-center rounded-full text-black hover:bg-neutral-200/60 active:scale-95 transition-all duration-150"
+              id="join-btn"
+              type="submit"
+              className="w-full py-2.5 bg-black text-white font-semibold text-xs hover:bg-neutral-800 active:scale-[0.99] transition-all"
             >
-              <ArrowLeft className="w-5 h-5" />
+              JOIN ROOM
             </button>
-            <div className="flex flex-col">
-              <span className="text-xl tracking-tight font-medium font-serif text-[#1b1b1b]">
-                AlphaMeet
-              </span>
-              <div className="flex items-center gap-1.5 text-[10px] text-neutral-500">
-                <span className="participant-count font-mono font-medium">{participantCount} active</span>
-                <span>•</span>
-                <span>Room #{roomName.slice(0, 10)}</span>
+          </form>
+        </div>
+      ) : (
+        <>
+          {/* Top Header Navigation */}
+          <header className={`h-14 border-b ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-4 shrink-0 z-30`}>
+            {/* Left Logo & Title */}
+            <div className="flex items-center gap-2.5">
+              <svg className="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="6" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
+                <circle cx="15" cy="11" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
+                <circle cx="15" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
+                <circle cx="15" cy="29" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
+                <circle cx="25" cy="14" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
+                <circle cx="25" cy="26" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
+                <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
+                <line x1="6" y1="20" x2="15" y2="11" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
+                <line x1="6" y1="20" x2="15" y2="20" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
+                <line x1="6" y1="20" x2="15" y2="29" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
+                <line x1="15" y1="11" x2="25" y2="14" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
+                <line x1="15" y1="20" x2="25" y2="14" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
+                <line x1="15" y1="20" x2="25" y2="26" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
+                <line x1="15" y1="29" x2="25" y2="26" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
+                <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
+                <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
+              </svg>
+              <span className={`text-lg font-bold tracking-tight ${darkMode ? 'text-white' : 'text-black'}`}>AlphaBrain</span>
+            </div>
+
+            {/* Right Status & Actions */}
+            <div className="flex items-center h-full">
+              <div className="font-mono text-[10px] uppercase tracking-wider font-semibold px-3 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse"></span>
+                <span>MEETING LIVE</span>
+              </div>
+              <div className={`h-full w-px ${darkMode ? 'border-r border-neutral-800' : 'bg-black'}`}></div>
+              <div className="flex items-center gap-1.5 px-3">
+                <Users className="w-3.5 h-3.5" />
+                <span id="participant-count" className="font-mono text-xs font-semibold">{participantCount}</span>
+              </div>
+              <div className={`h-full w-px ${darkMode ? 'border-r border-neutral-800' : 'bg-black'}`}></div>
+              <button
+                id="header-invite-btn"
+                type="button"
+                onClick={copyInviteLink}
+                className="flex items-center gap-1.5 px-3 h-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors font-mono text-[10px] uppercase font-semibold"
+                title="Copy Invite Link"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>SHARE</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Main Meeting Content Area */}
+          <main className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
+            {/* Stage Area: Adaptive Grid */}
+            <div className="flex-1 p-3 overflow-hidden flex flex-col min-h-[260px]">
+              <div id="stage-grid" className={stageLayoutClass}>
+                {/* Tile 1: Founder (Local) */}
+                <div id="local-tile" className="video-tile-container relative flex items-center justify-center bg-black min-h-[140px]">
+                  <video
+                    ref={localVideoRef}
+                    id="local-video"
+                    className={`w-full h-full object-cover ${cameraEnabled ? 'block' : 'hidden'}`}
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                  {!cameraEnabled && (
+                    <div className="flex flex-col items-center justify-center text-white/50">
+                      <div className="w-14 h-14 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center">
+                        <Users className="w-7 h-7 text-white/60" />
+                      </div>
+                      <span className="font-mono text-[10px] mt-2 uppercase tracking-wider text-neutral-400">Camera Off</span>
+                    </div>
+                  )}
+
+                  {/* Screen Share Floating PIP Card */}
+                  {isScreenSharing && (
+                    <div id="screen-share-stage" className="absolute bottom-4 left-4 w-52 pip-share-card p-2.5 z-20">
+                      <div className="flex items-center justify-between border-b border-black/10 pb-1 mb-1.5">
+                        <span className="font-mono text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
+                        <span className="font-mono text-[9px] uppercase font-bold text-[#E6391E] flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-ping"></span>
+                          LIVE
+                        </span>
+                      </div>
+                      <div className="relative mb-1.5 w-full h-20 bg-black overflow-hidden border border-black/10">
+                        <video
+                          ref={screenVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div id="slide-content" className="flex items-center justify-between">
+                        <div className="text-[9px] font-mono text-black font-bold">Screen active</div>
+                        <button
+                          id="stage-screen-btn"
+                          type="button"
+                          onClick={toggleScreenShare}
+                          className="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-2 hover:bg-black hover:text-white transition-colors"
+                        >
+                          STOP
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Speaker Name Tag */}
+                  <div className="speaker-badge">
+                    <span className={`w-2 h-2 rounded-full ${micMuted ? 'bg-neutral-400' : 'bg-[#E6391E] animate-pulse'}`}></span>
+                    <span id="local-name">{identity}</span>
+                  </div>
+                </div>
+
+                {/* Tile 2: Eva AI Architect */}
+                <div id="eva-tile" className="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center min-h-[140px]">
+                  {/* Active Waveform Indicator */}
+                  {evaSpeaking && (
+                    <div id="eva-wave" className="absolute top-3 right-3 z-10">
+                      <div className="active-wave">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Center Graphic for Eva: Circular #E6391E Equalizer */}
+                  <div className="flex flex-col items-center gap-2 text-neutral-400">
+                    <div className="w-14 h-14 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
+                      <Volume2 className="w-7 h-7 text-[#E6391E]" />
+                    </div>
+                    <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">
+                      Gemini Live Voice Active
+                    </div>
+                  </div>
+
+                  {/* Speaker Tag */}
+                  <div className="speaker-badge">
+                    <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse"></span>
+                    <span id="eva-status-text">Eva (AI Architect)</span>
+                  </div>
+                </div>
+
+                {/* Remote Participants Stack */}
+                {hasRemoteClient && (
+                  <div id="remote-stack" className="flex flex-col gap-2 h-full">
+                    <div id="remote-human-tile" className="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+                      <div id="remote-human-placeholder" className="text-white/40 flex flex-col items-center">
+                        <Users className="w-8 h-8" />
+                      </div>
+                      <div className="speaker-badge">
+                        <span id="remote-human-name">{remoteClientName}</span>
+                        <Mic className="w-3 h-3 text-white/60 ml-1" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            {/* Share Invite Pill */}
-            <button
-              onClick={handleShareInvite}
-              className="header-invite-btn flex items-center gap-1.5 px-3 py-1.5 rounded-full stone-glass hover:bg-neutral-100 transition-colors active:scale-95 shadow-sm text-[#1b1b1b]"
-              title="Share Invite Link"
-            >
-              {copiedLink ? (
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-              ) : (
-                <Share2 className="w-3.5 h-3.5 text-neutral-600" />
-              )}
-              <span className="text-xs font-medium tracking-normal">
-                {copiedLink ? 'Copied' : 'Share Invite'}
-              </span>
-            </button>
+            {/* Live Notes / Real-Time Transcript Drawer */}
+            {drawerOpen && (
+              <aside id="transcript-drawer" className={`w-full md:w-80 border-t md:border-t-0 md:border-l ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex flex-col max-h-64 md:max-h-full shrink-0`}>
+                <div className={`p-3 border-b ${darkMode ? 'border-neutral-800' : 'border-black'} flex items-center justify-between`}>
+                  <h2 className="font-mono text-xs uppercase font-bold tracking-wider flex items-center gap-1.5 text-black dark:text-white">
+                    <Sparkles className="w-3.5 h-3.5 text-[#E6391E]" />
+                    <span>LIVE NOTES</span>
+                  </h2>
+                  <span className="font-mono text-[10px] text-neutral-400">PCM 24kHz</span>
+                </div>
 
-            {/* Language Selector Pill */}
-            <div className="relative">
+                {/* Feed */}
+                <div ref={transcriptListRef} id="transcript-list" className="flex-1 overflow-y-auto divide-y divide-black/10 p-3 space-y-2 text-xs">
+                  {transcripts.map((item) => (
+                    <div key={item.id} className="pt-2 text-left space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
+                        <span className="font-bold text-[#E6391E]">{item.speaker}</span>
+                        <span>{item.time}</span>
+                      </div>
+                      <p className={`font-sans leading-relaxed font-medium ${darkMode ? 'text-neutral-100' : 'text-[#0A0A0A]'}`}>{item.text}</p>
+                      {liveTranslateEnabled && (
+                        <p className={`font-mono text-[11px] italic p-1.5 border ${
+                          darkMode ? 'bg-neutral-800 border-neutral-700 text-neutral-300' : 'bg-neutral-50 border-neutral-200 text-neutral-600'
+                        }`}>
+                          {getTranslatedLine(item, selectedLanguage)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Chat / Prompt Input Form */}
+                <div className={`p-2.5 border-t ${darkMode ? 'border-neutral-800 bg-neutral-950' : 'border-black bg-neutral-50'}`}>
+                  <form onSubmit={handleSendChat} id="chat-form" className="flex gap-2">
+                    <input
+                      id="chat-input"
+                      type="text"
+                      placeholder="Type message or ask Eva..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      className={`flex-1 border px-2.5 py-1.5 text-xs font-mono focus:outline-none ${
+                        darkMode ? 'border-neutral-700 bg-neutral-900 text-white' : 'border-black bg-white text-black'
+                      }`}
+                    />
+                    <button
+                      type="submit"
+                      className={`border px-3 py-1.5 text-xs font-mono font-bold transition-colors ${
+                        darkMode ? 'border-neutral-700 bg-neutral-800 text-white hover:bg-neutral-700' : 'border-black bg-black text-white hover:bg-neutral-800'
+                      }`}
+                    >
+                      ADD
+                    </button>
+                  </form>
+                </div>
+              </aside>
+            )}
+          </main>
+
+          {/* Bottom Bar Control Strip */}
+          <footer className={`h-16 border-t ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-4 shrink-0 z-30`}>
+            {/* Controls Group */}
+            <div className="flex items-center gap-2 overflow-x-auto py-1">
               <button
-                onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                className="language-btn w-9 h-9 flex items-center justify-center rounded-full text-neutral-700 hover:bg-neutral-200/60 active:scale-95 transition-all duration-150"
-                title="Change Meeting Translation"
+                id="mic-btn"
+                type="button"
+                onClick={toggleMic}
+                className={`control-btn-circle ${micMuted ? 'active' : ''}`}
+                title="Mute / Unmute Microphone"
+              >
+                {micMuted ? <MicOff className="w-4 h-4 text-neutral-600" /> : <Mic className="w-4 h-4" />}
+              </button>
+
+              <button
+                id="cam-btn"
+                type="button"
+                onClick={toggleCamera}
+                className={`control-btn-circle ${cameraEnabled ? 'active' : ''}`}
+                title="Turn Camera On / Off"
+              >
+                {cameraEnabled ? <Video className="w-4 h-4 text-[#E6391E]" /> : <VideoOff className="w-4 h-4" />}
+              </button>
+
+              <button
+                id="transcript-btn"
+                type="button"
+                onClick={() => setDrawerOpen(!drawerOpen)}
+                className={`control-btn-circle ${drawerOpen ? 'active' : ''}`}
+                title="Toggle Captions / Live Notes"
+              >
+                <MessageSquare className="w-4 h-4" />
+              </button>
+
+              <button
+                id="prompt-eva-btn"
+                type="button"
+                onClick={handlePromptEva}
+                className="control-btn-circle hover:text-[#E6391E]"
+                title="Ask Eva / Prompt"
+              >
+                <Hand className="w-4 h-4" />
+              </button>
+
+              <button
+                id="screen-btn"
+                type="button"
+                onClick={toggleScreenShare}
+                className={`control-btn-circle ${isScreenSharing ? 'active' : ''}`}
+                title="Present Screen"
+              >
+                <MonitorUp className="w-4 h-4" />
+              </button>
+
+              <button
+                id="footer-invite-btn"
+                type="button"
+                onClick={copyInviteLink}
+                className="control-btn-circle"
+                title="Invite Client"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+
+              <button
+                id="dark-mode-btn"
+                type="button"
+                onClick={toggleDarkMode}
+                className="control-btn-circle"
+                title="Toggle Dark Mode"
+              >
+                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+
+              <button
+                id="language-btn"
+                type="button"
+                onClick={() => setLanguageModalOpen(!languageModalOpen)}
+                className="control-btn-circle"
+                title="Change Language"
               >
                 <Languages className="w-4 h-4" />
               </button>
 
-              {isLangMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-neutral-200 py-1.5 z-50 text-xs font-medium max-h-64 overflow-y-auto">
-                  <div className="px-3 py-1 text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
-                    Audio Translation
-                  </div>
+              {/* Divider */}
+              <div className="h-6 w-px bg-black/20 mx-1 shrink-0"></div>
+
+              {/* End Call Red Button */}
+              <button
+                id="end-call-btn"
+                type="button"
+                onClick={handleEndCall}
+                className="control-btn-endcall shrink-0"
+                title="End Call"
+              >
+                <PhoneOff className="w-4 h-4" />
+                <span>END CALL</span>
+              </button>
+            </div>
+
+            {/* Timer Right */}
+            <div className="flex items-center h-full shrink-0">
+              <div className={`h-full w-px ${darkMode ? 'border-r border-neutral-800' : 'bg-black'} mr-3`}></div>
+              <div id="session-timer" className="font-mono text-xs font-semibold tracking-wider">
+                {formatTime(timerSeconds)}
+              </div>
+            </div>
+          </footer>
+
+          {/* Language Selection Modal */}
+          {languageModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white border-2 border-black p-6 w-full max-w-xs space-y-4 shadow-xl">
+                <div className="flex items-center justify-between border-b border-black pb-2">
+                  <h3 className="font-bold text-sm text-black">Select Audio Language</h3>
+                  <button onClick={() => setLanguageModalOpen(false)} className="text-neutral-500 hover:text-black">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto">
                   {LANGUAGES.map((lang) => (
                     <button
                       key={lang.code}
-                      onClick={() => handleLanguageChange(lang.code)}
-                      className={`w-full text-left px-3 py-1.5 hover:bg-neutral-100 flex items-center justify-between ${
-                        currentLang === lang.code ? 'text-emerald-700 font-semibold bg-emerald-50/50' : 'text-neutral-700'
+                      onClick={() => {
+                        setSelectedLanguage(lang.code);
+                        setLanguageModalOpen(false);
+                      }}
+                      className={`text-left px-3 py-1.5 text-xs font-mono flex items-center justify-between border transition-colors ${
+                        selectedLanguage === lang.code
+                          ? 'border-[#E6391E] bg-[#E6391E]/10 font-bold text-[#E6391E]'
+                          : 'border-neutral-200 hover:border-black text-black'
                       }`}
                     >
                       <span>{lang.name}</span>
-                      {currentLang === lang.code && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                      {selectedLanguage === lang.code && <Check className="w-3.5 h-3.5 text-[#E6391E]" />}
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content Canvas */}
-        <main className="flex-1 px-4 pt-2 flex flex-col gap-4">
-          {/* Meeting Metadata & Status Anchor */}
-          <section className="flex flex-col gap-1 pt-1">
-            <div className="flex items-center justify-between">
-              {/* Status Indicator Pill */}
-              <div className="session-timer inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/90 border border-white/60 shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-emerald-600 live-pulse"></span>
-                <span className="text-[10px] font-bold text-emerald-800 tracking-wider">LIVE</span>
-                <span className="text-neutral-300 font-light">|</span>
-                <span className="text-[10px] text-neutral-600 tracking-normal font-mono">
-                  {formatTimer(sessionSeconds)} CET
-                </span>
-              </div>
-
-              {/* Encryption Tag */}
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e8e2d5]/60 border border-neutral-300/40">
-                <Lock className="w-3 h-3 text-[#68645a]" />
-                <span className="text-[10px] font-semibold text-[#68645a]">E2E Secured</span>
+                <label className="flex items-center gap-2 text-xs font-mono text-neutral-700 pt-2 border-t border-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={liveTranslateEnabled}
+                    onChange={(e) => setLiveTranslateEnabled(e.target.checked)}
+                    className="accent-black"
+                  />
+                  Live Translation Active
+                </label>
               </div>
             </div>
-
-            <h1 className="text-xl font-serif text-[#1b1b1b] font-semibold tracking-normal mt-1 leading-snug">
-              AlphaMeet: System Architecture Review
-            </h1>
-            <p className="text-xs text-neutral-600">
-              High-performance LiveKit SFU topology & neural inference latency audit.
-            </p>
-          </section>
-
-          {/* Main Video Stage: Full-Stage Eva Card with Floating Ajay PiP */}
-          <section className="stage-grid layout-1 layout-2 layout-3 relative w-full rounded-3xl overflow-hidden shadow-lg border border-white/80 bg-neutral-900">
-            {/* Primary View: Full-Stage Eva Card */}
-            <article className="eva-tile relative w-full aspect-[4/5] sm:aspect-[1/1] rounded-3xl overflow-hidden bg-neutral-900 group">
-              <img
-                alt="Portrait photograph of futuristic female AI CTO executive Eva with subtle ambient holographic glow"
-                className="w-full h-full object-cover object-center transform group-hover:scale-102 transition-transform duration-700 ease-out"
-                src={EVA_PORTRAIT_URL}
-              />
-
-              {/* AI Ethereal Halo Lighting Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/15 via-transparent to-amber-200/20 mix-blend-overlay pointer-events-none"></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 pointer-events-none"></div>
-
-              {/* Top-Left: Eva Holographic HUD Status & SFU LiveKit Telemetry */}
-              <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-                <div className="bg-black/50 backdrop-blur-md rounded-full px-2.5 py-1 text-[10px] text-amber-200 font-mono flex items-center gap-1.5 border border-amber-400/20 shadow-sm">
-                  <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
-                  <span className="eva-status-text font-semibold">Gemini Live Voice Active</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md text-[9px] text-white/80 font-mono border border-white/10">
-                    LiveKit SFU
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 backdrop-blur-md text-[9px] text-emerald-300 font-mono border border-emerald-500/30 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    18ms
-                  </span>
-                </div>
-              </div>
-
-              {/* Bottom-Right: Real-Time Audio Synthesis Waveform (Eva Speaking) */}
-              <div className="eva-wave active-wave absolute bottom-3 right-3 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1.5 shadow-md flex items-center gap-1 h-7 border border-amber-400/30 z-10">
-                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-1 inline-block"></span>
-                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-2 inline-block"></span>
-                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-3 inline-block"></span>
-                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-4 inline-block"></span>
-                <span className="text-[9px] font-bold text-amber-300 ml-1 tracking-wider">SPEAKING</span>
-              </div>
-
-              {/* Bottom-Left: Eva Executive Nametag Pill */}
-              <div className="absolute bottom-3 left-3 z-10">
-                <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center gap-2 shadow-lg">
-                  <div className="flex flex-col">
-                    <p className="text-xs font-bold text-white leading-tight">Eva · CTO</p>
-                    <p className="text-[9px] text-amber-300 font-mono tracking-wide -mt-0.5">EVA ARCHITECT HUD</p>
-                  </div>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                </div>
-              </div>
-            </article>
-
-            {/* Floating PiP: Ajay (Founder & CEO) - Top-Right Corner */}
-            <article className="local-tile floating-pip absolute top-3 right-3 z-30 w-28 sm:w-32 aspect-[3/4] rounded-2xl rounded-3xl overflow-hidden shadow-2xl border-2 border-white/90 ring-1 ring-black/20 bg-neutral-900 group cursor-pointer transition-transform hover:scale-105 active:scale-95">
-              {cameraEnabled ? (
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="local-video w-full h-full object-cover object-center transform scale-x-[-1]"
-                />
-              ) : (
-                <img
-                  alt="Portrait photograph of South Asian founder Ajay Tiwari in modern executive setting"
-                  className="local-video w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-500 ease-out"
-                  src={AJAY_PORTRAIT_URL}
-                />
-              )}
-
-              {/* Frosted Sheen & Shadow */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none"></div>
-
-              {/* Mic status indicator in PiP */}
-              <div className="speaker-badge absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-md rounded-full p-1 shadow-sm text-white flex items-center justify-center border border-white/20">
-                {micMuted ? (
-                  <MicOff className="w-3 h-3 text-red-500" />
-                ) : (
-                  <Mic className="w-3 h-3 text-white" />
-                )}
-              </div>
-
-              {/* Top-left PiP badge */}
-              <div className="absolute top-1.5 left-1.5 bg-white/80 backdrop-blur-sm rounded px-1 py-0.5 text-[8px] font-bold text-black uppercase tracking-wider">
-                PiP
-              </div>
-
-              {/* Bottom Nametag Pill */}
-              <div className="local-name absolute bottom-1.5 inset-x-1.5">
-                <div className="px-2 py-1 rounded-xl bg-black/70 backdrop-blur-md border border-white/20 flex items-center justify-between">
-                  <div className="truncate">
-                    <p className="text-[10px] font-bold text-white truncate leading-tight">Ajay</p>
-                    <p className="text-[8px] text-neutral-300 truncate -mt-0.5">Founder & CEO</p>
-                  </div>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 ml-1 animate-pulse"></span>
-                </div>
-              </div>
-            </article>
-
-            {/* Subtle Remote Participants Stack */}
-            <div className="remote-stack remote-human-tile remote-human-name hidden">
-              <span>Remote Co-Founder</span>
-            </div>
-          </section>
-
-          {/* Live Executive Transcription & Spec Distillation Card (Directly below stage) */}
-          <section className="live-transcription-card w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 transition-all border border-white/80 shadow-sm">
-            <div className="flex items-center justify-between border-b border-neutral-200/80 pb-2">
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold text-[#1b1b1b] tracking-tight uppercase">
-                  Live Executive Transcription & Spec Distillation
-                </h3>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300">
-                  AUTO-GENERATING PLAN
-                </span>
-                <span className="text-[9px] font-semibold bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded">
-                  LIVE NOTES • PCM 24kHz
-                </span>
-                <button
-                  onClick={() => setShowNotes(!showNotes)}
-                  className="transcript-btn text-xs font-semibold text-neutral-600 hover:text-black p-1 transition-colors flex items-center gap-1"
-                  title={showNotes ? 'Collapse notes' : 'Expand notes'}
-                >
-                  <ChevronDown className={`w-3.5 h-3.5 transform transition-transform duration-200 ${showNotes ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-            </div>
-
-            {/* Transcript Stream List */}
-            {showNotes && (
-              <div className="transcript-list space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                {transcripts.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`p-2.5 rounded-xl text-xs flex gap-2.5 items-start ${
-                      t.isAi ? 'bg-amber-50/70 border border-amber-200/50' : 'bg-white/80 border border-neutral-200/50'
-                    }`}
-                  >
-                    {t.avatar ? (
-                      <img
-                        src={t.avatar}
-                        alt={`${t.speaker} avatar thumbnail`}
-                        className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5 border border-white"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                        {t.speaker[0]}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="font-semibold text-[#1b1b1b] text-[11px] truncate">
-                          {t.speaker}
-                        </span>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[9px] text-neutral-400 font-mono">{t.time}</span>
-                          {t.isAi && (
-                            <button
-                              onClick={() => speakText(t.text)}
-                              aria-label="Synthesize Voice"
-                              className="text-neutral-400 hover:text-amber-700 transition-colors"
-                              title="Listen to Eva synthesize"
-                            >
-                              <Volume2 className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-neutral-700 leading-relaxed break-words">{t.text}</p>
-                    </div>
-                  </div>
-                ))}
-                <div ref={transcriptListRef} />
-              </div>
-            )}
-
-            {/* Executive Directive Chat Input */}
-            <form onSubmit={handleSendMessage} className="chat-form flex items-center gap-2 mt-1">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Direct Eva or record executive decision..."
-                className="chat-input flex-1 px-3 py-2 text-xs bg-white/90 border border-neutral-300/80 rounded-xl focus:outline-none focus:ring-1 focus:ring-black placeholder:text-neutral-400"
-              />
-              <button
-                type="submit"
-                aria-label="Send Directive"
-                className="prompt-eva-btn px-3 py-2 bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors flex items-center justify-center shrink-0 active:scale-95"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </form>
-          </section>
-
-          {/* Conditional Presentation Slide Card (Shared Screen Area) */}
-          {isScreenSharing && (
-            <section className="screen-share-stage pip-share-card w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 relative overflow-hidden transition-all duration-200">
-              {/* Live Video Preview if Screen Sharing */}
-              <video
-                ref={screenVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-36 object-cover rounded-2xl border border-white/60 mb-1 shadow-sm"
-              />
-
-              {/* Header Ribbon */}
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] bg-[#e8e2d5] text-[#4a463d] px-2.5 py-0.5 rounded-full font-semibold tracking-wider uppercase">
-                  SHARED SCREEN · LIVE SLIDE 04/12
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={toggleScreenShare}
-                    className="stage-screen-btn text-[10px] text-neutral-600 hover:text-black font-medium transition-colors"
-                  >
-                    Stop Share
-                  </button>
-                  <span className="flex items-center gap-1 text-[10px] text-emerald-800 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    100% Verified
-                  </span>
-                </div>
-              </div>
-
-              {/* Slide Title */}
-              <div>
-                <h2 className="text-base font-serif text-[#1b1b1b] font-semibold">
-                  Architecture Blueprint: Next.js + FastAPI + LiveKit
-                </h2>
-                <p className="text-xs text-neutral-600 mt-0.5">
-                  Zero-jitter WebRTC ingest paired with async Python WebSocket pipelines.
-                </p>
-              </div>
-
-              {/* Architecture Spec Badges */}
-              <div className="flex flex-wrap gap-1.5">
-                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
-                  P99 &lt; 45ms Latency
-                </span>
-                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
-                  LiveKit Cloud SFU
-                </span>
-                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
-                  End-to-End Encrypted
-                </span>
-                <span className="px-2.5 py-1 rounded-full text-[10px] bg-[#e8e2d5] text-[#1e1b14] font-medium">
-                  15 Gates Passed
-                </span>
-                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/80 border border-neutral-300/40 text-neutral-600 font-mono">
-                  1080p SFU • DUPLEX HD • LiveKit 18ms
-                </span>
-              </div>
-
-              {/* Sleek Minimalist Topology Flow Breakdown */}
-              <div className="mt-1 bg-white/80 rounded-2xl p-3 border border-neutral-200/50 flex items-center justify-between gap-1 shadow-inner">
-                {/* Node 1: Client Core */}
-                <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#fdf9ef]/90 border border-white/60 flex-1">
-                  <span className="text-xs font-bold text-[#1b1b1b]">Client Core</span>
-                  <span className="text-[9px] text-neutral-500">Edge Native</span>
-                </div>
-                <span className="text-neutral-400 text-xs">→</span>
-
-                {/* Node 2: Edge Gateway */}
-                <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#fdf9ef]/90 border border-white/60 flex-1">
-                  <span className="text-xs font-bold text-[#1b1b1b]">Edge Gateway</span>
-                  <span className="text-[9px] text-neutral-500">SFU Mesh</span>
-                </div>
-                <span className="text-neutral-400 text-xs">→</span>
-
-                {/* Node 3: Eva Neural */}
-                <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#e8e2d5]/60 border border-neutral-300/50 flex-1">
-                  <span className="text-xs font-bold text-amber-900">Eva Neural</span>
-                  <span className="text-[9px] text-emerald-700 font-medium">Synchronized</span>
-                </div>
-              </div>
-            </section>
           )}
-
-          {/* Active Agenda Pill Strip */}
-          <section className="flex items-center justify-between px-1 py-1">
-            <div className="flex items-center gap-2 truncate">
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              <span className="text-xs text-neutral-600 truncate">
-                Focus: Opus 3.5 Token Streaming via WebSocket
-              </span>
-            </div>
-            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
-              Autonomous Sync
-            </span>
-          </section>
-
-          {/* Co-branding footer banner */}
-          <section className="flex items-center justify-center gap-2 pt-2 pb-4 text-neutral-500">
-            <span className="text-[11px] font-medium tracking-tight">
-              AlphaBrain is powered by DeployMate
-            </span>
-            <div className="flex items-center gap-1.5 opacity-80">
-              <img
-                src="/deploymate_logo.svg"
-                alt="DeployMate official brand logo badge"
-                className="w-4 h-4 object-contain"
-              />
-              <img
-                src="/alphabrain_logo.svg"
-                alt="AlphaBrain neural intelligence platform logo"
-                className="w-4 h-4 object-contain"
-              />
-            </div>
-          </section>
-        </main>
-
-        {/* Bottom Floating Glass Call Dock */}
-        <div className="fixed bottom-0 inset-x-0 z-50 flex justify-around items-center px-4 py-2 pointer-events-none">
-          <nav className="glass-dock pointer-events-auto rounded-full max-w-sm w-full mx-auto mb-4 shadow-2xl border border-white/80 px-4 py-2.5 flex items-center justify-between transition-all">
-            {/* Action 1: Mic Toggle */}
-            <button
-              onClick={toggleMic}
-              aria-label={micMuted ? 'Microphone muted' : 'Microphone active'}
-              className={`mic-btn flex items-center justify-center rounded-full p-2 hover:bg-neutral-200/60 active:scale-95 transition-all duration-150 w-11 h-11 shadow-sm ${
-                micMuted ? 'bg-neutral-200 text-neutral-800' : 'bg-[#1b1b1b] text-white'
-              }`}
-              title={micMuted ? 'Click to unmute microphone' : 'Microphone is on (Click to mute)'}
-            >
-              {micMuted ? <MicOff className="w-5 h-5 text-red-600" /> : <Mic className="w-5 h-5" />}
-            </button>
-
-            {/* Action 2: Video Camera Toggle */}
-            <button
-              onClick={toggleCamera}
-              aria-label={cameraEnabled ? 'Video camera active' : 'Video camera disabled'}
-              className={`cam-btn flex items-center justify-center p-2 hover:bg-neutral-200/60 active:scale-95 transition-all duration-150 rounded-full w-11 h-11 ${
-                cameraEnabled ? 'bg-[#1b1b1b] text-white' : 'text-[#1b1b1b]'
-              }`}
-              title={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-            >
-              {cameraEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5 text-neutral-500" />}
-            </button>
-
-            {/* Action 3: Screen Share Toggle */}
-            <button
-              onClick={toggleScreenShare}
-              aria-label="Screen Share"
-              className={`screen-btn flex items-center justify-center p-2 hover:bg-neutral-200/60 active:scale-95 transition-all duration-150 rounded-full w-11 h-11 relative ${
-                isScreenSharing ? 'text-black' : 'text-neutral-400'
-              }`}
-              title={isScreenSharing ? 'Presentation Slide Shared' : 'Share Presentation'}
-            >
-              <MonitorUp className="w-5 h-5" />
-              {isScreenSharing && (
-                <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-[#1b1b1b] rounded-full"></span>
-              )}
-            </button>
-
-            {/* Action 4: End Call / Leave Button */}
-            <button
-              onClick={handleEndCall}
-              aria-label="End Call"
-              className="end-call-btn flex items-center justify-center bg-[#ba1a1a] text-white rounded-full p-2 hover:opacity-90 active:scale-95 transition-all duration-150 px-4 h-11 gap-1.5 shadow-md"
-              title="Disconnect from Meeting"
-            >
-              <PhoneOff className="w-5 h-5" />
-              <span className="text-xs font-semibold tracking-normal">Leave</span>
-            </button>
-
-            {/* Hidden accessibility hooks for full parity test verification */}
-            <div className="hidden">
-              <button onClick={handleShareInvite} className="footer-invite-btn">Invite</button>
-              <button onClick={toggleDarkMode} className="dark-mode-btn">Theme</button>
-            </div>
-          </nav>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

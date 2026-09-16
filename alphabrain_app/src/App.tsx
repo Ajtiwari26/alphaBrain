@@ -171,7 +171,7 @@ export function App() {
   };
 
   return (
-    <div className={`min-h-screen ${currentScreen === 'eva_meeting' ? 'bg-[#FAF7F2]' : 'bg-white'} text-[#0A0A0A] flex flex-col font-sans max-w-md mx-auto relative border-x border-[#0A0A0A] selection:bg-[#E6391E] selection:text-white`}>
+    <div className={`min-h-screen bg-white text-[#0A0A0A] flex flex-col font-sans max-w-md mx-auto relative border-x border-[#0A0A0A] selection:bg-[#E6391E] selection:text-white`}>
       {/* Top Header Bar with Safe-Area Notch Inset (Hidden on Splash and Eva Meeting) */}
       {currentScreen !== 'splash' && currentScreen !== 'eva_meeting' && (
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#0A0A0A] px-4 pt-[max(env(safe-area-inset-top),2.5rem)] pb-3 flex items-center justify-between">
@@ -262,7 +262,7 @@ export function App() {
       <main
         className={`flex-1 overflow-y-auto flex flex-col ${
           currentScreen === 'eva_meeting'
-            ? 'p-0 pb-0 bg-[#FAF7F2]'
+            ? 'p-0 pb-0 bg-white'
             : currentScreen === 'splash'
             ? 'p-0 bg-white'
             : 'p-4 bg-white'
