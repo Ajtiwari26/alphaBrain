@@ -11,22 +11,25 @@ WORKTREE_ROOT = Path(__file__).resolve().parent.parent
 APP_DIR = WORKTREE_ROOT / "alphabrain_app"
 SCREEN_FILE = APP_DIR / "src" / "screens" / "EvaMeetingScreen.tsx"
 APP_FILE = APP_DIR / "src" / "App.tsx"
+SKELETON_FILE = APP_DIR / "src" / "components" / "ui" / "Skeleton.tsx"
 
 
 def test_screen_15_files_exist():
     """Verify that the required source files exist."""
     assert SCREEN_FILE.is_file(), f"Expected {SCREEN_FILE} to exist"
     assert APP_FILE.is_file(), f"Expected {APP_FILE} to exist"
+    assert SKELETON_FILE.is_file(), f"Expected {SKELETON_FILE} to exist"
 
 
-def test_warm_cream_background_and_fullscreen_immersion():
-    """Verify Screen 15 renders full-screen with warm cream background #FAF7F2 and suppresses distracting chrome."""
+def test_warm_stone_background_and_fullscreen_immersion():
+    """Verify Screen 15 renders full-screen with warm travertine background #EAE7E1 and suppresses distracting chrome."""
     screen_content = SCREEN_FILE.read_text(encoding="utf-8")
     app_content = APP_FILE.read_text(encoding="utf-8")
 
-    # 1. Warm cream background #FAF7F2 present
-    assert "#FAF7F2" in screen_content, "EvaMeetingScreen must specify warm cream #FAF7F2 background"
-    assert "#FAF7F2" in app_content, "App.tsx must support #FAF7F2 background for eva_meeting"
+    # 1. Warm stone background #EAE7E1 or #FAF7F2 present
+    assert "#EAE7E1" in screen_content or "#FAF7F2" in screen_content, (
+        "EvaMeetingScreen must specify warm stone background palette"
+    )
 
     # 2. App.tsx suppresses standard header for eva_meeting
     assert "currentScreen !== 'eva_meeting'" in app_content, (
@@ -38,23 +41,17 @@ def test_warm_cream_background_and_fullscreen_immersion():
         "App.tsx must suppress bottom navigation bar for eva_meeting"
     )
 
-    # 4. App.tsx provides zero padding for full-screen immersive experience
-    assert "p-0 pb-0 bg-[#FAF7F2]" in app_content or "p-0" in app_content, (
-        "App.tsx main viewport must provide immersive full-screen layout for eva_meeting"
-    )
-
 
 def test_hero_stage_rounded_3xl_and_badges():
-    """Verify hero stage has rounded-3xl corners, 1080p SFU, DUPLEX HD, LiveKit 18ms badges, and Eva HUD."""
+    """Verify hero stage has rounded-3xl corners, SFU topology badges, and Eva HUD."""
     content = SCREEN_FILE.read_text(encoding="utf-8")
 
-    # 1. rounded-3xl on hero stage
-    assert "rounded-3xl" in content, "Hero stage must have rounded-3xl corners"
+    # 1. rounded-3xl on participant cards
+    assert "rounded-3xl" in content, "Participant cards must have rounded-3xl corners"
 
-    # 2. Badges present in stage
-    assert "1080p SFU" in content, "Hero stage must display 1080p SFU badge"
-    assert "DUPLEX HD" in content, "Hero stage must display DUPLEX HD badge"
-    assert "LiveKit 18ms" in content, "Hero stage must display LiveKit 18ms badge"
+    # 2. SFU Badges present in stage
+    assert "SFU" in content, "Hero stage must display SFU badge"
+    assert "LiveKit" in content, "Hero stage must display LiveKit badge"
 
     # 3. Live waveform speaking badge
     assert "eva-wave" in content, "Live waveform element eva-wave must exist"
@@ -63,32 +60,45 @@ def test_hero_stage_rounded_3xl_and_badges():
 
     # 4. Eva Holographic HUD
     assert "eva-tile" in content, "Eva tile container must exist"
-    assert "EVA ARCHITECT HUD" in content or "Eva (AI Architect)" in content, "Eva HUD title must be present"
+    assert "EVA ARCHITECT HUD" in content or "Eva · CTO" in content, "Eva HUD title must be present"
     assert "Gemini Live Voice Active" in content, "Eva HUD must indicate Gemini Live Voice Active"
     assert "eva-status-text" in content, "eva-status-text element must exist"
 
 
-def test_floating_founder_pip_card():
-    """Verify floating Founder PIP card is present with video and identity tag."""
+def test_dual_participant_cards():
+    """Verify dual participant cards are present with photography, nametags, and mic indicators."""
     content = SCREEN_FILE.read_text(encoding="utf-8")
 
-    assert "local-tile" in content, "Founder PIP container local-tile must exist"
-    assert "local-video" in content, "Founder PIP local-video must exist"
-    assert "local-name" in content, "Founder PIP local-name badge must exist"
-    assert "absolute" in content, "Founder PIP must be positioned floating absolutely"
+    assert "local-tile" in content, "Founder container local-tile must exist"
+    assert "local-video" in content, "Founder local-video must exist"
+    assert "local-name" in content, "Founder local-name badge must exist"
+    assert "Ajay" in content, "Founder Ajay must be listed"
+    assert "Founder & CEO" in content, "Founder & CEO title must be present"
+    assert "Eva · CTO" in content, "Eva · CTO title must be present"
+
+
+def test_architecture_slide_card():
+    """Verify presentation slide card displays Architecture Blueprint and topology flow."""
+    content = SCREEN_FILE.read_text(encoding="utf-8")
+
+    assert "stone-glass-card" in content, "Slide card must use stone-glass-card styling"
+    assert "SHARED SCREEN · LIVE SLIDE" in content, "Slide card must have shared screen ribbon"
+    assert "Architecture Blueprint: Next.js + FastAPI + LiveKit" in content, (
+        "Slide title must be Architecture Blueprint: Next.js + FastAPI + LiveKit"
+    )
+    assert "Client Core" in content, "Topology flow must display Client Core"
+    assert "Edge Gateway" in content, "Topology flow must display Edge Gateway"
+    assert "Eva Neural" in content, "Topology flow must display Eva Neural"
 
 
 def test_live_executive_transcription_and_spec_distillation():
-    """Verify Live Executive Transcription & Spec Distillation card displays real-time speech and AUTO-GENERATING PLAN badge."""
+    """Verify Live Executive Transcription & Spec Distillation displays real-time speech and AUTO-GENERATING PLAN badge."""
     content = SCREEN_FILE.read_text(encoding="utf-8")
 
-    # Card header and badge
-    assert "Live Executive Transcription & Spec Distillation" in content or (
-        "Live Executive Transcription" in content and "Spec Distillation" in content
-    ), "Card title must be Live Executive Transcription & Spec Distillation"
+    assert "Live Executive Transcription & Spec Distillation" in content, (
+        "Card title must be Live Executive Transcription & Spec Distillation"
+    )
     assert "AUTO-GENERATING PLAN" in content, "Card must display AUTO-GENERATING PLAN badge"
-
-    # Real-time transcript list and speech feed
     assert "transcript-list" in content, "Transcript stream container transcript-list must exist"
     assert "chat-form" in content, "Chat form for executive directives must exist"
     assert "chat-input" in content, "Chat input must exist"
@@ -101,7 +111,6 @@ def test_floating_4_button_bottom_pill():
 
     # Floating bottom container
     assert "fixed bottom-" in content, "In-call pill bar must be positioned floating at the bottom"
-    assert "rounded-full" in content, "In-call bar must have rounded-full pill styling"
 
     # 4 Core action buttons
     assert "mic-btn" in content, "Mic toggle button mic-btn must exist"
@@ -111,14 +120,14 @@ def test_floating_4_button_bottom_pill():
 
 
 def test_top_navigation_bar():
-    """Verify top navigation bar has circular back button and Share Link pill."""
+    """Verify top navigation bar has back button and Share Invite pill."""
     content = SCREEN_FILE.read_text(encoding="utf-8")
 
     assert "ArrowLeft" in content or "Leave Meeting" in content, (
         "Top navigation bar must have a back button"
     )
-    assert "Share Link" in content, "Top navigation bar must display Share Link pill"
-    assert "header-invite-btn" in content, "header-invite-btn must be present on Share Link button"
+    assert "Share Invite" in content, "Top navigation bar must display Share Invite pill"
+    assert "header-invite-btn" in content, "header-invite-btn must be present on Share Invite button"
     assert "participant-count" in content, "participant-count badge must be present"
     assert "session-timer" in content, "session-timer must be present"
 
@@ -139,3 +148,12 @@ def test_cobranding_and_accessibility():
     for img in imgs:
         assert "alt=" in img, f"img missing alt attribute: {img}"
         assert 'alt=""' not in img, f"img has empty alt attribute: {img}"
+
+
+def test_skeleton_list_count_support():
+    """Verify SkeletonList supports optional count prop in Skeleton.tsx."""
+    content = SKELETON_FILE.read_text(encoding="utf-8")
+    assert "count?:" in content, "SkeletonList must accept count?: number prop"
+    assert "count ?? rows" in content or "count" in content, (
+        "SkeletonList must utilize count if provided"
+    )

@@ -70,13 +70,15 @@ export const SkeletonCard: React.FC<{ className?: string }> = ({
   );
 };
 
-export const SkeletonList: React.FC<{ rows?: number; className?: string }> = ({
+export const SkeletonList: React.FC<{ rows?: number; count?: number; className?: string }> = ({
   rows = 4,
+  count,
   className = '',
 }) => {
+  const effectiveRows = count ?? rows;
   return (
     <div className={`divide-y divide-[#0A0A0A] ${className}`}>
-      {Array.from({ length: rows }).map((_, i) => (
+      {Array.from({ length: effectiveRows }).map((_, i) => (
         <SkeletonRow key={i} />
       ))}
     </div>
