@@ -96,6 +96,8 @@ Gemini 3.1 Pro High.
 
 - [x] Refactor EvaMeetingScreen UI (`commit b68708d`, `tsk_eva_c1332de90892`).
 
+- [x] Polish EvaMeetingScreen layout (`commit dbc5571`, `tsk_eva_b2948dbd60a6`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
