@@ -125,6 +125,10 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit 6ed2de5`, `tsk_eva_c384d685a124`)
 - **Objective**: Optimize EvaMeetingScreen for Mobile Portrait Viewport Ergonomics
 
+### P15.1 Tri-Tier Model Routing, Complexity Escalation Gate & Cross-Provider Independence
+- **Status**: `[x] COMPLETED & MERGED` (`commit a0d0991`, `tsk_eva_423d7b089d43`)
+- **Objective**: P15.1 Tri-Tier Model Routing, Complexity Escalation Gate & Cross-Provider Independence
+
 ---
 
 ## Active Parallel Development Pipeline (Current)

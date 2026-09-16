@@ -102,6 +102,8 @@ Gemini 3.1 Pro High.
 
 - [x] Optimize EvaMeetingScreen for Mobile Portrait Viewport Ergonomics (`commit 6ed2de5`, `tsk_eva_c384d685a124`).
 
+- [x] P15.1 Tri-Tier Model Routing, Complexity Escalation Gate & Cross-Provider Independence (`commit a0d0991`, `tsk_eva_423d7b089d43`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
