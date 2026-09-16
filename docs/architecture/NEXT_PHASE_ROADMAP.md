@@ -121,6 +121,10 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit dbc5571`, `tsk_eva_b2948dbd60a6`)
 - **Objective**: Polish EvaMeetingScreen layout
 
+### Optimize EvaMeetingScreen for Mobile Portrait Viewport Ergonomics
+- **Status**: `[x] COMPLETED & MERGED` (`commit 6ed2de5`, `tsk_eva_c384d685a124`)
+- **Objective**: Optimize EvaMeetingScreen for Mobile Portrait Viewport Ergonomics
+
 ---
 
 ## Active Parallel Development Pipeline (Current)

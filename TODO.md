@@ -100,6 +100,8 @@ Gemini 3.1 Pro High.
 
 - [x] Refactor EvaMeetingScreen to AlphaBrain Design (`commit 7f1744e`, `tsk_eva_5d7e0cc5a9b5`).
 
+- [x] Optimize EvaMeetingScreen for Mobile Portrait Viewport Ergonomics (`commit 6ed2de5`, `tsk_eva_c384d685a124`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
