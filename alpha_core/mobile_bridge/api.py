@@ -335,14 +335,29 @@ async def get_executive_doc(doc_id: str) -> ExecutiveDocDetail:
 # =====================================================================
 
 @router.get("/delegates/list", response_model=list[DelegateCredential])
-async def list_delegates() -> list[DelegateCredential]:
+async def list_delegates(
+    principal: AuthPrincipal = Depends(require_api_principal),
+) -> list[DelegateCredential]:
     """List all registered client viewers and team delegates."""
-    return get_service().list_delegates()
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin or Founder role required to list delegates.",
+        )
+    return get_service().list_delegates(mask_passcode=True)
 
 
 @router.post("/delegates/invite", response_model=DelegateCredential)
-async def create_delegate_invite(req: DelegateInviteRequest) -> DelegateCredential:
+async def create_delegate_invite(
+    req: DelegateInviteRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
+) -> DelegateCredential:
     """Generate a shareable Client/Delegate ID & Passcode, optionally delegating admin access."""
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin or Founder role required to create delegate invites.",
+        )
     return get_service().create_delegate_invite(req)
 
 
@@ -377,6 +392,7 @@ async def submit_feedback(
 async def admin_verdict_on_feedback(
     feedback_id: str,
     verdict: AdminFeedbackVerdictRequest,
+    principal: AuthPrincipal = Depends(require_api_principal),
 ) -> FeedbackItem:
     """
     STRICT ADMIN PERMISSION INVARIANT:
@@ -385,12 +401,19 @@ async def admin_verdict_on_feedback(
     2. 'dismiss_rejected': Dismisses the issue as out-of-scope or duplicate.
     3. 'resolve_direct': Directly marks resolved with clarification notes.
     """
+    if principal.role not in {PrincipalRole.FOUNDER, PrincipalRole.ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Invariant I-1 strictly restricts verdict execution to Founder and Admin roles.",
+        )
     try:
-        return get_service().admin_verdict_on_feedback(feedback_id, verdict)
+        return get_service().admin_verdict_on_feedback(feedback_id, verdict, principal=principal)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from None
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Feedback item '{feedback_id}' not found.") from None
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Feedback item '{feedback_id}' not found.") from None
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
 
 
 def create_mobile_bridge_app() -> FastAPI:

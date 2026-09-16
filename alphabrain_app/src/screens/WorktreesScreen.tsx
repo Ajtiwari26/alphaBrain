@@ -263,7 +263,7 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess, onNavigateToT
               <div
                 key={wt.path}
                 onClick={() => setSelectedWorktree(wt)}
-                className="p-3 bg-white hover:bg-zinc-50 card-tactile transition-smooth cursor-pointer flex flex-col gap-1.5"
+                className="p-3 bg-white hover:bg-zinc-50 card-tactile hover-lift transition-smooth cursor-pointer flex flex-col gap-1.5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">

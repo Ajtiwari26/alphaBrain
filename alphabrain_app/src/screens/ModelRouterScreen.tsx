@@ -259,7 +259,7 @@ export const ModelRouterScreen: React.FC = () => {
       {activeAccount && (
         <div 
           onClick={() => setSelectedAccount(activeAccount)}
-          className="border-2 border-[#0A0A0A] p-3 bg-zinc-50 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-colors group"
+          className="border-2 border-[#0A0A0A] p-3 bg-zinc-50 flex items-center justify-between cursor-pointer hover:bg-zinc-100 card-tactile hover-lift transition-colors group"
         >
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5">
@@ -311,7 +311,7 @@ export const ModelRouterScreen: React.FC = () => {
                   key={s.email}
                   type="button"
                   onClick={() => setSelectedAccount(s)}
-                  className={`w-full text-left py-2.5 px-3 grid grid-cols-12 gap-1 items-center border transition-all cursor-pointer hover:bg-zinc-100 ${
+                  className={`w-full text-left py-2.5 px-3 grid grid-cols-12 gap-1 items-center border transition-all cursor-pointer hover:bg-zinc-100 card-tactile hover-lift ${
                     isActive
                       ? 'border-[#0A0A0A] bg-zinc-50 border-2 font-bold'
                       : 'border-zinc-300 bg-white hover:border-[#0A0A0A]'

@@ -361,7 +361,7 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
                   setSelectedTask(isSelected ? null : t);
                   setVerdictFeedback(null);
                 }}
-                className={`py-3.5 px-2 flex items-center justify-between hover:bg-zinc-50 cursor-pointer card-tactile transition-smooth group ${
+                className={`py-3.5 px-2 flex items-center justify-between hover:bg-zinc-50 cursor-pointer card-tactile hover-lift transition-smooth group ${
                   isSelected ? 'bg-zinc-100 border-l-4 border-l-[#E6391E]' : ''
                 }`}
               >

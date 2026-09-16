@@ -9,6 +9,7 @@ import {
   FeedbackItem,
 } from '../types';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonList } from '../components/ui/Skeleton';
 
 type TabMode = 'delivery' | 'docs' | 'portal';
 
@@ -264,8 +265,11 @@ export const ProjectsScreen: React.FC = () => {
       {activeTab === 'delivery' && (
         <div className="flex-1 my-4 overflow-y-auto max-h-[65vh] space-y-4 pr-1">
           {loadingDelivery ? (
-            <div className="p-8 flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200">
+            <div className="p-8 flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200 hover-lift">
               <LoadingSpinner size="md" label="Synthesizing pipeline milestones..." />
+              <div className="w-full mt-4">
+                <SkeletonList count={3} />
+              </div>
             </div>
           ) : !deliveryMap ? (
             <div className="p-8 text-center font-mono text-xs text-zinc-400">

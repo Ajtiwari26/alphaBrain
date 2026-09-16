@@ -39,10 +39,10 @@ export const SplashScreen: React.FC<Props> = ({ onContinue }) => {
       {/* Bottom: Co-Branding with POWERED BY + DeployMate Stacked SVG Logo */}
       <div className="flex flex-col items-center justify-center space-y-2.5 text-center">
         <span className="font-mono text-[11px] text-zinc-400 tracking-[0.25em] uppercase font-semibold">
-          POWERED BY
+          AlphaBrain is powered by DeployMate
         </span>
         <img
-          src="/deploymate-stacked-logo.svg"
+          src="/deploymate_logo.svg"
           alt="DeployMate"
           className="w-32 h-auto object-contain"
         />

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardScreenData, ExecutiveOverview, ScreenId, TaskSummary } from '../types';
 import { mobileApi } from '../api/client';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { Cpu, Sparkles, GitBranch, ArrowUpRight, Bot, UserCheck, Battery, BatteryCharging } from 'lucide-react';
 
 interface Props {
@@ -165,7 +167,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
       {/* SECTION 2: AI MODEL QUOTAS */}
       <div
         onClick={() => onNavigate('model_router')}
-        className="border border-[#0A0A0A] p-4 bg-white space-y-3 cursor-pointer hover:bg-zinc-50 transition-colors group"
+        className="border border-[#0A0A0A] p-4 bg-white space-y-3 cursor-pointer hover:bg-zinc-50 card-tactile hover-lift transition-colors group"
       >
         <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
           <div className="flex items-center gap-2">
@@ -214,8 +216,9 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
         </div>
 
         {loadingTasks ? (
-          <div className="py-6 text-center font-mono text-xs text-zinc-400 animate-pulse">
-            Loading active sprints from host Mac...
+          <div className="py-4 space-y-2">
+            <LoadingSpinner size="sm" label="Loading active sprints from host Mac..." />
+            <SkeletonList rows={3} />
           </div>
         ) : recentTasks.length === 0 && activeWorktrees.length === 0 ? (
           <div className="py-4 text-center font-mono text-xs text-zinc-400">
@@ -227,7 +230,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
               <div
                 key={task.task_id}
                 onClick={() => onNavigate('triage')}
-                className="py-2 flex items-start justify-between hover:bg-zinc-50 px-1 cursor-pointer transition-colors"
+                className="py-2 flex items-start justify-between hover:bg-zinc-50 px-1 cursor-pointer card-tactile hover-lift transition-colors"
               >
                 <div className="space-y-0.5 max-w-[260px]">
                   <div className="flex items-center gap-1.5">

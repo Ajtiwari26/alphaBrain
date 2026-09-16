@@ -396,6 +396,19 @@ class DelegateCredential(BaseModel):
     is_active: bool = True
     can_admin_verdict: bool = False
 
+    def masked(self) -> DelegateCredential:
+        """Return a copy of the credential with passcode masked."""
+        return self.model_copy(update={"passcode": self.masked_passcode})
+
+    @property
+    def masked_passcode(self) -> str:
+        if not self.passcode:
+            return "******"
+        if "-" in self.passcode:
+            prefix = self.passcode.split("-", 1)[0]
+            return f"{prefix}-****"
+        return "ALPHA-****"
+
 
 class DelegateInviteRequest(BaseModel):
     member_name: str
@@ -435,6 +448,7 @@ class FeedbackItem(BaseModel):
     eva_proposed_task: dict[str, Any] | None = None
     admin_notes: str | None = None
     admitted_task_id: str | None = None
+    reviewed_by: str | None = None
 
 
 class FeedbackCreateRequest(BaseModel):

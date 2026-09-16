@@ -12,6 +12,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from fastapi.testclient import TestClient  # noqa: E402
+
+from alpha_core.mobile_bridge.api import create_mobile_bridge_app  # noqa: E402
 from alpha_core.mobile_bridge.schemas import (  # noqa: E402
     AdminFeedbackVerdictRequest,
     DelegateAuthRequest,
@@ -20,6 +23,7 @@ from alpha_core.mobile_bridge.schemas import (  # noqa: E402
 )
 from alpha_core.mobile_bridge.service import MobileBridgeService  # noqa: E402
 from alpha_core.queue.triage_queue import DEFAULT_DB_PATH, TaskTriageQueue  # noqa: E402
+from alpha_core.security import AuthPrincipal, PrincipalRole, require_api_principal  # noqa: E402
 
 
 class TestDeliveryBoardAndDelegates(unittest.TestCase):
@@ -141,15 +145,162 @@ class TestDeliveryBoardAndDelegates(unittest.TestCase):
             admin_notes="Approved by Founder for autonomous worktree worker dispatch.",
             reviewer_name="Founder",
         )
-        updated = self.service.admin_verdict_on_feedback(item.id, verdict)
+        founder_principal = AuthPrincipal(subject="Ajay Founder", role=PrincipalRole.FOUNDER)
+        updated = self.service.admin_verdict_on_feedback(item.id, verdict, principal=founder_principal)
         self.assertEqual(updated.status, "handed_over")
         self.assertIsNotNone(updated.admitted_task_id)
+        self.assertEqual(updated.reviewed_by, "Ajay Founder")
 
         # 3. Verify task exists in SQLite triage queue!
         tasks = self.queue.list_tasks(limit=10)
         found_task = next((t for t in tasks if str(t.get("id")) == updated.admitted_task_id), None)
         self.assertIsNotNone(found_task)
         self.assertIn("Critical: Add p99 latency SLA check", str(found_task.get("title") or found_task.get("envelope_json")))
+
+    def test_06_delegate_passcode_masking(self):
+        """Verify Repair Directive R-3: passcodes are masked in delegate listings."""
+        # Seed an invite
+        invite = DelegateInviteRequest(
+            member_name="SecOps Auditor",
+            role="client_viewer",
+            grant_admin_access=False,
+        )
+        cred = self.service.create_delegate_invite(invite)
+        # Cleartext returned upon generation so admin can convey it
+        self.assertTrue(cred.passcode.startswith("ALPHA-"))
+        self.assertNotIn("****", cred.passcode)
+
+        # Listing masks all passcodes
+        listed = self.service.list_delegates(mask_passcode=True)
+        self.assertGreaterEqual(len(listed), 1)
+        for d in listed:
+            self.assertTrue(d.passcode.endswith("****") or d.passcode == "******")
+
+        # DelegateCredential.masked() helper unit check
+        masked_cred = cred.masked()
+        self.assertTrue(masked_cred.passcode.endswith("****"))
+        self.assertEqual(masked_cred.delegate_id, cred.delegate_id)
+
+    def test_07_service_admin_verdict_auth_principal_validation(self):
+        """Verify Repair Directive R-2: Invariant I-1 validation in service layer."""
+        # 1. Create a feedback item
+        item = self.service.submit_feedback(
+            FeedbackCreateRequest(
+                author_name="Auditor Delegate",
+                problem_title="Security Audit: Admin verdict unauthorized test",
+                problem_description="Verifying that non-admin principals cannot execute verdicts.",
+            )
+        )
+
+        verdict = AdminFeedbackVerdictRequest(
+            action="dismiss_rejected",
+            admin_notes="Attempted dismissal by unauthorized role.",
+        )
+
+        # 2. Client principal attempt must raise PermissionError (Fail-Closed)
+        unauthorized_principal = AuthPrincipal(subject="client_user", role=PrincipalRole.CLIENT)
+        with self.assertRaises(PermissionError):
+            self.service.admin_verdict_on_feedback(item.id, verdict, principal=unauthorized_principal)
+
+        # 3. Worker principal attempt must raise PermissionError
+        worker_principal = AuthPrincipal(subject="worker_daemon", role=PrincipalRole.WORKER)
+        with self.assertRaises(PermissionError):
+            self.service.admin_verdict_on_feedback(item.id, verdict, principal=worker_principal)
+
+        # 4. Founder principal must succeed and record authentic reviewer
+        founder_principal = AuthPrincipal(subject="Founder Ajay", role=PrincipalRole.FOUNDER)
+        resolved_item = self.service.admin_verdict_on_feedback(item.id, verdict, principal=founder_principal)
+        self.assertEqual(resolved_item.status, "rejected")
+        self.assertEqual(resolved_item.reviewed_by, "Founder Ajay")
+
+        # 5. Delegated admin principal must also succeed
+        admin_principal = AuthPrincipal(subject="VP Eng Delegate", role=PrincipalRole.ADMIN)
+        verdict_direct = AdminFeedbackVerdictRequest(
+            action="resolve_direct",
+            admin_notes="Directly clarified by Delegated Admin.",
+        )
+        direct_item = self.service.admin_verdict_on_feedback(item.id, verdict_direct, principal=admin_principal)
+        self.assertEqual(direct_item.status, "resolved")
+        self.assertEqual(direct_item.reviewed_by, "VP Eng Delegate")
+
+    def test_08_api_endpoints_role_guards(self):
+        """Verify Repair Directive R-1: Depends(require_api_principal) and Invariant I-1 on API routes."""
+        app = create_mobile_bridge_app()
+        client = TestClient(app)
+
+        # Create a feedback item to act upon
+        item = self.service.submit_feedback(
+            FeedbackCreateRequest(
+                author_name="API Tester",
+                problem_title="API Role Guard Test",
+                problem_description="Testing HTTP 403 on client role and 200 on admin role.",
+            )
+        )
+
+        # Case A: POST /feedback/{id}/admin-verdict with CLIENT role -> 403 Forbidden
+        app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+            subject="client_viewer_1", role=PrincipalRole.CLIENT
+        )
+        res_client = client.post(
+            f"/api/v1/mobile/feedback/{item.id}/admin-verdict",
+            json={"action": "dismiss_rejected", "admin_notes": "Client attempting verdict"},
+        )
+        self.assertEqual(res_client.status_code, 403)
+        self.assertIn("Invariant I-1", res_client.json()["detail"])
+
+        # Case B: POST /feedback/{id}/admin-verdict with FOUNDER role -> 200 OK
+        app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+            subject="ajay_founder", role=PrincipalRole.FOUNDER
+        )
+        res_founder = client.post(
+            f"/api/v1/mobile/feedback/{item.id}/admin-verdict",
+            json={"action": "resolve_direct", "admin_notes": "Founder direct resolution"},
+        )
+        self.assertEqual(res_founder.status_code, 200)
+        self.assertEqual(res_founder.json()["status"], "resolved")
+        self.assertEqual(res_founder.json()["reviewed_by"], "ajay_founder")
+
+        # Case C: POST /delegates/invite with CLIENT role -> 403 Forbidden
+        app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+            subject="client_viewer_1", role=PrincipalRole.CLIENT
+        )
+        res_invite_fail = client.post(
+            "/api/v1/mobile/delegates/invite",
+            json={"member_name": "Unauthorized Delegate", "role": "client_viewer"},
+        )
+        self.assertEqual(res_invite_fail.status_code, 403)
+
+        # Case D: POST /delegates/invite with ADMIN role -> 200 OK
+        app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+            subject="admin_user", role=PrincipalRole.ADMIN
+        )
+        res_invite_ok = client.post(
+            "/api/v1/mobile/delegates/invite",
+            json={"member_name": "New Delegate", "role": "client_viewer"},
+        )
+        self.assertEqual(res_invite_ok.status_code, 200)
+        self.assertTrue(res_invite_ok.json()["delegate_id"].startswith("CLT-"))
+
+        # Case E: GET /delegates/list with CLIENT role -> 403 Forbidden
+        app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+            subject="client_viewer_1", role=PrincipalRole.CLIENT
+        )
+        res_list_fail = client.get("/api/v1/mobile/delegates/list")
+        self.assertEqual(res_list_fail.status_code, 403)
+
+        # Case F: GET /delegates/list with FOUNDER role -> 200 OK with masked passcodes
+        app.dependency_overrides[require_api_principal] = lambda: AuthPrincipal(
+            subject="ajay_founder", role=PrincipalRole.FOUNDER
+        )
+        res_list_ok = client.get("/api/v1/mobile/delegates/list")
+        self.assertEqual(res_list_ok.status_code, 200)
+        delegates_data = res_list_ok.json()
+        self.assertGreater(len(delegates_data), 0)
+        for d in delegates_data:
+            self.assertTrue(d["passcode"].endswith("****") or d["passcode"] == "******")
+
+        # Clean up dependency overrides
+        app.dependency_overrides.clear()
 
 
 if __name__ == "__main__":
