@@ -171,9 +171,9 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#0A0A0A] flex flex-col font-sans max-w-md mx-auto relative border-x border-[#0A0A0A] selection:bg-[#E6391E] selection:text-white">
-      {/* Top Header Bar with Safe-Area Notch Inset (Hidden on Splash) */}
-      {currentScreen !== 'splash' && (
+    <div className={`min-h-screen ${currentScreen === 'eva_meeting' ? 'bg-[#FAF7F2]' : 'bg-white'} text-[#0A0A0A] flex flex-col font-sans max-w-md mx-auto relative border-x border-[#0A0A0A] selection:bg-[#E6391E] selection:text-white`}>
+      {/* Top Header Bar with Safe-Area Notch Inset (Hidden on Splash and Eva Meeting) */}
+      {currentScreen !== 'splash' && currentScreen !== 'eva_meeting' && (
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#0A0A0A] px-4 pt-[max(env(safe-area-inset-top),2.5rem)] pb-3 flex items-center justify-between">
           <div
             onClick={() => navigateTo('splash')}
@@ -260,9 +260,19 @@ export function App() {
 
       {/* Main Screen Content Viewport with Proper Padding */}
       <main
-        className={`flex-1 overflow-y-auto flex flex-col bg-white ${
-          currentScreen === 'splash' ? 'p-0' : 'p-4'
-        } ${sessionStage === 'authenticated' ? 'pb-24' : 'pb-[max(env(safe-area-inset-bottom),2.5rem)]'}`}
+        className={`flex-1 overflow-y-auto flex flex-col ${
+          currentScreen === 'eva_meeting'
+            ? 'p-0 pb-0 bg-[#FAF7F2]'
+            : currentScreen === 'splash'
+            ? 'p-0 bg-white'
+            : 'p-4 bg-white'
+        } ${
+          currentScreen === 'eva_meeting'
+            ? 'pb-0'
+            : sessionStage === 'authenticated'
+            ? 'pb-24'
+            : 'pb-[max(env(safe-area-inset-bottom),2.5rem)]'
+        }`}
       >
         {currentScreen === 'splash' && (
           <SplashScreen onContinue={handleSplashContinue} />
@@ -341,8 +351,8 @@ export function App() {
         )}
       </main>
 
-      {/* Bottom Sticky Locomotive Navigation (Only when Authenticated) */}
-      {sessionStage === 'authenticated' && (
+      {/* Bottom Sticky Locomotive Navigation (Only when Authenticated and Not on Eva Meeting) */}
+      {sessionStage === 'authenticated' && currentScreen !== 'eva_meeting' && (
         <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-[#0A0A0A] px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-center justify-around z-30">
           <button
             onClick={() => navigateTo('overview')}
