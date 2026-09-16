@@ -553,22 +553,22 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   return (
     <div className={`h-full w-full flex flex-col justify-between overflow-hidden ${darkMode ? 'bg-neutral-950 text-white' : 'bg-white text-black font-sans'}`}>
       {/* Co-Branding Banner */}
-      <div className="flex items-center justify-between border-b border-[#0A0A0A] bg-neutral-50 px-4 py-2 font-mono text-xs shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between border-b border-[#0A0A0A] bg-neutral-50 px-3 py-1.5 font-mono text-xs shrink-0">
+        <div className="flex items-center gap-2 truncate">
           <img
             src="/alphabrain_logo.svg"
             alt="AlphaBrain Logo"
-            className="w-4 h-4 object-contain"
+            className="w-3.5 h-3.5 object-contain shrink-0"
           />
-          <span className="font-bold text-[#0A0A0A] tracking-tight text-[11px]">
+          <span className="font-bold text-[#0A0A0A] tracking-tight text-[10px] sm:text-[11px] truncate">
             AlphaBrain is powered by DeployMate
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 shrink-0">
           <img
             src="/deploymate_logo.svg"
             alt="DeployMate Logo"
-            className="h-3.5 object-contain"
+            className="h-3 sm:h-3.5 object-contain"
           />
         </div>
       </div>
@@ -695,10 +695,10 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
       ) : (
         <>
           {/* Top Header Navigation */}
-          <header className={`h-14 border-b ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-4 shrink-0 z-30`}>
+          <header className={`h-12 sm:h-14 border-b ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-3 sm:px-4 shrink-0 z-30`}>
             {/* Left Logo & Title */}
-            <div className="flex items-center gap-2.5">
-              <svg className="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div className="flex items-center gap-2 shrink-0">
+              <svg className="w-6 h-6 sm:w-7 sm:h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="6" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
                 <circle cx="15" cy="11" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
                 <circle cx="15" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
@@ -716,17 +716,17 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
                 <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
               </svg>
-              <span className={`text-lg font-bold tracking-tight ${darkMode ? 'text-white' : 'text-black'}`}>AlphaBrain</span>
+              <span className={`text-base sm:text-lg font-bold tracking-tight ${darkMode ? 'text-white' : 'text-black'}`}>AlphaBrain</span>
             </div>
 
             {/* Right Status & Actions */}
             <div className="flex items-center h-full">
-              <div className="font-mono text-[10px] uppercase tracking-wider font-semibold px-3 flex items-center gap-1.5">
+              <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-wider font-semibold px-2 sm:px-3 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse"></span>
                 <span>MEETING LIVE</span>
               </div>
               <div className={`h-full w-px ${darkMode ? 'border-r border-neutral-800' : 'bg-black'}`}></div>
-              <div className="flex items-center gap-1.5 px-3">
+              <div className="flex items-center gap-1 px-2 sm:px-2.5">
                 <Users className="w-3.5 h-3.5" />
                 <span id="participant-count" className="font-mono text-xs font-semibold">{participantCount}</span>
               </div>
@@ -735,7 +735,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 id="header-invite-btn"
                 type="button"
                 onClick={copyInviteLink}
-                className="flex items-center gap-1.5 px-3 h-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors font-mono text-[10px] uppercase font-semibold"
+                className="flex items-center gap-1 px-2 sm:px-3 h-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors font-mono text-[10px] uppercase font-semibold"
                 title="Copy Invite Link"
               >
                 <Share2 className="w-3.5 h-3.5" />
@@ -745,12 +745,12 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
           </header>
 
           {/* Main Meeting Content Area */}
-          <main className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
+          <main className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
             {/* Stage Area: Adaptive Grid */}
-            <div className="flex-1 p-3 overflow-hidden flex flex-col min-h-[260px]">
+            <div className="flex-1 p-2 sm:p-3 overflow-hidden flex flex-col min-h-0">
               <div id="stage-grid" className={stageLayoutClass}>
                 {/* Tile 1: Founder (Local) */}
-                <div id="local-tile" className="video-tile-container relative flex items-center justify-center bg-black min-h-[140px]">
+                <div id="local-tile" className="video-tile-container relative flex items-center justify-center bg-black min-h-0">
                   <video
                     ref={localVideoRef}
                     id="local-video"
@@ -761,24 +761,24 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                   />
                   {!cameraEnabled && (
                     <div className="flex flex-col items-center justify-center text-white/50">
-                      <div className="w-14 h-14 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center">
-                        <Users className="w-7 h-7 text-white/60" />
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center">
+                        <Users className="w-6 h-6 sm:w-7 sm:h-7 text-white/60" />
                       </div>
-                      <span className="font-mono text-[10px] mt-2 uppercase tracking-wider text-neutral-400">Camera Off</span>
+                      <span className="font-mono text-[10px] mt-1.5 uppercase tracking-wider text-neutral-400">Camera Off</span>
                     </div>
                   )}
 
-                  {/* Screen Share Floating PIP Card */}
+                  {/* Screen Share Floating PIP Card - positioned top-left to avoid bottom speaker-badge collision */}
                   {isScreenSharing && (
-                    <div id="screen-share-stage" className="absolute bottom-4 left-4 w-52 pip-share-card p-2.5 z-20">
-                      <div className="flex items-center justify-between border-b border-black/10 pb-1 mb-1.5">
-                        <span className="font-mono text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
-                        <span className="font-mono text-[9px] uppercase font-bold text-[#E6391E] flex items-center gap-1">
+                    <div id="screen-share-stage" className="absolute top-2 left-2 w-44 sm:w-52 pip-share-card p-2 z-20">
+                      <div className="flex items-center justify-between border-b border-black/10 pb-1 mb-1">
+                        <span className="font-mono text-[8px] sm:text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
+                        <span className="font-mono text-[8px] sm:text-[9px] uppercase font-bold text-[#E6391E] flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-ping"></span>
                           LIVE
                         </span>
                       </div>
-                      <div className="relative mb-1.5 w-full h-20 bg-black overflow-hidden border border-black/10">
+                      <div className="relative mb-1 w-full h-16 sm:h-20 bg-black overflow-hidden border border-black/10">
                         <video
                           ref={screenVideoRef}
                           autoPlay
@@ -788,12 +788,12 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                         />
                       </div>
                       <div id="slide-content" className="flex items-center justify-between">
-                        <div className="text-[9px] font-mono text-black font-bold">Screen active</div>
+                        <div className="text-[8px] sm:text-[9px] font-mono text-black font-bold">Screen active</div>
                         <button
                           id="stage-screen-btn"
                           type="button"
                           onClick={toggleScreenShare}
-                          className="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-2 hover:bg-black hover:text-white transition-colors"
+                          className="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-1.5 hover:bg-black hover:text-white transition-colors"
                         >
                           STOP
                         </button>
@@ -801,18 +801,18 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                     </div>
                   )}
 
-                  {/* Speaker Name Tag */}
+                  {/* Speaker Name Tag with anti-collision truncation */}
                   <div className="speaker-badge">
-                    <span className={`w-2 h-2 rounded-full ${micMuted ? 'bg-neutral-400' : 'bg-[#E6391E] animate-pulse'}`}></span>
-                    <span id="local-name">{identity}</span>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${micMuted ? 'bg-neutral-400' : 'bg-[#E6391E] animate-pulse'}`}></span>
+                    <span id="local-name" className="truncate flex-1 min-w-0">{identity}</span>
                   </div>
                 </div>
 
                 {/* Tile 2: Eva AI Architect */}
-                <div id="eva-tile" className="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center min-h-[140px]">
+                <div id="eva-tile" className="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center min-h-0">
                   {/* Active Waveform Indicator */}
                   {evaSpeaking && (
-                    <div id="eva-wave" className="absolute top-3 right-3 z-10">
+                    <div id="eva-wave" className="absolute top-2.5 right-2.5 z-10">
                       <div className="active-wave">
                         <span></span>
                         <span></span>
@@ -823,32 +823,32 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                   )}
 
                   {/* Center Graphic for Eva: Circular #E6391E Equalizer */}
-                  <div className="flex flex-col items-center gap-2 text-neutral-400">
-                    <div className="w-14 h-14 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
-                      <Volume2 className="w-7 h-7 text-[#E6391E]" />
+                  <div className="flex flex-col items-center gap-1.5 text-neutral-400">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
+                      <Volume2 className="w-6 h-6 sm:w-7 sm:h-7 text-[#E6391E]" />
                     </div>
-                    <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">
+                    <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-widest text-neutral-400">
                       Gemini Live Voice Active
                     </div>
                   </div>
 
-                  {/* Speaker Tag */}
+                  {/* Speaker Tag with anti-collision truncation */}
                   <div className="speaker-badge">
-                    <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse"></span>
-                    <span id="eva-status-text">Eva (AI Architect)</span>
+                    <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse shrink-0"></span>
+                    <span id="eva-status-text" className="truncate flex-1 min-w-0">Eva (AI Architect)</span>
                   </div>
                 </div>
 
                 {/* Remote Participants Stack */}
                 {hasRemoteClient && (
-                  <div id="remote-stack" className="flex flex-col gap-2 h-full">
-                    <div id="remote-human-tile" className="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+                  <div id="remote-stack" className="flex flex-col gap-2 h-full min-h-0">
+                    <div id="remote-human-tile" className="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center min-h-0">
                       <div id="remote-human-placeholder" className="text-white/40 flex flex-col items-center">
-                        <Users className="w-8 h-8" />
+                        <Users className="w-7 h-7 sm:w-8 sm:h-8" />
                       </div>
                       <div className="speaker-badge">
-                        <span id="remote-human-name">{remoteClientName}</span>
-                        <Mic className="w-3 h-3 text-white/60 ml-1" />
+                        <span id="remote-human-name" className="truncate flex-1 min-w-0">{remoteClientName}</span>
+                        <Mic className="w-3 h-3 text-white/60 ml-1 shrink-0" />
                       </div>
                     </div>
                   </div>
@@ -858,8 +858,13 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
 
             {/* Live Notes / Real-Time Transcript Drawer */}
             {drawerOpen && (
-              <aside id="transcript-drawer" className={`w-full md:w-80 border-t md:border-t-0 md:border-l ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex flex-col max-h-64 md:max-h-full shrink-0`}>
-                <div className={`p-3 border-b ${darkMode ? 'border-neutral-800' : 'border-black'} flex items-center justify-between`}>
+              <aside
+                id="transcript-drawer"
+                className={`w-full md:w-80 border-t md:border-t-0 md:border-l ${
+                  darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'
+                } flex flex-col flex-[0.4] md:flex-none md:h-full min-h-0 shrink-0`}
+              >
+                <div className={`px-3 py-2 border-b ${darkMode ? 'border-neutral-800' : 'border-black'} flex items-center justify-between shrink-0`}>
                   <h2 className="font-mono text-xs uppercase font-bold tracking-wider flex items-center gap-1.5 text-black dark:text-white">
                     <Sparkles className="w-3.5 h-3.5 text-[#E6391E]" />
                     <span>LIVE NOTES</span>
@@ -868,7 +873,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 </div>
 
                 {/* Feed */}
-                <div ref={transcriptListRef} id="transcript-list" className="flex-1 overflow-y-auto divide-y divide-black/10 p-3 space-y-2 text-xs">
+                <div ref={transcriptListRef} id="transcript-list" className="flex-1 overflow-y-auto divide-y divide-black/10 px-3 py-2 space-y-2 text-xs min-h-0">
                   {transcripts.map((item) => (
                     <div key={item.id} className="pt-2 text-left space-y-1">
                       <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
@@ -888,21 +893,21 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 </div>
 
                 {/* Chat / Prompt Input Form */}
-                <div className={`p-2.5 border-t ${darkMode ? 'border-neutral-800 bg-neutral-950' : 'border-black bg-neutral-50'}`}>
-                  <form onSubmit={handleSendChat} id="chat-form" className="flex gap-2">
+                <div className={`p-2 border-t shrink-0 ${darkMode ? 'border-neutral-800 bg-neutral-950' : 'border-black bg-neutral-50'}`}>
+                  <form onSubmit={handleSendChat} id="chat-form" className="flex gap-1.5">
                     <input
                       id="chat-input"
                       type="text"
                       placeholder="Type message or ask Eva..."
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      className={`flex-1 border px-2.5 py-1.5 text-xs font-mono focus:outline-none ${
+                      className={`flex-1 border px-2 py-1 text-xs font-mono focus:outline-none ${
                         darkMode ? 'border-neutral-700 bg-neutral-900 text-white' : 'border-black bg-white text-black'
                       }`}
                     />
                     <button
                       type="submit"
-                      className={`border px-3 py-1.5 text-xs font-mono font-bold transition-colors ${
+                      className={`border px-2.5 py-1 text-xs font-mono font-bold transition-colors ${
                         darkMode ? 'border-neutral-700 bg-neutral-800 text-white hover:bg-neutral-700' : 'border-black bg-black text-white hover:bg-neutral-800'
                       }`}
                     >
@@ -914,92 +919,99 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             )}
           </main>
 
-          {/* Bottom Bar Control Strip */}
-          <footer className={`h-16 border-t ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-4 shrink-0 z-30`}>
-            {/* Controls Group */}
-            <div className="flex items-center gap-2 overflow-x-auto py-1">
-              <button
-                id="mic-btn"
-                type="button"
-                onClick={toggleMic}
-                className={`control-btn-circle ${micMuted ? 'active' : ''}`}
-                title="Mute / Unmute Microphone"
-              >
-                {micMuted ? <MicOff className="w-4 h-4 text-neutral-600" /> : <Mic className="w-4 h-4" />}
-              </button>
+          {/* Bottom Bar Control Strip - Ergonomic Two-Tier Mobile Dock (Zero Overflow on 390-430px Viewports) */}
+          <footer className={`border-t ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex flex-col shrink-0 z-30`}>
+            {/* Tier 1: Utility & Telemetry Strip */}
+            <div className={`flex items-center justify-between px-3 py-1 border-b text-[10px] font-mono ${darkMode ? 'border-neutral-800/80 bg-neutral-950/60 text-neutral-400' : 'border-black/10 bg-neutral-50/80 text-neutral-600'}`}>
+              <div className="flex items-center gap-1.5">
+                <button
+                  id="screen-btn"
+                  type="button"
+                  onClick={toggleScreenShare}
+                  className={`control-btn-circle control-btn-sm ${isScreenSharing ? 'active' : ''}`}
+                  title="Present Screen"
+                >
+                  <MonitorUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  id="footer-invite-btn"
+                  type="button"
+                  onClick={copyInviteLink}
+                  className="control-btn-circle control-btn-sm"
+                  title="Invite Client"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  id="language-btn"
+                  type="button"
+                  onClick={() => setLanguageModalOpen(!languageModalOpen)}
+                  className="control-btn-circle control-btn-sm"
+                  title="Change Language"
+                >
+                  <Languages className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  id="dark-mode-btn"
+                  type="button"
+                  onClick={toggleDarkMode}
+                  className="control-btn-circle control-btn-sm"
+                  title="Toggle Dark Mode"
+                >
+                  {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                </button>
+              </div>
 
-              <button
-                id="cam-btn"
-                type="button"
-                onClick={toggleCamera}
-                className={`control-btn-circle ${cameraEnabled ? 'active' : ''}`}
-                title="Turn Camera On / Off"
-              >
-                {cameraEnabled ? <Video className="w-4 h-4 text-[#E6391E]" /> : <VideoOff className="w-4 h-4" />}
-              </button>
+              {/* Timer */}
+              <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
+                <span id="session-timer">{formatTime(timerSeconds)}</span>
+              </div>
+            </div>
 
-              <button
-                id="transcript-btn"
-                type="button"
-                onClick={() => setDrawerOpen(!drawerOpen)}
-                className={`control-btn-circle ${drawerOpen ? 'active' : ''}`}
-                title="Toggle Captions / Live Notes"
-              >
-                <MessageSquare className="w-4 h-4" />
-              </button>
+            {/* Tier 2: Primary Interaction & Call Action Strip */}
+            <div className="flex items-center justify-between px-2 sm:px-3 py-2">
+              <div className={`flex items-center gap-1 sm:gap-2 p-1 rounded-full ${darkMode ? 'bg-neutral-800' : 'bg-neutral-100'}`}>
+                <button
+                  id="mic-btn"
+                  type="button"
+                  onClick={toggleMic}
+                  className={`control-btn-circle ${micMuted ? 'active' : ''}`}
+                  title="Mute / Unmute Microphone"
+                >
+                  {micMuted ? <MicOff className="w-4 h-4 text-neutral-600" /> : <Mic className="w-4 h-4" />}
+                </button>
 
-              <button
-                id="prompt-eva-btn"
-                type="button"
-                onClick={handlePromptEva}
-                className="control-btn-circle hover:text-[#E6391E]"
-                title="Ask Eva / Prompt"
-              >
-                <Hand className="w-4 h-4" />
-              </button>
+                <button
+                  id="cam-btn"
+                  type="button"
+                  onClick={toggleCamera}
+                  className={`control-btn-circle ${cameraEnabled ? 'active' : ''}`}
+                  title="Turn Camera On / Off"
+                >
+                  {cameraEnabled ? <Video className="w-4 h-4 text-[#E6391E]" /> : <VideoOff className="w-4 h-4" />}
+                </button>
 
-              <button
-                id="screen-btn"
-                type="button"
-                onClick={toggleScreenShare}
-                className={`control-btn-circle ${isScreenSharing ? 'active' : ''}`}
-                title="Present Screen"
-              >
-                <MonitorUp className="w-4 h-4" />
-              </button>
+                <button
+                  id="transcript-btn"
+                  type="button"
+                  onClick={() => setDrawerOpen(!drawerOpen)}
+                  className={`control-btn-circle ${drawerOpen ? 'active' : ''}`}
+                  title="Toggle Captions / Live Notes"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                </button>
 
-              <button
-                id="footer-invite-btn"
-                type="button"
-                onClick={copyInviteLink}
-                className="control-btn-circle"
-                title="Invite Client"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-
-              <button
-                id="dark-mode-btn"
-                type="button"
-                onClick={toggleDarkMode}
-                className="control-btn-circle"
-                title="Toggle Dark Mode"
-              >
-                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-
-              <button
-                id="language-btn"
-                type="button"
-                onClick={() => setLanguageModalOpen(!languageModalOpen)}
-                className="control-btn-circle"
-                title="Change Language"
-              >
-                <Languages className="w-4 h-4" />
-              </button>
-
-              {/* Divider */}
-              <div className="h-6 w-px bg-black/20 mx-1 shrink-0"></div>
+                <button
+                  id="prompt-eva-btn"
+                  type="button"
+                  onClick={handlePromptEva}
+                  className="control-btn-circle hover:text-[#E6391E]"
+                  title="Ask Eva / Prompt"
+                >
+                  <Hand className="w-4 h-4" />
+                </button>
+              </div>
 
               {/* End Call Red Button */}
               <button
@@ -1010,16 +1022,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 title="End Call"
               >
                 <PhoneOff className="w-4 h-4" />
-                <span>END CALL</span>
+                <span className="hidden sm:inline">END CALL</span>
               </button>
-            </div>
-
-            {/* Timer Right */}
-            <div className="flex items-center h-full shrink-0">
-              <div className={`h-full w-px ${darkMode ? 'border-r border-neutral-800' : 'bg-black'} mr-3`}></div>
-              <div id="session-timer" className="font-mono text-xs font-semibold tracking-wider">
-                {formatTime(timerSeconds)}
-              </div>
             </div>
           </footer>
 

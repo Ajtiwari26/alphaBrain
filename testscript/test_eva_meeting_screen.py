@@ -118,3 +118,36 @@ def test_lobby_modal_elements():
     assert "translate-toggle" in content, "translate-toggle must exist"
     assert "join-btn" in content, "join-btn must exist"
     assert "Join Meeting" in content, "Join Meeting title must be present"
+
+
+def test_mobile_portrait_ergonomics():
+    """Verify mobile portrait viewport ergonomics for 390-430px screens."""
+    css_file = APP_DIR / "src" / "index.css"
+    assert css_file.is_file(), f"Expected {css_file} to exist"
+    css_content = css_file.read_text(encoding="utf-8")
+    screen_content = SCREEN_FILE.read_text(encoding="utf-8")
+    app_content = APP_FILE.read_text(encoding="utf-8")
+
+    # 1. Anti-collision badge truncation
+    assert "truncate" in screen_content, "Speaker badges must have truncation to prevent collisions"
+    assert "max-w-" in screen_content, "Speaker badges must enforce max-width limits"
+    assert "max-width: calc(100% - 16px)" in css_content or "max-width:" in css_content, (
+        "CSS must enforce max-width constraint on speaker badges"
+    )
+
+    # 2. PIP screen share positioning without bottom-left badge collision
+    assert "top-2 left-2" in screen_content, "Screen share PIP must be positioned to avoid speaker badge collision"
+
+    # 3. Two-tier ergonomic mobile control bar (no horizontal overflow on 390-430px screens)
+    assert "control-btn-sm" in screen_content, "Mobile utility buttons must support compact sizing"
+    assert "control-btn-sm" in css_content, "CSS must define control-btn-sm"
+
+    # 4. Vertical flex layout containment without clipping or dead space
+    assert "min-h-0" in screen_content, "Stage and drawer elements must enforce min-h-0 for proper flex shrinking"
+    assert "min-height: 0" in css_content, "CSS stage grid and tiles must enforce min-height: 0"
+
+    # 5. App container full viewport height containment
+    assert "h-screen" in app_content and "100dvh" in app_content, (
+        "App.tsx must lock full dvh viewport height for eva_meeting"
+    )
+
