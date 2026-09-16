@@ -17,13 +17,182 @@ from typing import Any
 
 from alpha_core.queue.triage_queue import TaskTriageQueue
 from alpha_protocol.planning import ResearchSnapshot, SourceEvidence, request_digest
+from alpha_protocol.routing import (
+    ConfidenceScore,
+    ExecutionStage,
+    ModelTier,
+    RoutingDecision,
+    RoutingRequest,
+)
 
 logger = logging.getLogger("alphabrain.planning.research_agent")
 
 
 class ResearchConsensusError(Exception):
     """Raised when research fails or is blocked."""
+
     pass
+
+
+def compute_research_confidence(
+    query: str | dict[str, Any], strike_count: int = 0
+) -> ConfidenceScore:
+    """Computes a structured confidence score for a research query or envelope."""
+    signals: list[str] = []
+    base_score = 0.85
+
+    if isinstance(query, dict):
+        for k in ("extraction_confidence", "confidence_score", "confidence"):
+            if k in query and query[k] is not None:
+                try:
+                    score_val = float(query[k])
+                    signals.append(f"envelope_{k}_{score_val:.2f}")
+                    base_score = score_val
+                    break
+                except (ValueError, TypeError):
+                    pass
+        text = f"{query.get('title', '')} {query.get('detailed_instructions', '')} {query.get('objective', '')}".lower()
+    else:
+        text = str(query).lower()
+
+    ambiguity_keywords = [
+        "unclear",
+        "ambiguous",
+        "unknown",
+        "explore",
+        "investigate",
+        "compare",
+        "tradeoffs",
+        "open question",
+    ]
+    for kw in ambiguity_keywords:
+        if kw in text:
+            base_score -= 0.15
+            signals.append(f"ambiguity_keyword_{kw}")
+
+    specificity_keywords = [
+        "exact",
+        "version",
+        "schema",
+        "fix",
+        "contract",
+        "rfc",
+        "endpoint",
+        "url",
+    ]
+    for kw in specificity_keywords:
+        if kw in text:
+            base_score += 0.05
+            signals.append(f"specificity_keyword_{kw}")
+
+    if strike_count > 0:
+        penalty = strike_count * 0.2
+        base_score -= penalty
+        signals.append(f"strike_penalty_{strike_count}x0.2")
+
+    final_score = max(0.0, min(1.0, base_score))
+    return ConfidenceScore(
+        score=round(final_score, 4),
+        source="research_broker",
+        strike_count=strike_count,
+        signals=signals,
+    )
+
+
+def route_research_query(
+    query: str | dict[str, Any],
+    confidence_score: float | None = None,
+    strike_count: int = 0,
+    project_id: str = "default",
+    task_id: str = "tsk_research",
+    attempt_id: str = "att_1",
+    complexity_class: str = "medium",
+    risk_class: str = "low",
+    claude_budget_allowed: bool = False,
+    allowed_models: list[str] | None = None,
+    required_capabilities: list[str] | None = None,
+    tool_needs: list[str] | None = None,
+    **kwargs: Any,
+) -> RoutingDecision:
+    """
+    Tri-tier research broker routing with confidence scoring and 3-strike escalation.
+    Accelerates with gemini-3.8-flash-high for high-confidence queries,
+    and escalates to gemini-3.1-pro-high / claude-opus-4-6-thinking on strikes or low confidence.
+    """
+    from alpha_worker.routing import call_model_router
+
+    conf_obj = compute_research_confidence(query, strike_count=strike_count)
+    eff_confidence = (
+        confidence_score if confidence_score is not None else conf_obj.score
+    )
+
+    is_three_strikes = strike_count >= 3
+    rationale: list[str] = list(conf_obj.signals)
+
+    if is_three_strikes:
+        rationale.append("escalation_three_strikes_breached")
+        target_tier = ModelTier.TIER_3_REASONING.value
+        target_model = (
+            "claude-opus-4-6-thinking"
+            if claude_budget_allowed
+            else "gemini-3.1-pro-high"
+        )
+        effort = "high"
+    elif (
+        eff_confidence < 0.5
+        or complexity_class.lower() in ("high", "extreme", "complex")
+        or risk_class.lower() in ("critical", "high")
+    ):
+        rationale.append("escalation_low_confidence_or_high_complexity")
+        target_tier = (
+            ModelTier.TIER_3_REASONING.value
+            if claude_budget_allowed
+            else ModelTier.TIER_2_STANDARD.value
+        )
+        target_model = (
+            "claude-opus-4-6-thinking"
+            if claude_budget_allowed
+            else "gemini-3.1-pro-high"
+        )
+        effort = "high"
+    elif eff_confidence >= 0.8:
+        rationale.append("research_broker_accelerated_flash")
+        target_tier = ModelTier.TIER_1_FAST.value
+        target_model = "gemini-3.8-flash-high"
+        effort = "standard"
+    else:
+        rationale.append("research_standard_pro")
+        target_tier = ModelTier.TIER_2_STANDARD.value
+        target_model = "gemini-3.1-pro-high"
+        effort = "high"
+
+    req = RoutingRequest(
+        project_id=project_id,
+        task_id=task_id,
+        attempt_id=attempt_id,
+        stage=ExecutionStage.RESEARCH,
+        risk_class=risk_class,
+        complexity_class=complexity_class,
+        claude_budget_allowed=claude_budget_allowed,
+        allowed_models=allowed_models or [target_model],
+        required_capabilities=required_capabilities or ["web_search", "github_mcp"],
+        tool_needs=tool_needs or ["web_search", "github_mcp"],
+    )
+
+    decision = call_model_router(req)
+    if not decision.model or decision.model in (
+        "legacy_default",
+        "gemini-3.1-pro-high",
+    ):
+        decision.model = target_model
+        decision.effort = effort
+    decision.tier = target_tier
+    decision.confidence_score = eff_confidence
+    for r in rationale:
+        if r not in decision.rationale_codes:
+            decision.rationale_codes.append(r)
+
+    return decision
 
 
 class ResearchAgent:
@@ -34,6 +203,28 @@ class ResearchAgent:
     ) -> None:
         self.queue = queue
         self.agy_bin = agy_bin or (Path.home() / ".local" / "bin" / "agy")
+        self.strikes: dict[str, int] = {}
+
+    def route_research_query(
+        self,
+        query: str | dict[str, Any],
+        confidence_score: float | None = None,
+        strike_count: int | None = None,
+        **kwargs: Any,
+    ) -> RoutingDecision:
+        """Routes a research query using confidence scoring and strike tracking."""
+        if strike_count is None:
+            if isinstance(query, dict):
+                tid = query.get("task_id", "")
+                strike_count = self.strikes.get(tid, 0)
+            else:
+                strike_count = 0
+        return route_research_query(
+            query=query,
+            confidence_score=confidence_score,
+            strike_count=strike_count,
+            **kwargs,
+        )
 
     @staticmethod
     def _parse_response(stdout: str) -> dict[str, Any]:
@@ -187,11 +378,29 @@ Instructions:
 Remember: The output must purely be the factual findings that will later be fed to the Senior Architects (Opus/Pro) who will write the actual Plan Blueprint.
 """
 
+        strikes = self.strikes.get(task_id, 0)
+        route_decision = self.route_research_query(
+            envelope,
+            strike_count=strikes,
+            task_id=task_id,
+            project_id=project_id,
+        )
+        research_model = route_decision.model or "gemini-3.8-flash-high"
+        logger.info(
+            "Executing research phase via %s (tier=%s, confidence=%s, strikes=%d)",
+            research_model,
+            route_decision.tier,
+            route_decision.confidence_score,
+            strikes,
+        )
+
         try:
-            # We use gemini-3.1-pro-high for research, as it supports tools efficiently
-            response = self._invoke_agy_research("gemini-3.1-pro-high", prompt, research_schema)
+            response = self._invoke_agy_research(research_model, prompt, research_schema)
         except Exception as e:
-            raise ResearchConsensusError(f"Research phase failed: {e}") from e
+            self.strikes[task_id] = strikes + 1
+            raise ResearchConsensusError(
+                f"Research phase failed (strike {self.strikes[task_id]}): {e}"
+            ) from e
 
         # Construct SourceEvidence objects
         evidence_list = []

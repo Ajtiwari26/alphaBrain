@@ -28,9 +28,30 @@ from pathlib import Path
 from typing import Any
 
 from alpha_core.queue.triage_queue import TaskTriageQueue, TriageStatus
+from alpha_protocol.routing import DEGRADED_SAME_FAMILY, INDEPENDENT_CROSS_PROVIDER
 from alpha_protocol.task import REGISTERED_REVIEW_KEYS, ReviewAttestation
 
 logger = logging.getLogger("alphabrain.worker.senior_review")
+
+
+def evaluate_review_independence(
+    round1_model: str,
+    round2_model: str,
+) -> tuple[bool, str]:
+    """
+    Evaluates Invariants I-61 & I-62.
+    Returns (is_independent: bool, independence_status: str).
+    """
+    is_r1_gemini = "gemini" in round1_model.lower()
+    is_r2_gemini = "gemini" in round2_model.lower()
+    is_r1_claude = "claude" in round1_model.lower()
+    is_r2_claude = "claude" in round2_model.lower()
+
+    if (is_r1_gemini and is_r2_claude) or (is_r1_claude and is_r2_gemini):
+        return True, INDEPENDENT_CROSS_PROVIDER
+    elif (is_r1_gemini and is_r2_gemini) or (is_r1_claude and is_r2_claude):
+        return False, DEGRADED_SAME_FAMILY
+    return True, INDEPENDENT_CROSS_PROVIDER
 
 
 @dataclass
@@ -46,6 +67,10 @@ class SeniorReviewVerdict:
     codex_verdict: str | None = None
     codex_review_text: str | None = None
     codex_bypassed: bool = False
+    degraded_same_family: bool = False
+    independence_status: str = INDEPENDENT_CROSS_PROVIDER
+    founder_review_required: bool = False
+    round2_model: str = "claude-opus-4-6-thinking"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -60,6 +85,10 @@ class SeniorReviewVerdict:
             "codex_verdict": self.codex_verdict,
             "codex_review_text": self.codex_review_text,
             "codex_bypassed": self.codex_bypassed,
+            "degraded_same_family": self.degraded_same_family,
+            "independence_status": self.independence_status,
+            "founder_review_required": self.founder_review_required,
+            "round2_model": self.round2_model,
         }
 
 
@@ -564,11 +593,19 @@ Review Instructions:
 3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
         claude_model = os.getenv("ALPHA_SENIOR_REVIEW_MODEL", "claude-opus-4-6-thinking")
-        if os.getenv("CLAUDE_ON_HOLIDAY", "0") == "1" or claude_model != "claude-opus-4-6-thinking":
-            claude_model = "gemini-3.1-pro-high"
-
         opus_timeout = int(os.getenv("ALPHA_SENIOR_REVIEW_TIMEOUT", "900"))
-        try:
+        claude_holiday = os.getenv("CLAUDE_ON_HOLIDAY", "0") == "1"
+
+        degraded_same_family = False
+        independence_status = INDEPENDENT_CROSS_PROVIDER
+        founder_review_required = False
+
+        if claude_holiday:
+            logger.warning("CLAUDE_ON_HOLIDAY=1 active: degrading Round 2 to gemini-3.1-pro-high.")
+            claude_model = "gemini-3.1-pro-high"
+            degraded_same_family = True
+            independence_status = DEGRADED_SAME_FAMILY
+            founder_review_required = True
             opus_res = self._invoke_agy(
                 claude_model,
                 opus_prompt,
@@ -576,12 +613,9 @@ Review Instructions:
                 cwd=task.get("worktree_path"),
                 timeout_seconds=opus_timeout,
             )
-        except Exception as e:
-            if claude_model == "claude-opus-4-6-thinking":
-                logger.warning(
-                    f"Round 2 review on Claude failed ({e}). Claude on holiday fallback -> invoking gemini-3.1-pro-high..."
-                )
-                claude_model = "gemini-3.1-pro-high"
+        else:
+            try:
+                logger.info("Invoking primary Round 2 reviewer: %s", claude_model)
                 opus_res = self._invoke_agy(
                     claude_model,
                     opus_prompt,
@@ -589,9 +623,50 @@ Review Instructions:
                     cwd=task.get("worktree_path"),
                     timeout_seconds=opus_timeout,
                 )
-            else:
-                raise e
+            except Exception as e_opus:
+                # Invariant I-61: Preserve Anthropic cross-provider independence via claude-sonnet-4-6
+                logger.warning(
+                    f"Round 2 primary on {claude_model} failed ({e_opus}). Attempting cross-provider fallback to claude-sonnet-4-6..."
+                )
+                claude_model = "claude-sonnet-4-6"
+                try:
+                    opus_res = self._invoke_agy(
+                        claude_model,
+                        opus_prompt,
+                        schema_path=str(opus_schema_path),
+                        cwd=task.get("worktree_path"),
+                        timeout_seconds=opus_timeout,
+                    )
+                except Exception as e_sonnet:
+                    # Invariant I-62: Cross-provider fallback exhausted -> degraded same-family fallback
+                    logger.warning(
+                        f"Round 2 fallback on claude-sonnet-4-6 failed ({e_sonnet}). Exhausted Anthropic models; degrading to same-family gemini-3.1-pro-high..."
+                    )
+                    claude_model = "gemini-3.1-pro-high"
+                    degraded_same_family = True
+                    independence_status = DEGRADED_SAME_FAMILY
+                    founder_review_required = True
+                    opus_res = self._invoke_agy(
+                        claude_model,
+                        opus_prompt,
+                        schema_path=str(opus_schema_path),
+                        cwd=task.get("worktree_path"),
+                        timeout_seconds=opus_timeout,
+                    )
+
         opus_out = opus_res.get("response", "")
+        if degraded_same_family:
+            degraded_trailer = (
+                "\n\n---\n"
+                "[DEGRADED_SAME_FAMILY_ATTESTATION]\n"
+                f"warning: Round 2 architectural review degraded to same-family model ({claude_model}).\n"
+                "invariant_status: Invariants I-61 and I-62 degraded.\n"
+                "founder_review_required: true\n"
+                "independence_status: DEGRADED_SAME_FAMILY\n"
+                "[END_DEGRADED_SAME_FAMILY_ATTESTATION]\n"
+            )
+            opus_out = f"{opus_out}{degraded_trailer}"
+
         opus_struct = opus_res.get("structured_output", {})
         if isinstance(opus_struct, dict) and len(opus_struct) == 1 and "verdict" in opus_struct:
             opus_verdict = opus_struct["verdict"]
@@ -691,7 +766,20 @@ Review Instructions:
         else:
             unanimous = pro_approved and opus_approved and codex_approved
 
+        block_on_degraded = os.getenv("BLOCK_ON_DEGRADED_SAME_FAMILY", "0") == "1"
+        if degraded_same_family and block_on_degraded:
+            logger.warning(
+                "DEGRADED_SAME_FAMILY active with BLOCK_ON_DEGRADED_SAME_FAMILY=1. Blocking auto-approval."
+            )
+            unanimous = False
+
         evidence = task.get("result", {}).get("evidence", {})
+        if isinstance(evidence, dict):
+            evidence = dict(evidence)
+            evidence["degraded_same_family"] = degraded_same_family
+            evidence["independence_status"] = independence_status
+            evidence["founder_review_required"] = founder_review_required
+            evidence["round2_model"] = claude_model
 
         try:
             tree_digest = subprocess.check_output(
@@ -719,6 +807,12 @@ Review Instructions:
             key_id=key_id,
         )
 
+        att_dump = att.model_dump()
+        att_dump["degraded_same_family"] = degraded_same_family
+        att_dump["independence_status"] = independence_status
+        att_dump["founder_review_required"] = founder_review_required
+        att_dump["round2_model"] = claude_model
+
         verdict = SeniorReviewVerdict(
             task_id=task_id,
             approved=unanimous,
@@ -727,10 +821,14 @@ Review Instructions:
             pro_review_text=pro_out,
             opus_review_text=opus_out,
             reviewed_at=att.reviewed_at,
-            attestation=att.model_dump(),
+            attestation=att_dump,
             codex_verdict=codex_verdict,
             codex_review_text=codex_out,
             codex_bypassed=codex_bypassed,
+            degraded_same_family=degraded_same_family,
+            independence_status=independence_status,
+            founder_review_required=founder_review_required,
+            round2_model=claude_model,
         )
 
         # Record in queue
