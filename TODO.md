@@ -94,6 +94,8 @@ Gemini 3.1 Pro High.
 
 - [x] Elevate Screen 15 (EvaMeetingScreen) to authentic AlphaMeet design from screen_2_alphameet.html (`commit fd0f9e7`, `tsk_eva_47ae27e28404`).
 
+- [x] Refactor EvaMeetingScreen UI (`commit b68708d`, `tsk_eva_c1332de90892`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
