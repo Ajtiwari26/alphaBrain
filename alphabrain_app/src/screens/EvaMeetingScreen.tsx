@@ -703,8 +703,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 </div>
               </div>
 
-              {/* Top-Right: Real-Time Audio Synthesis Waveform (Eva Speaking) */}
-              <div className="eva-wave active-wave absolute top-3 right-3 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1.5 shadow-md flex items-center gap-1 h-7 border border-amber-400/30 z-10">
+              {/* Bottom-Right: Real-Time Audio Synthesis Waveform (Eva Speaking) */}
+              <div className="eva-wave active-wave absolute bottom-3 right-3 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1.5 shadow-md flex items-center gap-1 h-7 border border-amber-400/30 z-10">
                 <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-1 inline-block"></span>
                 <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-2 inline-block"></span>
                 <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-3 inline-block"></span>
@@ -724,8 +724,8 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               </div>
             </article>
 
-            {/* Floating PiP: Ajay (Founder & CEO) */}
-            <article className="local-tile floating-pip absolute bottom-3 right-3 z-30 w-28 sm:w-32 aspect-[3/4] rounded-2xl rounded-3xl overflow-hidden shadow-2xl border-2 border-white/90 ring-1 ring-black/20 bg-neutral-900 group cursor-pointer transition-transform hover:scale-105 active:scale-95">
+            {/* Floating PiP: Ajay (Founder & CEO) - Top-Right Corner */}
+            <article className="local-tile floating-pip absolute top-3 right-3 z-30 w-28 sm:w-32 aspect-[3/4] rounded-2xl rounded-3xl overflow-hidden shadow-2xl border-2 border-white/90 ring-1 ring-black/20 bg-neutral-900 group cursor-pointer transition-transform hover:scale-105 active:scale-95">
               {cameraEnabled ? (
                 <video
                   ref={localVideoRef}
@@ -777,104 +777,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             </div>
           </section>
 
-          {/* Presentation Slide Card (Shared Screen Area) */}
-          <section className="screen-share-stage pip-share-card w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 relative overflow-hidden transition-all duration-200">
-            {/* Live Video Preview if Screen Sharing */}
-            {isScreenSharing && (
-              <video
-                ref={screenVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-36 object-cover rounded-2xl border border-white/60 mb-1 shadow-sm"
-              />
-            )}
-
-            {/* Header Ribbon */}
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] bg-[#e8e2d5] text-[#4a463d] px-2.5 py-0.5 rounded-full font-semibold tracking-wider uppercase">
-                SHARED SCREEN · LIVE SLIDE 04/12
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleScreenShare}
-                  className="stage-screen-btn text-[10px] text-neutral-600 hover:text-black font-medium transition-colors"
-                >
-                  {isScreenSharing ? 'Stop Share' : 'Present Slide'}
-                </button>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-800 font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                  100% Verified
-                </span>
-              </div>
-            </div>
-
-            {/* Slide Title */}
-            <div>
-              <h2 className="text-base font-serif text-[#1b1b1b] font-semibold">
-                Architecture Blueprint: Next.js + FastAPI + LiveKit
-              </h2>
-              <p className="text-xs text-neutral-600 mt-0.5">
-                Zero-jitter WebRTC ingest paired with async Python WebSocket pipelines.
-              </p>
-            </div>
-
-            {/* Architecture Spec Badges */}
-            <div className="flex flex-wrap gap-1.5">
-              <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
-                P99 &lt; 45ms Latency
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
-                LiveKit Cloud SFU
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
-                End-to-End Encrypted
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[10px] bg-[#e8e2d5] text-[#1e1b14] font-medium">
-                15 Gates Passed
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/80 border border-neutral-300/40 text-neutral-600 font-mono">
-                1080p SFU • DUPLEX HD • LiveKit 18ms
-              </span>
-            </div>
-
-            {/* Sleek Minimalist Topology Flow Breakdown */}
-            <div className="mt-1 bg-white/80 rounded-2xl p-3 border border-neutral-200/50 flex items-center justify-between gap-1 shadow-inner">
-              {/* Node 1: Client Core */}
-              <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#fdf9ef]/90 border border-white/60 flex-1">
-                <span className="text-xs font-bold text-[#1b1b1b]">Client Core</span>
-                <span className="text-[9px] text-neutral-500">Edge Native</span>
-              </div>
-              <span className="text-neutral-400 text-xs">→</span>
-
-              {/* Node 2: Edge Gateway */}
-              <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#fdf9ef]/90 border border-white/60 flex-1">
-                <span className="text-xs font-bold text-[#1b1b1b]">Edge Gateway</span>
-                <span className="text-[9px] text-neutral-500">SFU Mesh</span>
-              </div>
-              <span className="text-neutral-400 text-xs">→</span>
-
-              {/* Node 3: Eva Neural */}
-              <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#e8e2d5]/60 border border-neutral-300/50 flex-1">
-                <span className="text-xs font-bold text-amber-900">Eva Neural</span>
-                <span className="text-[9px] text-emerald-700 font-medium">Synchronized</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Active Agenda Pill Strip */}
-          <section className="flex items-center justify-between px-1 py-1">
-            <div className="flex items-center gap-2 truncate">
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              <span className="text-xs text-neutral-600 truncate">
-                Focus: Opus 3.5 Token Streaming via WebSocket
-              </span>
-            </div>
-            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
-              Autonomous Sync
-            </span>
-          </section>
-
-          {/* Live Executive Transcription & Spec Distillation Card */}
+          {/* Live Executive Transcription & Spec Distillation Card (Directly below stage) */}
           <section className="live-transcription-card w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 transition-all border border-white/80 shadow-sm">
             <div className="flex items-center justify-between border-b border-neutral-200/80 pb-2">
               <div className="flex items-center gap-2">
@@ -964,6 +867,103 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 <Send className="w-3.5 h-3.5" />
               </button>
             </form>
+          </section>
+
+          {/* Conditional Presentation Slide Card (Shared Screen Area) */}
+          {isScreenSharing && (
+            <section className="screen-share-stage pip-share-card w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 relative overflow-hidden transition-all duration-200">
+              {/* Live Video Preview if Screen Sharing */}
+              <video
+                ref={screenVideoRef}
+                autoPlay
+                playsInline
+                className="w-full h-36 object-cover rounded-2xl border border-white/60 mb-1 shadow-sm"
+              />
+
+              {/* Header Ribbon */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] bg-[#e8e2d5] text-[#4a463d] px-2.5 py-0.5 rounded-full font-semibold tracking-wider uppercase">
+                  SHARED SCREEN · LIVE SLIDE 04/12
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={toggleScreenShare}
+                    className="stage-screen-btn text-[10px] text-neutral-600 hover:text-black font-medium transition-colors"
+                  >
+                    Stop Share
+                  </button>
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-800 font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    100% Verified
+                  </span>
+                </div>
+              </div>
+
+              {/* Slide Title */}
+              <div>
+                <h2 className="text-base font-serif text-[#1b1b1b] font-semibold">
+                  Architecture Blueprint: Next.js + FastAPI + LiveKit
+                </h2>
+                <p className="text-xs text-neutral-600 mt-0.5">
+                  Zero-jitter WebRTC ingest paired with async Python WebSocket pipelines.
+                </p>
+              </div>
+
+              {/* Architecture Spec Badges */}
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
+                  P99 &lt; 45ms Latency
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
+                  LiveKit Cloud SFU
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/90 border border-neutral-300/40 text-[#1b1b1b] font-medium shadow-sm">
+                  End-to-End Encrypted
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-[10px] bg-[#e8e2d5] text-[#1e1b14] font-medium">
+                  15 Gates Passed
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-[10px] bg-white/80 border border-neutral-300/40 text-neutral-600 font-mono">
+                  1080p SFU • DUPLEX HD • LiveKit 18ms
+                </span>
+              </div>
+
+              {/* Sleek Minimalist Topology Flow Breakdown */}
+              <div className="mt-1 bg-white/80 rounded-2xl p-3 border border-neutral-200/50 flex items-center justify-between gap-1 shadow-inner">
+                {/* Node 1: Client Core */}
+                <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#fdf9ef]/90 border border-white/60 flex-1">
+                  <span className="text-xs font-bold text-[#1b1b1b]">Client Core</span>
+                  <span className="text-[9px] text-neutral-500">Edge Native</span>
+                </div>
+                <span className="text-neutral-400 text-xs">→</span>
+
+                {/* Node 2: Edge Gateway */}
+                <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#fdf9ef]/90 border border-white/60 flex-1">
+                  <span className="text-xs font-bold text-[#1b1b1b]">Edge Gateway</span>
+                  <span className="text-[9px] text-neutral-500">SFU Mesh</span>
+                </div>
+                <span className="text-neutral-400 text-xs">→</span>
+
+                {/* Node 3: Eva Neural */}
+                <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#e8e2d5]/60 border border-neutral-300/50 flex-1">
+                  <span className="text-xs font-bold text-amber-900">Eva Neural</span>
+                  <span className="text-[9px] text-emerald-700 font-medium">Synchronized</span>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Active Agenda Pill Strip */}
+          <section className="flex items-center justify-between px-1 py-1">
+            <div className="flex items-center gap-2 truncate">
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span className="text-xs text-neutral-600 truncate">
+                Focus: Opus 3.5 Token Streaming via WebSocket
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
+              Autonomous Sync
+            </span>
           </section>
 
           {/* Co-branding footer banner */}

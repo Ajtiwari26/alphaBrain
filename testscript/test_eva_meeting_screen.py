@@ -76,6 +76,11 @@ def test_dual_participant_cards():
     assert "Founder & CEO" in content, "Founder & CEO title must be present"
     assert "Eva · CTO" in content, "Eva · CTO title must be present"
 
+    # Verify Ajay PiP is positioned in top-right corner
+    assert "top-3 right-3" in content and "floating-pip" in content, (
+        "Ajay PiP must be positioned in the top-right corner (top-3 right-3)"
+    )
+
 
 def test_architecture_slide_card():
     """Verify presentation slide card displays Architecture Blueprint and topology flow."""
@@ -90,6 +95,11 @@ def test_architecture_slide_card():
     assert "Edge Gateway" in content, "Topology flow must display Edge Gateway"
     assert "Eva Neural" in content, "Topology flow must display Eva Neural"
 
+    # Verify conditional rendering on state
+    assert "{isScreenSharing &&" in content, (
+        "Slide share must conditionally render based on isScreenSharing state"
+    )
+
 
 def test_live_executive_transcription_and_spec_distillation():
     """Verify Live Executive Transcription & Spec Distillation displays real-time speech and AUTO-GENERATING PLAN badge."""
@@ -103,6 +113,17 @@ def test_live_executive_transcription_and_spec_distillation():
     assert "chat-form" in content, "Chat form for executive directives must exist"
     assert "chat-input" in content, "Chat input must exist"
     assert "LIVE NOTES" in content, "LIVE NOTES header must be present"
+
+    # Verify direct transcription card placement below stage
+    stage_idx = content.find("stage-grid")
+    transcription_idx = content.find("live-transcription-card")
+    slide_idx = content.find("screen-share-stage")
+    assert stage_idx != -1 and transcription_idx != -1, "Stage and transcription card must exist"
+    assert transcription_idx > stage_idx, "Transcription card must be positioned below stage"
+    if slide_idx != -1:
+        assert transcription_idx < slide_idx, (
+            "Transcription card must be directly below stage before conditional slide share"
+        )
 
 
 def test_floating_4_button_bottom_pill():
