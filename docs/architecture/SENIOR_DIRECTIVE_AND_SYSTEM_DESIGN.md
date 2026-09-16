@@ -3951,3 +3951,201 @@ The patch successfully enforces Invariant I-1 across both API and service layers
 ---
 
 *End of Section 14.3 — Amazon-Style Delivery Board & Client Delegate Governance*
+
+---
+
+## 15.0 MODEL BENCHMARKS, TRI-TIER ROUTING TOPOLOGY & CROSS-PROVIDER INDEPENDENCE
+
+**Ratified:** 2026-09-17  
+**Review Authority:** Claude Opus 4.6 Thinking (Round 2), Gemini 3.1 Pro High (Round 1)  
+**Proposal Source:** Model Benchmarks & Routing Topology Report v1.0.0  
+**Sealed Invariants:** I-61, I-62  
+
+### 15.1 Empirical Benchmark Matrix (Baseline: 2026-09-17)
+
+| Model ID | Provider | SWE-bench Verified | DeepSWE v1.1 | Terminal-Bench 2.1 | GPQA Diamond | Output TPS | Context Window |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `claude-opus-4-6-thinking` | Anthropic | **80.8%** | **81.5%** | 89.2% | 89.4% | ~25–35 | 200K |
+| `gemini-3.1-pro-high` | Google | 80.6% | 78.2% | 88.4% | **94.3%** | ~40–55 | **1,000K** |
+| `claude-sonnet-4-6` | Anthropic | 79.6% | 77.9% | 89.5% | 86.8% | ~65–80 | 200K |
+| `gemini-3.8-flash-high` | Google | 78.4% | 73.7% | **90.8%** | 84.1% | **~140–180** | **1,000K** |
+| `gpt-oss-120b-medium` | Open MoE | 62.4% | 58.0% | 71.2% | 68.5% | ~85–100 | 128K |
+
+> [!NOTE]
+> Benchmarks are point-in-time measurements. All models must be re-benchmarked upon version upgrade before tier reassignment. Results are archived in `docs/architecture/model_benchmarks/` with ISO-dated filenames.
+
+### 15.2 Tri-Tier Model Routing Topology
+
+```mermaid
+graph TD
+    subgraph Tier1["Tier 1: High-Velocity Execution"]
+        T1M["gemini-3.8-flash-high"]
+        T1S["worker-cycle · test-gen · lint-repair · research-broker"]
+    end
+
+    subgraph Tier2["Tier 2: Deep Context & Systems Auditing"]
+        T2M["gemini-3.1-pro-high"]
+        T2S["senior-plan · multi-repo-research · review-round-1 · security-audit"]
+    end
+
+    subgraph Tier3["Tier 3: Supreme Architecture & Invariants"]
+        T3M["claude-opus-4-6-thinking"]
+        T3S["directive-authoring · review-round-2 · plan-critique · crypto-attestation"]
+    end
+
+    Tier1 -->|"Complexity Escalation"| Tier2
+    Tier2 -->|"Architectural Critique"| Tier3
+```
+
+#### 15.2.1 Stage Routing Contract
+
+| Pipeline Stage | Primary Model (Tier) | Fallback 1 | Fallback 2 | Rationale |
+| :--- | :--- | :--- | :--- | :--- |
+| Research Broker | `gemini-3.8-flash-high` (T1) | `gemini-3.1-pro-high` | — | 90.8% Terminal-Bench; 5× latency reduction (60s → 12s). Escalates on `confidence_score < 0.7` or 3× consecutive `< 0.85`. |
+| Worker Cycle | `gemini-3.8-flash-high` (T1) | `gemini-3.1-pro-high` | — | Fast red-green-refactor in isolated worktree. Complexity Escalation Gate (I-61) triggers Tier 2 for multi-package refactors. |
+| Senior Planning | `gemini-3.1-pro-high` (T2) | `claude-opus-4-6-thinking` | `claude-sonnet-4-6` | 1M context ingests full repo state. Blueprint is structured JSON. |
+| Plan Critique | `claude-opus-4-6-thinking` (T3) | `claude-sonnet-4-6` | `gemini-3.1-pro-high` | Independent architectural critique. Must validate Blueprint against ALL sealed invariants (I-1 through I-62+). |
+| Review Round 1 | `gemini-3.1-pro-high` (T2) | `gemini-3.8-flash-high` | — | Deep diff, security audit (GPQA 94.3%). |
+| Review Round 2 | `claude-opus-4-6-thinking` (T3) | **`claude-sonnet-4-6`** | `gemini-3.1-pro-high` *(DEGRADED)* | Supreme architectural check. Cross-provider independence enforced by I-62. |
+
+#### 15.2.2 Complexity Escalation Gate
+
+The worker cycle dispatcher SHALL escalate from Tier 1 (`gemini-3.8-flash-high`) to Tier 2 (`gemini-3.1-pro-high`) when ANY of the following conditions are detected:
+
+1. **Multi-Package Scope:** Blueprint specifies changes across ≥6 files in ≥3 distinct Python packages.
+2. **Schema-API Coupling:** Task involves Alembic migration AND API contract changes in the same Blueprint.
+3. **Repeated Test Failure:** Worker fails ≥2 consecutive `pytest` runs on the same test file (reasoning-depth limitation signal).
+
+Escalation events are logged with `COMPLEXITY_ESCALATION` audit tag, including the triggering condition and original/escalated model IDs.
+
+#### 15.2.3 Research Broker Confidence Protocol
+
+The research broker output schema SHALL include:
+```json
+{
+  "query": "string",
+  "results": ["..."],
+  "confidence_score": 0.0,
+  "model_used": "gemini-3.8-flash-high",
+  "escalated": false,
+  "escalation_reason": null
+}
+```
+
+- **Immediate escalation:** `confidence_score < 0.7` on any single query → re-execute with `gemini-3.1-pro-high`.
+- **Cumulative escalation:** 3 consecutive queries with `confidence_score < 0.85` → switch to `gemini-3.1-pro-high` for remainder of research phase.
+
+### 15.3 Cross-Provider Review Independence Protocol
+
+> [!IMPORTANT]
+> **The 2-round Senior Engineering Review is the final guardrail before code enters the canonical branch. Its integrity is non-negotiable.**
+
+#### 15.3.1 Independence Requirement
+
+Round 1 and Round 2 of the Senior Engineering Review MUST be executed by models from **different LLM providers**. The canonical configuration is:
+
+| Round | Provider | Primary Model | Purpose |
+| :--- | :--- | :--- | :--- |
+| Round 1 | Google | `gemini-3.1-pro-high` | Deep context diff analysis, security audit, test coverage validation |
+| Round 2 | Anthropic | `claude-opus-4-6-thinking` | Architectural invariant verification, boundary condition analysis, final attestation |
+
+#### 15.3.2 Round 2 Fallback Chain
+
+When `claude-opus-4-6-thinking` is unavailable (all Anthropic-capable OC-EDS accounts report $W_i \leq 0$):
+
+```
+claude-opus-4-6-thinking (PRIMARY)
+        │ unavailable
+        ▼
+claude-sonnet-4-6 (FALLBACK 1 — same provider, preserves independence)
+        │ unavailable
+        ▼
+gemini-3.1-pro-high (FALLBACK 2 — DEGRADED_SAME_FAMILY triggered)
+```
+
+#### 15.3.3 DEGRADED_SAME_FAMILY Attestation
+
+When Round 2 falls back to a Google model (same provider as Round 1), the following protocol activates:
+
+1. **Structured attestation** is embedded in the merge commit trailer:
+   ```json
+   {
+     "attestation_type": "DEGRADED_SAME_FAMILY",
+     "round1_model": "gemini-3.1-pro-high",
+     "round1_provider": "google",
+     "round2_model": "gemini-3.1-pro-high",
+     "round2_provider": "google",
+     "round2_intended_provider": "anthropic",
+     "accounts_checked": [
+       {"account": "acct1@...", "quota_remaining_pct": 0.0},
+       {"account": "acct2@...", "quota_remaining_pct": 0.0}
+     ],
+     "degradation_timestamp_utc": "ISO-8601",
+     "requires_human_ack": true
+   }
+   ```
+
+2. **Automatic merge is BLOCKED.** The merge enters `pending-degraded-review` state.
+
+3. **Resolution paths:**
+   - **Path A:** Human issues `/approve-degraded` command after manual review.
+   - **Path B:** System holds for 24 hours, retries with refreshed Anthropic quota. If retry succeeds, the degraded attestation is replaced with a clean one.
+
+4. **Audit logging:** `ReviewAttestation` log entry with severity `WARN`, tag `CROSS_PROVIDER_INDEPENDENCE_VIOLATED`.
+
+#### 15.3.4 Symmetric Guard Principle
+
+The cross-provider independence requirement is **provider-agnostic**. If Round 1 is ever reassigned to an Anthropic model, Round 2's fallback chain MUST prefer Google models before same-family fallback. The invariant protects against **provider monoculture**, not any specific provider.
+
+### 15.4 Account Scheduling: Opportunity-Cost / Earliest-Deadline Scheduling (OC-EDS)
+
+AlphaBrain rotates across available OAuth accounts using a 4-tier utility function to maximize quota utilization and prevent starvation:
+
+#### Tier 1 — Idle First ($W_i \geq 99.0\%$, countdown unstarted)
+$$U_i = 1000.0 + F_i$$
+Break the seal on untouched accounts to start their 7-day refresh timer.
+
+#### Tier 2 — Expiring Soon ($0 < T_{w,i} \leq T_{exp}$ days, default $T_{exp} = 2.0$)
+$$U_i = 100.0 + rac{100.0}{T_{w,i} + 0.1} \cdot rac{\sqrt{\max(0.1, W_i)}}{10.0}$$
+Burns expiring quota before the weekly reset window closes.
+
+#### Tier 3 — Normal OC-EDS Rotation
+$$U_i = rac{\ln(1 + W_i)}{T_{w,i} + 1.0} \cdot \left(\sqrt{\max(0, F_i)} + rac{2.0}{T_{f,i} + 1.0}ight)$$
+
+#### Tier 4 — Disqualified ($W_i \leq 0.0\%$)
+$$U_i = -\infty$$
+
+> [!TIP]
+> The Tier 2 expiry threshold is configurable via `ALPHABRAIN_OC_EDS_EXPIRY_THRESHOLD_DAYS` environment variable (default: `2.0`). Adjust based on observed provider refresh cadence.
+
+Where:
+- $W_i$: Remaining quota percentage for account $i$
+- $T_{w,i}$: Days until weekly quota reset for account $i$
+- $F_i$: Feature-capability score (provider-specific model access)
+- $T_{f,i}$: Days since account $i$ was last used (freshness)
+
+### 15.5 Model Exclusions
+
+| Model | Exclusion Scope | Permitted Use |
+| :--- | :--- | :--- |
+| `gpt-oss-120b-medium` | **All critical-path pipeline stages** (research, planning, worker cycle, review, attestation) | Offline auxiliary only: changelog generation, documentation summarization. All outputs must be reviewed by a Tier 2+ model before incorporation. |
+
+### 15.6 Sealed Invariants
+
+#### Invariant I-61: Tri-Tier Model Topology & Task Boundary Enforcement
+
+> The AlphaBrain autonomous pipeline SHALL enforce a Tri-Tier Model Routing Topology as defined in §15.2. Each pipeline stage is immutably assigned to a tier. No stage SHALL execute on a model from a lower tier than its assignment without traversing the defined fallback chain. The Complexity Escalation Gate (§15.2.2) SHALL escalate Tier 1 worker tasks to Tier 2 when multi-package scope, schema-API coupling, or repeated test failure conditions are detected. When a new model version is released, it MUST be benchmarked against SWE-bench Verified, DeepSWE v1.1, Terminal-Bench 2.1, and GPQA Diamond before tier (re)assignment. Minimum tier qualification thresholds: Tier 1 ≥ 85% Terminal-Bench, ≥ 140 TPS; Tier 2 ≥ 78% SWE-bench, ≥ 90% GPQA, ≥ 500K context; Tier 3 ≥ 80% SWE-bench, ≥ 80% DeepSWE, extended thinking capability required.
+>
+> **Sealed: 2026-09-17. Violation is a P0 pipeline integrity failure.**
+
+#### Invariant I-62: Cross-Provider Review Independence & Degraded Fallback Attestation
+
+> The 2-round Senior Engineering Review SHALL maintain cross-provider independence: Round 1 and Round 2 MUST use models from different LLM providers. Round 2 fallback order: (1) `claude-sonnet-4-6`, (2) `gemini-3.1-pro-high` with DEGRADED_SAME_FAMILY attestation. Degraded attestation SHALL embed structured JSON in the merge commit trailer, block automatic merge, and require either human `/approve-degraded` acknowledgment or 24-hour cooling retry. The independence requirement is symmetric and provider-agnostic. `gpt-oss-120b-medium` is permanently excluded from all review rounds and critical-path stages.
+>
+> **Sealed: 2026-09-17. Violation is a P0 architectural integrity failure requiring immediate pipeline halt and human escalation.**
+
+---
+
+*Section 15.0 ratified by dual senior review consensus. Next available section: 16.0.*  
+*Total sealed invariants: I-1 through I-62.*  
+*P15.0 architectural directive authored and sealed by Claude Opus 4.6 (Thinking) on 2026-09-17.*
