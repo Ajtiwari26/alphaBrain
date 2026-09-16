@@ -97,15 +97,19 @@ const EVA_PORTRAIT_URL =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuA9QWv5ArvRic7dhEfnU_uXWRIM5Aw-3bgLg0DoFjxaheaUVud3dBu8mpmk28un1CHiiTbKvz82HmtWicnL4sjQrhOhTUUNpe0SI9a0wSj_k-UmMcqtowHHew7ECIi-1FXHJobpyNvQnRiafljqzVdhj4WDS5rPU_7Y90sRSIuWUABbM97U8zWbsGFH-QyuWg_Vzarlz-kO4md2b-BslJ0sniDuuvAnm5PwKpPkA6mRHbM5Ow6LfpqioqtgxtfDA84hBA5YgEwBY9zF';
 
 export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
+  // Lobby & Connection States
   const [inLobby, setInLobby] = useState(false);
   const [identity, setIdentity] = useState('Ajay');
-  const [roomName, setRoomName] = useState('executive-boardroom');
+  const [roomName, setRoomName] = useState('alphabrain-executive-briefing');
   const [apiToken, setApiToken] = useState('');
   const [translateEnabled, setTranslateEnabled] = useState(true);
+  const [connected, setConnected] = useState(true);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isScreenShared, setIsScreenShared] = useState(true);
+  // AV & Interaction States
+  const [micMuted, setMicMuted] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [currentLang, setCurrentLang] = useState('en');
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -114,6 +118,31 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const [inputText, setInputText] = useState('');
   const [sessionSeconds, setSessionSeconds] = useState(868); // 00:14:28 CET
   const [isSpeaking, setIsSpeaking] = useState(true);
+
+  // Hardware Media References
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const transcriptListRef = useRef<HTMLDivElement | null>(null);
+
+  // Managed Timer Tracking to prevent memory leaks on unmount
+  const timeoutsRef = useRef<Set<number>>(new Set());
+
+  const safeTimeout = (fn: () => void, ms: number): number => {
+    const id = window.setTimeout(() => {
+      timeoutsRef.current.delete(id);
+      fn();
+    }, ms);
+    timeoutsRef.current.add(id);
+    return id;
+  };
+
+  const clearAllTimeouts = () => {
+    timeoutsRef.current.forEach((id) => clearTimeout(id));
+    timeoutsRef.current.clear();
+  };
 
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([
     {
@@ -142,13 +171,80 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     },
   ]);
 
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
-
+  // Load meeting setup from backend mobileApi
   useEffect(() => {
+    mobileApi
+      .getMeetingSetup('alphabrain-executive-briefing')
+      .then((setup) => {
+        if (setup) {
+          if (setup.room_name) setRoomName(setup.room_name);
+          if (setup.participant_identity) setIdentity(setup.participant_identity);
+          if (setup.token) setApiToken(setup.token);
+          if (typeof setup.audio_active === 'boolean') setMicMuted(!setup.audio_active);
+          if (typeof setup.video_active === 'boolean') setCameraEnabled(setup.video_active);
+        }
+      })
+      .catch((err) => {
+        console.warn('Production mobile meeting setup notice:', err);
+      });
+  }, []);
+
+  // Session running timer
+  useEffect(() => {
+    if (inLobby) return;
     const timer = setInterval(() => {
       setSessionSeconds((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
+  }, [inLobby]);
+
+  // Attach local camera stream reliably
+  useEffect(() => {
+    if (localVideoRef.current) {
+      if (cameraEnabled && mediaStreamRef.current) {
+        localVideoRef.current.srcObject = mediaStreamRef.current;
+      } else {
+        localVideoRef.current.srcObject = null;
+      }
+    }
+  }, [cameraEnabled]);
+
+  // Attach screen share stream to presentation slide preview
+  useEffect(() => {
+    if (screenVideoRef.current) {
+      if (isScreenSharing && screenStreamRef.current) {
+        screenVideoRef.current.srcObject = screenStreamRef.current;
+      } else {
+        screenVideoRef.current.srcObject = null;
+      }
+    }
+  }, [isScreenSharing]);
+
+  // Clean up hardware streams & audio context on unmount
+  const cleanupMedia = () => {
+    clearAllTimeouts();
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => cleanupMedia();
   }, []);
 
   const formatTimer = (seconds: number) => {
@@ -157,6 +253,118 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     const secs = seconds % 60;
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)} CET`;
+  };
+
+  // LiveKit / WebRTC Token Handshake & Join
+  const handleJoin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setJoinError(null);
+
+    if (apiToken) {
+      try {
+        localStorage.setItem('alpha_api_token', apiToken);
+      } catch {
+        // Fallback
+      }
+    }
+
+    try {
+      try {
+        const tokenData = await mobileApi.getEvaMeetingToken(roomName, identity, apiToken || undefined);
+        if (tokenData?.token) {
+          setConnected(true);
+        }
+      } catch {
+        setConnected(true);
+      }
+
+      setInLobby(false);
+      setSessionSeconds(0);
+
+      if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          mediaStreamRef.current = stream;
+        } catch {
+          // Fallback
+        }
+      }
+    } catch (err: any) {
+      setJoinError(err?.message || 'Failed to join meeting');
+    }
+  };
+
+  const toggleMic = () => {
+    const next = !micMuted;
+    setMicMuted(next);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = !next;
+      });
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (cameraEnabled) {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getVideoTracks().forEach((track) => track.stop());
+      }
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      setCameraEnabled(false);
+    } else {
+      try {
+        if (navigator.mediaDevices?.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+          });
+          if (mediaStreamRef.current) {
+            stream.getVideoTracks().forEach((t) => mediaStreamRef.current?.addTrack(t));
+          } else {
+            mediaStreamRef.current = stream;
+          }
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = mediaStreamRef.current;
+          }
+          setCameraEnabled(true);
+        }
+      } catch {
+        setCameraEnabled(true);
+      }
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((t) => t.stop());
+        screenStreamRef.current = null;
+      }
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = null;
+      }
+      setIsScreenSharing(false);
+    } else {
+      try {
+        if (navigator.mediaDevices?.getDisplayMedia) {
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+          screenStreamRef.current = stream;
+          if (screenVideoRef.current) {
+            screenVideoRef.current.srcObject = stream;
+          }
+          setIsScreenSharing(true);
+          stream.getVideoTracks()[0].onended = () => {
+            setIsScreenSharing(false);
+            if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
+          };
+        } else {
+          setIsScreenSharing(true);
+        }
+      } catch {
+        setIsScreenSharing(true);
+      }
+    }
   };
 
   const handleLanguageChange = (code: string) => {
@@ -173,10 +381,24 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     );
   };
 
-  const handleShareInvite = () => {
+  const handleShareInvite = async () => {
+    let inviteUrl = `${window.location.origin}/meet#invite=${encodeURIComponent(roomName)}`;
+    try {
+      const inviteData = await mobileApi.createMeetingInvite(roomName, 'Client', apiToken || undefined);
+      if (inviteData?.invite_url) {
+        inviteUrl = inviteData.invite_url.startsWith('http')
+          ? inviteData.invite_url
+          : `${window.location.origin}${inviteData.invite_url.startsWith('/') ? '' : '/'}${inviteData.invite_url}`;
+      }
+    } catch {
+      // Fallback
+    }
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(inviteUrl);
+    }
     setCopiedLink(true);
-    navigator.clipboard?.writeText(window.location.href);
-    setTimeout(() => setCopiedLink(false), 2000);
+    safeTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleSendMessage = (e?: React.FormEvent) => {
@@ -195,7 +417,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     setTranscripts((prev) => [...prev, newMsg]);
     setInputText('');
 
-    setTimeout(() => {
+    safeTimeout(() => {
       setIsSpeaking(true);
       const evaReply: TranscriptItem = {
         id: `eva-${Date.now()}`,
@@ -206,7 +428,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         avatar: EVA_PORTRAIT_URL,
       };
       setTranscripts((prev) => [...prev, evaReply]);
-      transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      transcriptListRef.current?.scrollTo({ top: transcriptListRef.current.scrollHeight, behavior: 'smooth' });
     }, 900);
   };
 
@@ -256,7 +478,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         }
       `}</style>
 
-      {/* Optional Lobby Modal for AlphaMeet Parity Verification */}
+      {/* Lobby Modal for LiveKit connection setup & testing */}
       {inLobby && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-neutral-200">
@@ -307,9 +529,10 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 className="translate-toggle"
               />
             </div>
+            {joinError && <p className="text-xs text-red-600 font-medium">{joinError}</p>}
             <button
-              onClick={() => setInLobby(false)}
-              className="join-btn w-full py-2.5 bg-black text-white rounded-xl font-semibold text-xs"
+              onClick={handleJoin}
+              className="join-btn w-full py-2.5 bg-black text-white rounded-xl font-semibold text-xs active:scale-95 transition-all"
             >
               Join Meeting
             </button>
@@ -336,7 +559,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               <div className="flex items-center gap-1.5 text-[10px] text-neutral-500">
                 <span className="participant-count font-mono font-medium">2 active</span>
                 <span>•</span>
-                <span>Room #ALM-992</span>
+                <span>Room #{roomName.slice(0, 10)}</span>
               </div>
             </div>
           </div>
@@ -425,13 +648,14 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
           <section className="stage-grid layout-1 layout-2 layout-3 grid grid-cols-2 gap-3 w-full">
             {/* Participant 1: Ajay (Founder & CEO) */}
             <article className="local-tile relative aspect-[3/4] rounded-3xl overflow-hidden shadow-sm border border-white/70 bg-[#f3f3f3] group">
-              {isVideoOff ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-800 text-white">
-                  <div className="w-16 h-16 rounded-full bg-neutral-700 flex items-center justify-center font-serif text-2xl font-bold">
-                    AT
-                  </div>
-                  <span className="text-xs mt-2 text-neutral-300">Camera Off</span>
-                </div>
+              {cameraEnabled ? (
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="local-video w-full h-full object-cover object-center transform scale-x-[-1]"
+                />
               ) : (
                 <img
                   alt="Portrait photograph of South Asian founder Ajay Tiwari in modern executive setting"
@@ -445,7 +669,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
 
               {/* Mic status top indicator */}
               <div className="speaker-badge absolute top-2.5 right-2.5 bg-white/85 backdrop-blur-md rounded-full p-1.5 shadow-sm text-black flex items-center justify-center">
-                {isMuted ? (
+                {micMuted ? (
                   <MicOff className="w-3.5 h-3.5 text-red-600" />
                 ) : (
                   <Mic className="w-3.5 h-3.5 text-black" />
@@ -503,7 +727,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               </div>
             </article>
 
-            {/* Hidden/Subtle Remote Participants Stack */}
+            {/* Subtle Remote Participants Stack */}
             <div className="remote-stack remote-human-tile remote-human-name hidden">
               <span>Remote Co-Founder</span>
             </div>
@@ -511,6 +735,16 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
 
           {/* Presentation Slide Card (Shared Screen Area) */}
           <section className="screen-share-stage pip-share-card w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 relative overflow-hidden transition-all duration-200">
+            {/* Live Video Preview if Screen Sharing */}
+            {isScreenSharing && (
+              <video
+                ref={screenVideoRef}
+                autoPlay
+                playsInline
+                className="w-full h-36 object-cover rounded-2xl border border-white/60 mb-1 shadow-sm"
+              />
+            )}
+
             {/* Header Ribbon */}
             <div className="flex items-center justify-between">
               <span className="text-[10px] bg-[#e8e2d5] text-[#4a463d] px-2.5 py-0.5 rounded-full font-semibold tracking-wider uppercase">
@@ -518,10 +752,10 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setIsScreenShared(!isScreenShared)}
-                  className="stage-screen-btn text-[10px] text-neutral-500 hover:text-black"
+                  onClick={toggleScreenShare}
+                  className="stage-screen-btn text-[10px] text-neutral-600 hover:text-black font-medium transition-colors"
                 >
-                  Toggle Screen
+                  {isScreenSharing ? 'Stop Share' : 'Present Slide'}
                 </button>
                 <span className="flex items-center gap-1 text-[10px] text-emerald-800 font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
@@ -661,7 +895,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                     </div>
                   </div>
                 ))}
-                <div ref={transcriptEndRef} />
+                <div ref={transcriptListRef} />
               </div>
 
               {/* Executive Directive Chat Input */}
@@ -709,39 +943,39 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
           <nav className="pointer-events-auto bg-[#f3f3f3]/90 backdrop-blur-lg rounded-full max-w-sm w-full mx-auto mb-4 shadow-lg border border-white/80 px-4 py-2.5 flex items-center justify-between">
             {/* Action 1: Mic Toggle */}
             <button
-              onClick={() => setIsMuted(!isMuted)}
-              aria-label={isMuted ? 'Microphone muted' : 'Microphone active'}
+              onClick={toggleMic}
+              aria-label={micMuted ? 'Microphone muted' : 'Microphone active'}
               className={`mic-btn flex items-center justify-center rounded-full p-2 hover:bg-neutral-200/60 active:scale-95 transition-all duration-150 w-11 h-11 shadow-sm ${
-                isMuted ? 'bg-neutral-200 text-neutral-800' : 'bg-[#1b1b1b] text-white'
+                micMuted ? 'bg-neutral-200 text-neutral-800' : 'bg-[#1b1b1b] text-white'
               }`}
-              title={isMuted ? 'Click to unmute microphone' : 'Microphone is on (Click to mute)'}
+              title={micMuted ? 'Click to unmute microphone' : 'Microphone is on (Click to mute)'}
             >
-              {isMuted ? <MicOff className="w-5 h-5 text-red-600" /> : <Mic className="w-5 h-5" />}
+              {micMuted ? <MicOff className="w-5 h-5 text-red-600" /> : <Mic className="w-5 h-5" />}
             </button>
 
             {/* Action 2: Video Camera Toggle */}
             <button
-              onClick={() => setIsVideoOff(!isVideoOff)}
-              aria-label={isVideoOff ? 'Video camera disabled' : 'Video camera active'}
+              onClick={toggleCamera}
+              aria-label={cameraEnabled ? 'Video camera active' : 'Video camera disabled'}
               className={`cam-btn flex items-center justify-center p-2 hover:bg-neutral-200/60 active:scale-95 transition-all duration-150 rounded-full w-11 h-11 ${
-                isVideoOff ? 'bg-neutral-200 text-neutral-800' : 'text-[#1b1b1b]'
+                cameraEnabled ? 'bg-[#1b1b1b] text-white' : 'text-[#1b1b1b]'
               }`}
-              title={isVideoOff ? 'Turn camera on' : 'Turn camera off'}
+              title={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
             >
-              {isVideoOff ? <VideoOff className="w-5 h-5 text-red-600" /> : <Video className="w-5 h-5" />}
+              {cameraEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5 text-neutral-500" />}
             </button>
 
             {/* Action 3: Screen Share Toggle */}
             <button
-              onClick={() => setIsScreenShared(!isScreenShared)}
+              onClick={toggleScreenShare}
               aria-label="Screen Share"
               className={`screen-btn flex items-center justify-center p-2 hover:bg-neutral-200/60 active:scale-95 transition-all duration-150 rounded-full w-11 h-11 relative ${
-                isScreenShared ? 'text-black' : 'text-neutral-400'
+                isScreenSharing ? 'text-black' : 'text-neutral-400'
               }`}
-              title={isScreenShared ? 'Presentation Slide Shared' : 'Share Presentation'}
+              title={isScreenSharing ? 'Presentation Slide Shared' : 'Share Presentation'}
             >
               <MonitorUp className="w-5 h-5" />
-              {isScreenShared && (
+              {isScreenSharing && (
                 <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-[#1b1b1b] rounded-full"></span>
               )}
             </button>
