@@ -281,6 +281,26 @@ body {
   0% { transform: scaleY(0.4); }
   100% { transform: scaleY(1); }
 }
+
+/* Glass Dock & Floating PiP Mobile AlphaMeet Room Styles */
+.glass-dock {
+  background: rgba(243, 243, 243, 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.floating-pip {
+  position: absolute;
+  z-index: 30;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
 /* Smooth Transition Curves & Micro-Interactions */
 :root {
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);

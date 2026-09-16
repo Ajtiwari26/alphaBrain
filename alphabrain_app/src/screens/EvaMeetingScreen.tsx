@@ -114,7 +114,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const [currentLang, setCurrentLang] = useState('en');
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+  const [showNotes, setShowNotes] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [inputText, setInputText] = useState('');
   const [sessionSeconds, setSessionSeconds] = useState(868); // 00:14:28
@@ -672,10 +672,60 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             </p>
           </section>
 
-          {/* Main Video Stage: 2-Participant Dynamic Grid */}
-          <section className="stage-grid layout-1 layout-2 layout-3 grid grid-cols-2 gap-3 w-full">
-            {/* Participant 1: Ajay (Founder & CEO) */}
-            <article className="local-tile relative aspect-[3/4] rounded-3xl overflow-hidden shadow-sm border border-white/70 bg-[#f3f3f3] group">
+          {/* Main Video Stage: Full-Stage Eva Card with Floating Ajay PiP */}
+          <section className="stage-grid layout-1 layout-2 layout-3 relative w-full rounded-3xl overflow-hidden shadow-lg border border-white/80 bg-neutral-900">
+            {/* Primary View: Full-Stage Eva Card */}
+            <article className="eva-tile relative w-full aspect-[4/5] sm:aspect-[1/1] rounded-3xl overflow-hidden bg-neutral-900 group">
+              <img
+                alt="Portrait photograph of futuristic female AI CTO executive Eva with subtle ambient holographic glow"
+                className="w-full h-full object-cover object-center transform group-hover:scale-102 transition-transform duration-700 ease-out"
+                src={EVA_PORTRAIT_URL}
+              />
+
+              {/* AI Ethereal Halo Lighting Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/15 via-transparent to-amber-200/20 mix-blend-overlay pointer-events-none"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 pointer-events-none"></div>
+
+              {/* Top-Left: Eva Holographic HUD Status & SFU LiveKit Telemetry */}
+              <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+                <div className="bg-black/50 backdrop-blur-md rounded-full px-2.5 py-1 text-[10px] text-amber-200 font-mono flex items-center gap-1.5 border border-amber-400/20 shadow-sm">
+                  <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
+                  <span className="eva-status-text font-semibold">Gemini Live Voice Active</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md text-[9px] text-white/80 font-mono border border-white/10">
+                    LiveKit SFU
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 backdrop-blur-md text-[9px] text-emerald-300 font-mono border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    18ms
+                  </span>
+                </div>
+              </div>
+
+              {/* Top-Right: Real-Time Audio Synthesis Waveform (Eva Speaking) */}
+              <div className="eva-wave active-wave absolute top-3 right-3 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1.5 shadow-md flex items-center gap-1 h-7 border border-amber-400/30 z-10">
+                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-1 inline-block"></span>
+                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-2 inline-block"></span>
+                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-3 inline-block"></span>
+                <span className="w-[2px] bg-amber-400 rounded-full waveform-bar-4 inline-block"></span>
+                <span className="text-[9px] font-bold text-amber-300 ml-1 tracking-wider">SPEAKING</span>
+              </div>
+
+              {/* Bottom-Left: Eva Executive Nametag Pill */}
+              <div className="absolute bottom-3 left-3 z-10">
+                <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center gap-2 shadow-lg">
+                  <div className="flex flex-col">
+                    <p className="text-xs font-bold text-white leading-tight">Eva · CTO</p>
+                    <p className="text-[9px] text-amber-300 font-mono tracking-wide -mt-0.5">EVA ARCHITECT HUD</p>
+                  </div>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                </div>
+              </div>
+            </article>
+
+            {/* Floating PiP: Ajay (Founder & CEO) */}
+            <article className="local-tile floating-pip absolute bottom-3 right-3 z-30 w-28 sm:w-32 aspect-[3/4] rounded-2xl rounded-3xl overflow-hidden shadow-2xl border-2 border-white/90 ring-1 ring-black/20 bg-neutral-900 group cursor-pointer transition-transform hover:scale-105 active:scale-95">
               {cameraEnabled ? (
                 <video
                   ref={localVideoRef}
@@ -692,65 +742,31 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 />
               )}
 
-              {/* Frosted Overlay Sheen & Shadow */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent pointer-events-none"></div>
+              {/* Frosted Sheen & Shadow */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none"></div>
 
-              {/* Mic status top indicator */}
-              <div className="speaker-badge absolute top-2.5 right-2.5 bg-white/85 backdrop-blur-md rounded-full p-1.5 shadow-sm text-black flex items-center justify-center">
+              {/* Mic status indicator in PiP */}
+              <div className="speaker-badge absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-md rounded-full p-1 shadow-sm text-white flex items-center justify-center border border-white/20">
                 {micMuted ? (
-                  <MicOff className="w-3.5 h-3.5 text-red-600" />
+                  <MicOff className="w-3 h-3 text-red-500" />
                 ) : (
-                  <Mic className="w-3.5 h-3.5 text-black" />
+                  <Mic className="w-3 h-3 text-white" />
                 )}
               </div>
 
+              {/* Top-left PiP badge */}
+              <div className="absolute top-1.5 left-1.5 bg-white/80 backdrop-blur-sm rounded px-1 py-0.5 text-[8px] font-bold text-black uppercase tracking-wider">
+                PiP
+              </div>
+
               {/* Bottom Nametag Pill */}
-              <div className="local-name absolute bottom-2.5 inset-x-2.5">
-                <div className="px-2.5 py-1.5 rounded-full stone-glass flex items-center justify-between backdrop-blur-md shadow-sm">
+              <div className="local-name absolute bottom-1.5 inset-x-1.5">
+                <div className="px-2 py-1 rounded-xl bg-black/70 backdrop-blur-md border border-white/20 flex items-center justify-between">
                   <div className="truncate">
-                    <p className="text-xs font-semibold text-[#1b1b1b] truncate leading-tight">Ajay</p>
-                    <p className="text-[10px] text-neutral-600 truncate -mt-0.5">Founder & CEO</p>
+                    <p className="text-[10px] font-bold text-white truncate leading-tight">Ajay</p>
+                    <p className="text-[8px] text-neutral-300 truncate -mt-0.5">Founder & CEO</p>
                   </div>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 ml-1"></span>
-                </div>
-              </div>
-            </article>
-
-            {/* Participant 2: Eva (Lead AI CTO) */}
-            <article className="eva-tile relative aspect-[3/4] rounded-3xl overflow-hidden shadow-sm border border-amber-200/80 ring-2 ring-amber-400/20 bg-[#f3f3f3] group">
-              <img
-                alt="Portrait photograph of futuristic female AI CTO executive Eva with subtle ambient holographic glow"
-                className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-500 ease-out"
-                src={EVA_PORTRAIT_URL}
-              />
-
-              {/* AI Ethereal Halo Lighting Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-amber-200/20 mix-blend-overlay pointer-events-none"></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent pointer-events-none"></div>
-
-              {/* Real-Time Audio Synthesis Waveform (Eva Speaking) */}
-              <div className="eva-wave active-wave absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-md rounded-full px-2 py-1 shadow-sm flex items-center gap-0.5 h-7">
-                <span className="w-[2px] bg-black rounded-full waveform-bar-1 inline-block"></span>
-                <span className="w-[2px] bg-black rounded-full waveform-bar-2 inline-block"></span>
-                <span className="w-[2px] bg-black rounded-full waveform-bar-3 inline-block"></span>
-                <span className="w-[2px] bg-black rounded-full waveform-bar-4 inline-block"></span>
-                <span className="text-[9px] font-bold text-amber-800 ml-1">SPEAKING</span>
-              </div>
-
-              {/* Eva Holographic HUD Status Anchor */}
-              <div className="absolute top-2.5 left-2.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-0.5 text-[9px] text-amber-200 font-mono flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                <span className="eva-status-text">Gemini Live Voice Active</span>
-              </div>
-
-              {/* Bottom Nametag Pill with Live AI Indicator */}
-              <div className="absolute bottom-2.5 inset-x-2.5">
-                <div className="px-2.5 py-1.5 rounded-full stone-glass flex items-center justify-between backdrop-blur-md shadow-sm">
-                  <div className="truncate">
-                    <p className="text-xs font-semibold text-[#1b1b1b] truncate leading-tight">Eva · CTO</p>
-                    <p className="text-[10px] text-neutral-600 truncate -mt-0.5">EVA ARCHITECT HUD</p>
-                  </div>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-700 shrink-0 ml-1" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 ml-1 animate-pulse"></span>
                 </div>
               </div>
             </article>
@@ -845,7 +861,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             </div>
           </section>
 
-          {/* Active Agenda Pill Strip & Live Notes Toggle */}
+          {/* Active Agenda Pill Strip */}
           <section className="flex items-center justify-between px-1 py-1">
             <div className="flex items-center gap-2 truncate">
               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -853,34 +869,38 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 Focus: Opus 3.5 Token Streaming via WebSocket
               </span>
             </div>
-            <button
-              onClick={() => setShowNotes(!showNotes)}
-              className="transcript-btn text-xs font-semibold text-[#1b1b1b] underline underline-offset-4 decoration-neutral-300 hover:text-neutral-600 transition-colors shrink-0 ml-2"
-            >
-              {showNotes ? 'Hide Transcripts' : `Notes (${transcripts.length})`}
-            </button>
+            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
+              Autonomous Sync
+            </span>
           </section>
 
-          {/* Live Executive Transcription & Spec Distillation Drawer */}
-          {showNotes && (
-            <section className="w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 transition-all">
-              <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-[#1b1b1b] tracking-tight uppercase">
-                    Live Executive Transcription & Spec Distillation
-                  </h3>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300">
-                    AUTO-GENERATING PLAN
-                  </span>
-                  <span className="text-[9px] font-semibold bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded">
-                    LIVE NOTES • PCM 24kHz
-                  </span>
-                </div>
+          {/* Live Executive Transcription & Spec Distillation Card */}
+          <section className="live-transcription-card w-full stone-glass-card rounded-[1.75rem] p-4 flex flex-col gap-3 transition-all border border-white/80 shadow-sm">
+            <div className="flex items-center justify-between border-b border-neutral-200/80 pb-2">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-[#1b1b1b] tracking-tight uppercase">
+                  Live Executive Transcription & Spec Distillation
+                </h3>
               </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300">
+                  AUTO-GENERATING PLAN
+                </span>
+                <span className="text-[9px] font-semibold bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded">
+                  LIVE NOTES • PCM 24kHz
+                </span>
+                <button
+                  onClick={() => setShowNotes(!showNotes)}
+                  className="transcript-btn text-xs font-semibold text-neutral-600 hover:text-black p-1 transition-colors flex items-center gap-1"
+                  title={showNotes ? 'Collapse notes' : 'Expand notes'}
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transform transition-transform duration-200 ${showNotes ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+            </div>
 
-              {/* Transcript Stream List */}
+            {/* Transcript Stream List */}
+            {showNotes && (
               <div className="transcript-list space-y-2.5 max-h-48 overflow-y-auto pr-1">
                 {transcripts.map((t) => (
                   <div
@@ -925,26 +945,26 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 ))}
                 <div ref={transcriptListRef} />
               </div>
+            )}
 
-              {/* Executive Directive Chat Input */}
-              <form onSubmit={handleSendMessage} className="chat-form flex items-center gap-2 mt-1">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Direct Eva or record executive decision..."
-                  className="chat-input flex-1 px-3 py-2 text-xs bg-white/90 border border-neutral-300/80 rounded-xl focus:outline-none focus:ring-1 focus:ring-black placeholder:text-neutral-400"
-                />
-                <button
-                  type="submit"
-                  aria-label="Send Directive"
-                  className="prompt-eva-btn px-3 py-2 bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors flex items-center justify-center shrink-0 active:scale-95"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              </form>
-            </section>
-          )}
+            {/* Executive Directive Chat Input */}
+            <form onSubmit={handleSendMessage} className="chat-form flex items-center gap-2 mt-1">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Direct Eva or record executive decision..."
+                className="chat-input flex-1 px-3 py-2 text-xs bg-white/90 border border-neutral-300/80 rounded-xl focus:outline-none focus:ring-1 focus:ring-black placeholder:text-neutral-400"
+              />
+              <button
+                type="submit"
+                aria-label="Send Directive"
+                className="prompt-eva-btn px-3 py-2 bg-black text-white rounded-xl hover:bg-neutral-800 transition-colors flex items-center justify-center shrink-0 active:scale-95"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </section>
 
           {/* Co-branding footer banner */}
           <section className="flex items-center justify-center gap-2 pt-2 pb-4 text-neutral-500">
@@ -968,7 +988,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
 
         {/* Bottom Floating Glass Call Dock */}
         <div className="fixed bottom-0 inset-x-0 z-50 flex justify-around items-center px-4 py-2 pointer-events-none">
-          <nav className="pointer-events-auto bg-[#f3f3f3]/90 backdrop-blur-lg rounded-full max-w-sm w-full mx-auto mb-4 shadow-lg border border-white/80 px-4 py-2.5 flex items-center justify-between">
+          <nav className="glass-dock pointer-events-auto rounded-full max-w-sm w-full mx-auto mb-4 shadow-2xl border border-white/80 px-4 py-2.5 flex items-center justify-between transition-all">
             {/* Action 1: Mic Toggle */}
             <button
               onClick={toggleMic}
