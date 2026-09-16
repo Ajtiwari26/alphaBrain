@@ -105,6 +105,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const [translateEnabled, setTranslateEnabled] = useState(true);
   const [connected, setConnected] = useState(true);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [participantCount, setParticipantCount] = useState(2);
 
   // AV & Interaction States
   const [micMuted, setMicMuted] = useState(false);
@@ -116,7 +117,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
   const [showNotes, setShowNotes] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [sessionSeconds, setSessionSeconds] = useState(868); // 00:14:28 CET
+  const [sessionSeconds, setSessionSeconds] = useState(868); // 00:14:28
   const [isSpeaking, setIsSpeaking] = useState(true);
 
   // Hardware Media References
@@ -220,7 +221,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     }
   }, [isScreenSharing]);
 
-  // Clean up hardware streams & audio context on unmount
+  // Clean up hardware streams & audio context on unmount or end call
   const cleanupMedia = () => {
     clearAllTimeouts();
     if (mediaStreamRef.current) {
@@ -247,12 +248,20 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     return () => cleanupMedia();
   }, []);
 
+  // Graceful meeting exit handler preventing stream leaks
+  const handleEndCall = () => {
+    cleanupMedia();
+    if (onLeave) {
+      onLeave();
+    }
+  };
+
   const formatTimer = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(hrs)}:${pad(mins)}:${pad(secs)} CET`;
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
   };
 
   // LiveKit / WebRTC Token Handshake & Join
@@ -359,10 +368,11 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
           };
         } else {
-          setIsScreenSharing(true);
+          setIsScreenSharing(false);
         }
-      } catch {
-        setIsScreenSharing(true);
+      } catch (err) {
+        console.warn('Screen share cancelled or failed:', err);
+        setIsScreenSharing(false);
       }
     }
   };
@@ -399,6 +409,16 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
     }
     setCopiedLink(true);
     safeTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', next);
+      }
+      return next;
+    });
   };
 
   const handleSendMessage = (e?: React.FormEvent) => {
@@ -478,12 +498,16 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         }
       `}</style>
 
-      {/* Lobby Modal for LiveKit connection setup & testing */}
+      {/* Accessible Lobby Form for LiveKit setup & keyboard submission */}
       {inLobby && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-neutral-200">
+          <form
+            onSubmit={handleJoin}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-neutral-200"
+          >
             <h2 className="text-lg font-bold text-center">Join Meeting</h2>
             <input
+              id="identity-input"
               type="text"
               value={identity}
               onChange={(e) => setIdentity(e.target.value)}
@@ -491,6 +515,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               placeholder="Your Name"
             />
             <input
+              id="room-input"
               type="text"
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
@@ -498,6 +523,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               placeholder="Room Name"
             />
             <input
+              id="api-token-input"
               type="password"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
@@ -505,6 +531,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               placeholder="API Token (Optional)"
             />
             <select
+              id="language-select"
               value={currentLang}
               onChange={(e) => handleLanguageChange(e.target.value)}
               className="language-select w-full p-2.5 border rounded-xl text-xs"
@@ -521,8 +548,9 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
               <option value="pt">Portuguese</option>
             </select>
             <div className="flex items-center justify-between text-xs py-1">
-              <span>Enable AI Translation</span>
+              <label htmlFor="translate-toggle">Enable AI Translation</label>
               <input
+                id="translate-toggle"
                 type="checkbox"
                 checked={translateEnabled}
                 onChange={(e) => setTranslateEnabled(e.target.checked)}
@@ -531,12 +559,12 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             </div>
             {joinError && <p className="text-xs text-red-600 font-medium">{joinError}</p>}
             <button
-              onClick={handleJoin}
+              type="submit"
               className="join-btn w-full py-2.5 bg-black text-white rounded-xl font-semibold text-xs active:scale-95 transition-all"
             >
               Join Meeting
             </button>
-          </div>
+          </form>
         </div>
       )}
 
@@ -546,7 +574,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
         <header className="sticky top-0 z-40 bg-[#fdf9ef]/85 backdrop-blur-md flex justify-between items-center w-full px-4 py-3 border-b border-white/60 transition-all duration-200">
           <div className="flex items-center gap-2">
             <button
-              onClick={onLeave}
+              onClick={handleEndCall}
               aria-label="Leave Meeting"
               className="w-9 h-9 flex items-center justify-center rounded-full text-black hover:bg-neutral-200/60 active:scale-95 transition-all duration-150"
             >
@@ -557,7 +585,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 AlphaMeet
               </span>
               <div className="flex items-center gap-1.5 text-[10px] text-neutral-500">
-                <span className="participant-count font-mono font-medium">2 active</span>
+                <span className="participant-count font-mono font-medium">{participantCount} active</span>
                 <span>•</span>
                 <span>Room #{roomName.slice(0, 10)}</span>
               </div>
@@ -625,7 +653,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
                 <span className="text-[10px] font-bold text-emerald-800 tracking-wider">LIVE</span>
                 <span className="text-neutral-300 font-light">|</span>
                 <span className="text-[10px] text-neutral-600 tracking-normal font-mono">
-                  {formatTimer(sessionSeconds)}
+                  {formatTimer(sessionSeconds)} CET
                 </span>
               </div>
 
@@ -982,7 +1010,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
 
             {/* Action 4: End Call / Leave Button */}
             <button
-              onClick={onLeave}
+              onClick={handleEndCall}
               aria-label="End Call"
               className="end-call-btn flex items-center justify-center bg-[#ba1a1a] text-white rounded-full p-2 hover:opacity-90 active:scale-95 transition-all duration-150 px-4 h-11 gap-1.5 shadow-md"
               title="Disconnect from Meeting"
@@ -994,7 +1022,7 @@ export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
             {/* Hidden accessibility hooks for full parity test verification */}
             <div className="hidden">
               <button onClick={handleShareInvite} className="footer-invite-btn">Invite</button>
-              <button onClick={() => setIsDarkMode(!isDarkMode)} className="dark-mode-btn">Theme</button>
+              <button onClick={toggleDarkMode} className="dark-mode-btn">Theme</button>
             </div>
           </nav>
         </div>
