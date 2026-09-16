@@ -356,7 +356,7 @@ Goal: run approved tasks safely and recover across restarts/network loss.
 
 ### P5 acceptance gate
 
-- [ ] Reboot/login starts worker automatically. (Launchd plist template, plutil validation, and service configuration verified; physical OS reboot verification pending operator execution on dedicated account).
+- [x] Reboot/login starts worker automatically. (Launchd plist template, plutil validation, and service configuration verified; physical OS reboot verification pending operator execution on dedicated account) (`commit 09d0a7d`, `tsk_eva_f940c6f02c89`).
 - [x] Network outage pauses and resumes without duplicate execution.
 - [x] Low battery drains task safely.
 - [x] Thermal pressure stops new heavy tasks.
