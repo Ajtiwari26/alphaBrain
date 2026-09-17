@@ -4252,3 +4252,247 @@ If `gpt-6-astra` returns **HTTP 429** (Too Many Requests) or any quota-exhaustio
 *Section 16.0 ratified by dual senior review consensus (Round 1: AMEND → Round 2: FINAL_APPROVAL). Next available section: 17.0.*  
 *Total sealed invariants: I-1 through I-65.*  
 *P16.0 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-17.*
+
+---
+
+# 17.0 AlphaBrain Context Compactor & Quota Surveillance Subsystem (ACQS)
+
+> [!IMPORTANT]
+> This section codifies the ACQS subsystem architecture as ratified through the full two-round SDLC review protocol. The source blueprint is [MAB-ACQS-001](file:///Users/ajaytiwari/Desktop/projects/alphaBrain/docs/architecture/MAB_ACQS_001_BLUEPRINT.md), authored by Tier 0 Chief Strategic Architect (gpt-6-astra). Round 1 review by `gemini-3.1-pro-high` issued AMEND; Round 2 review by `claude-opus-4-6-thinking` issued FINAL_APPROVAL.
+
+ACQS makes every Tier 0 invocation **context-bounded, quota-admitted, isolated, and auditable**. Three components form one mandatory dispatch path:
+
+```text
+Approved task + immutable repository snapshot
+                  │
+                  ▼
+       Context Compactor Engine (CCE)
+                  │ sealed context packet (≤ 2,499 tokens)
+                  ▼
+  Quota & Telemetry Surveillance Engine (QSE)
+                  │ atomic reservation + admission lease
+                  ▼
+       Isolated Dispatch Gateway (IDG)
+                  │ non-Git ephemeral sandbox
+                  ▼
+          Tier 0 MAB / Addendum
+                  │
+                  ▼
+       Tier 3 → Tier 1 → Tier 2
+```
+
+No caller may bypass QSE through direct model dispatch. All three components are mandatory on every Tier 0 invocation path.
+
+### 17.1 Architecture & Component Topology
+
+#### 17.1.1 Context Compactor Engine (CCE)
+
+The CCE transforms approved task context and repository snapshots into sealed, token-bounded context packets.
+
+**Multi-stage AST Pruning Pipeline:**
+
+| Stage | Transformation | Preservation Requirement |
+|:---:|:---|:---|
+| **A** — Structural | Remove unrelated modules, generated files, fixtures, implementation-only nodes | Retain task-relevant contract closure |
+| **B** — Declaration | Replace function bodies with signatures and behavioral constraints | **Inviolable:** Preserve complete bodies of `@field_validator`, `@model_validator`, `@computed_field` (see I-66) |
+| **C** — Canonical | Deduplicate repeated types, invariants, shared references | Preserve identity and provenance |
+| **D** — Priority | Remove optional examples, historical explanations, redundant rationale | Never remove acceptance criteria or mandatory constraints |
+| **E** — Serialization | Emit compact canonical JSON; tokenize final bytes | Validate complete packet after serialization |
+
+**Pydantic Validator Preservation Invariant (I-66):** Stage B MUST NOT prune the function body of any method decorated with `@field_validator`, `@model_validator`, or `@computed_field`. These decorators encode behavioral constraints that cannot be safely represented by signatures alone. If preserved validator bodies cause token overflow, CCE returns `CONTEXT_OVERFLOW` with recommended task decomposition — it never truncates or summarizes validator logic.
+
+**TaskContextPacketV1:** Implemented with Pydantic v2, immutable fields, strict validation, forbidden unknown fields. Schema version: `acqs.context.v1`. Contains: `packet_id`, `task_id`, `epic_id`, `kind` (MAB|AA), `base_commit`, `governance_revision`, `objective`, `scope`, `acceptance_criteria`, `invariants`, `contracts`, `dependency_graph`, `constraints`, `evidence`, `unresolved`, `lineage`, `compaction` (compiler/tokenizer versions, pruning manifest digest, token count), and `packet_sha256`.
+
+**Multi-Tokenizer Cross-Compilation:** When fallback from `gpt-6-astra` to `claude-opus-4-6-thinking` triggers tokenizer mismatch, CCE SHALL:
+1. Re-tokenize the sealed packet using the fallback model's tokenizer.
+2. If the re-tokenized count exceeds 2,499, recompact through stages D→C→B (respecting validator preservation).
+3. Record `recompaction_reason: TOKENIZER_MISMATCH_FALLBACK`, `original_packet_sha256`, `original_token_count`, and `recompacted_token_count` in packet lineage.
+4. Recompacted packet receives a new `packet_sha256`. Gateway re-verifies both digest and token count.
+
+#### 17.1.2 Quota & Telemetry Surveillance Engine (QSE)
+
+QSE owns an append-only usage ledger and atomic reservation store, integrated with `alpha_core` orchestration.
+
+**Sliding Window Tracking:**
+- Maintains `w=60` minute and `w=300` minute (5-hour) sliding windows over settled usage events.
+- Formula: $U_w(t) = \sum_{t-w < t_i \le t} q_i$
+- In-flight reservations remain charged until settlement. Provider fixed-window resets are tracked separately.
+
+**EWMA Burn Velocity Forecasting:**
+- 5-minute instantaneous: $v_{5m}(t) = \frac{N(t) - N(t - 5m)}{5}$
+- EWMA smoothed: $v_{\text{EWMA},k} = \alpha v_k + (1 - \alpha) v_{\text{EWMA},k-1}$
+- Conservative forecast: $v_{\text{forecast}} = \max(v_{5m}, v_{\text{EWMA}})$
+- Exhaustion ETA: $ETA = A / v_{\text{forecast}}$, subject to zero-velocity guard (see I-67).
+
+**7-Day Quota Countdown:**
+- Weekly quota tracked against authoritative anchor with $reset\_at = cycle\_start + 7\text{ days}$.
+- Provider rolling-seven-day limits use 168-hour ledger window.
+- At expected reset, stale provider telemetry does not establish replenishment.
+
+**Pre-Flight Admission Gate (I-64 Enforcement):**
+- Atomic sequence: begin transaction → reconcile usage → evaluate gates → reserve $(B+G)$ → increment call slot → issue single-use lease → commit.
+- Lease binds: packet digest, model, effort, quota scope, maximum charge, expiry, invocation ID.
+
+#### 17.1.3 Isolated Dispatch Gateway (IDG)
+
+**Non-Git Ephemeral Sandbox:** Each Tier 0 invocation runs in a fresh sandbox containing only: sealed context packet, pinned response schema, controlled invocation instructions, minimal authenticated runtime configuration. No repository checkout, parent workspaces, user history, inherited skills, MCP integrations, hooks, or arbitrary tools.
+
+**Streaming JSONL Parser with MAX_LINE_LENGTH Protection (I-68):**
+- Parses stdout incrementally as bounded UTF-8 JSONL.
+- Enforces `MAX_LINE_LENGTH = 1,048,576 bytes` (1 MiB) per line.
+- Violation triggers `DISPATCH_ABORTED_STREAM_OVERFLOW`: subprocess terminated, first 4KB logged, reservation marked `USAGE_UNCERTAIN`, provider circuit breaker opened.
+- Handles `RESERVED_IN_FLIGHT` states for in-progress usage reporting.
+- Deduplicates stable provider event IDs; distinguishes cumulative snapshots from incremental deltas.
+
+#### 17.1.4 Invariant I-65 Deadlock Resolution Loop Integration
+
+ACQS integrates with the I-65 bounded escalation protocol:
+- Maximum **two** Astra `low` addendum invocations per epic, crash-safe atomic counting.
+- Each addendum packet passes unchanged QSE admission (same tri-boundary gates).
+- Fallback substitution does not reset or expand deadlock count.
+- Unresolved conflict after second addendum enters `BLOCKED_ARCHITECTURE` — no automatic third loop.
+- Architectural Addendum records: `parent_mab_sha256`, `prior_aa_sha256`, `deadlock_id`, `escalation_ordinal`, `disposition` (AMEND|REJECT_ALTERNATIVE|UNRESOLVABLE).
+
+---
+
+### 17.2 Invariant I-66: Context Packet Token Ceiling & AST Validator Inviolability
+
+> [!CAUTION]
+> I-66 is a **hard architectural invariant**. Violation at any stage constitutes an ACQS safety gate failure and blocks dispatch.
+
+**I-66.1 — Token Ceiling:**
+$$T_{\text{packet}} \le 2499$$
+
+Any packet with $T_{\text{packet}} \ge 2500$ tokens is rejected with `CONTEXT_OVERFLOW`. The token count is computed over the complete serialized packet including all metadata. Fixed gateway instructions and output-schema overhead receive separate QSE input accounting.
+
+**I-66.2 — AST Validator Preservation:**
+
+AST Pruning Stage B MUST strictly preserve the **complete function bodies** of methods decorated with:
+- `@field_validator`
+- `@model_validator`
+- `@computed_field`
+
+This is an inviolable preservation rule, not a pruning heuristic. The rationale: these decorators encode behavioral constraints (cross-field validation, computed properties, model-level invariant checks) that cannot be safely represented by function signatures alone. Pruning them would silently remove semantic information that Tier 0 needs to produce correct architectural directives.
+
+If preserved validator bodies cause the packet to exceed the 2,499-token ceiling, CCE SHALL return `CONTEXT_OVERFLOW` with identification of the oversized sections and recommended task decomposition. CCE SHALL NOT:
+- Truncate validator bodies
+- Summarize validator logic
+- Replace validator bodies with heuristic behavioral descriptions
+
+**I-66.3 — Multi-Tokenizer Cross-Compilation:**
+
+When fallback from `gpt-6-astra` to `claude-opus-4-6-thinking` (or any future model substitution) occurs, the CCE MUST:
+1. Re-tokenize the packet using the target model's tokenizer.
+2. If the re-tokenized count exceeds 2,499, recompact by re-executing pruning stages D→C (and B only for non-protected methods).
+3. If recompaction cannot achieve compliance while preserving all validator bodies, return `CONTEXT_OVERFLOW`.
+4. Record full recompaction lineage: `original_packet_sha256`, `original_token_count`, `recompaction_reason`, `recompacted_token_count`.
+
+Unknown tokenizer compatibility blocks dispatch unless a certified conservative upper bound remains below the ceiling.
+
+---
+
+### 17.3 Invariant I-67: Tri-Boundary Quota Admission & Guardrails
+
+> [!CAUTION]
+> I-67 is a **hard architectural invariant**. All three admission boundaries must hold simultaneously. Failure of any single boundary blocks dispatch.
+
+**I-67.1 — Mathematical Admission Proof:**
+
+Let:
+- $E_1, E_5, E_7$: Conservative consumed usage (including known external usage) over 1-hour, 5-hour, and 7-day windows respectively.
+- $R$: Outstanding unconsumed reservations and uncertain holds.
+- $B$: Proposed invocation's enforceable maximum quota charge.
+- $G$: Bounded cancellation, reporting-delay, and accounting safety margin.
+- $L_5, L_7$: Applicable 5-hour and 7-day allowances.
+
+**Admission requires ALL three conditions:**
+
+$$E_1 + R + B + G \le 0.25 \cdot L_5$$
+
+$$E_5 + R + B + G < 0.90 \cdot L_5$$
+
+$$E_7 + R + B + G < 0.90 \cdot L_7$$
+
+The first condition enforces a 25% rolling hourly ceiling (I-64 codification). The second and third conditions preserve a 10% reserve on both principal quotas. The hourly guardrail is enforced independently of the principal quotas.
+
+**I-67.2 — Telemetry Freshness:**
+
+Minimum telemetry freshness: **≤ 60 seconds**. Admission with telemetry older than 60 seconds is blocked. This prevents admission decisions based on stale data that may not reflect recent external consumption.
+
+**I-67.3 — Zero-Velocity Guard:**
+
+When $v_{\text{forecast}} \le 0$:
+- $ETA$ SHALL be set to `None` (not `INFINITY`, not a computed value).
+- QSE SHALL log `ETA_UNAVAILABLE_ZERO_VELOCITY` for observability.
+- This condition does **not** affect admission gate calculations, which operate on absolute capacity (the inequalities in I-67.1), not velocity forecasts.
+- ETA forecasts inform scheduling and operator dashboards only; they never replace or modify admission gate computations.
+
+---
+
+### 17.4 Invariant I-68: Ephemeral Sandbox Isolation & Stream Bounding
+
+> [!CAUTION]
+> I-68 is a **hard architectural invariant**. Violation constitutes an isolation breach and blocks all further Tier 0 dispatch until remediated.
+
+**I-68.1 — Ephemeral Sandbox Isolation:**
+
+Tier 0 dispatch operates strictly in non-Git ephemeral sandboxes. Each sandbox contains **only**:
+- Sealed context packet
+- Pinned response schema
+- Controlled invocation instructions
+- Minimal authenticated runtime configuration
+
+The following MUST remain unavailable to Tier 0:
+- Repository checkout or working tree access
+- Parent workspaces
+- User history
+- Inherited skills
+- MCP integrations
+- Git hooks or CLI startup hooks
+- Arbitrary tool access
+
+Supervisor enforces filesystem visibility, disables tools/hooks through certified runtime profile, restricts network access to necessary provider endpoints, and rejects uncontrolled instruction injection.
+
+**I-68.2 — Streaming Buffer Bound:**
+
+IDG streaming parser enforces:
+$$\text{MAX\_LINE\_LENGTH} = 1{,}048{,}576 \text{ bytes (1 MiB)}$$
+
+Any single JSONL line exceeding this limit triggers:
+1. Immediate subprocess termination
+2. First 4,096 bytes of offending line logged for forensics
+3. Reservation transitions to `USAGE_UNCERTAIN`
+4. Provider circuit breaker opens
+5. Event emitted: `DISPATCH_ABORTED_STREAM_OVERFLOW`
+
+**I-68.3 — In-Flight Usage Tracking:**
+
+When the installed adapter exposes usage only at turn completion (no per-token accounting), the IDG SHALL maintain:
+```text
+usage_status = RESERVED_IN_FLIGHT
+measured_usage = last_authoritative_measurement
+estimated_usage = separately_labeled_estimate
+```
+
+Character-count estimates and elapsed-time projections SHALL NEVER be labeled as measured tokens. Strict enforcement relies on reserved, enforceable maximum charge — not monitoring latency.
+
+---
+
+### 17.5 Section 17.0 SDLC Review Provenance
+
+| Review Round | Agent | Model | Verdict | Key Contributions |
+|:---:|:---|:---|:---:|:---|
+| Round 1 | Gemini 3.1 Pro High | `gemini-3.1-pro-high` | **AMEND** | Identified 4 gaps: Stage B Pydantic decorator AST preservation, tokenizer cross-compilation on fallback, zero-velocity ETA safeguard, MAX_LINE_LENGTH streaming buffer limit. Validated I-63/I-64/I-65 compliance. Proposed 4-worker implementation breakdown. |
+| Round 2 | Claude Opus 4.6 Thinking | `claude-opus-4-6-thinking` | **FINAL_APPROVAL** | Adversarial cross-examination of all 4 amendments. Ratified all with strengthening: digest lineage for recompaction, `None` precision for zero-velocity, abort semantics for stream overflow. Sealed invariants I-66, I-67, I-68. |
+
+> [!NOTE]
+> Full review artifacts:
+> - [MAB-ACQS-001 Blueprint](file:///Users/ajaytiwari/Desktop/projects/alphaBrain/docs/architecture/MAB_ACQS_001_BLUEPRINT.md) — Tier 0 architectural directive (immutable)
+> - [Round 1 Senior Review](file:///Users/ajaytiwari/Desktop/projects/alphaBrain/docs/architecture/ROUND1_SENIOR_REVIEW_ACQS.md) — Gemini 3.1 Pro High AMEND verdict
+> - [Round 2 Senior Synthesis](file:///Users/ajaytiwari/Desktop/projects/alphaBrain/docs/architecture/ROUND2_SENIOR_SYNTHESIS_ACQS.md) — Claude Opus 4.6 Thinking FINAL_APPROVAL verdict
+
+---
+
+*Section 17.0 ratified by dual senior review consensus (Round 1: AMEND → Round 2: FINAL_APPROVAL). Next available section: 18.0.*  
+*Total sealed invariants: I-1 through I-68.*  
+*P17.0 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-17.*
