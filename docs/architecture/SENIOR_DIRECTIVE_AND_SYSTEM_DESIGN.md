@@ -4149,3 +4149,106 @@ Where:
 *Section 15.0 ratified by dual senior review consensus. Next available section: 16.0.*  
 *Total sealed invariants: I-1 through I-62.*  
 *P15.0 architectural directive authored and sealed by Claude Opus 4.6 (Thinking) on 2026-09-17.*
+
+---
+
+# 16.0 GPT-6 Astra Quad-Tier Hierarchy & Quota-Gated Strategic Governance
+
+> [!IMPORTANT]
+> This section establishes the integration of `gpt-6-astra` into the AlphaBrain autonomous pipeline as a **Tier 0 Chief Strategic Architect**, strictly quarantined to Macro Architectural Blueprint (MAB) generation. This governance model was ratified through the full 2-Round adversarial SDLC review: Gemini 3.1 Pro High (Round 1, verdict: **AMEND** — proposed I-65) → Claude Opus 4.6 Thinking (Round 2, verdict: **FINAL_APPROVAL**).
+
+### 16.1 Quad-Tier Autonomous Hierarchy Topology
+
+AlphaBrain operates under a strict 4-tier separation of concerns. Each tier has immutable task boundaries and escalation paths. No tier may execute responsibilities assigned to another tier without traversing the defined governance protocol.
+
+| Tier | Agent / System | Role | Default Reasoning | Boundary |
+| :---: | :--- | :--- | :---: | :--- |
+| **Tier 0** | `gpt-6-astra` | Chief Strategic Architect | `medium` | Generates Macro Architectural Blueprints (MAB). Strategic subsystem decomposition, invariant design, and cross-cutting concern topology. **No code, no tests, no PR reviews.** |
+| **Tier 3** | Dual Senior Engineering Board: `claude-opus-4-6-thinking` & `gemini-3.1-pro-high` | Adversarial SDLC Review, Implementation Blueprinting, Architectural Alignment | Extended thinking / high | 2-Round adversarial review (I-61, I-62). Translates MABs into implementation-ready blueprints. Validates invariant compliance. Raises `ARCHITECTURAL_DEADLOCK` when MABs conflict with repository constraints. |
+| **Tier 1** | High-Throughput Autonomous Worker: `gemini-3.8-flash-high` | Code Modification, Unit Tests, Gate Compliance | High-throughput | Executes git worktree code modifications, writes and runs unit tests, enforces gate compliance per Tier 3 blueprints. Operates strictly within the scope of approved implementation blueprints. |
+| **Tier 2** | Execution Validation & Deterministic Testing: Pytest, SafetyGates, Linters | Deterministic Verification | N/A (deterministic) | Runs pytest suites, static analysis, linter enforcement, safety gate checks. Produces binary pass/fail verdicts. No reasoning, no discretion — purely mechanical validation. |
+
+> [!NOTE]
+> The tier numbering is intentionally non-sequential in the table above (0 → 3 → 1 → 2) to reflect the **invocation order** during a typical pipeline cycle: Tier 0 issues the MAB, Tier 3 reviews and blueprints, Tier 1 executes, Tier 2 validates. The numeric tier IDs reflect **authority rank** (0 = highest strategic authority, 3 = senior review authority, 1 = execution, 2 = validation).
+
+### 16.2 Invariant I-63: Astra Conservation & Strategic Isolation Boundary
+
+> `gpt-6-astra` is **strictly quarantined** to Macro Architectural Blueprint (MAB) generation. It is programmatically prohibited from the following activities:
+>
+> 1. **Source code edits** — Astra SHALL NOT generate, modify, or patch any source file in any repository branch or worktree.
+> 2. **Direct test creation** — Astra SHALL NOT author test cases, test fixtures, or test configuration. Test authorship is exclusively a Tier 1 responsibility under Tier 3 blueprint guidance.
+> 3. **PR code reviews** — All code reviews remain strictly governed by the 2-Round Senior Engineering Review protocol: Gemini 3.1 Pro High (Round 1) + Claude Opus 4.6 Thinking (Round 2), as defined in Invariants I-61 and I-62. Astra has no review authority.
+> 4. **Routine triage tasks** — Bug triage, issue labeling, dependency updates, and operational maintenance are beneath Tier 0 scope and SHALL NOT consume Astra quota.
+>
+> **Maximum invocation frequency**: 1 invocation per epic/feature cycle. An "epic/feature cycle" is defined as a single product-level feature or architectural initiative from inception through merge. Multiple sub-tasks within the same epic share the single MAB invocation. Exceptions require explicit operator override with audit trail.
+>
+> **Sealed: 2026-09-17. Violation is a P0 quota integrity and architectural boundary failure.**
+
+### 16.3 Invariant I-64: Astra Mode Budgeting & Quota Governance
+
+> All `gpt-6-astra` invocations SHALL specify an explicit reasoning `mode` parameter. The mode governs hidden chain-of-thought depth and maps to hourly API budget consumption as follows:
+>
+> | Mode | Hidden Reasoning Tokens | Hourly Budget Impact | Permitted Use Cases | Activation |
+> | :---: | :---: | :---: | :--- | :--- |
+> | `low` | ~3–8k | ~2–3% | Feasibility checks, schema shape validation, `ARCHITECTURAL_DEADLOCK` resolution queries (see I-65) | Automatic for deadlock resolution; manual for feasibility |
+> | `medium` | ~15–25k | ~6–8% | **DEFAULT.** System-wide architectural blueprints, subsystem invariant design, cross-cutting concern topology | Default for all MAB generation |
+> | `high` | ~50–90k | ~15–22% | Critical cryptographic primitives, zero-day threat modeling, novel consensus algorithm design | **Requires explicit operator override flag** (`--astra-high-override`) |
+>
+> The pipeline SHALL reject any Astra invocation that does not include an explicit `mode` parameter. Implicit defaulting at the API client level is prohibited — the orchestrator must set the mode intentionally to enforce cost awareness.
+>
+> **Budget guardrails**: If cumulative Astra consumption within a rolling 1-hour window exceeds 25% of the hourly budget, the pipeline SHALL halt all further Astra invocations for the remainder of the window and emit a `QUOTA_CEILING_BREACH` alert to the operator channel.
+>
+> **Sealed: 2026-09-17. Violation is a P0 budget integrity and governance failure.**
+
+### 16.4 Invariant I-65: ARCHITECTURAL_DEADLOCK Handover & Resolution Loop
+
+> Tier 3 agents (Claude Opus 4.6 Thinking and Gemini 3.1 Pro High) are **prohibited from silently altering** Astra-originated macro architectural invariants. If a Tier 3 agent determines during implementation blueprinting or adversarial review that physical repository constraints, dependency incompatibilities, platform limitations, or runtime environment restrictions make an Astra MAB unimplementable as specified, the following protocol SHALL be executed:
+>
+> 1. **Detection**: The Tier 3 agent identifies an irreconcilable conflict between the MAB and implementation reality.
+> 2. **ARCHITECTURAL_DEADLOCK Signal**: The Tier 3 agent raises an `ARCHITECTURAL_DEADLOCK` event, which includes:
+>    - The specific MAB clause(s) that cannot be implemented.
+>    - A structured failure trace documenting the constraint violation (dependency version conflicts, API incompatibilities, platform limitations, etc.).
+>    - The Tier 3 agent's proposed alternative approach (advisory only — Tier 0 holds final authority).
+> 3. **Bounded Resolution Query**: The pipeline dispatches a targeted resolution query back to Tier 0 (`gpt-6-astra`) on **`low` reasoning effort** (per I-64 budget governance). The query payload includes the full failure trace and the advisory alternative.
+> 4. **Architectural Addendum (AA)**: Tier 0 issues an Architectural Addendum (AA) that either:
+>    - (a) Amends the original MAB to accommodate the constraint, OR
+>    - (b) Overrides the Tier 3 objection with explicit justification and an alternative implementation path.
+> 5. **Resumption**: The pipeline resumes from the Tier 3 blueprinting stage with the AA incorporated.
+>
+> **Loop bound**: A single epic/feature cycle may trigger at most **2 ARCHITECTURAL_DEADLOCK → AA resolution rounds**. If deadlock persists after 2 rounds, the pipeline halts and escalates to human operator intervention with a full audit trail.
+>
+> **Sealed: 2026-09-17. Violation is a P0 architectural integrity failure. Silent MAB alteration by Tier 3 without ARCHITECTURAL_DEADLOCK protocol is a critical governance breach.**
+
+### 16.5 Fail-Closed Fallback on Astra Rate Limiting
+
+> [!CAUTION]
+> Astra rate-limiting triggers a **fail-closed** pipeline response — not a silent skip.
+
+If `gpt-6-astra` returns **HTTP 429** (Too Many Requests) or any quota-exhaustion signal during a MAB generation or deadlock resolution invocation, the pipeline SHALL execute the following fail-closed protocol:
+
+1. **Immediate halt** of the current Astra-dependent pipeline stage.
+2. **Fallback promotion**: `claude-opus-4-6-thinking` is promoted to **acting Tier-0 architect** for the duration of the rate-limited window. Claude Opus 4.6 Thinking generates an interim MAB or AA under its own architectural authority.
+3. **Audit trail**: A structured audit log entry is embedded in the **merge commit trailer** of any PR that incorporated the fallback MAB/AA. The trailer SHALL include:
+   - `X-AlphaBrain-Astra-Fallback: true`
+   - `X-AlphaBrain-Fallback-Architect: claude-opus-4-6-thinking`
+   - `X-AlphaBrain-Fallback-Reason: HTTP_429_QUOTA_EXHAUSTED`
+   - `X-AlphaBrain-Fallback-Timestamp: <ISO-8601>`
+4. **Post-recovery reconciliation**: When Astra quota recovers, the pipeline SHALL queue a **reconciliation review** where Astra validates the fallback MAB/AA on `low` reasoning mode. If Astra issues corrections, they are applied as a follow-up PR with full Tier 3 review.
+
+> [!WARNING]
+> The fallback to Claude Opus 4.6 Thinking as acting Tier-0 architect does **not** exempt the resulting work from the 2-Round adversarial review protocol (I-61, I-62). In fallback mode, the Round 2 review is conducted by `gemini-3.1-pro-high` to preserve cross-provider independence.
+
+---
+
+#### Section 16.0 — SDLC Review Provenance
+
+| Review Round | Agent | Verdict | Key Contributions |
+| :---: | :--- | :---: | :--- |
+| Round 1 | `gemini-3.1-pro-high` | **AMEND** | Proposed Invariant I-65 (ARCHITECTURAL_DEADLOCK Handover & Resolution Loop). Validated I-63 conservation boundary and I-64 quota tiers. Identified gap in silent MAB alteration governance. |
+| Round 2 | `claude-opus-4-6-thinking` | **FINAL_APPROVAL** | Accepted I-65 with loop-bound and escalation refinements. Ratified complete Quad-Tier Hierarchy topology. Sealed I-63, I-64, I-65. |
+
+---
+
+*Section 16.0 ratified by dual senior review consensus (Round 1: AMEND → Round 2: FINAL_APPROVAL). Next available section: 17.0.*  
+*Total sealed invariants: I-1 through I-65.*  
+*P16.0 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-17.*
