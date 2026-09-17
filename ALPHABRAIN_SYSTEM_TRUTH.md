@@ -1,0 +1,1 @@
+docs/architecture/ALPHABRAIN_SYSTEM_TRUTH.md
