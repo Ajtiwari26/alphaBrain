@@ -4496,3 +4496,420 @@ Character-count estimates and elapsed-time projections SHALL NEVER be labeled as
 *Section 17.0 ratified by dual senior review consensus (Round 1: AMEND → Round 2: FINAL_APPROVAL). Next available section: 18.0.*  
 *Total sealed invariants: I-1 through I-68.*  
 *P17.0 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-17.*
+
+---
+
+# 18.0 Architectural Garbage Collector & Context Lifecycle Subsystem (AGC)
+
+**Milestone:** AGC — Architectural Garbage Collector & Context Lifecycle Management  
+**Review Status:** 🟢 **FINAL_APPROVAL** by Claude Opus 4.6 Thinking, 2026-09-18  
+**Prior Reviews:** Gemini 3.1 Pro High (AMEND) → Tier 0 Astra MAB-AGC-001 (PROPOSED) → Claude Opus 4.6 Thinking (FINAL_APPROVAL)  
+**Scope:** Architectural context selection, modularization, archival, ephemeral pruning, provenance, and recovery. Reduces active architectural context while preserving authoritative meaning, reproducible evidence, and immutable provenance.
+
+> [!IMPORTANT]
+> AGC is a **deterministic maintenance subsystem**. It MUST NOT independently decide which architectural proposals become authoritative, rewrite architectural conclusions, or treat age as proof that an artifact is disposable. Compression, relocation, and pruning MUST remain distinct from architectural ratification.
+
+---
+
+### 18.1 Architecture & 3-Tier Lifecycle Topology
+
+#### 18.1.1 Lifecycle States
+
+| State | Contents | Default Retrieval Behavior |
+|:---|:---|:---|
+| `ACTIVE_WORKING_SET` | Current governing `SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md`, active epic MABs, in-flight reviews, registered working artifacts | Eligible for role-scoped retrieval |
+| `ARCHIVED_COLD` | Immutable, compressed historical architectural records with verified manifest and cryptographic provenance | Excluded from context unless explicitly requested |
+| `PRUNED_EPHEMERAL` | Source permanently removed; durable evidence reference and immutable tombstone retained; **terminal state** | Excluded |
+
+Lifecycle state belongs to an artifact revision. Paths alone do not define identity or state.
+
+#### 18.1.2 State Machine Transitions
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                  AGC LIFECYCLE STATE MACHINE                        │
+└─────────────────────────────────────────────────────────────────────┘
+
+                    ACTIVE_WORKING_SET
+                   /                  \
+                  /                    \
+     [archive]   /                      \   [prune]
+                ▼                        ▼
+        ARCHIVED_COLD              PRUNED_EPHEMERAL
+                \                    (TERMINAL)
+                 \
+          [reactivate]
+                  \
+                   ▼
+           ACTIVE_WORKING_SET
+              (new revision)
+
+  ═══════════════════════════════════════════
+  PROHIBITED: ARCHIVED_COLD → PRUNED_EPHEMERAL
+  (Cold archives are immutable institutional
+   memory and may contain the only surviving
+   copy of superseded architectural decisions)
+  ═══════════════════════════════════════════
+```
+
+**Allowed Transitions:**
+
+| Transition | Preconditions | Postconditions |
+|:---|:---|:---|
+| `ACTIVE → ARCHIVED_COLD` | Epic terminal; no active references or pins; explicit archival classification; verified successor where superseded; exact Opus authorization for Markdown mutations | Verified immutable bundle published; catalog committed; original active source removed through recoverable cleanup |
+| `ACTIVE → PRUNED_EPHEMERAL` | Explicit ephemeral classification; no unique governing content; no active references; durable evidence captured; verified Git trailer provenance | Source absent; immutable tombstone and evidence locator retained |
+| `ARCHIVED_COLD → ACTIVE` | Explicit reactivation request; archive verification; admission coordination; authority checks | New active revision created from verified bytes; historical archive remains immutable |
+
+Transaction phases (`PREPARED`, `COMMITTED`) are operational states, not additional lifecycle tiers.
+
+#### 18.1.3 Fencing Tokens, Reference Pinning & Global Lock Ordering
+
+**Global acquisition order (strict, non-negotiable):**
+
+```text
+repository coordination lock
+  → epic locks, ascending epic_id
+    → artifact locks, ascending artifact_id
+      → lifecycle catalog transaction
+```
+
+**Concurrency control invariants:**
+
+- Normal admissions and reads acquire **shared** coordination protection.
+- AGC commit and directive topology changes acquire **exclusive** coordination protection.
+- Context readers hold **generation pins** for their full read operation.
+- Active tasks retain **durable reference pins** beyond short-lived read locks.
+- Every mutation transaction carries a **monotonically increasing fencing token**.
+- Every filesystem mutation passes through a **mutation broker** that validates the current token.
+- Workers without broker authorization MUST lack direct mutation access to protected paths.
+- A process-local mutex or unenforced lease is **insufficient**.
+- Lock timeout releases acquired locks **in reverse acquisition order** and returns a retryable denial.
+- Lock acquisition MUST NOT wait indefinitely or upgrade shared locks in place.
+- No model or network call may occur while mutation locks are held.
+
+#### 18.1.4 Transaction Protocol (7-Phase)
+
+1. **Plan:** Capture candidates, hashes, task references, policy versions, Git identity, and lifecycle generation.
+2. **Prepare:** Build and verify staged archives or ephemeral evidence **outside** exclusive mutation locks.
+3. **Revalidate:** Acquire ordered locks; reread scheduler state, pins, generations, source identities, and authorization.
+4. **Publish:** Durably publish immutable evidence and append transaction intent.
+5. **Commit:** Atomically switch lifecycle catalog generation to verified destinations.
+6. **Clean up:** Remove redundant source copies under the same fencing protections.
+7. **Finalize:** Record completion and release locks.
+
+**Crash recovery semantics:**
+- Pre-commit failure: sources remain active, no data loss.
+- Post-commit/pre-cleanup failure: redundant bytes exist (safe), recovery resumes cleanup after revalidation.
+- Published destinations MUST exist and pass verification before catalog commit.
+
+---
+
+### 18.2 Master Directive Modularization & Path Protection
+
+#### 18.2.1 Directory Taxonomy
+
+```text
+docs/architecture/
+├── SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md   ← Master Index (canonical entry point)
+├── invariants/                              ← Detailed I-1 through I-72 modules
+│   ├── INDEX.md
+│   ├── I-001.md ... I-072.md
+├── topologies/                              ← System topology diagrams
+│   ├── autonomous-development.md
+│   └── context-lifecycle.md
+├── security/                                ← Authority, path protection, locking
+│   ├── authority-and-path-protection.md
+│   ├── safety-gates.md
+│   └── locking-and-recovery.md
+├── epics/                                   ← Active epic materials
+│   └── <epic_id>/
+│       ├── MAB-<id>.md
+│       └── <active-review>.md
+└── archive/                                 ← Cold archive bundles
+    └── <epic_id>/
+        └── <archive_id>/
+            ├── manifest.json
+            └── payload.tar.zst
+```
+
+#### 18.2.2 Master Index Role
+
+`SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md` remains the **canonical entry point** and contains:
+
+- Governance authority and precedence rules
+- Mandatory baseline modules for every agent
+- Topic-to-module routing with stable anchors
+- Current ratified revision and migration provenance
+- Explicit separation between governing modules and historical evidence
+
+Each index entry exposes: `module_id | topic | relative_path | stable_anchor | authority_status | ratification_ref | required_for_roles`
+
+Agents load the master index, mandatory governance baseline, and relevant topic modules. **Recursive loading of all architectural Markdown is prohibited** as the default context strategy.
+
+#### 18.2.3 Strict Immutability of `docs/architecture/**/*.md`
+
+> [!CAUTION]
+> **ALL files matching the glob `docs/architecture/**/*.md` are restricted to exclusive authoring by Claude Opus 4.6 Thinking.** This is enforced at the Path Protection Engine level (§6.4.3) and covers:
+>
+> - Every Markdown file directly or recursively under `docs/architecture/`
+> - Both source and destination paths for moves
+> - Rename, unlink, replacement, and symlink-based bypass attempts
+> - Extraction or restoration that would materialize protected Markdown
+
+AGC may mechanically execute a Markdown lifecycle mutation **only** under an authenticated Opus authorization bound to:
+
+```text
+plan_digest
+source_paths_and_hashes
+destination_paths
+permitted_operations
+policy_revision
+expiry
+```
+
+An author field or model name inside a document is **not** authorization. Non-Opus agents may propose changes through review artifacts outside canonical protected paths. They MUST NOT author canonical modules.
+
+#### 18.2.4 Modularization Activation Prerequisites
+
+Before modularization becomes authoritative, Opus MUST approve a coverage ledger mapping every existing ratified section to its destination. Required checks:
+
+1. I-1 through I-72 remain represented without semantic loss
+2. Existing internal references resolve or have explicit compatibility mappings
+3. No competing canonical copy remains active
+4. Index and modules publish as one catalog generation
+5. Previous directive bytes remain recoverable with verified provenance
+
+> [!NOTE]
+> Modularization activation requires a **separate SDLC epic** with its own Round 1/Round 2 senior review cycle. AGC provides the lifecycle infrastructure; modularization requires independent architectural ratification. AGC cannot ratify its own modularization.
+
+---
+
+### 18.3 Invariant I-69: Active Work Exclusion & Non-Inferable Disposal
+
+> [!IMPORTANT]
+> **I-69 is a MANDATORY architectural invariant.** Violation constitutes a critical safety breach equivalent to I-4 (Path Protection Engine) violations.
+
+**I-69.1 — Active Work Exclusion:**
+
+No artifact referenced by an **active, queued, leased, reviewing, or promotion-pending** task may leave the active working set. Reference checks MUST include:
+
+- Task packets and admission records
+- Queued and leased work
+- Reviews, promotions, and retry eligibility
+- Cross-epic dependencies
+- Explicit human or system retention pins
+
+Expired leases alone do not establish terminal status. Unknown scheduler state **blocks** mutation (fail-closed).
+
+Shared artifacts remain active until **every** relevant reference permits transition.
+
+**I-69.2 — Non-Inferable Disposal:**
+
+File age, filename, extension, directory placement, or low retrieval frequency **cannot independently establish pruning eligibility**. This explicitly overrules any age-based pruning heuristic (including the 48-hour periodic sweep proposed in Round 1). Pruning eligibility requires:
+
+1. Explicit ephemeral classification at creation or subsequent reclassification
+2. All reference checks in I-69.1 returning terminal/clear
+3. Durable evidence capture verified
+4. Git trailer provenance verified
+
+**Enforcement:** Both planning and execution phases. Candidates failing any I-69 check are rejected with reason code `ACTIVE_REFERENCE_HELD` or `DISPOSAL_NOT_ESTABLISHED`.
+
+---
+
+### 18.4 Invariant I-70: Cryptographic Cold Archive Verification & Pre-Compression Digests
+
+**I-70.1 — Cold Archive Bundle Format:**
+
+| Format | Policy |
+|:---|:---|
+| `tar.zst` | Default compression |
+| `tar.gz` | Explicit compatibility option |
+
+Archive creation MUST normalize member ordering, ownership metadata, and timestamps according to a versioned compression profile. Only regular-file members are permitted. Absolute paths, traversal, duplicate names, links, devices, and undeclared members are **prohibited**.
+
+**I-70.2 — `manifest.json` Schema-v1:**
+
+All fields are required; unknown fields are rejected for schema version 1.
+
+| Field | Type / Constraint |
+|:---|:---|
+| `schema_version` | Integer; exactly `1` |
+| `archive_id` | Unique path-safe string |
+| `epic_id` | Path-safe string |
+| `created_at` | UTC RFC 3339 timestamp |
+| `transaction_id` | Unique string |
+| `plan_sha256` | 64 lowercase hexadecimal characters |
+| `policy_revision` | Immutable policy identifier |
+| `catalog_generation_before` | Nonnegative integer |
+| `authority_ref` | Durable reference to verified authorization |
+| `predecessor_archive_id` | String or `null` |
+| `source_git` | Object: `{repository_id, object_format, commit_oid, retention_ref}` |
+| `bundle` | Object: `{name, format, compression_profile, bytes, sha256}` |
+| `files` | Nonempty array of file entries |
+
+Each `files[]` entry: `{artifact_id, revision_id, original_path, member_path, classification, bytes, sha256_precompression, source_blob_oid, superseded_by}`
+
+**Constraints:**
+- Original paths, member paths, and artifact revisions MUST be unique
+- `superseded_architecture` classification requires a verified `superseded_by` reference
+- Bundle extension and format MUST agree
+- Pre-compression hashes cover **exact original bytes**, without newline or encoding normalization
+- Manifest digest is recorded externally in the immutable transaction receipt; MUST NOT be embedded as a self-hash
+
+**I-70.3 — Verified Restore Before Source Removal:**
+
+Before removing any source, the following 8-step verification protocol is mandatory:
+
+1. Verify manifest schema, authorization reference, and retained Git provenance
+2. Verify compressed bundle size and SHA-256
+3. Stream-decompress using bounded resource limits
+4. Reject unsafe, duplicate, missing, or undeclared members
+5. Verify each member's uncompressed size and SHA-256 against `sha256_precompression`
+6. Verify reconstructed bytes against retained Git blobs
+7. Revalidate current source bytes under mutation locks
+8. Durably persist bundle, manifest, directory entries, and transaction receipt
+
+Restore MUST repeat verification before materializing files. Extracted content is historical evidence until separately admitted as active context. **Published archive generations cannot be overwritten.** Corrections create new generations with explicit predecessor links.
+
+---
+
+### 18.5 Invariant I-71: Ephemeral Pruning Commit Trailer Provenance
+
+**I-71.1 — Durable Evidence Requirement:**
+
+Before pruning, AGC MUST retain either the exact ephemeral bytes or an approved durable evidence record sufficient for the artifact's retention policy.
+
+**I-71.2 — Git Commit Trailer:**
+
+A retained Git commit MUST contain:
+
+```text
+AlphaBrain-Review-Hash: <sha256>
+```
+
+An accompanying durable receipt maps that hash to:
+- Artifact identity and revision
+- Original path
+- Evidence locator (Git blob OID or archive reference)
+- Transaction ID
+- Retained commit SHA
+
+**I-71.3 — Non-Substitution Clause:**
+
+The trailer is an **integrity reference**, not a substitute for evidence content. If unique evidence cannot be retained and verified, pruning is **denied**. A hash alone is not a recoverable record.
+
+**Enforcement:** Pruning operations that cannot produce a valid `AlphaBrain-Review-Hash` trailer and accompanying receipt are blocked with reason code `EVIDENCE_CAPTURE_FAILED`.
+
+---
+
+### 18.6 Invariant I-72: Deterministic Maintenance CLI & Fail-Closed Guards
+
+**I-72.1 — CLI Interface Specification:**
+
+```bash
+# Build a read-only garbage collection plan (no mutations)
+.venv/bin/python -m alpha_core.triage_cli gc \
+  --dry-run \
+  --format json
+
+# Build an archival plan for a completed epic
+.venv/bin/python -m alpha_core.triage_cli archive-epic \
+  --epic-id EPIC-042 \
+  --compression tar.zst \
+  --dry-run \
+  --format json
+
+# Apply an exact plan with verified digest and authorization
+.venv/bin/python -m alpha_core.triage_cli gc \
+  --apply \
+  --plan /path/to/agc-plan.json \
+  --expect-plan-sha256 <sha256> \
+  --authorization-ref <reference>
+```
+
+**I-72.2 — Dry-Run Default & Zero `--force` Bypass:**
+
+| Argument | Contract |
+|:---|:---|
+| `--dry-run` | **Default**; inspect and emit plan without mutation |
+| `--apply` | Explicit execution; mutually exclusive with `--dry-run` |
+| `--epic-id <id>` | Scope selection; required by `archive-epic` |
+| `--compression tar.zst\|tar.gz` | Archive encoding; default `tar.zst` |
+| `--plan <path>` | Serialized immutable execution plan |
+| `--expect-plan-sha256 <digest>` | **Required** with `--apply` |
+| `--authorization-ref <ref>` | **Required** with `--apply` |
+| `--lock-timeout-seconds <n>` | Bounded lock acquisition |
+| `--format text\|json` | Human or machine-readable output |
+
+> [!CAUTION]
+> **No `--force`, recursive deletion option, or SafetyGate bypass is permitted.** Any PR introducing a `--force` flag or SafetyGate bypass mechanism to the AGC CLI will be rejected at senior review without exception.
+
+**I-72.3 — SafetyGate Checks (10 Mandatory Gates):**
+
+Both planning and execution evaluate typed gates. Execution reruns all mutable checks under coordination protection.
+
+1. Canonical policy available; I-65 compatibility ratified (**RATIFIED 2026-09-18**)
+2. Plan digest, scope, expiry, and authority valid
+3. Opus authority valid for every protected Markdown operation
+4. Epic and task state authoritative and terminal where required
+5. Reference pins and retention holds absent
+6. Source identity, hashes, Git provenance, and generations unchanged
+7. Destinations collision-free and path-safe
+8. Evidence manifests and payloads valid
+9. Storage and audit facilities support durable commit and recovery
+10. Lock ownership and fencing token current
+
+Gate results MUST distinguish `PASS`, `DENY`, and `UNKNOWN`. **Only complete `PASS` permits mutation.** `UNKNOWN` is treated as `DENY` (fail-closed).
+
+**I-72.4 — Exit Code Semantics:**
+
+| Exit Code | Meaning |
+|:---:|:---|
+| `0` | Plan produced, verified no-op, or transaction completed |
+| `2` | Invalid arguments or schema |
+| `3` | SafetyGate denial or unknown prerequisite |
+| `4` | Lock timeout or stale-plan conflict; replan required |
+| `5` | Integrity or provenance failure |
+| `6` | Interrupted transaction or recovery required |
+
+**I-72.5 — Failure Matrix (No Blind Deletion):**
+
+| Condition | Required Response |
+|:---|:---|
+| Epic reopens after planning | Generation/reference mismatch; deny before mutation |
+| Task admission races archival | Shared coordination serializes; admitted references prevent archival |
+| Source changes during compression | Locked revalidation detects mismatch; discard staged candidate |
+| Concurrent collectors select same artifact | Exclusive ownership and generation compare-and-swap allow one commit |
+| Worker resumes after losing lease | Mutation broker rejects stale fencing token |
+| Manifest missing or malformed | Preserve source; deny transition; never infer archive completeness |
+| Hash mismatch or unsafe member | Reject candidate; preserve active state; record integrity failure |
+| Crash before catalog commit | Sources remain authoritative; published candidate is uncommitted |
+| Crash after catalog commit | Verified archive authoritative; recovery removes source after revalidation |
+| Audit storage unavailable | Deny mutation |
+| Symlink or path substitution | Reject using no-follow access and locked identity verification |
+| Unknown scheduler or pin state | **Fail closed** |
+
+> [!WARNING]
+> **No failure path may fall back to blind deletion.** Every failure mode preserves the more-available copy (source or verified archive). Recovery always revalidates before resuming cleanup.
+
+---
+
+### 18.7 Section 18.0 SDLC Review Provenance
+
+| Review Round | Agent | Model ID | Verdict | Date | Key Contributions |
+|:---:|:---|:---|:---:|:---|:---|
+| Tier 0 Blueprint | GPT-6 Astra (Chief Strategic Architect) | `gpt-6-astra` | **PROPOSED** | 2026-09-18 | Authored MAB-AGC-001: 12 blueprint invariants (AGC-01 through AGC-12), 3-tier lifecycle state machine, 7-phase transaction protocol, manifest.json schema-v1, CLI specification, 17-scenario failure matrix, activation acceptance criteria. |
+| Round 1 Senior Audit | Gemini 3.1 Pro High | `gemini-3.1-pro-high` | **AMEND** | 2026-09-18 | Identified 3-tier lifecycle taxonomy (Tier A/B/C), modularization strategy, automation triggers (post-merge, phase-completion, periodic). Gaps: no concurrency control, age-based pruning contradiction, no transaction protocol, underspecified manifest, no CLI safety spec. |
+| Round 2 Senior Synthesis | Claude Opus 4.6 Thinking (Supreme Lead Architect) | `claude-opus-4-6-thinking` | **FINAL_APPROVAL** | 2026-09-18 | Adversarial cross-examination of Round 1 gaps and Astra blueprint. Ratified: I-65 compatibility, ARCHIVED_COLD→PRUNED_EPHEMERAL prohibition, modularization as future epic. Overruled: Gemini's age-based pruning. Strengthened: 2 additional activation criteria (lock timeout cascading, concurrent archive+restore). Sealed invariants I-69, I-70, I-71, I-72. |
+
+> [!NOTE]
+> Full review artifacts:
+> - [MAB-AGC-001 Blueprint](file:///Users/ajaytiwari/Desktop/projects/AlphaBrain/docs/architecture/MAB_AGC_001_BLUEPRINT.md) — Tier 0 architectural directive (immutable)
+> - [Round 1 Senior Review](file:///Users/ajaytiwari/Desktop/projects/AlphaBrain/docs/architecture/ROUND1_SENIOR_REVIEW_AGC.md) — Gemini 3.1 Pro High AMEND verdict
+> - [Round 2 Senior Synthesis](file:///Users/ajaytiwari/Desktop/projects/AlphaBrain/docs/architecture/ROUND2_SENIOR_SYNTHESIS_AGC.md) — Claude Opus 4.6 Thinking FINAL_APPROVAL verdict
+
+---
+
+*Section 18.0 ratified by triple-tier senior review consensus (Tier 0: PROPOSED → Round 1: AMEND → Round 2: FINAL_APPROVAL). Next available section: 19.0.*  
+*Total sealed invariants: I-1 through I-72.*  
+*P18.0 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-18.*
