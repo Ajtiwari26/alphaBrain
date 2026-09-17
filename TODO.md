@@ -104,6 +104,8 @@ Gemini 3.1 Pro High.
 
 - [x] P15.1 Tri-Tier Model Routing, Complexity Escalation Gate & Cross-Provider Independence (`commit a0d0991`, `tsk_eva_423d7b089d43`).
 
+- [x] Deliver macOS Desktop Widescreen Layouts for Screens M-01, M-02, M-03, M-04, App container and layout test suite (`commit 545b5e7`, `tsk_eva_9449f52da6e2`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
