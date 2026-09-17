@@ -127,7 +127,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
+    <div className="p-8 max-w-[1800px] w-full mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4 flex justify-between items-end">
         <div>
@@ -160,7 +160,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
       </div>
 
       {/* System Metrics Telemetry Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 font-mono text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 font-mono text-xs">
         <div className="border border-[#0A0A0A] p-4 bg-neutral-50 space-y-1">
           <div className="flex items-center justify-between text-neutral-500">
             <span>CPU UTILIZATION</span>
@@ -316,7 +316,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
           </div>
         </div>
 
-        <div className="bg-[#0A0A0A] p-4 h-64 overflow-y-auto font-mono text-xs space-y-1.5">
+        <div className="bg-[#0A0A0A] p-4 h-[500px] overflow-y-auto font-mono text-xs space-y-1.5">
           {logs.map((log) => (
             <div key={log.id} className="flex items-start gap-2">
               <span className="text-neutral-500 select-none text-[10px] pt-0.5">{log.timestamp}</span>

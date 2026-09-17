@@ -202,7 +202,7 @@ export const App: React.FC = () => {
       <footer className="border-t border-[#0A0A0A] bg-neutral-50 py-2 px-6 font-mono text-[11px] text-neutral-600 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <span>HOST: <strong className="text-black">Apple M4 Max (macOS 15)</strong></span>
-          <span>BRANCH: <strong className="text-[#E6391E]">alpha/tsk_eva_c1b1b4ca54ca</strong></span>
+          <span>BRANCH: <strong className="text-[#E6391E]">alpha/tsk_eva_9449f52da6e2</strong></span>
           <span>CORE: <strong className="text-black">Tauri 2.0 (Rust) + React 19</strong></span>
         </div>
         <div className="flex items-center gap-3">

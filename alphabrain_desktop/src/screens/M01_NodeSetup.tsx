@@ -85,7 +85,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
+    <div className="p-8 max-w-[1800px] w-full mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4 flex justify-between items-end">
         <div>
@@ -118,7 +118,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {/* Left Column: Directory & Toolchain */}
         <div className="space-y-6">
           {/* Workspace Path Section */}
@@ -216,10 +216,11 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-mono font-bold uppercase mb-1">
+                <label htmlFor="backendUrl" className="block text-xs font-mono font-bold uppercase mb-1">
                   Central API URL
                 </label>
                 <input
+                  id="backendUrl"
                   type="text"
                   value={backendUrl}
                   onChange={(e) => setBackendUrl(e.target.value)}
@@ -228,10 +229,11 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-mono font-bold uppercase mb-1">
+                <label htmlFor="authToken" className="block text-xs font-mono font-bold uppercase mb-1">
                   Master Auth Token / Secret Key
                 </label>
                 <input
+                  id="authToken"
                   type="password"
                   placeholder="Paste JWT / Secret Key from Cloud Settings"
                   value={authToken}
@@ -292,6 +294,36 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
             </div>
           )}
         </div>
+
+        {/* Right Column: Host Topology Dashboard */}
+        <div className="space-y-6">
+          <div className="border border-[#0A0A0A] p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-[#E6391E]" />
+              <h2 className="text-sm font-mono font-bold uppercase tracking-wider">
+                4. Host Topology
+              </h2>
+            </div>
+            <p className="text-xs text-neutral-500">
+              Live mapping of local execution clusters and daemon routing.
+            </p>
+            <div className="space-y-3 font-mono text-xs">
+              <div className="p-3 border border-neutral-200 bg-neutral-50 flex justify-between items-center">
+                <span>Daemon Loopback</span>
+                <span className="font-bold text-black">127.0.0.1:4040</span>
+              </div>
+              <div className="p-3 border border-neutral-200 bg-neutral-50 flex justify-between items-center">
+                <span>IPC Socket</span>
+                <span className="font-bold text-black">/tmp/ab-ipc.sock</span>
+              </div>
+              <div className="p-3 border border-emerald-800 bg-emerald-50 text-emerald-900 flex items-center gap-2 font-bold uppercase">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Topology Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
