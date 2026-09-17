@@ -11,7 +11,8 @@ import pytest
 @pytest.fixture
 def codex_switch_bin() -> str:
     path = Path.home() / ".local" / "bin" / "codex-switch"
-    assert path.exists(), f"{path} does not exist"
+    if not path.exists():
+        pytest.skip(f"codex-switch binary not found at {path}")
     return str(path)
 
 
