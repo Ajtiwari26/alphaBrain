@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "archive_id": "ARCHIVE-2026-Q3-ACQS-001",
+  "created_at": "2026-09-17T20:29:59.555710+00:00",
+  "policy_governance": "Invariant I-70 Cryptographic Cold Archive Verification",
+  "files_count": 4,
+  "files": [
+    {
+      "filename": "ASTRA_ARCHITECTURAL_DIGEST.md",
+      "bytes": 7189,
+      "sha256_precompression": "b2e5f4bf5798af76be00a17c71bfb30aab446a94b033b1dd9a92277a0e753860",
+      "relative_path": "docs/architecture/archive/2026-Q3-acqs/ASTRA_ARCHITECTURAL_DIGEST.md"
+    },
+    {
+      "filename": "MAB_ACQS_001_BLUEPRINT.md",
+      "bytes": 23293,
+      "sha256_precompression": "c227b25906b8aaa9b10ca519a6122866705e9874017f4411f65e7592fd4ffb4d",
+      "relative_path": "docs/architecture/archive/2026-Q3-acqs/MAB_ACQS_001_BLUEPRINT.md"
+    },
+    {
+      "filename": "ROUND1_SENIOR_REVIEW_ACQS.md",
+      "bytes": 5633,
+      "sha256_precompression": "9c0ee242154a146610dda48c12e093a3e99dbf20c9daf4743f807f36d5b4d7be",
+      "relative_path": "docs/architecture/archive/2026-Q3-acqs/ROUND1_SENIOR_REVIEW_ACQS.md"
+    },
+    {
+      "filename": "ROUND2_SENIOR_SYNTHESIS_ACQS.md",
+      "bytes": 15170,
+      "sha256_precompression": "024c27d69d3c35198f30d2493ff9541d540b0a9a472c5be17991cba4ec46b769",
+      "relative_path": "docs/architecture/archive/2026-Q3-acqs/ROUND2_SENIOR_SYNTHESIS_ACQS.md"
+    }
+  ]
+}

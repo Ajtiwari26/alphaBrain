@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "archive_id": "ARCHIVE-2026-Q3-AGC-001",
+  "created_at": "2026-09-17T20:29:59.556247+00:00",
+  "policy_governance": "Invariant I-70 Cryptographic Cold Archive Verification",
+  "files_count": 3,
+  "files": [
+    {
+      "filename": "MAB_AGC_001_BLUEPRINT.md",
+      "bytes": 22510,
+      "sha256_precompression": "757ba76b567af3d328e99db51ba08bf118593c60eed4b5da60a052083d079661",
+      "relative_path": "docs/architecture/archive/2026-Q3-agc/MAB_AGC_001_BLUEPRINT.md"
+    },
+    {
+      "filename": "ROUND1_SENIOR_REVIEW_AGC.md",
+      "bytes": 4622,
+      "sha256_precompression": "57b86639becef141cbc70ad79115a6df1b4b98d8db39e42edd97cba397150b8c",
+      "relative_path": "docs/architecture/archive/2026-Q3-agc/ROUND1_SENIOR_REVIEW_AGC.md"
+    },
+    {
+      "filename": "ROUND2_SENIOR_SYNTHESIS_AGC.md",
+      "bytes": 19307,
+      "sha256_precompression": "3f6f679d20dcb32d59aba9309ad4c968d6d20ac2b527ef860d9bd608e3d849d6",
+      "relative_path": "docs/architecture/archive/2026-Q3-agc/ROUND2_SENIOR_SYNTHESIS_AGC.md"
+    }
+  ]
+}

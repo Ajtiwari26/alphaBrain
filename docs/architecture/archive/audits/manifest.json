@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "archive_id": "ARCHIVE-2026-AUDITS-001",
+  "created_at": "2026-09-17T20:29:59.556455+00:00",
+  "policy_governance": "Invariant I-70 Cryptographic Cold Archive Verification",
+  "files_count": 2,
+  "files": [
+    {
+      "filename": "ASTRA_FINAL_TRUTH_AUDIT_2026-09-08.md",
+      "bytes": 2814,
+      "sha256_precompression": "441297e5f10bd5ca4a16c09a167c9d85dc1eeffecb0714e6a4ebaeb3d73bdb78",
+      "relative_path": "docs/architecture/archive/audits/ASTRA_FINAL_TRUTH_AUDIT_2026-09-08.md"
+    },
+    {
+      "filename": "MODEL_BENCHMARKS_AND_ROUTING_TOPOLOGY_REPORT.md",
+      "bytes": 10417,
+      "sha256_precompression": "15ff423ff43b606c17480b06c5e58f2c3bb6b3dd03805e1c7a74e81f0d48498e",
+      "relative_path": "docs/architecture/archive/audits/MODEL_BENCHMARKS_AND_ROUTING_TOPOLOGY_REPORT.md"
+    }
+  ]
+}

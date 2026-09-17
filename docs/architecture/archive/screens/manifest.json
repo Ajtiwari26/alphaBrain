@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "archive_id": "ARCHIVE-2026-SCREENS-001",
+  "created_at": "2026-09-17T20:29:59.556695+00:00",
+  "policy_governance": "Invariant I-70 Cryptographic Cold Archive Verification",
+  "files_count": 2,
+  "files": [
+    {
+      "filename": "ALPHABRAIN_FOUNDER_SCREENS.html",
+      "bytes": 140766,
+      "sha256_precompression": "7cb0650d936f71647ac689eb73704bcd256339edff314e02ba23731d4ba14175",
+      "relative_path": "docs/architecture/archive/screens/ALPHABRAIN_FOUNDER_SCREENS.html"
+    },
+    {
+      "filename": "ALPHABRAIN_MAC_DESKTOP_SCREENS.html",
+      "bytes": 29419,
+      "sha256_precompression": "bc2ec54c961c38f9b770ca0a6f1fa9598653dfc55bbe838e81f88df4c103ecc7",
+      "relative_path": "docs/architecture/archive/screens/ALPHABRAIN_MAC_DESKTOP_SCREENS.html"
+    }
+  ]
+}
