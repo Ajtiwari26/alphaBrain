@@ -405,7 +405,7 @@ Goal: execute development through supported, observable agent interfaces.
 ### Codex
 
 - [ ] Add Codex SDK or CLI/MCP adapter.
-- [ ] Use workspace-write sandbox for normal implementation tasks.
+- [x] Use workspace-write sandbox for normal implementation tasks (`commit d9211dd`, `tsk_eva_586aaae0d415`).
 - [ ] Use read-only sandbox for reviews/research.
 - [ ] Support thread continuation for retries and review feedback.
 

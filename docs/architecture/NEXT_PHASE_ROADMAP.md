@@ -129,6 +129,10 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit a0d0991`, `tsk_eva_423d7b089d43`)
 - **Objective**: P15.1 Tri-Tier Model Routing, Complexity Escalation Gate & Cross-Provider Independence
 
+### Update testscript/test_codex_switch.py to use pytest.skip when codex-switch binary is absent in isolated sandbox environments
+- **Status**: `[x] COMPLETED & MERGED` (`commit d9211dd`, `tsk_eva_586aaae0d415`)
+- **Objective**: Update testscript/test_codex_switch.py to use pytest.skip when codex-switch binary is absent in isolated sandbox environments
+
 ---
 
 ## Active Parallel Development Pipeline (Current)
