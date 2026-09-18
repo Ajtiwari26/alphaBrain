@@ -74,7 +74,7 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-8 max-w-[1800px] w-full mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
+    <div className="p-8 max-w-[1800px] w-full h-full flex flex-col mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4 flex justify-between items-end">
         <div>
@@ -137,7 +137,7 @@ export const M04_SecurityEnclave: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 flex-1">
         {/* Left Column: API Key Vault */}
         <div className="space-y-6">
           <div className="border border-[#0A0A0A] p-5 space-y-4">

@@ -127,7 +127,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-8 max-w-[1800px] w-full mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
+    <div className="p-8 max-w-[1800px] w-full h-full flex flex-col mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans">
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4 flex justify-between items-end">
         <div>
@@ -290,7 +290,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
       </div>
 
       {/* Live Terminal Streaming Console */}
-      <div className="border border-[#0A0A0A] space-y-0">
+      <div className="border border-[#0A0A0A] space-y-0 flex-1 flex flex-col min-h-0">
         <div className="bg-[#0A0A0A] text-white px-4 py-2.5 flex items-center justify-between font-mono text-xs border-b border-neutral-800">
           <div className="flex items-center gap-2">
             <Terminal className="w-4 h-4 text-[#E6391E]" />
@@ -316,7 +316,7 @@ export const M03_CommandNode: React.FC<Props> = ({ onNavigate }) => {
           </div>
         </div>
 
-        <div className="bg-[#0A0A0A] p-4 h-[500px] overflow-y-auto font-mono text-xs space-y-1.5">
+        <div className="bg-[#0A0A0A] p-4 flex-1 overflow-y-auto font-mono text-xs space-y-1.5">
           {logs.map((log) => (
             <div key={log.id} className="flex items-start gap-2">
               <span className="text-neutral-500 select-none text-[10px] pt-0.5">{log.timestamp}</span>

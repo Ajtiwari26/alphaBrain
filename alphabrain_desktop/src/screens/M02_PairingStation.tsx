@@ -91,7 +91,7 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-8 max-w-[1800px] w-full mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans panoramic-layout">
+    <div className="p-8 max-w-[1800px] w-full h-full flex flex-col mx-auto space-y-8 bg-white text-[#0A0A0A] font-sans panoramic-layout">
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4 flex justify-between items-end">
         <div>
@@ -120,7 +120,7 @@ export const M02_PairingStation: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start flex-1">
         {/* Left Column: Genuine QR Code & SAS Verification (5 cols) */}
         <div className="md:col-span-5 border-2 border-[#0A0A0A] p-6 space-y-5 bg-white flex flex-col items-center text-center">
           <div className="w-full flex justify-between items-center text-xs font-mono border-b border-neutral-200 pb-2">

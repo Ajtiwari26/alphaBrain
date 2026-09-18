@@ -25,7 +25,7 @@ def test_m03_widescreen():
     with open(path) as f:
         content = f.read()
     assert 'h-64' not in content
-    assert 'h-[500px]' in content
+    assert 'flex-1' in content
     assert 'xl:grid-cols-4' in content
     assert 'max-w-[1800px]' in content
 

@@ -42,7 +42,7 @@ export const App: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white text-[#0A0A0A] flex flex-col font-sans selection:bg-[#E6391E] selection:text-white">
+    <div className="h-full min-h-screen bg-white text-[#0A0A0A] flex flex-col font-sans selection:bg-[#E6391E] selection:text-white">
       {/* Top Application Bar */}
       <header className="border-b border-[#0A0A0A] bg-white sticky top-0 z-50">
         <div className="w-full px-6 h-14 flex items-center justify-between">
@@ -184,7 +184,7 @@ export const App: React.FC = () => {
         </aside>
 
         {/* Main Screen Content View */}
-        <main className="flex-1 overflow-y-auto bg-white transition-smooth">
+        <main className="flex-1 overflow-y-auto bg-white transition-smooth flex flex-col">
           {currentScreen === 'M01_NodeSetup' && <M01_NodeSetup onNavigate={setCurrentScreen} />}
           {currentScreen === 'M02_PairingStation' && <M02_PairingStation onNavigate={setCurrentScreen} />}
           {currentScreen === 'M03_CommandNode' && <M03_CommandNode onNavigate={setCurrentScreen} />}
