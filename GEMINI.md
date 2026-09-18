@@ -22,10 +22,11 @@
    Always clean up and kill unwanted or no longer in-use background tasks (like lingering `tail -f`, sleep loops, or temporary monitor tasks) using `manage_task` before stopping or completing things so no dangling tasks are left running.
 
 4. **Multi-Agent SDLC & Graph Integration**:
-   - When the user mentions 'sdlc' or requests an engineering pipeline, activate and execute the `multi-agent-sdlc` skill across 3 modular modes:
-     1. **`sdlc-worker` (Implementation Mode):** Autonomous coding via `gemini-3.8-flash-high` (`--effort high`) in an isolated Git worktree; runs tests and lint; zero edits on main (Invariant I-68).
-     2. **`sdlc-seniors` (Standard Senior Review Mode):** Mandatory 2-Round debate between Gemini 3.1 Pro High (`--effort high` Round 1 audit) and Claude Opus 4.6 Thinking (`--effort high` Round 2 synthesis via `agy-switch` Tiered OC-EDS). Does NOT require Astra.
-     3. **`sdlc-astra` (On-Demand Tier 0 Blueprint Mode):** `gpt-6-astra` Master Architectural Blueprint (MAB); strictly quarantined and SKIPPED by default unless explicitly requested.
+   - When the user mentions 'sdlc' or requests an engineering pipeline, activate and execute the `multi-agent-sdlc` skill across 4 modular modes:
+     1. **`sdlc-full` (Full Pipeline Mode):** Executes the complete autonomous pipeline (`alpha_core.triage_cli`: admit -> review -> approve -> senior-plan -> worker-cycle on `gemini-3.8-flash-high` in isolated worktree -> senior-review -> merge).
+     2. **`sdlc-worker` (Implementation Mode):** Autonomous coding via `gemini-3.8-flash-high` (`--effort high`) in an isolated Git worktree; runs tests and lint; zero edits on main (Invariant I-68).
+     3. **`sdlc-seniors` (Standard Senior Review Mode):** Mandatory 2-Round debate between Gemini 3.1 Pro High (`--effort high` Round 1 audit) and Claude Opus 4.6 Thinking (`--effort high` Round 2 synthesis via `agy-switch` Tiered OC-EDS). Does NOT require Astra.
+     4. **`sdlc-astra` (On-Demand Tier 0 Blueprint Mode):** `gpt-6-astra` Master Architectural Blueprint (MAB); strictly quarantined and SKIPPED by default. MUST ask user for explicit confirmation before invoking.
    - Maintain workspace clean: every test script must be under `testscript/` directory.
    - Code review graph MCP must be consulted for context to prevent token waste and preserve architectural integrity.
    - Every terminal command or curl command must have a clear commented explanation string describing what it achieves.
