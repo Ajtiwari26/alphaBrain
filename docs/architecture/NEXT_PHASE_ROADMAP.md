@@ -94,8 +94,8 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Objective**: P14.2-FRONTEND: Mobile Remote Control Screens & Pixel-Perfect Access Gate
 
 ### P14.2-DESKTOP: Tauri 2.0 Rust Core Mac App & 4 Locomotive Screens (M-01 to M-04)
-- **Status**: `[x] COMPLETED & MERGED` (`commit 57341a1`, `tsk_eva_689ad86800a2`)
-- **Objective**: P14.4-DESKTOP-BUNDLE: Tauri 2.0 MacOS Application Packaging and Entrypoints
+- **Status**: `[x] COMPLETED & MERGED` (`commit 994c948`, `tsk_eva_625d9f6d7ee6`)
+- **Objective**: Deliver full-bleed pro-density layout for macOS Desktop screens M-01 to M-04 eliminating center white space and vertical void
 
 ### P14 Phase 2 Deliverables: AlphaBrain Production Transition
 - **AlphaMeet Unified Integration**: `[x] COMPLETED & MERGED` (`commit 9395ddf`, `tsk_eva_8c0e743b9110`)

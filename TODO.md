@@ -106,6 +106,8 @@ Gemini 3.1 Pro High.
 
 - [x] Deliver macOS Desktop Widescreen Layouts for Screens M-01, M-02, M-03, M-04, App container and layout test suite (`commit 545b5e7`, `tsk_eva_9449f52da6e2`).
 
+- [x] Deliver full-bleed pro-density layout for macOS Desktop screens M-01 to M-04 eliminating center white space and vertical void (`commit 994c948`, `tsk_eva_625d9f6d7ee6`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).
