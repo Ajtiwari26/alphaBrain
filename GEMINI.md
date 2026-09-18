@@ -22,7 +22,8 @@
    Always clean up and kill unwanted or no longer in-use background tasks (like lingering `tail -f`, sleep loops, or temporary monitor tasks) using `manage_task` before stopping or completing things so no dangling tasks are left running.
 
 4. **Multi-Agent SDLC & Graph Integration**:
-   - When the user mentions 'sdlc' or requests an engineering pipeline, activate and execute the `multi-agent-sdlc` skill across 4 modular modes:
+   - **Strictly On-Demand:** The SDLC pipeline is never run automatically for simple questions, code inspections, or minor inquiries. Invoke the `multi-agent-sdlc` skill ONLY when the user explicitly instructs you to do so (by mentioning 'sdlc' or requesting an engineering pipeline).
+   - When invoked, execute across the 4 modular modes:
      1. **`sdlc-full` (Full Pipeline Mode):** Executes the complete autonomous pipeline (`alpha_core.triage_cli`: admit -> review -> approve -> senior-plan -> worker-cycle on `gemini-3.8-flash-high` in isolated worktree -> senior-review -> merge).
      2. **`sdlc-worker` (Implementation Mode):** Autonomous coding via `gemini-3.8-flash-high` (`--effort high`) in an isolated Git worktree; runs tests and lint; zero edits on main (Invariant I-68).
      3. **`sdlc-seniors` (Standard Senior Review Mode):** Mandatory 2-Round debate between Gemini 3.1 Pro High (`--effort high` Round 1 audit) and Claude Opus 4.6 Thinking (`--effort high` Round 2 synthesis via `agy-switch` Tiered OC-EDS). Does NOT require Astra.
