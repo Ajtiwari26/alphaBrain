@@ -40,7 +40,7 @@
      3. **Founder Approval**: Operator sign-off (`.venv/bin/python -m alpha_core.triage_cli approve <task_id>`).
      4. **Autonomous Senior Research**: Web & GitHub-grounded research via gemini-3.1-pro-high (`.venv/bin/python -m alpha_core.triage_cli senior-research <task_id>`).
      5. **Autonomous Planning**: Blueprint generation (`.venv/bin/python -m alpha_core.triage_cli senior-plan <task_id>`).
-     6. **Autonomous Worker Dispatch**: AGY coding agent dispatched inside an isolated Git worktree (`.venv/bin/python -m alpha_core.triage_cli worker-cycle <task_id>`). All code edits, test additions, and gate executions occur inside this isolated worktree by the AGY worker.
+     6. **Autonomous Worker Dispatch**: AGY coding agent dispatched inside an isolated Git worktree (`.venv/bin/python -m alpha_core.triage_cli worker-cycle <task_id>`). Worker executes exclusively on `gemini-3.8-flash-high` (`--effort high`) for high-velocity tool/test loops (~160 TPS, 90.8% Terminal-Bench). All code edits, test additions, and gate executions occur inside this isolated worktree by the AGY worker.
      7. **Senior Engineering Review**: Mandatory 2-Round debate between Gemini 3.1 Pro High and Claude Opus 4.6 Thinking (`.venv/bin/python -m alpha_core.triage_cli senior-review <task_id>`). If repairs are required, the repair instructions are fed back into AlphaBrain's autonomous retry cycle—NEVER manually patched by the supervisor.
      8. **Autonomous Merge**: Atomic fast-forward merge into main (`.venv/bin/python -m alpha_core.triage_cli merge <task_id>`) only after unanimous senior approval.
    - The supervisor's role is strictly orchestration, monitoring, and operator feedback—never direct coding or bypass.
