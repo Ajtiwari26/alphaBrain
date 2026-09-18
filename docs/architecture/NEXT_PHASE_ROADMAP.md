@@ -130,8 +130,8 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Objective**: P15.1 Tri-Tier Model Routing, Complexity Escalation Gate & Cross-Provider Independence
 
 ### Update testscript/test_codex_switch.py to use pytest.skip when codex-switch binary is absent in isolated sandbox environments
-- **Status**: `[x] COMPLETED & MERGED` (`commit d9211dd`, `tsk_eva_586aaae0d415`)
-- **Objective**: Update testscript/test_codex_switch.py to use pytest.skip when codex-switch binary is absent in isolated sandbox environments
+- **Status**: `[x] COMPLETED & MERGED` (`commit a8a9a06`, `tsk_eva_705c95a348b8`)
+- **Objective**: Update testscript/test_android_production_release.py to use pytest.skip when production APK is absent in isolated worktree sandbox
 
 ---
 
