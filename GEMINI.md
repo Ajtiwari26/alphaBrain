@@ -22,9 +22,15 @@
    Always clean up and kill unwanted or no longer in-use background tasks (like lingering `tail -f`, sleep loops, or temporary monitor tasks) using `manage_task` before stopping or completing things so no dangling tasks are left running.
 
 4. **Multi-Agent SDLC & Graph Integration**:
+   - When the user mentions 'sdlc' or requests senior architectural review / full engineering pipeline, activate and execute the `multi-agent-sdlc` skill.
+   - Enforce the 3-Tier Multi-Model Hierarchy for architectural synthesis:
+     1. **Tier 0**: `gpt-6-astra` (Master Architectural Blueprint).
+     2. **Round 1**: `gemini-3.1-pro-high` (`--effort high` Senior Audit & deep code tracing).
+     3. **Round 2**: `claude-opus-4-6-thinking` (`--effort high` Adversarial Cross-Examination & Definitive Senior Directive via `agy-switch` Tiered OC-EDS quota routing).
    - Maintain workspace clean: every test script must be under `testscript/` directory.
    - Code review graph MCP must be consulted for context to prevent token waste and preserve architectural integrity.
    - Every terminal command or curl command must have a clear commented explanation string describing what it achieves.
+   - Maintain the single living system truth in `ALPHABRAIN_SYSTEM_TRUTH.md` and enforce Architectural Garbage Collection (Invariants I-69 to I-72).
 
 5. **Strict Autonomous Self-Development Invariant (Zero Direct Manual Edits)**:
    - **NO DIRECT MANUAL CODE MODIFICATIONS**: Assistants (Antigravity, Gemini, Claude, etc.) must NEVER manually edit task implementation code, tests, or features directly in the workspace working tree.
