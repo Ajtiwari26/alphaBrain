@@ -46,3 +46,8 @@
      8. **Autonomous Merge**: Atomic fast-forward merge into main (`.venv/bin/python -m alpha_core.triage_cli merge <task_id>`) only after unanimous senior approval.
    - The supervisor's role is strictly orchestration, monitoring, and operator feedback—never direct coding or bypass.
 
+6. **Multi-Account CLI Execution & Subagent Isolation Invariant**:
+   - **Interactive GUI Session Protection**: The user account logged into the active Antigravity 2.0 GUI must NEVER be depleted by spawning heavy background subagent loops (`invoke_subagent`). Subagents share the active session's quota, transmitting duplicated transcript and system context across every turn, which rapidly exhausts the 5-hour limit.
+   - **Rotated AGY Worker Dispatch**: Autonomous worker coding cycles must be dispatched exclusively via `agy` CLI (`alpha_core.triage_cli worker-cycle` or headless `agy` processes) executed on the other 7 available accounts rotated via `agy-switch switch <account>`.
+   - **Controlled Model & Bounded Context**: Dispatches must route to accounts with 100% available Gemini 5h quota, utilizing `gemini-3.8-flash-high` in isolated git worktrees with strict, bounded prompts and toolsets to avoid token bloat and ensure the entire 5-hour limit is never prematurely exhausted.
+
