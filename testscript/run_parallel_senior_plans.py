@@ -4,10 +4,7 @@ Runs concurrent senior-research, senior-plan, and approve across all remaining e
 """
 
 import concurrent.futures
-import json
 import subprocess
-import sys
-from pathlib import Path
 
 TASKS = [
     ("E1", "tsk_eva_13c288859a81"),
@@ -24,7 +21,7 @@ PYTHON = "/Users/ajaytiwari/Desktop/Projects/alphaBrain/.venv/bin/python"
 def process_task(epic_name, task_id):
     snapshot_path = f"/tmp/snapshot_{epic_name.lower()}.json"
     print(f"[{epic_name}] Starting senior-research for {task_id}...")
-    
+
     # 1. Senior Research
     res = subprocess.run(
         [PYTHON, "-m", "alpha_core.triage_cli", "senior-research", task_id, "--output", snapshot_path],
@@ -32,9 +29,9 @@ def process_task(epic_name, task_id):
     )
     if res.returncode != 0:
         return f"[{epic_name}] Research failed: {res.stderr}"
-        
+
     print(f"[{epic_name}] Research complete. Starting senior-plan...")
-    
+
     # 2. Senior Plan
     res = subprocess.run(
         [PYTHON, "-m", "alpha_core.triage_cli", "senior-plan", task_id, "--snapshot", snapshot_path],
@@ -42,9 +39,9 @@ def process_task(epic_name, task_id):
     )
     if res.returncode != 0:
         return f"[{epic_name}] Plan failed: {res.stderr}"
-        
+
     print(f"[{epic_name}] Plan complete. Executing founder approval...")
-    
+
     # 3. Approve
     res = subprocess.run(
         [PYTHON, "-m", "alpha_core.triage_cli", "approve", task_id],
@@ -52,7 +49,7 @@ def process_task(epic_name, task_id):
     )
     if res.returncode != 0:
         return f"[{epic_name}] Approve failed: {res.stderr}"
-        
+
     return f"[{epic_name}] Successfully APPROVED for worker intake!"
 
 def main():
