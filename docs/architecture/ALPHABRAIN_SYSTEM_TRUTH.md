@@ -165,7 +165,7 @@ All 72 ratified invariants are sealed and binding. Below is the operational summ
 ```
 docs/architecture/
 ├── ALPHABRAIN_SYSTEM_TRUTH.md              # THIS FILE — Living Master Truth & Architecture
-├── SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md   # Canonical Master Directive (Sections 1.0–18.0; Invariants I-1–I-72)
+├── SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md   # Canonical Master Directive (Sections 1.0–19.0; Invariants I-1–I-72 + INV-ETTA-11–20)
 ├── NEXT_PHASE_ROADMAP.md                   # Active Project Roadmap & Feature Backlog (3 code refs)
 ├── ALPHABRAIN_MOBILE_SCREENS.md            # Mobile Bridge UI Specification (2 code refs)
 ├── autonomous-project-kernel.md            # Kernel Process Spec (2 code refs)

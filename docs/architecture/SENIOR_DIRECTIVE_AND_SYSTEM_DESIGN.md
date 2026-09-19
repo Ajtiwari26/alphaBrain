@@ -4913,3 +4913,799 @@ Gate results MUST distinguish `PASS`, `DENY`, and `UNKNOWN`. **Only complete `PA
 *Section 18.0 ratified by triple-tier senior review consensus (Tier 0: PROPOSED → Round 1: AMEND → Round 2: FINAL_APPROVAL). Next available section: 19.0.*  
 *Total sealed invariants: I-1 through I-72.*  
 *P18.0 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-18.*
+
+---
+
+## 19.0 DeployMate Etta Unified CLI Dominance (P19.0 Approved)
+
+**Approval Gate:** Senior Architectural Review — Claude Opus 4.6 (Thinking)  
+**Date:** 2026-09-18  
+**Prior Gate:** Mid-Level Structural Audit (Gemini 3.1 Pro High) — APPROVED_WITH_AMENDMENTS (`AUDIT-ETTA-001`)  
+**Grand Architect Blueprint:** GPT-6 Astra (`MAB-ETTA-UNIFIED-DOMINANCE-002`)  
+**Canonical Directive:** [`docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN_UNIFIED_DOMINANCE.md`](file:///Users/ajaytiwari/Desktop/Projects/etta/docs/architecture/SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN_UNIFIED_DOMINANCE.md)  
+
+### 19.1 Invariant Table (INV-ETTA-11 through INV-ETTA-20)
+
+| Invariant ID | Name | Core Requirement | Enforcement Layer |
+|---|---|---|---|
+| **INV-ETTA-11** | Zero-Playwright CDP Engine | Pure-Rust async loopback CDP over `127.0.0.1`; peak RSS <15MB; zero Electron/Puppeteer. | `crates/etta-browser` |
+| **INV-ETTA-12** | Discrete Retina 2.0x DPI Transform | Physical coordinates must round and clamp to discrete integers: `(x * S).round().clamp(...) as i32`. | `desktop.rs` (`DisplayGeometry`) |
+| **INV-ETTA-13** | Event Serialization Boundary Redaction | Mask `Authorization`, `Cookie`, and tokens with `[REDACTED]` before injecting into context. | `cdp.rs` (ADR-005) |
+| **INV-ETTA-14** | Configurable Postcondition Verification | Support `VerificationStrategy` (`ExpectedMutation`, `None`, `StateUnchanged`); drops yield `ExecutedUnverified`. | `cdp.rs` (ADR-006) |
+| **INV-ETTA-15** | JEV System 1 <15ms Zero-Token Reflex | Safety gates, path sandboxes, permission matrices, and regex lints execute locally in Rust (0 LLM tokens). | `crates/etta-runtime` |
+| **INV-ETTA-16** | Dual-Tier Universal LSP 3.17 | Stdout/stdin JSON-RPC for standard language servers (`rust-analyzer`, `pyright`), seamless fallback to `AgentAPI`. | `crates/etta-language` |
+| **INV-ETTA-17** | AST Minimal Blast-Radius Context | Tree-sitter dependency pruning limits context to ~100 tokens, keeping prompt baseline <2,000 tokens. | `code-review-graph` |
+| **INV-ETTA-18** | Sub-4ms SQLite WAL CAS Rollback | Workspace mutations tracked in SQLite journal with `journal_mode=WAL` and `synchronous=NORMAL`. | `crates/etta-runtime` |
+| **INV-ETTA-19** | Mathematical OC-EDS Live Rotation | Smooth opportunity-cost rotation across all 8 Google AI Pro accounts using real-time quota telemetry. | `crates/etta-credentials` |
+| **INV-ETTA-20** | Batch REPL Mode Acceleration | High-velocity multi-step commands collapse into single programmatic execution transactions. | `crates/etta-tools` |
+
+### 19.2 Binding Amendments Ratified by Opus (MA-01 to MA-06)
+- **MA-01**: Persistent shared session container (`Arc<RwLock<Option<CdpSession>>>` and `Arc<RwLock<Option<LanguageBridge>>>`) in `ToolRegistry`.
+- **MA-02**: Tokio-native async process spawning (`tokio::process::Command`) and background channel polling (`tokio::sync::mpsc`).
+- **MA-03**: Discrete integer coordinate rounding preventing display edge crashes.
+- **MA-04**: Structured JSON key redaction at serialization boundary.
+- **MA-05**: Configurable postcondition verification (`VerificationStrategy`) yielding `StateUnchanged` on non-mutating events.
+- **MA-06**: High-performance SQLite WAL mode configuration for <4ms transactional recovery.
+
+*Section 19.0 ratified by triple-tier senior review consensus (Tier 0: PROPOSED → Round 1: AMEND → Round 2: FINAL_APPROVAL). Next available section: 20.0.*  
+*P19.0 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-18.*
+
+---
+
+## 20. MAB-ETTA-002: Interactive Performance, Streaming Transport & Benchmark Integrity (FINAL_APPROVAL)
+
+> [!IMPORTANT]
+> **Verdict: `FINAL_APPROVAL`**  
+> **Blueprint:** MAB-ETTA-002 by `gpt-6-astra` — Interactive Performance and Benchmark Integrity  
+> **Round 1 Audit:** `gemini-3.1-pro-high` — Verdict: `AMEND` (all 5 amendments accepted and ratified herein)  
+> **Round 2 Synthesis:** `claude-opus-4-6-thinking` — This document  
+> **Target Codebase:** [`crates/etta-cli/src/runner.rs`](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs) at SHA `a4d93de7baaa4adc35218c73bb55393f77f191c0`  
+> **Date:** 2026-09-19  
+> **Scope:** Remediation of benchmark fabrication, latency inflation, buffered delivery, and absence of adaptive effort routing in DeployMate Etta v0.2.0.
+
+---
+
+### 20.1 Triple-Tier Review Chain & Cross-Examination Record
+
+This section documents the complete review chain, specific points of agreement, disagreement, and resolution between the three senior tiers.
+
+#### 20.1.1 Astra MAB-ETTA-002: Accepted Findings
+
+The Tier 0 Master Architectural Blueprint correctly identified and evidenced the following critical defects. All are **independently verified** against the source code by both Round 1 and Round 2 reviewers:
+
+| # | Astra Finding | Source Evidence | Opus Independent Verification |
+|---|---|---|---|
+| F-1 | Benchmark shortcut: `"Mock "`, `"mock_"`, `"benchmark task"` patterns return canned response | [runner.rs L165-171](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L165-L171) | ✅ Confirmed. `is_mock_benchmark` gate returns hardcoded `("Mock task executed via local reflex engine", 120, 0.0)` |
+| F-2 | Failed dispatch masked as success with fabricated 1,540 tokens and $0.0035 cost | [runner.rs L173-178](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L173-L178) | ✅ Confirmed. `Err(e)` branch returns `("offline_fallback", 1540, 0.0035)`, then L208 wraps it in `status: "success"` |
+| F-3 | Buffered delivery via `cmd.output().await` locks TTFT to total completion time | [runner.rs L452](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L452) | ✅ Confirmed. Tokio `Command::output()` collects all stdout/stderr into `Output` struct, printing only after child exits |
+| F-4 | Per-turn process spawning (AGY child per goal) | [runner.rs L440-470](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L440-L470) | ✅ Confirmed. Loop over `agy_candidates` spawns fresh `tokio::process::Command` per `dispatch_live_stream()` call |
+| F-5 | Hardcoded `"high"` effort with 16,384 thinking budget regardless of task complexity | [runner.rs L130-131](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L130-L131), [L490](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L490) | ✅ Confirmed. Default is `"high"` and fallback SSE case maps to `(gemini-3.6-flash-high, 16384)` |
+| F-6 | Published claims (6.08ms JEV, 19.8% faster, 8.34MB RAM, 1,540-token ratio) are unsupported | Benchmark harness and whitepaper cross-ref | ✅ Accepted per Astra's evidence decomposition table (§1) |
+
+**Astra Point Accepted with Clarification:** Astra correctly noted that "complete terminal freeze with zero feedback" overstates the evidence — the spinner provides acknowledgment. The accurate description is: **no answer content visible until the child process fully terminates**, despite the animated spinner. This nuance matters for TTFT measurement definitions.
+
+#### 20.1.2 Gemini Round 1 Amendments: Disposition
+
+All five of Gemini 3.1 Pro High's amendments are **accepted and ratified** as binding constraints:
+
+| # | Amendment | Opus Disposition | Rationale |
+|---|---|---|---|
+| GA-1 | **Transport: Direct HTTP/2 SSE** via `Arc<reqwest::Client>` — discard IPC daemon | ✅ **ACCEPTED** | IPC daemon violates single-binary simplicity, introduces zombie risk, socket permission complexity, version skew. `reqwest::Client` already provides HTTP/2 connection pooling and TLS session resumption when reused. |
+| GA-2 | **Buffer Safety:** Ban `from_utf8_lossy` on partial chunks; mandate `bytes::BytesMut` | ✅ **ACCEPTED** | Critical correctness defect. Multi-byte UTF-8 characters split across TCP boundaries are permanently corrupted by lossy conversion. This is not a performance issue — it is data destruction. |
+| GA-3 | **Cancellation:** `tokio::select!` binding SSE stream + spinner + OS signal | ✅ **ACCEPTED** | Current implementation has no structured concurrency between the spinner task and stream consumption. SIGINT during generation leaks the child process or HTTP connection and leaves terminal in broken state (hidden cursor). |
+| GA-4 | **Token Refresh:** Background async task refreshing credentials 5 minutes before expiry | ✅ **ACCEPTED with modification** | Gemini proposed 5-minute pre-expiry refresh. I ratify this but **tighten the requirement**: the refresh task must use `Arc<RwLock<String>>` for the cached token, and read-lock acquisition on the hot path must be demonstrably <1ms at p99. The 5-minute window is correct for Google OAuth tokens (typically 3600s expiry). |
+| GA-5 | **Adaptive Effort:** Local <2ms heuristic classifier with 3-tier routing | ✅ **ACCEPTED with constraints** | Gemini proposed Aho-Corasick/Regex routing. I accept the approach but add binding constraints: (1) context-aware — `"hi, inspect this deadlock"` must NOT route to reflex; (2) explicit user override always wins; (3) low-confidence classification takes conservative (higher) route; (4) Tier 2 thinking budget capped at 1,024 tokens, not "model minimum" which is underspecified. |
+
+#### 20.1.3 Additional Defects Identified in Round 2
+
+My independent code review surfaced the following defects **not explicitly called out** by either prior tier:
+
+| # | Defect | Location | Severity |
+|---|---|---|---|
+| OD-1 | **5-second overall request timeout** on the `reqwest::Client` builder. For any generation taking >5s (which is all non-trivial tasks), this will abort the SSE stream mid-generation. This is not a "fallback timeout" — it is a hard wall-clock timeout on the entire request lifecycle including response body streaming. | [runner.rs L524](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L524) | 🔴 **Critical** — Makes the SSE transport non-functional for real workloads |
+| OD-2 | **Silent model remapping**: The wire model resolution (L485-491) silently maps `"flash-high"` to `"gemini-3.6-flash-high"` and `"pro"` to `"gemini-pro-agent"`. User believes they selected one model but a different one executes. No log or display of the wire model ID. | [runner.rs L485-491](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L485-L491) | 🟡 **Medium** — Integrity violation: user intent not faithfully executed |
+| OD-3 | **Usage estimation fallback** at L611-614: when provider returns no `usageMetadata`, tokens are estimated by dividing combined byte length by 4. This synthetic usage data contaminates the cost calculation at L617-618, making `cost` and `tokens_used` unreliable. | [runner.rs L611-614](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L611-L614) | 🟡 **Medium** — Synthetic data with no provenance marker |
+| OD-4 | **Spinner cleanup race**: The spinner task is cancelled by setting `AtomicBool` to false, but `await`-ing the join handle can race with the terminal escape sequence cleanup. If the spinner task is in the middle of a multi-line ANSI write when stopped, partial escape sequences may corrupt terminal state. | [runner.rs L456-461](file:///Users/ajaytiwari/Desktop/Projects/etta/crates/etta-cli/src/runner.rs#L456-L461) | 🟡 **Medium** — Terminal corruption under race conditions |
+
+---
+
+### 20.2 Binding Invariants: I-ETTA-INTERACTIVE-01 through I-ETTA-INTERACTIVE-04
+
+> [!CAUTION]
+> These four invariants are **binding acceptance criteria** for Etta v0.2.0 release. No worker may self-certify compliance. All invariants must be independently verified by both senior reviewers (Round 1 and Round 2) against reproducible evidence from the test harness specified in §20.5.
+
+---
+
+#### I-ETTA-INTERACTIVE-01 — TTFT Ceiling
+
+**Definition:** Time to First Token (TTFT) measures the elapsed wall-clock time from user input submission to the first **visible answer content character** rendered in the terminal.
+
+**What Counts as Answer Content:**
+- Text from the model's response `candidates[].content.parts[].text` (for SSE transport)
+- Visible text output from the provider child process (for bridge transport)
+
+**What Does NOT Count:**
+- Spinner animation, status messages, cursor changes, input echo
+- Thought summaries or reasoning trace (unless the user explicitly requested thinking display)
+- Acknowledgment events (`TurnAccepted`, `RouteSelected`)
+- Blank lines, ANSI escape sequences, or formatting preamble
+
+**Release Gates:**
+
+| Metric | Target | Measurement Protocol |
+|---|---|---|
+| Tier 2 (Conversation) TTFT | p95 < 800ms | PTY-driven automated measurement over ≥100 turns across ≥3 warm sessions |
+| Acknowledgment latency | p95 ≤ 100ms | Time from input submission to first visual feedback (spinner start or status line) |
+| Transport-to-render delay | p95 ≤ 50ms | Time from SSE chunk arrival in Rust to character appearing in terminal stdout |
+| Cold-start TTFT penalty | Report only | Separate cohort; must not be merged with warm-session TTFT statistics |
+| Auth-refresh cohort | Report only | Turns where token refresh occurred; must be reported separately |
+
+**Anti-Gaming Rules:**
+1. Spinner start time MUST NOT be reported as TTFT.
+2. An empty response (0 answer characters) has **no TTFT** — it is a failure, not a fast success.
+3. A locally-generated greeting or reflex response has a valid TTFT but MUST be reported in a separate Tier 1 cohort, never mixed into Tier 2 statistics.
+4. If the TTFT measurement depends on a specific SSE event field (e.g., `data:` payload with non-empty `text`), the PTY harness must validate that the rendered text matches the expected SSE content.
+
+---
+
+#### I-ETTA-INTERACTIVE-02 — Native Streaming Transport
+
+**Binding Transport Decision: Direct HTTP/2 SSE via `Arc<reqwest::Client>`**
+
+> [!IMPORTANT]
+> The Persistent IPC Daemon alternative proposed in MAB-ETTA-002 §4 is **formally rejected**. All workers MUST implement the Direct HTTP/2 SSE path. Any PR introducing an IPC daemon, Unix domain socket bridge, or persistent child process for provider communication will be rejected at senior review.
+
+**Rationale (synthesized from Astra §4, Gemini GA-1, and independent analysis):**
+- IPC daemon violates Etta's zero-external-dependency single-binary architecture
+- Daemon lifecycle creates zombie process risk, socket permission complexity, and version skew between CLI and daemon
+- `reqwest::Client` inherently maintains an HTTP/2 connection pool with TLS session resumption when the `Client` instance is reused
+- All benefits attributed to IPC (connection reuse, session persistence, reduced handshake cost) are achievable via a shared `Client` with zero cross-process overhead
+
+**Mandatory Implementation Contract:**
+
+```rust
+// REQUIRED: Single shared HTTP client on the session/Runner struct
+pub struct Runner {
+    // ... existing fields ...
+    http_client: Arc<reqwest::Client>,           // I-ETTA-INTERACTIVE-02: shared pooled client
+    cached_token: Arc<RwLock<CachedCredential>>, // I-ETTA-INTERACTIVE-02: background-refreshed credential
+}
+
+// CachedCredential holds the token and its expiry
+pub struct CachedCredential {
+    pub access_token: String,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+// REQUIRED: Client constructed ONCE at session init, NOT per-turn
+impl Runner {
+    pub fn new(/* ... */) -> Result<Self, CliError> {
+        let http_client = Arc::new(
+            reqwest::Client::builder()
+                // NO overall request timeout here — use per-phase deadlines instead
+                .tcp_nodelay(true)
+                .pool_max_idle_per_host(2)        // HTTP/2 multiplexes; 2 is ample
+                .http2_prior_knowledge()           // Cloud Code PA supports HTTP/2
+                .connect_timeout(Duration::from_secs(10))  // Connection-only deadline
+                .build()
+                .expect("HTTP client construction is infallible with these settings")
+        );
+        // ...
+    }
+}
+```
+
+**Forbidden Patterns:**
+1. `reqwest::Client::new()` or `reqwest::Client::builder().build()` inside `dispatch_live_stream()` or any per-turn function — **REJECTED**
+2. `cmd.output().await` on any provider subprocess in the interactive path — **REJECTED**
+3. `String::from_utf8_lossy(&chunk)` on raw network byte chunks — **REJECTED** (see Buffer Safety below)
+4. Overall `.timeout(Duration::from_secs(5))` on the client builder — **REJECTED** (this kills any generation >5s)
+
+**Buffer Safety Mandate (GA-2 Ratified):**
+
+```rust
+// REQUIRED: BytesMut accumulation with newline-delimited splitting
+use bytes::BytesMut;
+
+let mut buf = BytesMut::with_capacity(8192);
+
+while let Some(chunk_result) = stream.next().await {
+    match chunk_result {
+        Ok(chunk) => {
+            buf.extend_from_slice(&chunk);
+            // Split ONLY on complete newlines — never decode partial data
+            while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+                let line_bytes = buf.split_to(pos + 1); // includes the \n
+                // UTF-8 decode only AFTER extracting a complete line
+                match std::str::from_utf8(&line_bytes[..line_bytes.len() - 1]) {
+                    Ok(line) => { /* process SSE line */ }
+                    Err(e) => {
+                        // Emit TurnFailed — do NOT use lossy conversion
+                        return Err(StreamError::InvalidUtf8(e));
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            // FORBIDDEN: silent `break` — must emit TurnFailed
+            return Err(StreamError::TransportInterrupted(e));
+        }
+    }
+}
+```
+
+**Timeout Architecture (4 distinct deadlines, NOT one overall timeout):**
+
+| Deadline | Scope | Default | Configurable |
+|---|---|---|---|
+| `connect_timeout` | TCP + TLS handshake | 10s | Yes |
+| `first_event_timeout` | Connection established → first SSE `data:` event | 30s | Yes |
+| `idle_timeout` | Between consecutive SSE events | 60s | Yes |
+| `overall_timeout` | Total wall-clock for the entire turn | 300s | Yes, per-effort-tier |
+
+Each deadline is enforced via `tokio::time::timeout()` wrapping the appropriate future. An expired deadline produces a typed `TurnFailed` event with the specific timeout variant — never a silent break or a fabricated success.
+
+---
+
+#### I-ETTA-INTERACTIVE-03 — Adaptive Cognitive Effort Routing
+
+**3-Tier Classification Cascade:**
+
+| Tier | Name | Routing Mechanism | Thinking Budget | Acceptance Gate |
+|---|---|---|---|---|
+| **1** | **Reflex** | Deterministic local: slash commands (`/help`, `/status`, `/clear`, `/accounts`, `/switch`), version queries, policy decisions | 0 (no cloud call) | Local decision p95 < 15ms; zero network I/O |
+| **2** | **Conversation** | Default for standard text input; brief explanations, short rewrites, ordinary chat | **1,024 thinking tokens** (hard cap) | Visible-answer TTFT p95 < 800ms |
+| **3** | **Deep Reasoning** | Triggered by heuristics (prompt > 1,500 chars, structural keywords) OR explicit user escalation (`--effort high`, `/boost`, `--effort max`) | **16,384 thinking tokens** | Responsive cancellation; truthful progress reporting |
+
+**Classification Implementation Requirements:**
+
+1. **Execution budget:** The classifier itself MUST execute in < 2ms. This mandates a local heuristic approach (Aho-Corasick automaton, compiled regex, or trie). No LLM call for classification.
+
+2. **Context awareness:** The classifier MUST consider conversation history, not just the current turn in isolation. Examples:
+   - `"hi"` at conversation start → Tier 1 (greeting)
+   - `"hi, inspect this deadlock"` → Tier 3 (deep reasoning, despite starting with "hi")
+   - `"yes"` after an architectural discussion → Tier 2 (contextual follow-up, not reflex)
+
+3. **Conservative fallback:** When confidence is low (ambiguous input, mixed signals), the classifier MUST route to the **higher** tier (more compute), not the lower one. It is always better to spend extra thinking tokens than to give a shallow answer to a complex question.
+
+4. **User override supremacy:** An explicit effort override (`/effort high`, `--effort low`, `--effort max`) MUST override the classifier's decision unconditionally. The override persists for the session until changed.
+
+5. **Wire-level fidelity:** The thinking budget sent on the wire (in `generationConfig.thinkingConfig.thinkingBudget`) MUST match the tier's declared budget. The actual model used MUST be logged and displayed to the user. Silent model remapping (current L485-491 behavior) is **forbidden**.
+
+6. **Separate reporting:** TTFT statistics for each tier MUST be reported in separate cohorts. Mixing Tier 1 reflex latencies (which are trivially fast) with Tier 2 cloud latencies to produce an artificially low aggregate is **forbidden**.
+
+---
+
+#### I-ETTA-INTERACTIVE-04 — Zero Provider Process Spawning Per Turn
+
+**After session initialization completes**, ordinary conversational turns (Tier 2 and Tier 3) MUST NOT spawn any new operating system processes for provider communication. Specifically:
+
+1. No `tokio::process::Command::new()` for AGY, Gemini CLI, or any provider binary
+2. No `std::process::Command::new()` for provider communication
+3. All provider interaction occurs over the persistent `Arc<reqwest::Client>` HTTP/2 connection pool
+
+**Exceptions (classified separately in metrics):**
+- Tool execution commands (e.g., `/run cargo test`) legitimately spawn child processes
+- Session initialization (first connection, credential bootstrap) may spawn processes
+- Crash recovery of the HTTP client may require re-initialization
+
+**Verification Protocol:**
+- PTY test harness samples the process tree (`pgrep -P <etta_pid>`) across 100 consecutive ordinary turns
+- Any child process spawned during ordinary turns that is not a tool command → **GATE FAILURE**
+- Evidence artifact: process-tree snapshots at turn-start and turn-end for each measured turn
+
+---
+
+### 20.3 Integrity Enforcement Invariants
+
+> [!CAUTION]
+> These invariants address the benchmark fabrication and failure masking defects identified by all three review tiers. Violation of any integrity invariant is a **release blocker** — no exceptions, no waivers.
+
+#### I-ETTA-INTEGRITY-01 — No Benchmark Shortcuts in Production Code
+
+The following code pattern MUST be completely removed from `runner.rs` and any other production source file:
+
+```rust
+// THIS ENTIRE BLOCK MUST BE DELETED:
+let is_mock_benchmark = goal.starts_with("Mock ")
+    || goal.starts_with("mock_")
+    || goal.contains("benchmark task");
+
+let (response_text, new_tokens, new_cost) = if is_mock_benchmark {
+    ("Mock task executed via local reflex engine".to_string(), 120, 0.0)
+} else { /* ... */ };
+```
+
+**Replacement:** All inputs follow the same code path — through the intent classifier (I-ETTA-INTERACTIVE-03) and then to the appropriate handler (local reflex or cloud provider). There is no input-pattern-based shortcut. Benchmarks must measure the real system.
+
+#### I-ETTA-INTEGRITY-02 — No Failure-to-Success Masking
+
+The following code pattern MUST be completely removed:
+
+```rust
+// THIS ENTIRE BLOCK MUST BE DELETED:
+Err(e) => {
+    eprintln!("\x1b[33m⚠️  Live connection note: {}\x1b[0m", e);
+    ("offline_fallback".to_string(), 1540, 0.0035)
+}
+```
+
+**Replacement:** A failed dispatch MUST produce a `TurnFailed` result with:
+- The original error preserved (not stringified and discarded)
+- `status: "failed"` (never `"success"`)
+- `tokens_used: 0` (or the actual count consumed before failure, if known from partial usage metadata)
+- `cost: 0.0` (or actual cost from partial usage metadata)
+- A typed error variant in `HeadlessReport.error` field
+
+#### I-ETTA-INTEGRITY-03 — No Synthetic Usage Data Without Provenance
+
+The following fallback estimation MUST be eliminated or explicitly marked:
+
+```rust
+// CURRENT (FORBIDDEN as implicit):
+if total_tokens == 0 {
+    total_tokens = ((prompt.len() + full_text.len()) / 4) as u64;
+    // ...
+}
+```
+
+**If estimation is retained as a user convenience**, it MUST:
+1. Be explicitly labeled in the `HeadlessReport` as `usage_source: "estimated"` (not `"provider"`)
+2. Never be mixed with provider-reported usage in aggregate statistics
+3. Never be used in benchmark comparisons
+4. Carry the estimation method as metadata: `"byte_length_div_4"`
+
+#### I-ETTA-INTEGRITY-04 — Publication Correction
+
+All existing benchmark documents, whitepapers, and claim tables referencing the invalidated metrics MUST be:
+1. Marked with an erratum header: `"⚠️ UNVERIFIED — Under correction per MAB-ETTA-002 audit"`
+2. Preserved in their original form (no retroactive editing of published claims)
+3. Accompanied by a correction document explaining which claims were invalidated and why
+
+---
+
+### 20.4 Cancellation & Terminal State Machine
+
+**Structured Concurrency Mandate (GA-3 Ratified):**
+
+The SSE streaming loop, spinner animation, and OS signal handling MUST be unified under a single `tokio::select!` block to ensure deterministic cancellation:
+
+```rust
+// REQUIRED PATTERN: Structured concurrency via tokio::select!
+use tokio::signal;
+
+let mut ctrl_c = signal::ctrl_c(); // or platform-appropriate signal
+
+loop {
+    tokio::select! {
+        // Branch 1: Next SSE chunk arrives
+        chunk = stream.next() => {
+            match chunk {
+                Some(Ok(bytes)) => { /* accumulate in BytesMut, process complete lines */ }
+                Some(Err(e)) => {
+                    // Emit TurnFailed — NOT a silent break
+                    emit_event(TurnEvent::TurnFailed { error: e.into() });
+                    break;
+                }
+                None => {
+                    // Stream ended cleanly
+                    emit_event(TurnEvent::TurnCompleted { usage });
+                    break;
+                }
+            }
+        }
+
+        // Branch 2: User pressed Ctrl-C
+        _ = &mut ctrl_c => {
+            // 1. Drop the stream (closes HTTP connection)
+            // 2. Stop the spinner
+            // 3. Restore terminal state (show cursor, reset colors)
+            // 4. Emit TurnCancelled
+            emit_event(TurnEvent::TurnCancelled);
+            break;
+        }
+
+        // Branch 3: Overall timeout expired
+        _ = &mut overall_deadline => {
+            emit_event(TurnEvent::TurnFailed {
+                error: StreamError::OverallTimeout.into()
+            });
+            break;
+        }
+    }
+}
+```
+
+**Cancellation Recovery Gate:**
+- From Ctrl-C to usable prompt: p95 ≤ 250ms
+- Terminal state fully restored (cursor visible, colors reset, no orphaned ANSI sequences)
+- HTTP connection cleanly closed (no connection leak visible via `lsof` or `netstat`)
+- Partial response preserved in journal with `status: "cancelled"` and actual token count consumed up to cancellation point
+
+**Terminal Event Contract:**
+
+Every turn MUST produce **exactly one** terminal event:
+
+| Event | Condition |
+|---|---|
+| `TurnCompleted` | Stream ended cleanly with valid response content |
+| `TurnFailed` | Any error: network, timeout, auth, parse, UTF-8, provider error |
+| `TurnCancelled` | User-initiated cancellation (Ctrl-C, `/cancel`) |
+
+An incomplete stream (error during chunked transfer) MUST NOT produce `TurnCompleted`. The current behavior where `Err(_) => break` silently terminates the loop and then falls through to returning `Ok(...)` is **explicitly forbidden**.
+
+---
+
+### 20.5 Credential Refresh Architecture
+
+**Background Token Refresh (GA-4 Ratified with Tightening):**
+
+```rust
+// REQUIRED: Background credential refresh task
+pub struct CachedCredential {
+    pub access_token: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+impl Runner {
+    /// Spawns a background task that proactively refreshes the OAuth token
+    /// 5 minutes before expiry. The task runs for the session lifetime.
+    fn spawn_credential_refresh(
+        cached: Arc<RwLock<CachedCredential>>,
+        client: Arc<reqwest::Client>,
+        account: String,
+    ) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            loop {
+                let sleep_duration = {
+                    let cred = cached.read().await;
+                    let remaining = cred.expires_at - Utc::now();
+                    // Refresh 5 minutes before expiry, minimum 10s sleep
+                    let refresh_at = remaining - chrono::Duration::minutes(5);
+                    refresh_at.to_std().unwrap_or(Duration::from_secs(10))
+                };
+
+                tokio::time::sleep(sleep_duration).await;
+
+                // Perform OAuth refresh (same logic as current resolve_live_access_token)
+                match refresh_token_impl(&client, &account).await {
+                    Ok(new_cred) => {
+                        let mut guard = cached.write().await;
+                        *guard = new_cred;
+                        // Log: credential refreshed successfully
+                    }
+                    Err(e) => {
+                        // Log warning — do NOT crash the session
+                        // The hot path will detect expiry and attempt inline refresh as fallback
+                        eprintln!("Background token refresh failed: {}", e);
+                    }
+                }
+            }
+        })
+    }
+}
+```
+
+**Hot-Path Contract:**
+- Read-lock acquisition: p99 < 1ms (this is a `tokio::sync::RwLock` read, which is nearly free under low contention)
+- If the cached token is expired AND background refresh failed, fall back to inline refresh (current behavior) — but log the latency penalty
+- Never block the hot path waiting for a write-lock; if write-lock is held by the refresh task, use the (potentially expired) cached token and let the provider return 401, triggering a retry with fresh credentials
+
+---
+
+### 20.6 Bounded Worker Execution Plan (Epics E0–E7)
+
+> [!IMPORTANT]
+> All epics are executed by **`gemini-3.8-flash-high`** workers in **isolated Git worktrees** under the standard AlphaBrain lifecycle (§6.6). No worker may modify files outside its declared `allowed_paths`. No worker may self-certify its own output. All results undergo dual senior review (Round 1 + Round 2).
+
+**Execution Order:** `E0 → E1 → E2 → E3 → E4 → E5 → E6 → E7`
+
+Parallel execution is permitted ONLY for explicitly marked pairs with non-overlapping file ownership and pre-agreed interface contracts.
+
+---
+
+#### Epic E0: Evidence Baseline & Claim Ledger
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E0-EVIDENCE-BASELINE` |
+| **Base SHA** | `a4d93de7baaa4adc35218c73bb55393f77f191c0` |
+| **Allowed Paths** | `testscript/performance/manifest.json`, `testscript/performance/claim_ledger.md`, `docs/benchmarks/ERRATUM_*.md` |
+| **Dependencies** | None (first epic) |
+| **Budget** | 2 hours wall-clock, 50,000 tokens |
+
+**Deliverables:**
+1. `manifest.json`: Pinned source SHA, installed binary SHA-256, Rust toolchain version, OS/arch, model IDs, effort settings, corpus spec
+2. `claim_ledger.md`: Every published claim mapped to its evidence source, with disposition: `VERIFIED`, `SYNTHETIC`, `CONTRADICTED`, `UNSUPPORTED`, `WITHDRAWN`
+3. Erratum documents for existing benchmark publications per I-ETTA-INTEGRITY-04
+4. Audit of existing test harness (`bench_harness.sh`, `compare_agy_vs_etta.py`, `audit_interactive_lag.py`) against false-success, spinner-as-token, and benchmark-recognition attacks
+
+**Acceptance Gate:**
+```bash
+# Verify manifest.json is valid JSON with required fields
+python3 -c "import json; m=json.load(open('testscript/performance/manifest.json')); assert all(k in m for k in ['source_sha','binary_sha256','rust_toolchain','models','corpus'])"
+# Verify claim ledger has no claims with disposition "UNREVIEWED"
+! grep -c "UNREVIEWED" testscript/performance/claim_ledger.md
+```
+
+---
+
+#### Epic E1: Truthful Outcomes & Failure States
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E1-TRUTHFUL-OUTCOMES` |
+| **Base SHA** | E0 result commit |
+| **Allowed Paths** | `crates/etta-cli/src/runner.rs`, `crates/etta-cli/src/headless.rs`, `crates/etta-cli/src/error.rs` |
+| **Dependencies** | E0 completed |
+| **Budget** | 3 hours wall-clock, 80,000 tokens |
+
+**Deliverables:**
+1. **Remove** the benchmark shortcut at L165-171 (I-ETTA-INTEGRITY-01)
+2. **Remove** the failure-to-success masking at L173-178 (I-ETTA-INTEGRITY-02)
+3. **Introduce** typed failure states: `TurnFailed`, `TurnCancelled` as distinct from `TurnCompleted`
+4. **Fix** usage provenance: mark estimated usage explicitly, never report synthetic data as provider-sourced (I-ETTA-INTEGRITY-03)
+5. **Remove** the hardcoded `1540` token fallback and `$0.0035` synthetic cost
+
+**Acceptance Gate:**
+```bash
+# Rust compilation and lint checks
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+# Verify benchmark shortcut is gone
+! grep -n "Mock benchmark\|mock_\|is_mock_benchmark\|benchmark task" crates/etta-cli/src/runner.rs
+# Verify failure masking is gone
+! grep -n "offline_fallback\|1540" crates/etta-cli/src/runner.rs
+```
+
+---
+
+#### Epic E2: Independent Measurement Harness
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E2-MEASUREMENT-HARNESS` |
+| **Base SHA** | E1 result commit |
+| **Allowed Paths** | `testscript/performance/run_interactive.py`, `testscript/performance/collect_process_tree.py`, `testscript/performance/report.py`, `testscript/performance/requirements.txt` |
+| **Dependencies** | E1 completed (truthful outcomes must exist before measurement) |
+| **Budget** | 4 hours wall-clock, 100,000 tokens |
+
+**Deliverables:**
+1. `run_interactive.py`: PTY-driven real interactive session driver with monotonic timestamp instrumentation at all milestone points (input, ack, route, auth, provider dispatch, first event, first answer, each chunk, last answer, terminal event, prompt ready)
+2. `collect_process_tree.py`: Process tree sampler using `pgrep`/`ps` to count provider child processes
+3. `report.py`: Statistical report generator computing p50/p95/p99/max for all metrics, with confidence intervals, failure rates, and per-cohort breakdowns (Tier 1/2/3, warm/cold, auth-refresh)
+4. Deliberately buffered fixture test: a mock that holds all content until end — MUST fail the streaming gate
+5. Spinner-as-TTFT detection: a test that verifies spinner start time ≠ TTFT
+
+**Acceptance Gate:**
+```bash
+# Harness scripts are syntactically valid
+python3 -m py_compile testscript/performance/run_interactive.py
+python3 -m py_compile testscript/performance/collect_process_tree.py
+python3 -m py_compile testscript/performance/report.py
+# Buffered fixture correctly fails streaming gate
+python3 testscript/performance/run_interactive.py --fixture=buffered --expect-fail
+```
+
+---
+
+#### Epic E3: Stream Protocol & SSE Parser
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E3-STREAM-PROTOCOL` |
+| **Base SHA** | E1 result commit (may run in parallel with E2 if interfaces are pre-agreed) |
+| **Allowed Paths** | `crates/etta-cli/src/stream.rs` (new), `crates/etta-cli/src/events.rs` (new), `crates/etta-cli/src/runner.rs` (integration) |
+| **Dependencies** | E1 completed |
+| **Budget** | 5 hours wall-clock, 120,000 tokens |
+
+**Deliverables:**
+1. **Typed event enum** implementing the full event contract from MAB-ETTA-002 §4:
+   ```
+   TurnAccepted, RouteSelected, ProviderRequestStarted,
+   AnswerDelta, ThoughtSummaryDelta,
+   ToolStarted, ToolFinished,
+   UsageReported,
+   TurnCompleted | TurnFailed | TurnCancelled
+   ```
+2. **Incremental SSE parser** using `bytes::BytesMut` (GA-2) with:
+   - Newline-delimited splitting before UTF-8 decode
+   - Multi-line `data:` field concatenation per SSE spec
+   - Graceful handling of `event:`, `id:`, `retry:` fields
+   - Bounded buffer (configurable max, default 1MB) with backpressure
+3. **Cancellation state machine** per §20.4
+4. **Unit tests** covering:
+   - Fragmented UTF-8 across chunk boundaries (multi-byte emoji split mid-character)
+   - SSE event split across chunk boundaries (`"data: {"` in chunk 1, `"text": "hello"}\n\n"` in chunk 2)
+   - Stream error mid-generation → `TurnFailed`
+   - Backpressure: buffer exceeds limit → `TurnFailed` with `BufferOverflow`
+   - Ctrl-C during active stream → `TurnCancelled`
+
+**Acceptance Gate:**
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+# Specifically: stream parser tests pass
+cargo test -p etta-cli stream -- --nocapture
+```
+
+---
+
+#### Epic E4: Persistent Transport & Connection Pooling
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E4-PERSISTENT-TRANSPORT` |
+| **Base SHA** | E3 result commit |
+| **Allowed Paths** | `crates/etta-cli/src/runner.rs`, `crates/etta-cli/src/transport.rs` (new), `crates/etta-cli/src/credentials.rs` (new) |
+| **Dependencies** | E3 completed (stream protocol must exist) |
+| **Budget** | 4 hours wall-clock, 100,000 tokens |
+
+**Deliverables:**
+1. **Elevate `reqwest::Client`** to `Arc<reqwest::Client>` on the `Runner` struct (or equivalent session holder) — constructed once at session initialization
+2. **Remove** per-turn `reqwest::Client::builder().build()` at current L523-530
+3. **Remove** the 5-second overall timeout at L524; implement 4-deadline architecture per §20.2
+4. **Background credential refresh** per §20.5
+5. **Remove** the AGY subprocess dispatch (L440-470) from the interactive path — this becomes a legacy/bridge mode only, not the primary transport
+6. **Wire model fidelity**: Log and display the actual wire model ID; eliminate silent remapping
+
+**Acceptance Gate:**
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+# Verify no per-turn client construction
+! grep -n "Client::builder\|Client::new" crates/etta-cli/src/runner.rs | grep -v "impl Runner\|fn new"
+# Verify no 5-second timeout
+! grep -n "from_secs(5)" crates/etta-cli/src/runner.rs
+# Process tree verification: 100 turns, zero provider spawns
+# (requires live test — senior review will execute)
+```
+
+---
+
+#### Epic E5: Adaptive Effort Routing & Classification
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E5-ADAPTIVE-EFFORT` |
+| **Base SHA** | E4 result commit |
+| **Allowed Paths** | `crates/etta-cli/src/classifier.rs` (new), `crates/etta-cli/src/runner.rs` (integration), `crates/etta-cli/src/config.rs` |
+| **Dependencies** | E4 completed (transport must exist for effort routing to wire correctly) |
+| **Budget** | 3 hours wall-clock, 80,000 tokens |
+
+**Deliverables:**
+1. **3-Tier classifier** per I-ETTA-INTERACTIVE-03 executing in < 2ms
+2. **Context-aware routing** considering conversation history (not just current turn)
+3. **Held-out test corpus** with ground-truth tier labels:
+   - `"hi"` → Tier 1 (greeting)
+   - `"explain async/await in Rust"` → Tier 2 (conversation)
+   - `"architect a distributed cache with consistent hashing and failure recovery"` → Tier 3 (deep reasoning)
+   - `"hi, inspect this deadlock"` → Tier 3 (NOT Tier 1 — context-sensitive)
+   - `"/help"` → Tier 1 (slash command)
+   - `"yes"` (after architectural discussion) → Tier 2 (contextual follow-up)
+4. **Wire-level verification**: recorded `thinkingBudget` in request payload matches tier specification (0 / 1024 / 16384)
+5. **User override**: `/effort low|medium|high|max` overrides classifier for session duration
+
+**Acceptance Gate:**
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+# Classifier unit tests pass with 100% accuracy on held-out corpus
+cargo test -p etta-cli classifier -- --nocapture
+# Classification latency benchmark
+cargo bench -p etta-cli -- classifier_latency  # must report < 2ms p95
+```
+
+---
+
+#### Epic E6: Terminal Integration & Incremental Rendering
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E6-TERMINAL-INTEGRATION` |
+| **Base SHA** | E5 result commit (may run in parallel with E5 if renderer interface is pre-agreed) |
+| **Allowed Paths** | `crates/etta-cli/src/renderer.rs` (new), `crates/etta-cli/src/runner.rs` (integration), `crates/etta-cli/src/spinner.rs` (refactor) |
+| **Dependencies** | E3 completed (event types), E4 completed (transport) |
+| **Budget** | 3 hours wall-clock, 80,000 tokens |
+
+**Deliverables:**
+1. **Incremental renderer** consuming `TurnEvent` stream and rendering `AnswerDelta` chunks immediately to stdout
+2. **Spinner refactor**: spinner MUST be cleanly cancelled via the `tokio::select!` structure, not via `AtomicBool` with join-handle race (fixes OD-4)
+3. **Headless output isolation**: when `--headless` or `--json` mode is active, no ANSI escape sequences, no spinner, no raw text printing — only structured JSON output
+4. **Cancellation recovery**: Ctrl-C restores terminal (cursor visible, colors reset, prompt ready) within 250ms
+5. **PTY integration test**: automated test that captures PTY output and verifies answer characters appear before the stream's final event
+
+**Acceptance Gate:**
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+# PTY rendering test
+cargo test -p etta-cli renderer_pty -- --nocapture
+# Headless isolation test: no ANSI in JSON mode
+cargo test -p etta-cli headless_clean_output
+```
+
+---
+
+#### Epic E7: Independent Release Audit & Publication Correction
+
+| Field | Value |
+|---|---|
+| **Task ID** | `ETTA-E7-RELEASE-AUDIT` |
+| **Base SHA** | E6 result commit |
+| **Allowed Paths** | `testscript/performance/evidence/`, `docs/benchmarks/`, `testscript/performance/report.py` |
+| **Dependencies** | ALL prior epics completed |
+| **Budget** | 6 hours wall-clock, 150,000 tokens |
+
+**Deliverables:**
+1. **Full benchmark run** using the E2 harness against the completed implementation:
+   - 100+ turns per product (Etta, AGY, optionally Claude Code) in critical conversational cohorts
+   - Randomized paired run order
+   - Separate warm/cold sessions
+   - All timeouts, quota errors, empty answers, retries, wrong answers retained
+2. **Statistical report** with p50/p95/p99/max for all metrics, confidence intervals, and claim ledger update
+3. **Matched transport comparison**: Same model, effort, prompt, credentials — only transport differs
+4. **Product experience comparison**: Normal defaults for each product — differences documented, not assumed to be transport-only
+5. **Publication correction documents** with updated claims based on real evidence
+6. **Process tree evidence**: Screenshots/logs proving zero provider spawns across 100 ordinary turns
+7. **Memory reporting**: Parent RSS, process-tree summed RSS, shared helper baseline — separate measurement, not conflated
+
+**Acceptance Gate:**
+```bash
+# Generate full benchmark report
+python3 testscript/performance/report.py --evidence-dir testscript/performance/evidence/latest/
+# Verify all release gates pass
+python3 testscript/performance/report.py --check-gates
+# Verify no "UNVERIFIED" claims remain in updated publications
+! grep -r "UNVERIFIED\|UNSUPPORTED\|CONTRADICTED" docs/benchmarks/ --include="*.md" | grep -v "ERRATUM"
+```
+
+**Senior Review Gate:** E7 results are reviewed by BOTH senior reviewers independently. Workers cannot certify their own benchmarks.
+
+---
+
+### 20.7 Release Gate Summary
+
+> [!WARNING]
+> ALL of the following gates must pass before Etta v0.2.0 can make any interactive performance claims. A single gate failure blocks release. There are no waivers.
+
+| # | Gate | Metric | Source |
+|---|---|---|---|
+| G-1 | Truthful failure states | Zero fabricated successes on forced auth/network/truncation failures | I-ETTA-INTEGRITY-01, I-ETTA-INTEGRITY-02 |
+| G-2 | No benchmark shortcuts | Zero input-pattern-based canned responses in production code | I-ETTA-INTEGRITY-01 |
+| G-3 | Usage provenance | All reported usage carries explicit source: `"provider"` or `"estimated"` | I-ETTA-INTEGRITY-03 |
+| G-4 | Tier 1 reflex latency | p95 < 15ms, zero cloud calls | I-ETTA-INTERACTIVE-03 |
+| G-5 | Tier 2 answer TTFT | p95 < 800ms (warm-session conversational cohort) | I-ETTA-INTERACTIVE-01 |
+| G-6 | Acknowledgment latency | p95 ≤ 100ms | I-ETTA-INTERACTIVE-01 |
+| G-7 | Render delay | p95 ≤ 50ms (SSE event to terminal character) | I-ETTA-INTERACTIVE-01 |
+| G-8 | Cancellation recovery | p95 ≤ 250ms (Ctrl-C to usable prompt) | §20.4 |
+| G-9 | Zero provider spawns | 0 child processes per ordinary warm turn across 100 turns | I-ETTA-INTERACTIVE-04 |
+| G-10 | Streaming fidelity | Every multi-event fixture renders answer before final event | I-ETTA-INTERACTIVE-02 |
+| G-11 | UTF-8 safety | Fragmented multi-byte character test passes (no U+FFFD corruption) | I-ETTA-INTERACTIVE-02 |
+| G-12 | Terminal state integrity | Exactly one terminal event per turn; no silent success on error | §20.4 |
+| G-13 | Functional quality | Task completion quality meets predeclared noninferiority margin | I-ETTA-INTERACTIVE-03 |
+| G-14 | Rust checks | `cargo fmt`, `cargo clippy -D warnings`, `cargo test` all pass | Standard |
+
+---
+
+### 20.8 Binding Amendments Ratified by Opus (MA-07 to MA-14)
+
+- **MA-07**: Transport Decision — Direct HTTP/2 SSE via `Arc<reqwest::Client>` on session struct. IPC daemon formally rejected. (Synthesizing Astra §4 + Gemini GA-1)
+- **MA-08**: Buffer Safety — `String::from_utf8_lossy` banned on partial network chunks. `bytes::BytesMut` with newline-delimited splitting mandated before UTF-8 decode. (Ratifying Gemini GA-2)
+- **MA-09**: Cancellation — `tokio::select!` structured concurrency binding SSE stream, spinner, and OS signals. Prompt recovery p95 ≤ 250ms with zero connection leaks. (Ratifying Gemini GA-3)
+- **MA-10**: Credential Refresh — Background async task refreshing token 5 minutes before expiry via `Arc<RwLock<CachedCredential>>`. Hot-path read-lock p99 < 1ms. (Ratifying Gemini GA-4 with tightening)
+- **MA-11**: Adaptive Effort — 3-Tier classification cascade (Reflex < 15ms / Conversation 1,024 thinking tokens / Deep Reasoning 16,384 thinking tokens) with context-aware routing, conservative fallback, and user override supremacy. (Ratifying Gemini GA-5 with constraints)
+- **MA-12**: Timeout Architecture — 4 distinct deadlines (connect, first-event, idle, overall) replacing the catastrophic 5-second overall timeout. Each deadline produces a typed `TurnFailed` event. (New — OD-1)
+- **MA-13**: Wire Model Fidelity — Silent model remapping forbidden. Actual wire model ID logged and displayed to user. (New — OD-2)
+- **MA-14**: Spinner Safety — Spinner cancellation via structured `tokio::select!` instead of `AtomicBool` + join-handle race, preventing terminal corruption under race conditions. (New — OD-4)
+
+---
+
+*Section 20.0 ratified by triple-tier senior review consensus (Tier 0: PROPOSED by `gpt-6-astra` → Round 1: AMEND by `gemini-3.1-pro-high` → Round 2: FINAL_APPROVAL by `claude-opus-4-6-thinking`). Next available section: 21.0.*  
+*MAB-ETTA-002 architectural directive authored and sealed by Claude Opus 4.6 Thinking on 2026-09-19.*
+
