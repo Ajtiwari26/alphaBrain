@@ -6,7 +6,6 @@ Round 2: Claude Opus 4.6 Thinking (Supreme Lead Architect & Arbiter)
 """
 
 import json
-import os
 import subprocess
 import sys
 import tempfile

@@ -788,12 +788,13 @@ class TriageTaskDispatcher:
         prov = leased_task.get("provenance") or {}
         audit = prov.get("audit_history") or []
         for entry in reversed(audit):
-            if entry.get("action") == "task_retried" and entry.get("notes"):
-                retry_notes = entry.get("notes")
-                repair_block = f"\n\n## 🚨 OPERATOR RETRY DIRECTIVES\n{retry_notes}\n"
-                old_inst = env_dict.get("detailed_instructions") or ""
-                env_dict["detailed_instructions"] = old_inst + repair_block
-                break
+            if entry.get("action") in ("task_retried", "senior_repair_queued"):
+                notes = entry.get("notes") or entry.get("repair_directives")
+                if notes:
+                    repair_block = f"\n\n## 🚨 SENIOR REPAIR DIRECTIVES\n{notes}\n"
+                    old_inst = env_dict.get("detailed_instructions") or ""
+                    env_dict["detailed_instructions"] = old_inst + repair_block
+                    break
 
         blueprint_json = leased_task.get("plan_blueprint_json")
         if blueprint_json:
