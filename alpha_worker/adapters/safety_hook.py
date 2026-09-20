@@ -76,6 +76,12 @@ def sandbox_profile(worktree: Path) -> str:
         )
     ]
     runtime.append(Path(sys.prefix).resolve())
+    cargo_home = Path.home() / ".cargo"
+    if cargo_home.is_dir():
+        runtime.append(cargo_home.resolve())
+    rustup_home = Path.home() / ".rustup"
+    if rustup_home.is_dir():
+        runtime.append(rustup_home.resolve())
     git_roots, git_files = _git_read_paths(worktree)
     read_roots = [*runtime, *git_roots]
     # getcwd traverses parent directories on macOS. Directory literals do not
@@ -171,14 +177,18 @@ def decide(payload: Any, worktree: Path) -> dict[str, Any]:
             for directory in (home, temp):
                 directory.mkdir(parents=True, exist_ok=True)
             # Clear inherited credentials and shell startup overrides.
+            cargo_bin = Path.home() / ".cargo" / "bin"
+            extra_path = f":{cargo_bin}" if cargo_bin.is_dir() else ""
             argv = [
                 "/usr/bin/sandbox-exec",
                 "-p",
                 sandbox_profile(worktree),
                 "/usr/bin/env",
                 "-i",
-                f"PATH={Path(sys.prefix) / 'bin'}:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
+                f"PATH={Path(sys.prefix) / 'bin'}:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin{extra_path}",
                 f"HOME={home}",
+                f"RUSTUP_HOME={Path.home() / '.rustup'}",
+                f"CARGO_HOME={Path.home() / '.cargo'}",
                 f"TMPDIR={temp}",
                 f"TEMP={temp}",
                 f"TMP={temp}",

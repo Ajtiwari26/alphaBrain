@@ -940,6 +940,7 @@ class TaskTriageQueue:
         opus_verdict: str,
         approved: bool,
         review_details: dict[str, Any] | None = None,
+        evidence: dict[str, Any] | None = None,
     ) -> bool:
         """
         Records the outcome of the 2-Round Senior Review (Pro + Opus) for a completed task.
@@ -956,6 +957,9 @@ class TaskTriageQueue:
             if not row:
                 return False
             result_data = json.loads(row[0]) if row[0] else {}
+
+            if evidence is not None:
+                result_data["evidence"] = evidence
 
             import hashlib
 

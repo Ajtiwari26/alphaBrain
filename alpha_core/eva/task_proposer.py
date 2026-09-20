@@ -147,18 +147,27 @@ class EvaTaskProposer:
         )
 
         # Construct acceptance gates
-        commands = [
-            GateCommand(
-                gate_type=GateType.UNIT_TEST,
-                executable="pytest",
-                args=["-q"],
-            ),
-            GateCommand(
-                gate_type=GateType.LINT,
-                executable="ruff",
-                args=["check", "."],
-            ),
-        ]
+        if project_id == "etta":
+            commands = [
+                GateCommand(
+                    gate_type=GateType.UNIT_TEST,
+                    executable="cargo",
+                    args=["test", "-p", "etta-cli"],
+                ),
+            ]
+        else:
+            commands = [
+                GateCommand(
+                    gate_type=GateType.UNIT_TEST,
+                    executable="pytest",
+                    args=["-q"],
+                ),
+                GateCommand(
+                    gate_type=GateType.LINT,
+                    executable="ruff",
+                    args=["check", "."],
+                ),
+            ]
         if spec.required_gates:
             for g in spec.required_gates:
                 if isinstance(g, str) and g not in ("unit_test", "lint", "typecheck"):

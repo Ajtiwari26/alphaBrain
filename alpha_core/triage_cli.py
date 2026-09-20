@@ -501,13 +501,14 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
             if getattr(args, "criteria", None)
             else []
         )
+        req_gates = ["unit_test"] if getattr(args, "project_id", None) == "etta" else ["unit_test", "lint"]
         spec = ExtractedSpecification(
             title=prompt_text,
             summary=args.objective,
             requirements=[args.objective],
             acceptance_criteria=criteria,
             allowed_paths=allowed_paths,
-            required_gates=["unit_test", "lint"],
+            required_gates=req_gates,
             confidence_score=0.99,
             is_actionable=True,
         )
@@ -533,7 +534,8 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     from alpha_core.eva.task_proposer import EvaTaskProposer
     from alpha_core.queue.triage_queue import TaskProvenance, TriageStatus
 
-    repo = str(Path.cwd().resolve())
+    repo_candidate = getattr(args, "repo", None)
+    repo = str(Path(repo_candidate).resolve()) if repo_candidate else str(Path.cwd().resolve())
     proposer = EvaTaskProposer()
     import subprocess
 
@@ -1384,6 +1386,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional comma-separated acceptance criteria",
     )
     p_admit.add_argument("--depends-on", help="Optional comma-separated list of dependent task IDs")
+    p_admit.add_argument("--repo", default=None, help="Target repository directory path")
     p_admit.add_argument("--project-id", default="alphabrain_dogfood", help="Project ID")
     p_admit.add_argument("--json", action="store_true", help="Output JSON format")
 

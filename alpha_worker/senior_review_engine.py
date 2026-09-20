@@ -838,6 +838,7 @@ Review Instructions:
             opus_verdict=opus_verdict,
             approved=unanimous,
             review_details=verdict.to_dict(),
+            evidence=evidence,
         )
 
         # If repairs required, automatically transition back to APPROVED with senior directives
