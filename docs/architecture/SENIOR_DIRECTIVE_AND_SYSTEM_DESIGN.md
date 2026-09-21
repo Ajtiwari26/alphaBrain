@@ -5989,3 +5989,461 @@ Any proposed modification to these invariants requires a new Round 2 Senior Revi
 
 *— Opus, Round 2 Synthesis · § 21.0 Complete · 2026-09-20T16:51+05:30*
 
+---
+
+# § 22.0 — Senior Architectural Directive: JEV Reflex-Governor Closed-Loop, Semantic Tool Interception & MVCC Concurrency Resolution
+
+**Round 2 · Senior Synthesis — Opus (Claude Opus 4.6 Thinking)**
+**Date:** 2026-09-21
+**Classification:** Binding Architectural Directive — ETTA Core & AlphaBrain Runtime
+**Supersedes:** All prior informal proposals regarding "Semantic Tools," reflex repair loops, and MVCC locking strategy.
+**Predecessor:** § 21.0 (JEV Adaptive Governor & Dynamic Test-Time Compute Allocation)
+
+---
+
+## 22.1 — Empirical Showdown: Findings & Structural Diagnosis
+
+The unrestricted head-to-head showdown between ETTA and AGY across two ultra-hard software engineering challenges produced empirical evidence that is too precise to ignore. I will now synthesize the systemic failure modes into architectural corrective actions.
+
+### 22.1.1 — Challenge 1: Python AST Non-Commutative Power Distribution
+
+| Dimension | AGY | ETTA |
+|-----------|-----|------|
+| Score | 9/10 | 2/10 |
+| Latency | 300.0s | 24.04s |
+| Token consumption | ~65,000 | 4,828 |
+| Interactive tool calls | 17 | 0 |
+| Root cause of failure | 1 edge case | Single-token hallucination |
+
+**ETTA's failure was a single-token hallucination:** `if is_commutative(factor):` — calling `is_commutative` as a standalone function — instead of the correct `getattr(factor, 'is_commutative', True)`. The error is catastrophic because `is_commutative` is an *object attribute* on `Expr`, not a module-level function. The resulting `NameError: name 'is_commutative' is not defined` cascaded to 8/10 failing tests.
+
+**Diagnosis:** This is not a reasoning failure — ETTA's algorithmic approach was structurally correct. This is a **verification absence failure**. ETTA operated in blind single-pass mode without any runtime verification. AGY, by contrast, executed 5 separate `python3 -c` REPL probes that would have caught the `NameError` within seconds.
+
+**Architectural implication:** ETTA requires a **closed-loop reflex feedback path** that intercepts compiler/runtime faults (specifically `NameError`, `TypeError`, `AttributeError` at the language level) and routes them through a deterministic repair decision tree *before* any model re-invocation. The `is_commutative` error is a **zero-token heuristic auto-repair candidate**: the diagnostic `NameError: name 'is_commutative' is not defined` combined with the AST context `if is_commutative(factor)` where `factor` is typed as `Expr` unambiguously resolves to `getattr(factor, 'is_commutative', True)`. No model call needed.
+
+### 22.1.2 — Challenge 2: Rust MVCC 3-Way Deadlock
+
+Both ETTA and AGY correctly identified and fixed the *obvious* 2-way lock inversion between `commit()` and `garbage_collect()` — synchronizing both to acquire `active_txs` before `index`. However, both missed the *hidden* 3-way deadlock involving `get()`:
+
+```
+Thread A (commit):      active_txs.write() → index.write()
+Thread B (gc):          active_txs.write() → index.write()
+Thread C (get/reader):  index.read()       → active_txs.read()
+                        ↑                     ↑
+                        DEADLOCK: C holds index.read(), blocks A/B's index.write()
+                                  A/B hold active_txs.write(), blocks C's active_txs.read()
+```
+
+Under `parking_lot::RwLock`'s writer-preference policy, 16 concurrent readers and 16 writers on the same lock pair create a classic **read-write priority inversion deadlock** detectable only under adversarial concurrency.
+
+**Diagnosis:** Both systems applied a *local* fix (ordering `commit` and `gc`) without verifying the *global* lock acquisition order across **all methods** that touch the same lock pair. This is a **semantic verification scope failure** — the repair was correct within the method boundary but incorrect at the module boundary.
+
+**Architectural implication:** ETTA's verification harness must enforce a **global monotonic lock hierarchy** as a compile-time or static-analysis invariant, not merely as a per-method code review concern.
+
+---
+
+## 22.2 — Cross-Examination of Gemini Round 1 Audit
+
+Gemini Pro's Round 1 audit proposed three concrete mechanisms: (1) migrating from raw OS-level shell commands to native "Semantic Tools" (`AstProbe`, `MicroTestHarness`, `SurgicalPatcher`), (2) JEV as a closed-loop reflex governor, and (3) wait-free MVCC via `ArcSwap` or strict global lock hierarchy. I now evaluate each.
+
+### 22.2.1 — What Gemini Got Right
+
+| # | Proposal | Verdict |
+|---|----------|---------|
+| G2-✓ | Shell-command tool calls are token-expensive and non-semantic | **Agreed.** The existing `etta-language` crate (`diagnostic.rs`, `patch.rs`) already provides `RustcDiagnosticAdapter` and `StructuralDiffParser` — the substrate for native semantic interception. Gemini correctly identified the *need*; the *implementation* already partially exists but is disconnected from the ReAct loop. |
+| G2-✓ | JEV must govern the repair loop, not simple counters | **Agreed.** The current `ReActEngine.repair_counter < max_repairs` gating in `react.rs` (lines 377-387) is a degenerate boolean gate with no value-theoretic foundation. The `JevGovernor` in `etta-policy/governor.rs` implements the correct decision function but is not wired into the ReAct state machine. |
+| G2-✓ | The MVCC `get()` method violates global lock ordering | **Agreed.** This was the precise root cause of the 3-way deadlock in Challenge 2. |
+| G2-✓ | Delta-repair prompts must be bounded (<350 tokens) | **Agreed and strengthened.** The existing `DeltaRepairPacket::build_zero_context_payload()` already enforces <400 tokens with Zero-Context Shrinking. I accept the bound but lower it to **<350 tokens** for repair prompts specifically dispatched from the reflex governor (vs. the general 400-token ceiling for standalone packets). |
+
+### 22.2.2 — What Gemini Got Wrong or Left Incomplete
+
+**Deficiency G2-D1: The "Semantic Tools" Abstraction Is Over-Specified and Under-Grounded.**
+
+Gemini proposed three new tool types (`AstProbe`, `MicroTestHarness`, `SurgicalPatcher`) as first-class tool definitions registered in the tool router. This is architecturally wrong for two reasons:
+
+1. **These are not tools — they are interceptors.** A tool is an operation the model *requests*. An interceptor is an operation the *runtime* applies *before* the model sees the result. The `RustcDiagnosticAdapter` should not be a tool the model calls; it should be a **diagnostic interceptor** that the `ReActEngine` applies to *every* `ToolExecution → Observation` transition when the tool is a compiler/test-runner. The model should never need to "decide" to parse compiler output — that decision has zero information content and wastes a model call.
+
+2. **The `SurgicalPatcher` is already implemented** as `StructuralDiffParser` in `etta-language/patch.rs`. Renaming it and re-registering it as a tool adds indirection without architectural benefit.
+
+**Correction:** Instead of "Semantic Tools," ETTA implements **Semantic Interceptors** — stateless, zero-token transformation functions injected into the `ToolExecution → Observation` edge of the ReAct state machine. They operate *beneath* the model's awareness, not as model-invocable tools.
+
+**Deficiency G2-D2: Wait-Free MVCC via `ArcSwap` Is Correct but Incomplete.**
+
+Gemini proposed `ArcSwap<HashMap<K, Vec<Version>>>` for the index and a concurrent lock-free set for `active_txs`. This eliminates the RwLock deadlock but introduces two new concerns Gemini did not address:
+
+1. **Memory pressure under high-frequency snapshot readers.** `ArcSwap` clones the entire index `Arc` on every `store()`. Under 16 concurrent writers, each committing to a large index, this creates O(n × w) Arc reference counting overhead where n = index size and w = write throughput.
+
+2. **Garbage collection linearizability.** If GC reads a stale `ArcSwap` snapshot while a concurrent commit is mid-flight, it may incorrectly identify live versions as garbage. Gemini's proposal did not specify the linearization point between commit and GC.
+
+**Correction:** Section 22.5 specifies the definitive locking protocol that eliminates the 3-way deadlock using a strict global lock hierarchy *without* requiring wait-free data structures, preserving `parking_lot::RwLock` for its mature ecosystem support and lower implementation risk.
+
+**Deficiency G2-D3: Gemini Did Not Formalize the Decision Tiers.**
+
+Gemini stated that JEV should "decide between auto-repair and re-generation" but provided no formal criteria for when each path activates. Without a formalized decision tree, the implementation will devolve into ad-hoc conditionals. Section 22.4 provides the complete decision tree.
+
+---
+
+## 22.3 — Semantic Interceptor Architecture
+
+### 22.3.1 — Interceptor Definition
+
+A **Semantic Interceptor** is a pure function:
+
+```
+I: (ToolOutput, ToolKind) → InterceptResult
+```
+
+where:
+
+```rust
+pub enum InterceptResult {
+    /// Output is clean; pass through to Observation as-is.
+    PassThrough(ArtifactRef),
+
+    /// Output contains diagnosable faults. Provides structured diagnostics
+    /// and, optionally, a zero-token heuristic repair patch.
+    Intercepted {
+        diagnostics: Vec<Diagnostic>,
+        heuristic_patch: Option<StructuralPatch>,
+        severity: InterceptSeverity,
+    },
+}
+
+pub enum InterceptSeverity {
+    /// Fatal: execution cannot continue (e.g., compilation crash, OOM).
+    Fatal,
+    /// Error: test failures or compiler errors; potentially repairable.
+    Error,
+    /// Warning: non-fatal; proceed but log for telemetry.
+    Warning,
+}
+```
+
+### 22.3.2 — Interceptor Registry
+
+The interceptor registry maps `ToolKind` discriminants to interceptor chains:
+
+| ToolKind | Interceptor Chain |
+|----------|-------------------|
+| `RustCompiler` | `RustcDiagnosticAdapter` → `HeuristicRepairMatcher` |
+| `PythonExecutor` | `PythonTracebackParser` → `HeuristicRepairMatcher` |
+| `TestRunner` | `TestResultParser` → `OracleVerifier` |
+| `ShellCommand` | `ExitCodeInterceptor` (pass-through on exit 0) |
+
+The `HeuristicRepairMatcher` is the zero-token auto-repair engine that matches known diagnostic patterns to deterministic AST transformations. See § 22.4.1 for the pattern catalog.
+
+### 22.3.3 — Integration Point in ReActEngine
+
+The interceptor fires at the `ToolExecution → Observation` transition in `react.rs`. The modified state machine edge becomes:
+
+```
+ToolExecution { operation }
+    │
+    ├─ tool_router.dispatch(operation, call, context) → raw_output
+    │
+    ├─ interceptor_registry.intercept(raw_output, tool_kind) → InterceptResult
+    │
+    ├─ InterceptResult::PassThrough(artifact)
+    │       → Observation { artifact }                    [existing path]
+    │
+    ├─ InterceptResult::Intercepted { heuristic_patch: Some(patch), .. }
+    │       → apply_patch(source, patch)
+    │       → re-execute tool with patched source         [ZERO-TOKEN REPAIR]
+    │       → Observation { patched_artifact }
+    │
+    └─ InterceptResult::Intercepted { heuristic_patch: None, severity: Error, .. }
+            → JevGovernor.evaluate_repair_decision(diagnostics)
+            → ReflectRepair { attempt }                   [BOUNDED DELTA-REPAIR]
+            OR
+            → Termination { reason: Failed }              [BUDGET EXHAUSTED]
+```
+
+**Key property:** The zero-token heuristic repair path (`heuristic_patch: Some`) **never invokes the model**. It applies a deterministic AST patch, re-executes the tool, and returns the result to `Observation`. This is the path that would have fixed ETTA's `is_commutative` hallucination in Challenge 1 at zero additional token cost.
+
+---
+
+## 22.4 — JEV Reflex-Governor Closed-Loop Decision Tree
+
+The JEV Reflex-Governor is the decision function that governs the repair loop. It operates at three tiers, evaluated in strict priority order:
+
+### 22.4.1 — Tier 0: Deterministic Zero-Token Heuristic Auto-Repair
+
+**Activation condition:** The `HeuristicRepairMatcher` identifies a diagnostic that matches a known pattern in the **Heuristic Repair Catalog**.
+
+**Decision:** Apply the deterministic patch. No model call. No token cost. No transcript entry.
+
+**Heuristic Repair Catalog (initial entries):**
+
+| Pattern ID | Diagnostic Signature | AST Context | Repair Action |
+|-----------|---------------------|-------------|---------------|
+| `HR-001` | `NameError: name 'X' is not defined` | `X` appears as function call `X(obj)` where `obj` has attribute `.X` | Rewrite `X(obj)` → `getattr(obj, 'X', <default>)` |
+| `HR-002` | `AttributeError: 'Y' has no attribute 'Z'` | Import statement present for module `Y` | Suggest qualified import `from Y.Z import Z` |
+| `HR-003` | `TypeError: 'NoneType' is not subscriptable` | Variable assigned from function with conditional return | Insert null guard `if var is not None:` |
+| `HR-004` | `E0308: mismatched types` (Rust) | `expected &str, found String` or vice versa | Insert `.as_str()` or `.to_string()` |
+| `HR-005` | `E0502: cannot borrow as mutable` (Rust) | Immutable borrow in scope of mutable borrow | Clone the immutable reference or restructure scope |
+| `HR-006` | `E0433: failed to resolve: use of undeclared crate` (Rust) | Missing `use` statement | Insert `use` from workspace `Cargo.toml` dependencies |
+
+**Bounded guarantee:** Each heuristic repair is applied **at most once** per diagnostic fingerprint per execution. If the repair does not resolve the diagnostic (same fingerprint persists after re-execution), the system falls through to Tier 1.
+
+**Convergence proof:** Since each repair is applied at most once per fingerprint, and the fingerprint space is bounded by the size of the diagnostic output, the Tier 0 loop terminates in at most `|D|` iterations where `|D|` is the number of distinct diagnostics.
+
+### 22.4.2 — Tier 1: Bounded Delta-Repair Prompt (<350 Tokens)
+
+**Activation condition:** The interceptor produces diagnostics that do NOT match any Tier 0 heuristic, AND `JevGovernor.evaluate_repair_budget(failure_count, remaining_task_tokens).should_repair == true`.
+
+**Decision:** Construct a `DeltaRepairPacket` from the diagnostic data and dispatch it to the model as a **bounded delta-repair prompt** with the following constraints:
+
+1. **Token ceiling:** The prompt (including the `DeltaRepairPacket` payload) MUST NOT exceed **350 tokens**. This is enforced by `DeltaRepairPacket::shrink_context(350)`.
+
+2. **Zero-context isolation:** The repair prompt MUST NOT contain any prior conversation history, system prompt fragments, or multi-turn markers. This is enforced by `DeltaRepairPacket::is_zero_context_compliant()`.
+
+3. **Structural content:** The repair prompt contains EXACTLY:
+   - `FAILING INPUT:` — the test case or input that triggered the failure
+   - `EXPECTED:` — the expected output or behavior
+   - `ACTUAL:` — the actual output or error
+   - `ERROR:` — the last N lines of the stack trace / error message (prioritizing exception message)
+   - `CODE:` — the relevant code snippet (the function or block being repaired)
+
+4. **Model response constraint:** The model response to a delta-repair prompt is interpreted as a **structural patch** (not free-form text). The response MUST parse as a valid code block or diff; if it does not, the repair attempt is counted as failed.
+
+### 22.4.3 — Tier 2: Full Re-Generation
+
+**Activation condition:** Either (a) `JevGovernor.evaluate_repair_budget()` returns `should_repair == false` (repair budget exhausted), OR (b) repair attempt count has reached the tier's `max_repairs` limit.
+
+**Decision:** The system does NOT re-generate. It terminates with `StopReason::Failed` and emits a structured diagnostic artifact containing:
+- All diagnostic fingerprints encountered
+- All repair attempts made and their outcomes
+- The remaining budget at termination
+- The `JevGovernorDiagnostic` explaining why repair was denied
+
+**Rationale for no full re-generation:** Full re-generation is a pathological token sink. If two bounded delta-repair attempts (each <350 tokens) could not fix the issue, a full re-generation (potentially 5,000–15,000 tokens) is unlikely to succeed and will consume budget that should be reserved for subsequent task nodes per INV-ETTA-25 (Budget Conservation Law). The correct response is **graceful degradation**: emit the best partial result and continue the DAG.
+
+### 22.4.4 — Formal State Machine: ReActEngine ↔ JevGovernor ↔ Interceptor
+
+The complete state machine transitions for the reflex loop are:
+
+```
+                    ┌─────────────────────────────────────────────────────────┐
+                    │                    ReActEngine                          │
+                    │                                                         │
+  Init ──→ Thought ──→ ActionCall ──→ ToolExecution ──→ [INTERCEPTOR] ──→ ?  │
+                                                              │               │
+                                           ┌──────────────────┼───────────────┤
+                                           │                  │               │
+                                     PassThrough         Intercepted          │
+                                           │            ┌─────┴──────┐        │
+                                           ▼            │            │        │
+                                      Observation   Has Tier 0   No Tier 0   │
+                                           │         Heuristic    Heuristic   │
+                                           │            │            │        │
+                                           │            ▼            ▼        │
+                                           │     Apply Patch   JevGovernor   │
+                                           │     Re-Execute    .evaluate()   │
+                                           │         │         ┌────┴────┐   │
+                                           │         ▼      Approved  Denied │
+                                           │    Observation     │        │   │
+                                           │         │          ▼        ▼   │
+                                           │         │   ReflectRepair  Term │
+                                           │         │     (Tier 1)    Failed│
+                                           │         │          │            │
+                                           ▼         ▼          ▼            │
+                                     [continue normal ReAct loop]            │
+                                                                             │
+                    └─────────────────────────────────────────────────────────┘
+```
+
+**State transitions formalized in `react.rs` terms:**
+
+```
+(ToolExecution, InterceptResult::PassThrough)        → Observation
+(ToolExecution, InterceptResult::Intercepted + HR)   → [apply patch, re-execute] → Observation
+(ToolExecution, InterceptResult::Intercepted + !HR)  → JevGovernor.evaluate()
+(JevGovernor, RepairDecision::approved)              → ReflectRepair { attempt }
+(JevGovernor, RepairDecision::denied)                → Termination { Failed }
+(ReflectRepair, delta-repair success)                → Observation
+(ReflectRepair, delta-repair failure)                → JevGovernor.evaluate() [re-entry]
+```
+
+---
+
+## 22.5 — MVCC Concurrency Resolution: Definitive Locking Protocol
+
+### 22.5.1 — The 3-Way Deadlock Root Cause (Formal)
+
+Let `L_a` = `active_txs` lock and `L_i` = `index` lock. Define the lock acquisition graph:
+
+```
+commit():            L_a.write() → L_i.write()     (order: a < i)
+garbage_collect():   L_a.write() → L_i.write()     (order: a < i)
+get(&snap, &key):    L_i.read()  → L_a.read()      (order: i < a)  ← VIOLATION
+```
+
+The `get()` method acquires locks in reverse order `(i, a)` compared to `commit()/gc()` which acquire `(a, i)`. Under `parking_lot::RwLock`'s writer-preference policy, this creates a cycle:
+
+1. Thread A holds `L_a.write()`, wants `L_i.write()`.
+2. Thread C holds `L_i.read()`, wants `L_a.read()`.
+3. Thread A cannot acquire `L_i.write()` because Thread C holds `L_i.read()`.
+4. Thread C cannot acquire `L_a.read()` because Thread A holds `L_a.write()` (writer-preference blocks new readers).
+5. **Deadlock.**
+
+### 22.5.2 — Resolution: Strict Global Monotonic Lock Hierarchy
+
+**Rule:** Every method in `MvccEngine` that acquires multiple locks MUST acquire them in the **canonical order: `L_a` (active_txs) before `L_i` (index)`**. No exceptions. No conditional lock ordering.
+
+The fix for `get()` is to restructure it to acquire `L_a.read()` FIRST, then `L_i.read()`:
+
+```rust
+pub fn get(&self, snap: &Snapshot, key: &K) -> Option<V> {
+    // INVARIANT INV-ETTA-31: Always acquire active_txs before index.
+    let active = self.active_txs.read();    // L_a.read() — FIRST
+    let index = self.index.read();          // L_i.read() — SECOND
+
+    let versions = index.get(key)?;
+    for version in versions.iter().rev() {
+        if version.commit_id <= snap.read_ts
+            && version.status == VersionStatus::Committed
+            && !active.contains(&version.tx_id)
+        {
+            return Some(version.value.clone());
+        }
+    }
+    None
+}
+```
+
+**Why this is correct:**
+
+1. **No deadlock:** All three methods now acquire `L_a` before `L_i`. The lock acquisition graph is acyclic.
+
+2. **Snapshot isolation preserved:** `get()` reads `active_txs` first to capture the set of in-flight transactions, then reads `index` to find visible versions. Since `active_txs` is acquired before `index`, any transaction that commits *after* `get()` reads `active_txs` will have its `commit_id` set atomically before its version becomes visible in `index`. The snapshot sees a consistent view.
+
+3. **Reader contention:** Under the new ordering, readers (`get`) acquire `L_a.read()` first. Since `commit()/gc()` acquire `L_a.write()`, readers will block while a commit or GC is in progress. This is the correct behavior — a snapshot reader should not observe a partial commit.
+
+4. **Performance:** The lock hold times remain bounded. `get()` holds both locks for the duration of a version scan (O(v) where v = number of versions for the key). Under typical workloads (v < 100), this is sub-microsecond.
+
+### 22.5.3 — Why ArcSwap Was Rejected
+
+While `ArcSwap` eliminates the RwLock deadlock, it introduces:
+
+1. **Unbounded memory amplification:** Each `ArcSwap::store()` on the index clones the `Arc`, and readers may hold arbitrarily old snapshots. Under 16 writers with a 10,000-entry index, peak memory consumption is O(16 × 10,000) = 160,000 version entries simultaneously live.
+
+2. **GC linearization complexity:** The garbage collector must reason about which versions are reachable from *any* outstanding `Arc` snapshot. With `parking_lot::RwLock`, the GC can simply acquire `L_a.write()` to freeze the transaction set; with `ArcSwap`, there is no single linearization point.
+
+3. **Implementation risk:** `ArcSwap` is an excellent library but introduces a fundamentally different concurrency model that would require rewriting the entire `MvccEngine`. The global lock hierarchy fix requires changing **6 lines of code** in `get()`.
+
+The engineering decision is unambiguous: **strict lock hierarchy, not ArcSwap.**
+
+---
+
+## 22.6 — Implementation Directives
+
+### 22.6.1 — Wiring the Interceptor into ReActEngine
+
+The `ReActEngine` in `crates/etta-runtime/src/react.rs` must be extended with:
+
+1. A new field `interceptor_registry: Option<Arc<dyn InterceptorRegistry>>` on `ReActEngine`.
+2. Modification to the `LoopPhase::ToolExecution` match arm (lines 334–371) to invoke `interceptor_registry.intercept()` before transitioning to `Observation`.
+3. A new `LoopPhase` variant is NOT required — the interceptor operates *within* the `ToolExecution → Observation` transition, not as a separate phase. This preserves the existing state machine topology.
+
+### 22.6.2 — Wiring JevGovernor into ReActEngine
+
+The `ReActEngine` must replace the degenerate `repair_counter < max_repairs` gating (lines 377-387, 428-444) with:
+
+1. A new field `jev_governor: Option<JevGovernor>` on `ReActEngine`.
+2. In the `Observation` match arm, when diagnostics are present and no heuristic repair is available, invoke `jev_governor.evaluate_repair_budget(failure_count, remaining_tokens)` to obtain a `RepairDecision`.
+3. If `RepairDecision::approved`, transition to `ReflectRepair` with the allocated token ceiling.
+4. If `RepairDecision::denied`, transition to `Termination { Failed }`.
+
+### 22.6.3 — HeuristicRepairMatcher Location
+
+The `HeuristicRepairMatcher` should be implemented as a new module `crates/etta-language/src/heuristic.rs` that:
+
+1. Takes a `Vec<Diagnostic>` and the current source text.
+2. Matches diagnostic fingerprints against the Heuristic Repair Catalog (§ 22.4.1).
+3. Returns `Option<StructuralPatch>` — the deterministic repair patch if a match is found.
+4. Delegates patch application to the existing `StructuralDiffParser` in `patch.rs`.
+
+---
+
+## 22.7 — Binding Invariants
+
+The following invariants are **binding on all ETTA and AlphaBrain implementations** from this directive forward. Violation of any invariant constitutes a **P0 architectural defect** requiring immediate remediation.
+
+---
+
+### INV-ETTA-29: Semantic Interceptor Interposition & Zero-Transcript Verification
+
+> **Statement:** Every `ToolExecution → Observation` transition in the `ReActEngine` where the tool's `ToolKind` has a registered interceptor chain MUST pass the raw tool output through the interceptor chain BEFORE the model observes the output. The interceptor chain operates as a **pure function** — it MUST NOT perform I/O, allocate unbounded memory, or invoke the model. Interceptor execution time MUST NOT exceed **5ms** for any single interceptor invocation (enforced by a timeout wrapper that falls through to `PassThrough` on deadline).
+>
+> When a Tier 0 heuristic repair patch is available, the `ReActEngine` MUST apply the patch and re-execute the tool **without emitting any model call or transcript entry**. This is a "zero-transcript verification" — the model never learns that an error occurred and was fixed, preserving context window budget.
+>
+> **Verification criterion:** The interceptor chain MUST be exercised by at least one property-based test per registered `ToolKind` in CI. The test MUST verify that (a) `PassThrough` is returned for clean outputs, (b) `Intercepted` is returned for outputs containing known diagnostic patterns, and (c) no interceptor invocation exceeds the 5ms deadline.
+>
+> **Rationale:** The empirical showdown demonstrated that ETTA's single-pass blind mode is the dominant failure mode. The interceptor is the minimal architectural addition that closes the verification gap without requiring model calls or additional token consumption. By operating beneath the model's awareness, interceptors preserve the context window for genuinely novel reasoning rather than wasting it on diagnosing known error patterns.
+
+---
+
+### INV-ETTA-30: JEV Reflex-Governor Closed-Loop Bounded Delta-Repair (<350 Tokens)
+
+> **Statement:** The `ReActEngine` MUST NOT transition from `Observation` to `ReflectRepair` without first consulting the `JevGovernor.evaluate_repair_budget()` decision function. The following conditions MUST hold:
+>
+> 1. **Budget gate:** A repair attempt is permitted ONLY if `evaluate_repair_budget(failure_count, remaining_task_tokens).should_repair == true`. The degenerate `repair_counter < max_repairs` condition currently in `react.rs` is **deprecated and MUST be replaced**.
+>
+> 2. **Token ceiling:** Every delta-repair prompt dispatched to the model MUST satisfy `DeltaRepairPacket::estimate_tokens(payload) < 350`. Any prompt exceeding 350 tokens MUST be rejected and the repair attempt counted as failed.
+>
+> 3. **Zero-context compliance:** Every delta-repair prompt MUST satisfy `DeltaRepairPacket::is_zero_context_compliant() == true`. Prompts containing conversation history markers (`User:`, `Assistant:`, `<|im_start|>`, etc.) MUST be rejected.
+>
+> 4. **Re-generation prohibition:** The `ReActEngine` MUST NOT perform "full re-generation" (re-sending the entire original prompt with accumulated context) as a repair strategy. If the `JevGovernor` denies repair, the correct response is `Termination { Failed }` with a structured `JevGovernorDiagnostic`, NOT a retry with more tokens.
+>
+> 5. **Telemetry:** Every repair decision (approved or denied) MUST emit a `GovernorDecisionRecord` to the `etta.governor.decisions` telemetry stream per INV-ETTA-27.
+>
+> **Rationale:** The JEV Governor's repair budget is derived from the global budget conservation law (INV-ETTA-25). Bypassing it with ad-hoc repair counters creates an unaccounted token sink that violates conservation. The 350-token ceiling ensures that repair attempts are bounded, composable, and cheap — a single repair attempt costs less than 1% of a typical task budget (35,000 tokens). The zero-context compliance rule prevents the repair prompt from smuggling in stale conversation state that could mislead the model.
+
+---
+
+### INV-ETTA-31: Global Monotonic Lock Hierarchy & Reader Isolation
+
+> **Statement:** In any concurrent data structure within the ETTA runtime that acquires multiple locks (including but not limited to `MvccEngine`), the following MUST hold:
+>
+> 1. **Canonical lock ordering:** All locks MUST be assigned a **static rank** at compile time (e.g., via a `const LOCK_RANK: u32` associated with each lock). Every method that acquires more than one lock MUST acquire them in **strictly ascending rank order**. Acquiring a lock with rank `r_j` while holding a lock with rank `r_k ≥ r_j` is a **P0 defect**.
+>
+> 2. **For `MvccEngine` specifically:** The canonical ordering is:
+>    ```
+>    Rank 1: active_txs (L_a)
+>    Rank 2: index      (L_i)
+>    ```
+>    All methods — `begin()`, `commit()`, `get()`, `garbage_collect()` — that acquire both locks MUST acquire `active_txs` (rank 1) before `index` (rank 2).
+>
+> 3. **Static verification:** The lock ordering MUST be verified by either (a) a `#[cfg(test)]` compile-time assertion using a lock-order checker crate (e.g., `tracing-mutex`, `lock_order`), or (b) a dedicated integration test that spawns N writer threads, N reader threads, and M GC threads (with N ≥ 16, M ≥ 4) and asserts no deadlock within a 6-second timeout.
+>
+> 4. **No conditional lock ordering:** Lock acquisition order MUST NOT depend on runtime conditions (e.g., `if condition { lock A then B } else { lock B then A }`). Every code path through a method MUST acquire locks in the same canonical order.
+>
+> **Rationale:** The empirical showdown Challenge 2 demonstrated that both ETTA and AGY failed to detect a 3-way lock inversion across method boundaries. The root cause was that `get()` acquired locks in reverse order `(index, active_txs)` compared to `commit()` and `garbage_collect()` which acquired `(active_txs, index)`. A global monotonic lock hierarchy eliminates this entire class of concurrency defects by construction. The static verification requirement ensures that future modifications to any method that touches these locks cannot silently introduce a new lock ordering violation.
+
+---
+
+## 22.8 — Summary of Architectural Decisions
+
+| Decision | Chosen Approach | Rejected Alternative | Rationale |
+|----------|----------------|---------------------|-----------|
+| Compiler output processing | Semantic Interceptors (zero-token, stateless) | "Semantic Tools" (model-invocable) | Interceptors operate beneath model awareness; tools waste a model call on zero-information decisions |
+| Heuristic auto-repair | Deterministic pattern matching (Tier 0) | Model-based repair for all errors | The `is_commutative` error class is deterministically resolvable; model calls for known patterns waste tokens |
+| Repair prompt format | DeltaRepairPacket (<350 tokens, zero-context) | Full-context re-prompting | Bounded, composable, cheap; prevents context window pollution |
+| Full re-generation | Prohibited; graceful degradation | Allowed as fallback | Token sink with negative expected value after two failed delta-repairs |
+| MVCC concurrency | Strict global lock hierarchy (parking_lot) | ArcSwap wait-free | 6-line fix vs. full rewrite; no memory amplification; deterministic linearization |
+| Lock ordering verification | Static rank + adversarial integration test | Code review only | Code review missed the 3-way deadlock in the showdown; static checks catch it by construction |
+
+---
+
+## 22.9 — Directive Authority
+
+This section (§ 22.0) is issued under Round 2 Senior Architectural Synthesis authority by Claude Opus 4.6 Thinking. All three invariants (INV-ETTA-29 through INV-ETTA-31) are **immediately binding**. Implementation teams MUST NOT ship any ETTA or AlphaBrain release that violates these invariants. Compliance verification MUST be included in the CI gate as automated tests.
+
+These invariants are **additive** to INV-ETTA-25 through INV-ETTA-28 from § 21.0. The complete invariant set for the ETTA runtime is now INV-ETTA-01 through INV-ETTA-31.
+
+Any proposed modification to these invariants requires a new Senior Review with explicit Opus sign-off.
+
+---
+
+*— Opus (Claude Opus 4.6 Thinking), Round 2 Synthesis · § 22.0 Complete · 2026-09-21T18:15+05:30*
+
