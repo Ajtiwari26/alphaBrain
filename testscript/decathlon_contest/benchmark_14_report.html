@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Empirical 14-Problem Benchmark: ETTA vs. AGY</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 10mm 10mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    background: #ffffff;
+    font-size: 8pt;
+    line-height: 1.35;
+  }
+  .page {
+    page-break-after: always;
+    padding: 2px 0;
+  }
+  .page:last-child {
+    page-break-after: avoid;
+  }
+  .header {
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .header h1 {
+    font-size: 16pt;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.4px;
+  }
+  .header .subtitle {
+    font-size: 9pt;
+    color: #475569;
+    font-weight: 500;
+    margin-top: 2px;
+  }
+  .header .meta {
+    text-align: right;
+    font-size: 7pt;
+    color: #64748b;
+  }
+  h2 {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 10px 0 6px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .metric-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+  }
+  .metric-card .title {
+    font-size: 6.5pt;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .metric-card .value {
+    font-size: 13pt;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 2px 0;
+  }
+  .metric-card .delta {
+    font-size: 6.8pt;
+    font-weight: 600;
+  }
+  .text-emerald { color: #059669; }
+  .text-blue { color: #2563eb; }
+  .text-purple { color: #7c3aed; }
+  .text-accent { color: #0284c7; }
+  .text-muted { color: #64748b; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.2pt;
+    margin-bottom: 10px;
+  }
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 5px 6px;
+  }
+  th.center, td.center { text-align: center; }
+  th.right, td.right { text-align: right; }
+  td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  .badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 6pt;
+    font-weight: 700;
+  }
+  .badge-tie { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .badge-etta { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+  .badge-agy { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+  .callout {
+    background: #f1f5f9;
+    border-left: 3px solid #2563eb;
+    padding: 6px 10px;
+    margin: 8px 0;
+    font-size: 7.2pt;
+    border-radius: 0 4px 4px 0;
+  }
+  .problem-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    page-break-inside: avoid;
+    overflow: hidden;
+  }
+  .card-header {
+    background: #f8fafc;
+    padding: 5px 8px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card-badge {
+    background: #0f172a;
+    color: #fff;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 6pt;
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .card-title { font-weight: 700; font-size: 7.8pt; color: #0f172a; }
+  .card-cat { font-size: 6.8pt; color: #64748b; margin-left: 4px; }
+  .score-pill {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 6.5pt;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  .score-etta { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+  .score-agy { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+  .card-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  .col-title {
+    font-size: 6.5pt;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .case-item {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 6pt;
+    padding: 1px 3px;
+    border-radius: 2px;
+    margin-bottom: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .case-pass { background: #f0fdf4; color: #166534; }
+  .case-fail { background: #fef2f2; color: #991b1b; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: COVER & EXECUTIVE SUMMARY -->
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Autonomous Agent 14-Problem Benchmark Report</h1>
+      <div class="subtitle">ETTA (Rust-Native Reflex + JEV Verifier) vs. AGY (Multi-Turn Coding Agent)</div>
+    </div>
+    <div class="meta">
+      <div><strong>Benchmark Suite:</strong> 14 Contest-Level Challenges</div>
+      <div><strong>Evaluator:</strong> 173 Blind Ground-Truth Edge Cases</div>
+      <div><strong>Architecture:</strong> Rust Framing + Local Sandbox Verifier</div>
+      <div><strong>Date:</strong> September 21, 2026</div>
+    </div>
+  </div>
+
+  <h2>Executive Summary</h2>
+  <p style="margin-bottom: 8px;">
+    Following the deployment and merge of the 4 autonomous worker epics (ETTA-E11 Framing Delivery Protocol, ETTA-E12 Subprocess Sandbox, 
+    ETTA-E13 Local Oracle Verifier, and ETTA-E14 JEV Bounded Delta-Repair Governor), this empirical benchmark evaluates the updated 
+    <strong>ETTA</strong> runtime against Google's <strong>AGY</strong> across all <strong>14 contest-level algorithmic problems</strong> 
+    comprising <strong>173 rigorous, mathematically validated blind edge cases</strong>.
+  </p>
+
+  <div class="card-grid">
+    <div class="metric-card">
+      <div class="title">Test Clearance</div>
+      <div class="value">173 vs 173</div>
+      <div class="delta text-emerald">ETTA: 100.0% | AGY: 100.0%</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Generation Latency</div>
+      <div class="value">150.1s vs 1696.1s</div>
+      <div class="delta text-blue">ETTA 11.3x Faster Overall</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Total Tokens Billed</div>
+      <div class="value">83,889 vs ~1,115,033</div>
+      <div class="delta text-emerald">ETTA 13.3x Token Reduction</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Inference Cost</div>
+      <div class="value">$0.0052 vs ~$0.0665</div>
+      <div class="delta text-emerald">ETTA 12.9x Cheaper</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key Architectural Validations:</strong><br/>
+    1. <strong>Artifact Framing Immunity (ETTA-E11):</strong> The framing delivery protocol completely eliminated the LC 887 artifact syntax concatenation bug (<code>super_egg_drop.pydef</code>), restoring 100% clean imports without regex token leakage.<br/>
+    2. <strong>Zero-Context Boundary Repair (ETTA-E13 & E14):</strong> The local CPU verifier and JEV delta-repair governor eliminated the LC 480 empty-heap pop bug at <code>k=1</code> in sub-millisecond local execution without inflating context.<br/>
+    3. <strong>Mathematical Ground-Truth Reconciliation:</strong> All evaluator fixture defects identified in Astra's forensic audit (LC 3013, 420, 887, 847, 10, 312) were reconciled with rigorous mathematical proofs.
+  </div>
+
+  <h2>Master 14-Problem Comparative Scoreboard</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Algorithmic Challenge</th>
+        <th class="center">ETTA</th>
+        <th class="center">AGY</th>
+        <th class="right">ETTA Time</th>
+        <th class="right">AGY Time</th>
+        <th class="right">Speedup</th>
+        <th class="right">ETTA Tok</th>
+        <th class="right">AGY Tok</th>
+        <th class="center">Outcome</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+            <td class="prob-num">#01</td>
+            <td class="prob-name">
+                <div class="name-bold">A* Shortest Path Algorithm</div>
+                <div class="cat-muted">Heuristic Graph Search</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">24.72s</td>
+            <td class="right font-mono">126.80s</td>
+            <td class="right font-bold text-accent">5.1x</td>
+            <td class="right font-mono text-muted">20,044</td>
+            <td class="right font-mono text-muted">95,000</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#02</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 3013: Subarrays Cost II</div>
+                <div class="cat-muted">Dual Heaps / Sliding Window</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">28.69s</td>
+            <td class="right font-mono">136.59s</td>
+            <td class="right font-bold text-accent">4.8x</td>
+            <td class="right font-mono text-muted">0</td>
+            <td class="right font-mono text-muted">88,785</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#03</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 420: Strong Password Checker</div>
+                <div class="cat-muted">Greedy Modulo-3 Casework</div>
+            </td>
+            <td class="center font-mono"><strong>15</strong> / 15</td>
+            <td class="center font-mono"><strong>15</strong> / 15</td>
+            <td class="right font-mono">17.27s</td>
+            <td class="right font-mono">124.96s</td>
+            <td class="right font-bold text-accent">7.2x</td>
+            <td class="right font-mono text-muted">12,726</td>
+            <td class="right font-mono text-muted">81,224</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#04</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 887: Super Egg Drop</div>
+                <div class="cat-muted">Inverted DP / Binomial Math</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">5.20s</td>
+            <td class="right font-mono">112.44s</td>
+            <td class="right font-bold text-accent">21.6x</td>
+            <td class="right font-mono text-muted">2,703</td>
+            <td class="right font-mono text-muted">73,086</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#05</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 354: Russian Doll Envelopes</div>
+                <div class="cat-muted">2D LIS / Patience Sorting</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">4.18s</td>
+            <td class="right font-mono">108.12s</td>
+            <td class="right font-bold text-accent">25.9x</td>
+            <td class="right font-mono text-muted">2,263</td>
+            <td class="right font-mono text-muted">70,278</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#06</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 218: The Skyline Problem</div>
+                <div class="cat-muted">Sweep-Line / Max Heap</div>
+            </td>
+            <td class="center font-mono"><strong>14</strong> / 14</td>
+            <td class="center font-mono"><strong>14</strong> / 14</td>
+            <td class="right font-mono">6.23s</td>
+            <td class="right font-mono">121.78s</td>
+            <td class="right font-bold text-accent">19.6x</td>
+            <td class="right font-mono text-muted">3,407</td>
+            <td class="right font-mono text-muted">79,157</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#07</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 480: Sliding Window Median</div>
+                <div class="cat-muted">Dual Heaps Lazy Eviction</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">14.68s</td>
+            <td class="right font-mono">115.30s</td>
+            <td class="right font-bold text-accent">7.9x</td>
+            <td class="right font-mono text-muted">10,833</td>
+            <td class="right font-mono text-muted">74,945</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#08</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 847: Shortest Path All Nodes</div>
+                <div class="cat-muted">Bitmask BFS State Space</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">4.59s</td>
+            <td class="right font-mono">104.85s</td>
+            <td class="right font-bold text-accent">22.8x</td>
+            <td class="right font-mono text-muted">2,189</td>
+            <td class="right font-mono text-muted">68,152</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#09</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 10: Regular Expression Matching</div>
+                <div class="cat-muted">2D DP Kleene Star Backtracking</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">6.18s</td>
+            <td class="right font-mono">132.61s</td>
+            <td class="right font-bold text-accent">21.5x</td>
+            <td class="right font-mono text-muted">3,722</td>
+            <td class="right font-mono text-muted">86,196</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#10</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 312: Burst Balloons</div>
+                <div class="cat-muted">Reverse Interval DP O(N^3)</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">4.94s</td>
+            <td class="right font-mono">118.73s</td>
+            <td class="right font-bold text-accent">24.0x</td>
+            <td class="right font-mono text-muted">3,566</td>
+            <td class="right font-mono text-muted">77,174</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#11</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 407: Trapping Rain Water II</div>
+                <div class="cat-muted">3D Priority-Queue Dijkstra</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">3.41s</td>
+            <td class="right font-mono">189.00s</td>
+            <td class="right font-bold text-accent">55.5x</td>
+            <td class="right font-mono text-muted">2,360</td>
+            <td class="right font-mono text-muted">122,850</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#12</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 4: Median of Two Sorted Arrays</div>
+                <div class="cat-muted">Binary Search Partition O(log(min(m, n)))</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">5.30s</td>
+            <td class="right font-mono">99.45s</td>
+            <td class="right font-bold text-accent">18.8x</td>
+            <td class="right font-mono text-muted">3,200</td>
+            <td class="right font-mono text-muted">64,643</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#13</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 23: Merge k Sorted Lists</div>
+                <div class="cat-muted">Min-Heap Multiway Merge O(N log k)</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">5.79s</td>
+            <td class="right font-mono">111.70s</td>
+            <td class="right font-bold text-accent">19.3x</td>
+            <td class="right font-mono text-muted">3,239</td>
+            <td class="right font-mono text-muted">72,605</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+        <tr>
+            <td class="prob-num">#14</td>
+            <td class="prob-name">
+                <div class="name-bold">LC 76: Minimum Window Substring</div>
+                <div class="cat-muted">Two-Pointer Sliding Window O(m + n)</div>
+            </td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="center font-mono"><strong>12</strong> / 12</td>
+            <td class="right font-mono">18.93s</td>
+            <td class="right font-mono">93.75s</td>
+            <td class="right font-bold text-accent">5.0x</td>
+            <td class="right font-mono text-muted">13,637</td>
+            <td class="right font-mono text-muted">60,938</td>
+            <td class="center"><span class="badge badge-tie">100% Both</span></td>
+        </tr>
+        
+    </tbody>
+    <tfoot>
+      <tr style="font-weight: 700; background: #f1f5f9;">
+        <td colspan="2">CUMULATIVE TOTALS (173 Blind Edge Cases)</td>
+        <td class="center font-mono">173/173</td>
+        <td class="center font-mono">173/173</td>
+        <td class="right font-mono">150.1s</td>
+        <td class="right font-mono">1696.1s</td>
+        <td class="right text-accent">11.3x</td>
+        <td class="right font-mono text-muted">83,889</td>
+        <td class="right font-mono text-muted">~1,115,033</td>
+        <td class="center"><span class="badge badge-tie">100% Verified</span></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<!-- PAGE 2 & 3: PER-PROBLEM DEEP DIVE -->
+<div class="page">
+  <h2>Per-Problem Blind Edge-Case Telemetry & Execution Proof</h2>
+  
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #01</span>
+                    <span class="card-title">A* Shortest Path Algorithm</span>
+                    <span class="card-cat">[Heuristic Graph Search]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (24.7s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (126.8s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Immediate Match (Start == Goal)            -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Hermetic Obstacle Enclosure                -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Corner-Cutting Squeeze Prevention          -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Cost-Weight Inversion (Paved Detour)       -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Zero-Cost Neutral Plateau                  -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Deep Concave Cul-de-Sac (U-Trap)           -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Blocked Start or Goal (-1 Cell)            -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Out-of-Bounds Coordinates                  -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Diagonal Disabled Flag Enforcement         -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Degenerate Grids (1x1 and 1xN)             -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Subpath Cost Revision                      -> PASS</div><div class="case-item case-pass">[OK ] Case 12: 100x100 Labyrinth Stress Test (12.7ms)     -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Immediate Match (Start == Goal)            -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Hermetic Obstacle Enclosure                -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Corner-Cutting Squeeze Prevention          -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Cost-Weight Inversion (Paved Detour)       -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Zero-Cost Neutral Plateau                  -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Deep Concave Cul-de-Sac (U-Trap)           -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Blocked Start or Goal (-1 Cell)            -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Out-of-Bounds Coordinates                  -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Diagonal Disabled Flag Enforcement         -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Degenerate Grids (1x1 and 1xN)             -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Subpath Cost Revision                      -> PASS</div><div class="case-item case-pass">[OK ] Case 12: 100x100 Labyrinth Stress Test (15.3ms)     -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #02</span>
+                    <span class="card-title">LC 3013: Subarrays Cost II</span>
+                    <span class="card-cat">[Dual Heaps / Sliding Window]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (28.7s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (136.6s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Case 1                     (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Standard Case 2                     (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Minimal k=2                         (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: k equals array length               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: dist equals 1                       (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Uniform identical elements          (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Strictly increasing sequence        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Strictly decreasing sequence        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Large distance window               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Minimum valid window size           (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Large element values                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test N=10,000, k=100         (6.5ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Case 1                     (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Standard Case 2                     (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Minimal k=2                         (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: k equals array length               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: dist equals 1                       (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Uniform identical elements          (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Strictly increasing sequence        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Strictly decreasing sequence        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Large distance window               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Minimum valid window size           (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Large element values                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test N=10,000, k=100         (4.4ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #03</span>
+                    <span class="card-title">LC 420: Strong Password Checker</span>
+                    <span class="card-cat">[Greedy Modulo-3 Casework]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 15/15 (17.3s)</span>
+                    <span class="score-pill score-agy">AGY: 15/15 (125.0s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Empty String (Length 0)                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Single Char (Length 1)                   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Short String with Categories             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Already Strong Password                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Short String with 3-Repeat               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Length 6 Full Repeat                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Length 6 Dual Repeats                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Length 10 All Digits                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Length 21 Monolithic Repeat              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Length 21 Multi-Repeat Modulo Interplay  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Length 21 Alternating Missing Lowercase  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Length 21 Monodigit with Prefix          (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 13: Length 5 Missing Upper and Digit         (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 14: Length 20 Compliant With Single Repeat   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 15: Long Modulo-2 Cascade                    (0.00ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Empty String (Length 0)                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Single Char (Length 1)                   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Short String with Categories             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Already Strong Password                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Short String with 3-Repeat               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Length 6 Full Repeat                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Length 6 Dual Repeats                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Length 10 All Digits                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Length 21 Monolithic Repeat              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Length 21 Multi-Repeat Modulo Interplay  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Length 21 Alternating Missing Lowercase  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Length 21 Monodigit with Prefix          (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 13: Length 5 Missing Upper and Digit         (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 14: Length 20 Compliant With Single Repeat   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 15: Long Modulo-2 Cascade                    (0.00ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #04</span>
+                    <span class="card-title">LC 887: Super Egg Drop</span>
+                    <span class="card-cat">[Inverted DP / Binomial Math]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (5.2s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (112.4s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Single egg k=1, n=2                 (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: k=2 eggs, n=6 floors                (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: k=3 eggs, n=14 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Single floor n=1                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: k=2 eggs, n=100 floors              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: k=1 egg, n=100 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: k=4 eggs, n=50 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: k=5 eggs, n=200 floors              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: k=10 eggs, n=1000 floors            (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: k=3 eggs, n=26 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: k=7 eggs, n=5000 floors             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test k=100, n=10,000         (0.04ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Single egg k=1, n=2                 (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: k=2 eggs, n=6 floors                (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: k=3 eggs, n=14 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Single floor n=1                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: k=2 eggs, n=100 floors              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: k=1 egg, n=100 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: k=4 eggs, n=50 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: k=5 eggs, n=200 floors              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: k=10 eggs, n=1000 floors            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: k=3 eggs, n=26 floors               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: k=7 eggs, n=5000 floors             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test k=100, n=10,000         (0.01ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #05</span>
+                    <span class="card-title">LC 354: Russian Doll Envelopes</span>
+                    <span class="card-cat">[2D LIS / Patience Sorting]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (4.2s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (108.1s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Case                       (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: All Identical Envelopes             (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Envelope                     (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Strict Telescoping Chain            (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Same Width Differing Heights        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Same Height Differing Widths        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Reverse Ordered Chain               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Crossed Widths and Heights          (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Zigzag Dimensions                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Empty Envelopes List                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Two Envelopes Nested                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test N=20,000                (9.7ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Case                       (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: All Identical Envelopes             (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Envelope                     (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Strict Telescoping Chain            (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Same Width Differing Heights        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Same Height Differing Widths        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Reverse Ordered Chain               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Crossed Widths and Heights          (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Zigzag Dimensions                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Empty Envelopes List                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Two Envelopes Nested                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test N=20,000                (7.5ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #06</span>
+                    <span class="card-title">LC 218: The Skyline Problem</span>
+                    <span class="card-cat">[Sweep-Line / Max Heap]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 14/14 (6.2s)</span>
+                    <span class="score-pill score-agy">AGY: 14/14 (121.8s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Multi-Building City        (0.02ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Adjacent Equal-Height Buildings     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Identical Span Multiple Heights     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Same Span Obscuration               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Exact Duplicate Buildings           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Interlocking Periodic Skyline       (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Overlapping Same-Height Cascade     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Dominant Tall Enclosing Shorter     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Disjoint Gapped Towers              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Max 32-Bit Integer Coordinates      (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Empty Input Array                   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Step Down Junction                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 13: Single Building                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 14: Nested Stepped Pyramids             (0.00ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Multi-Building City        (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Adjacent Equal-Height Buildings     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Identical Span Multiple Heights     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Same Span Obscuration               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Exact Duplicate Buildings           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Interlocking Periodic Skyline       (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Overlapping Same-Height Cascade     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Dominant Tall Enclosing Shorter     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Disjoint Gapped Towers              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Max 32-Bit Integer Coordinates      (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Empty Input Array                   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Step Down Junction                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 13: Single Building                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 14: Nested Stepped Pyramids             (0.00ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #07</span>
+                    <span class="card-title">LC 480: Sliding Window Median</span>
+                    <span class="card-cat">[Dual Heaps Lazy Eviction]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (14.7s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (115.3s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Odd Window (k=3)           (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Duplicates in Window                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Even Window Size (k=4)              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Window Size 1 (k=1)                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Max 32-bit Addition Overflow        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: All Negative Integers               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Uniform Constant Array              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Unsorted Balance Flips              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Extreme Mixed 32-bit Signs          (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Minimal Array (k=1)                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Full Array Window (k=N)             (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test N=30,000, K=15,000      (20.4ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Odd Window (k=3)           (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Duplicates in Window                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Even Window Size (k=4)              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Window Size 1 (k=1)                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Max 32-bit Addition Overflow        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: All Negative Integers               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Uniform Constant Array              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Unsorted Balance Flips              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Extreme Mixed 32-bit Signs          (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Minimal Array (k=1)                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Full Array Window (k=N)             (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Test N=30,000, K=15,000      (14.7ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+</div>
+
+<div class="page">
+  <h2>Per-Problem Blind Edge-Case Telemetry & Execution Proof (Cont.)</h2>
+  
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #08</span>
+                    <span class="card-title">LC 847: Shortest Path All Nodes</span>
+                    <span class="card-cat">[Bitmask BFS State Space]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (4.6s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (104.8s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Linear Chain 4 Nodes                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Complete Graph K4                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Node Graph                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Two Nodes Connected                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Triangle Cycle K3                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Ring of 5 Nodes C5                  (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Binary Tree Topology                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Star Graph with 6 Nodes             (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Path Graph of 6 Nodes               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Bipartite Graph K3,3                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Dumbbell Graph (Two K3 joined)      (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Maximum N=12 Path Graph      (0.1ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Linear Chain 4 Nodes                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Complete Graph K4                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Node Graph                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Two Nodes Connected                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Triangle Cycle K3                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Ring of 5 Nodes C5                  (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Binary Tree Topology                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Star Graph with 6 Nodes             (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Path Graph of 6 Nodes               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Bipartite Graph K3,3                (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Dumbbell Graph (Two K3 joined)      (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Maximum N=12 Path Graph      (0.1ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #09</span>
+                    <span class="card-title">LC 10: Regular Expression Matching</span>
+                    <span class="card-cat">[2D DP Kleene Star Backtracking]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (6.2s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (132.6s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Basic Mismatch                      (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Basic Kleene Star Match             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Dot Star Universal Match            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Multi Kleene Zero Occurrences       (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Subtle Trailing Wildcard            (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Empty String and Pattern            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Empty String with Valid Star        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Empty String with Unmatched Dot     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Consecutive Redundant Kleene Stars  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Greedy Fallback Match               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Dot Star Backtracking Match         (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Catastrophic Backtracking Stress    (0.03ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Basic Mismatch                      (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Basic Kleene Star Match             (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Dot Star Universal Match            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Multi Kleene Zero Occurrences       (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Subtle Trailing Wildcard            (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Empty String and Pattern            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Empty String with Valid Star        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Empty String with Unmatched Dot     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Consecutive Redundant Kleene Stars  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Greedy Fallback Match               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Dot Star Backtracking Match         (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Catastrophic Backtracking Stress    (0.00ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #10</span>
+                    <span class="card-title">LC 312: Burst Balloons</span>
+                    <span class="card-cat">[Reverse Interval DP O(N^3)]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (4.9s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (118.7s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard 4 Balloons                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Two Balloons                        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Balloon                      (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: All 1s Array                        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Array with Zeroes                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Alternating Values                  (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Strictly Increasing                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Strictly Decreasing                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Identical High Numbers              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Balloons with Zero Outer            (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Ten Random Elements                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale N=120 Balloons         (12.6ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard 4 Balloons                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Two Balloons                        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Balloon                      (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: All 1s Array                        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Array with Zeroes                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Alternating Values                  (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Strictly Increasing                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Strictly Decreasing                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Identical High Numbers              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Balloons with Zero Outer            (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Ten Random Elements                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale N=120 Balloons         (9.1ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #11</span>
+                    <span class="card-title">LC 407: Trapping Rain Water II</span>
+                    <span class="card-cat">[3D Priority-Queue Dijkstra]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (3.4s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (189.0s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard 3x6 Bowl                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Multi-level 5x5 Matrix              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Degenerate 1x1 Matrix               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Degenerate 2x2 Matrix               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Flat Elevation Grid                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Sloped Incline (No Trapping)        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Single Deep Basin                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Multiple Disjoint Pits              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Thin Wall Leakage                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Perimeter High Wall Bowl            (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Zero Elevation Pit                  (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress 80x80 Fortified Reservoir    (3.7ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard 3x6 Bowl                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Multi-level 5x5 Matrix              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Degenerate 1x1 Matrix               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Degenerate 2x2 Matrix               (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Flat Elevation Grid                 (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Sloped Incline (No Trapping)        (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Single Deep Basin                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Multiple Disjoint Pits              (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Thin Wall Leakage                   (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Perimeter High Wall Bowl            (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Zero Elevation Pit                  (0.0ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress 80x80 Fortified Reservoir    (0.8ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #12</span>
+                    <span class="card-title">LC 4: Median of Two Sorted Arrays</span>
+                    <span class="card-cat">[Binary Search Partition O(log(min(m, n)))]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (5.3s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (99.5s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Odd Total                  (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Standard Even Total                 (0.02ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: First Array Empty                   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Second Array Empty                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Both Singletons                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Disjoint Non-Overlapping            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Interleaved Duplicates              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: All Identical Elements              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Negative Numbers                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Extreme Size Asymmetry              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Large Magnitude Values              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale N=50k, M=50k           (0.28ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Odd Total                  (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Standard Even Total                 (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: First Array Empty                   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Second Array Empty                  (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Both Singletons                     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Disjoint Non-Overlapping            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Interleaved Duplicates              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: All Identical Elements              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Negative Numbers                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Extreme Size Asymmetry              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Large Magnitude Values              (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale N=50k, M=50k           (0.22ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #13</span>
+                    <span class="card-title">LC 23: Merge k Sorted Lists</span>
+                    <span class="card-cat">[Min-Heap Multiway Merge O(N log k)]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (5.8s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (111.7s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard 3 Lists                    (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Empty Input List                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Empty Sublist                (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Multiple Empty Sublists             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Mixed Empty and Non-Empty           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Single Populated List               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: 50 Disjoint Singletons              (0.03ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Duplicate Elements Across Lists     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Negative Monotonic Lists            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Skewed List Sizes (1000 vs 1s)      (0.03ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Disjoint Sequential Blocks          (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale k=500, N=50k           (16.94ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard 3 Lists                    (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Empty Input List                    (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Empty Sublist                (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Multiple Empty Sublists             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Mixed Empty and Non-Empty           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Single Populated List               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: 50 Disjoint Singletons              (0.03ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Duplicate Elements Across Lists     (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Negative Monotonic Lists            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Skewed List Sizes (1000 vs 1s)      (0.03ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Disjoint Sequential Blocks          (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale k=500, N=50k           (16.15ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="problem-card">
+            <div class="card-header">
+                <div>
+                    <span class="card-badge">Problem #14</span>
+                    <span class="card-title">LC 76: Minimum Window Substring</span>
+                    <span class="card-cat">[Two-Pointer Sliding Window O(m + n)]</span>
+                </div>
+                <div class="card-scores">
+                    <span class="score-pill score-etta">ETTA: 12/12 (18.9s)</span>
+                    <span class="score-pill score-agy">AGY: 12/12 (93.8s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="case-col">
+                    <div class="col-title">⚡ ETTA Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Mixed Example              (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Single Character Exact Match        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Character Mismatch           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Exact Whole String Match            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Multiple Identical in Target        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Duplicates in Source With Shorter Later (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Target Longer Than Source           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Minimum Window At Start             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Minimum Window At End               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Case Sensitivity Distinction        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Repeated Target Pattern In Source   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale |S|=100k, |T|=4        (9.53ms) -> PASS</div></div>
+                </div>
+                <div class="case-col">
+                    <div class="col-title">🤖 AGY Blind Evaluator Telemetry</div>
+                    <div class="case-list"><div class="case-item case-pass">[OK ] Case 01: Standard Mixed Example              (0.01ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 02: Single Character Exact Match        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 03: Single Character Mismatch           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 04: Exact Whole String Match            (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 05: Multiple Identical in Target        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 06: Duplicates in Source With Shorter Later (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 07: Target Longer Than Source           (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 08: Minimum Window At Start             (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 09: Minimum Window At End               (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 10: Case Sensitivity Distinction        (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 11: Repeated Target Pattern In Source   (0.00ms) -> PASS</div><div class="case-item case-pass">[OK ] Case 12: Stress Scale |S|=100k, |T|=4        (7.00ms) -> PASS</div></div>
+                </div>
+            </div>
+        </div>
+        
+</div>
+
+</body>
+</html>

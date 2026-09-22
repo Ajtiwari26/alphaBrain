@@ -1,0 +1,44 @@
+{
+  "benchmark_id": 1,
+  "name": "Live Head-to-Head: Monolithic 2,841-Line Refactor",
+  "timestamp_utc": "2026-09-22 02:01:48 UTC",
+  "goal": "In src/lib.rs, implement `pub fn run_filtered_settlement(batches: &mut [TelemetryRecordBatch1]) -> f64` that iterates over batches, ignores any record where is_anomaly() is true, and returns the sum of calculate_weighted_index(). Make sure `cargo test` passes cleanly.",
+  "starter_repo": {
+    "total_lines": 2841,
+    "struct_count": 149,
+    "pre_implementation_test_passed": false
+  },
+  "etta": {
+    "provider": "google",
+    "model": "gemini-3.8-flash-high",
+    "thinking_level": "high",
+    "status": "success",
+    "exit_code": 0,
+    "wall_time_seconds": 14.92,
+    "tokens_used": 25085,
+    "input_tokens": 23858,
+    "output_tokens": 395,
+    "thinking_tokens": 0,
+    "cargo_test_passed": true,
+    "cost_usd": 0.019375
+  },
+  "agy": {
+    "provider": "google",
+    "model": "gemini-3.8-flash-high",
+    "thinking_level": "high",
+    "status": "SUCCESS",
+    "exit_code": 0,
+    "wall_time_seconds": 71.83,
+    "tokens_used": 159267,
+    "input_tokens": 153940,
+    "output_tokens": 5327,
+    "thinking_tokens": 3340,
+    "cache_read_tokens": 342747,
+    "cargo_test_passed": true,
+    "cost_usd": 0.135431
+  },
+  "variance": {
+    "token_ratio": 6.35,
+    "cost_savings_pct": 85.69
+  }
+}

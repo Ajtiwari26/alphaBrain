@@ -73,7 +73,14 @@ def sandbox_profile(worktree: Path) -> str:
             "/Library/Apple",
             "/Library/Developer/CommandLineTools",
             "/opt/homebrew",
+            "/private/etc",
+            "/etc",
+            "/private/var",
+            "/var",
+            "/private/tmp",
+            "/tmp",
         )
+        if Path(p).exists()
     ]
     runtime.append(Path(sys.prefix).resolve())
     cargo_home = Path.home() / ".cargo"
@@ -125,6 +132,10 @@ def sandbox_profile(worktree: Path) -> str:
             *(rule("allow", "file-read-data", "literal", p) for p in sorted(directory_literals)),
             *(rule("allow", "file-read-data", "literal", p) for p in file_literals),
             task_scope("file-write*"),
+            rule("allow", "file-write*", "subpath", Path("/private/tmp")),
+            rule("allow", "file-write*", "subpath", Path("/tmp")),
+            rule("allow", "file-write*", "subpath", Path("/private/var/folders")),
+            rule("allow", "file-write*", "subpath", Path("/var/folders")),
             rule("allow", "file-write-data", "literal", Path("/dev/null")),
         ]
     )

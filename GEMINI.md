@@ -27,7 +27,11 @@
      1. **`sdlc-full` (Full Pipeline Mode):** Executes the complete autonomous pipeline (`alpha_core.triage_cli`: admit -> review -> approve -> senior-plan -> worker-cycle on `gemini-3.8-flash-high` in isolated worktree -> senior-review -> merge).
      2. **`sdlc-worker` (Implementation Mode):** Autonomous coding via `gemini-3.8-flash-high` (`--effort high`) in an isolated Git worktree; runs tests and lint; zero edits on main (Invariant I-68).
      3. **`sdlc-seniors` (Standard Senior Review Mode):** Mandatory 2-Round debate between Gemini 3.1 Pro High (`--effort high` Round 1 audit) and Claude Opus 4.6 Thinking (`--effort high` Round 2 synthesis via `agy-switch` Tiered OC-EDS). Does NOT require Astra.
-     4. **`sdlc-astra` (On-Demand Tier 0 Blueprint Mode):** `gpt-6-astra` Master Architectural Blueprint (MAB); strictly quarantined and SKIPPED by default. MUST ask user for explicit confirmation before invoking.
+     4. **`sdlc-astra` (On-Demand Tier 0 Blueprint Mode):** `gpt-6-astra` Master Architectural Blueprint (MAB); strictly quarantined and SKIPPED by default. MUST ask user for explicit confirmation before invoking. Invocation protocol via Codex CLI:
+        ```bash
+        codex exec --ephemeral --skip-git-repo-check --cd /tmp -m gpt-6-astra -c 'model_reasoning_effort="medium"' -o <output_file> < <prompt_file>
+        ```
+        (Always include `--ephemeral --skip-git-repo-check --cd /tmp` to isolate execution from repo token bloat and protect 5h quota).
    - Maintain workspace clean: every test script must be under `testscript/` directory.
    - Code review graph MCP must be consulted for context to prevent token waste and preserve architectural integrity.
    - Every terminal command or curl command must have a clear commented explanation string describing what it achieves.
@@ -51,3 +55,12 @@
    - **Rotated AGY Worker Dispatch**: Autonomous worker coding cycles must be dispatched exclusively via `agy` CLI (`alpha_core.triage_cli worker-cycle` or headless `agy` processes) executed on the other 7 available accounts rotated via `agy-switch switch <account>`.
    - **Controlled Model & Bounded Context**: Dispatches must route to accounts with 100% available Gemini 5h quota, utilizing `gemini-3.8-flash-high` in isolated git worktrees with strict, bounded prompts and toolsets to avoid token bloat and ensure the entire 5-hour limit is never prematurely exhausted.
 
+7. **Strict Effort Argument Rules (`--effort`)**:
+   - **Gemini Models REQUIRE Explicit Effort**: Whenever invoking Gemini models via CLI (e.g. `gemini-3.8-flash-high`, `gemini-3.1-pro-high`), you MUST ALWAYS explicitly provide the `--effort` argument (typically `--effort high`, or `--effort medium` / `--effort low` as appropriate). Never omit the `--effort` flag when executing Gemini models.
+   - **Claude Models NEVER Take Effort**: Claude models (e.g. `claude-opus-4-6-thinking`) do NOT have an `--effort` argument. Never pass the `--effort` flag when invoking Claude models.
+
+8. **Parallel Worker Dispatch Workflow**:
+   - When complex multi-file fixes are required, the Senior Agent (`gemini-3.1-pro-high --effort high`) MUST construct a master plan and draft distinct subtasks.
+   - The Senior Agent MUST then dispatch workers (`gemini-3.8-flash-high --effort high`) in **PARALLEL** using `invoke_subagent` ensuring their file scopes do not overlap.
+   - As soon as any individual worker completes its task, the Senior Agent (`gemini-3.1-pro-high --effort high`) MUST immediately review its work to save time (do not wait for all workers to finish).
+   - Finally, once all workers are reviewed, the Senior Agent MUST explicitly execute unit tests, lint error tests (`cargo clippy`), and QA validation, and ONLY then trigger the final build to get rid of build errors.

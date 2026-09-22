@@ -1,0 +1,41 @@
+{
+  "benchmark_id": 2,
+  "name": "Live Head-to-Head: The Hallucinated Success Trap (Boundary Defect)",
+  "timestamp_utc": "2026-09-22 02:04:58 UTC",
+  "etta": {
+    "provider": "google",
+    "model": "gemini-3.8-flash-high",
+    "thinking_level": "high",
+    "wall_clock_seconds": 13.38,
+    "tests_passed": true,
+    "tokens_used": 3994,
+    "input_tokens": 3502,
+    "output_tokens": 237,
+    "thinking_tokens": 0,
+    "cost_usd": 0.003515,
+    "status": "success",
+    "exit_code": 0,
+    "raw_output_file": "/Users/ajaytiwari/Desktop/Projects/alphaBrain/testscript/investor_benchmarks/live_head_to_head/test2/etta_raw.log"
+  },
+  "agy": {
+    "provider": "google",
+    "model": "gemini-3.8-flash-high",
+    "thinking_level": "high",
+    "wall_clock_seconds": 69.23,
+    "duration_seconds": 53.036216,
+    "tests_passed": true,
+    "num_turns": 1,
+    "input_tokens": 88249,
+    "output_tokens": 5194,
+    "thinking_tokens": 3740,
+    "total_tokens": 93443,
+    "cost_usd": 0.085664,
+    "status": "SUCCESS",
+    "exit_code": 0,
+    "raw_output_file": "/Users/ajaytiwari/Desktop/Projects/alphaBrain/testscript/investor_benchmarks/live_head_to_head/test2/agy_raw.log"
+  },
+  "variance": {
+    "token_ratio": 23.4,
+    "cost_savings_pct": 95.9
+  }
+}

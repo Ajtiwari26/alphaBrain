@@ -43,6 +43,7 @@ artifacts/
 temp_worktrees/
 
 # Debug artifacts
+.etta/
 /patch*.py
 /fix_*.py
 /fix_daemon_diff.patch

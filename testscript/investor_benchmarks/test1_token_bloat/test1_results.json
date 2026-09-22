@@ -1,0 +1,32 @@
+{
+  "test_id": 1,
+  "title": "The Token Bloat Trap (Large-Context Monolithic Refactor)",
+  "context_size_tokens": 79688,
+  "lines_of_code": 2846,
+  "etta": {
+    "status": "success",
+    "compiles": true,
+    "implementation_correct": true,
+    "latency_s": 76.51,
+    "tokens": 4570,
+    "cost_usd": 0.00226,
+    "turns_executed": 30,
+    "avg_tokens_per_turn": 152.3
+  },
+  "agy_baseline": {
+    "status": "success",
+    "compiles": true,
+    "implementation_correct": true,
+    "latency_s": 74.50,
+    "tokens": 168400,
+    "cost_usd": 0.08420,
+    "turns_executed": 2,
+    "avg_tokens_per_turn": 84200.0
+  },
+  "metrics": {
+    "token_efficiency_ratio": "36.8x lower token burn",
+    "cost_reduction_percent": "97.3% cost savings",
+    "speed_parity": "Parity (76.5s vs 74.5s)",
+    "architectural_advantage": "INV-ETTA-29 & INV-ETTA-30 bounded zero-context turns prevent quadratic history re-transmission"
+  }
+}

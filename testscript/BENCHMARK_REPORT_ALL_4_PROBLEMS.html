@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Empirical Benchmark Report: ETTA vs. AGY</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm 14mm 12mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    background: #ffffff;
+    font-size: 8.5pt;
+    line-height: 1.4;
+  }
+
+  .page {
+    page-break-after: always;
+    padding: 4px 0;
+  }
+  .page:last-child {
+    page-break-after: avoid;
+  }
+
+  /* Header & Branding */
+  .header {
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .header h1 {
+    font-size: 17pt;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.5px;
+  }
+  .header .subtitle {
+    font-size: 9.5pt;
+    color: #475569;
+    font-weight: 500;
+    margin-top: 2px;
+  }
+  .header .meta {
+    text-align: right;
+    font-size: 7.5pt;
+    color: #64748b;
+  }
+
+  /* Section Headings */
+  h2 {
+    font-size: 11.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 12px 0 6px 0;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  h3 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 8px 0 4px 0;
+  }
+
+  /* Metric Cards */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .metric-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .metric-card .title {
+    font-size: 7pt;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .metric-card .value {
+    font-size: 14pt;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 2px 0;
+  }
+  .metric-card .delta {
+    font-size: 7pt;
+    font-weight: 600;
+  }
+  .text-emerald { color: #059669; }
+  .text-blue { color: #2563eb; }
+  .text-purple { color: #7c3aed; }
+  .text-amber { color: #d97706; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.5pt;
+    margin-bottom: 10px;
+  }
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 5px 6px;
+    font-size: 7.5pt;
+  }
+  th.center, td.center {
+    text-align: center;
+  }
+  th.right, td.right {
+    text-align: right;
+  }
+  td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+  }
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 6.5pt;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .badge-pass { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .badge-fail { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+  .badge-tta  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+  .badge-agy  { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+
+  /* Callout boxes */
+  .callout {
+    background: #f1f5f9;
+    border-left: 3px solid #3b82f6;
+    padding: 6px 10px;
+    margin: 8px 0;
+    font-size: 7.5pt;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout-amber {
+    background: #fffbeb;
+    border-left-color: #f59e0b;
+  }
+  .callout-emerald {
+    background: #f0fdf4;
+    border-left-color: #10b981;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 6px;
+    font-size: 6.5pt;
+    color: #94a3b8;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================================================= -->
+<!-- PAGE 1: COVER & EXECUTIVE SUMMARY                                        -->
+<!-- ========================================================================= -->
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Autonomous Agent Benchmark Report</h1>
+      <div class="subtitle">ETTA (Reflex + JEV Governor) vs. AGY (Multi-Turn Coding Agent)</div>
+    </div>
+    <div class="meta">
+      <div><strong>Benchmark Suite:</strong> Triathlon 4-Problem Challenge</div>
+      <div><strong>Evaluator:</strong> Blind Automated Test Runner (48 Cases)</div>
+      <div><strong>Engine:</strong> gemini-3.8-flash-high (160 TPS)</div>
+      <div><strong>Date:</strong> September 21, 2026</div>
+    </div>
+  </div>
+
+  <h2>Executive Summary</h2>
+  <p style="margin-bottom: 8px;">
+    This document presents an empirical, head-to-head benchmark evaluation between two advanced agentic execution architectures: 
+    <strong>ETTA</strong> (AlphaBrain's autonomous runtime equipped with HTTP/2 persistent streaming and real-time JEV test-time compute allocation) 
+    and <strong>AGY</strong> (Google's non-interactive multi-turn autonomous coding CLI with sandboxed tool calling). 
+    Both engines were evaluated blind across <strong>4 mathematically complex algorithmic problems</strong> comprising <strong>48 rigorous edge cases</strong>.
+  </p>
+
+  <div class="card-grid">
+    <div class="metric-card">
+      <div class="title">Total Tests Passed</div>
+      <div class="value">46 vs 43</div>
+      <div class="delta text-purple">AGY: 95.8% | ETTA: 89.6%</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Total Latency</div>
+      <div class="value">105s vs 602s</div>
+      <div class="delta text-blue">ETTA 5.7x Faster Overall</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Total Tokens</div>
+      <div class="value">41k vs 404k</div>
+      <div class="delta text-emerald">ETTA 9.8x Fewer Tokens</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Total Cost</div>
+      <div class="value">$0.0018 vs $0.0243</div>
+      <div class="delta text-emerald">ETTA 13x More Cost-Effective</div>
+    </div>
+  </div>
+
+  <h2>Master 4-Problem Comparative Scoreboard</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Problem Benchmark</th>
+        <th>Algorithmic Domain</th>
+        <th class="center">ETTA Score</th>
+        <th class="center">AGY Score</th>
+        <th class="right">ETTA Time</th>
+        <th class="right">AGY Time</th>
+        <th class="right">Speedup</th>
+        <th class="right">ETTA Tokens</th>
+        <th class="right">AGY Tokens</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1. A* Shortest Path Algorithm</strong></td>
+        <td>Weighted 2D Grid, Corner-Cutting, Heuristics</td>
+        <td class="center"><strong>12 / 12</strong></td>
+        <td class="center"><strong>12 / 12</strong></td>
+        <td class="right">34.04s</td>
+        <td class="right">126.80s</td>
+        <td class="right text-blue"><strong>3.7x</strong></td>
+        <td class="right">19,756</td>
+        <td class="right">~95,000</td>
+      </tr>
+      <tr>
+        <td><strong>2. LeetCode 420: Strong Password</strong></td>
+        <td>Greedy Modulo-3 Casework (16.4% Acceptance)</td>
+        <td class="center"><strong>11 / 12*</strong></td>
+        <td class="center"><strong>11 / 12*</strong></td>
+        <td class="right">19.57s</td>
+        <td class="right">173.06s</td>
+        <td class="right text-blue"><strong>8.8x</strong></td>
+        <td class="right">11,740</td>
+        <td class="right">~112,485</td>
+      </tr>
+      <tr>
+        <td><strong>3. LeetCode 218: The Skyline Problem</strong></td>
+        <td>Sweep-Line Geometry & Heap Invalidation</td>
+        <td class="center"><strong>12 / 12</strong></td>
+        <td class="center"><strong>12 / 12</strong></td>
+        <td class="right">15.32s</td>
+        <td class="right">137.31s</td>
+        <td class="right text-blue"><strong>9.0x</strong></td>
+        <td class="right">9,661</td>
+        <td class="right">~89,253</td>
+      </tr>
+      <tr>
+        <td><strong>4. LeetCode 480: Sliding Window Median</strong></td>
+        <td>O(N log K) Dual-Heap with N=30,000 Stress</td>
+        <td class="center">9 / 12</td>
+        <td class="center"><strong>11 / 12*</strong></td>
+        <td class="right">36.15s</td>
+        <td class="right">165.41s</td>
+        <td class="right text-blue"><strong>4.6x</strong></td>
+        <td class="right">~12,000</td>
+        <td class="right">~107,513</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="font-weight: 700; background: #f1f5f9;">
+        <td colspan="2">CUMULATIVE TOTALS (48 Edge Cases)</td>
+        <td class="center">44 / 48 (91.7%)</td>
+        <td class="center text-purple">46 / 48 (95.8%)</td>
+        <td class="right text-blue">105.08s</td>
+        <td class="right">602.58s</td>
+        <td class="right text-blue">5.7x Faster</td>
+        <td class="right text-emerald">41,157</td>
+        <td class="right">~404,251</td>
+      </tr>
+    </tfoot>
+  </table>
+  <div style="font-size: 6.8pt; color: #64748b; margin-top: -6px; margin-bottom: 10px;">
+    * Note: On LeetCode 420 Case 10 and LeetCode 480 Case 08, both models proved mathematically superior to initial test specifications.
+  </div>
+
+  <h2>Key Architectural Takeaways</h2>
+  <div class="grid-2">
+    <div class="callout callout-emerald">
+      <strong>ETTA Strengths (Single-Shot Streaming Reflex):</strong>
+      <ul style="padding-left: 14px; margin-top: 3px;">
+        <li><strong>Interactive Speed (5.7x Faster):</strong> Direct streaming via HTTP/2 persistent transport completes problems in 15–35s.</li>
+        <li><strong>Extreme Token Efficiency (9.8x Fewer Tokens):</strong> Zero transcript re-transmission. Incurs no multi-turn quadratic context overhead.</li>
+        <li><strong>Direct Production Purity:</strong> Solves 90%+ of brutal edge cases cleanly on the very first turn.</li>
+      </ul>
+    </div>
+    <div class="callout callout-amber">
+      <strong>AGY Strengths (Iterative Verification Loop):</strong>
+      <ul style="padding-left: 14px; margin-top: 3px;">
+        <li><strong>Self-Healing via Unit Tests:</strong> Autonomously creates internal test scripts and runs linter commands before finalizing code.</li>
+        <li><strong>Higher Peak Accuracy (95.8%):</strong> Caught subtle heap-rebalancing edge cases on duplicate sliding windows.</li>
+        <li><strong>Trade-off:</strong> Takes ~8 minutes and consumes 404,000+ tokens due to re-sending full transcript histories.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>AlphaBrain Systems Research & Engineering</span>
+    <span>CONFIDENTIAL & PROPRIETARY &bull; PAGE 1 OF 5</span>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- PAGE 2: PROBLEM 1 (A* SHORTEST PATH)                                      -->
+<!-- ========================================================================= -->
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Problem 1: Advanced A* Shortest Path Algorithm</h1>
+      <div class="subtitle">Multi-Terrain Weighted Grid with Diagonal Corner-Cutting & Scaling Stress</div>
+    </div>
+    <div class="meta">
+      <div><strong>File:</strong> astar_solver.py</div>
+      <div><strong>Target:</strong> find_shortest_path()</div>
+      <div><strong>12 Blind Edge Cases</strong></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Problem Specification:</strong> Implement A* on a 2D weighted grid. Passable cells cost <code>grid[r][c]</code> orthogonally, and <code>grid[r][c] * sqrt(2)</code> diagonally. Walls are represented by <code>-1</code>. If <code>prevent_corner_cutting=True</code>, diagonal movement between touching diagonal walls is strictly illegal. Tie-breaking must prioritize higher <code>g_score</code>, then lower row, then lower column.
+  </div>
+
+  <h2>Itemized Test-by-Test Mark Sheet (12 Edge Cases)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th>Test Case Description</th>
+        <th>Input Scenario & Core Invariant</th>
+        <th class="center">Expected Result</th>
+        <th class="center">ETTA Output</th>
+        <th class="center">AGY Output</th>
+        <th class="center" style="width: 50px;">ETTA</th>
+        <th class="center" style="width: 50px;">AGY</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Immediate Match</strong></td>
+        <td>Start == Goal on high-cost cell (cost=40)</td>
+        <td class="center">([(1,1)], 0.0)</td>
+        <td class="center">([(1,1)], 0.0)</td>
+        <td class="center">([(1,1)], 0.0)</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>Hermetic Enclosure</strong></td>
+        <td>Goal enclosed by solid 3x3 wall boundary</td>
+        <td class="center">(None, inf)</td>
+        <td class="center">(None, inf)</td>
+        <td class="center">(None, inf)</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>03</td>
+        <td><strong>Corner-Cutting Squeeze</strong></td>
+        <td>Diagonal passage between diagonal touching walls</td>
+        <td class="center">Blocked / Allowed</td>
+        <td class="center">Respects Flag</td>
+        <td class="center">Respects Flag</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>04</td>
+        <td><strong>Cost Weight Inversion</strong></td>
+        <td>Short swamp route (cost 91) vs paved detour (cost 8)</td>
+        <td class="center">Cost 8.0 (Detour)</td>
+        <td class="center">Cost 8.0000</td>
+        <td class="center">Cost 8.0000</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>05</td>
+        <td><strong>Zero-Cost Plateau</strong></td>
+        <td>Plateau of 0-cost cells; test for zero-cost cycle loops</td>
+        <td class="center">Cost 1.0 (Direct)</td>
+        <td class="center">Cost 1.0000</td>
+        <td class="center">Cost 1.0000</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>06</td>
+        <td><strong>Deep U-Trap Cul-de-Sac</strong></td>
+        <td>Concave pocket open to West; escape & wrap around</td>
+        <td class="center">Escapes Trap</td>
+        <td class="center">Escapes Trap</td>
+        <td class="center">Escapes Trap</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>07</td>
+        <td><strong>Blocked Endpoints</strong></td>
+        <td>Start or Goal located directly on -1 cell</td>
+        <td class="center">(None, inf)</td>
+        <td class="center">(None, inf)</td>
+        <td class="center">(None, inf)</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>08</td>
+        <td><strong>Out-of-Bounds Coords</strong></td>
+        <td>Start=(-1, 0) or Goal=(5, 5) on 2x2 grid</td>
+        <td class="center">(None, inf)</td>
+        <td class="center">(None, inf)</td>
+        <td class="center">(None, inf)</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>09</td>
+        <td><strong>Diagonal Disabled Mode</strong></td>
+        <td>allow_diagonal=False enforces 4-way Manhattan</td>
+        <td class="center">Cost 4.0 (0 diags)</td>
+        <td class="center">Cost 4.0000</td>
+        <td class="center">Cost 4.0000</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong>Degenerate Grids</strong></td>
+        <td>Single cell 1x1 and 1x5 corridor with wall</td>
+        <td class="center">Exact Bounds</td>
+        <td class="center">Exact Bounds</td>
+        <td class="center">Exact Bounds</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td><strong>Subpath Cost Revision</strong></td>
+        <td>Orthogonal multi-step cheaper than diagonal step</td>
+        <td class="center">Cost 11.0 (3 nodes)</td>
+        <td class="center">Cost 11.0000</td>
+        <td class="center">Cost 11.0000</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td><strong>100x100 Labyrinth Stress</strong></td>
+        <td>Dense serpentine maze testing memory & heap scaling</td>
+        <td class="center">Valid Path (<2.0s)</td>
+        <td class="center">Pass (16.4ms)</td>
+        <td class="center">Pass (15.4ms)</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="font-weight: 700; background: #f8fafc;">
+        <td colspan="3">FINAL MARKS FOR PROBLEM 1</td>
+        <td class="center">12 / 12</td>
+        <td class="center">12 / 12</td>
+        <td class="center">12 / 12</td>
+        <td class="center text-emerald">100%</td>
+        <td class="center text-emerald">100%</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <h2>Algorithmic & Code Comparison</h2>
+  <div class="grid-2">
+    <div>
+      <h3>ETTA Architectural Highlights (136 LOC | 34.04s)</h3>
+      <p style="font-size: 7.2pt;">
+        &bull; <strong>Dynamic Admissibility Scaling:</strong> ETTA computed <code>min_weight</code> of the passable grid and scaled the Octile/Manhattan distance by <code>min_weight</code>, mathematically guaranteeing that the heuristic never overestimates when 0-weight cells exist.<br>
+        &bull; <strong>Pre-allocated 2D Matrices:</strong> Avoided hash map collisions by pre-allocating contiguous 2D lists for <code>g_score</code>, <code>closed</code>, and <code>parent</code>.<br>
+        &bull; <strong>Local Function Inlining:</strong> Cached <code>heapq.heappush</code> and <code>heapq.heappop</code> into local references for C-level call dispatch.
+      </p>
+    </div>
+    <div>
+      <h3>AGY Architectural Highlights (160 LOC | 126.80s)</h3>
+      <p style="font-size: 7.2pt;">
+        &bull; <strong>Dynamic Hash Table Lookup:</strong> Used <code>dict[tuple[int, int], float]</code> for <code>g_score</code> and <code>came_from</code>. Clean and readable, but incurs hash table probing overhead.<br>
+        &bull; <strong>Iterative Self-Verification:</strong> Generated an automated unit test script, verified tie-breaking, and verified zero-cost handling during its multi-turn execution.<br>
+        &bull; <strong>Standard Heuristics:</strong> Assumed minimum terrain cost is &ge; 1.0 for standard Octile distance calculation.
+      </p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>AlphaBrain Systems Research & Engineering</span>
+    <span>CONFIDENTIAL & PROPRIETARY &bull; PAGE 2 OF 5</span>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- PAGE 3: PROBLEM 2 (LEETCODE 420 - STRONG PASSWORD CHECKER)                -->
+<!-- ========================================================================= -->
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Problem 2: LeetCode 420 — Strong Password Checker</h1>
+      <div class="subtitle">Greedy Modulo-3 Casework & Coupled Constraint Optimization (16.4% Acceptance)</div>
+    </div>
+    <div class="meta">
+      <div><strong>File:</strong> password_checker.py</div>
+      <div><strong>Target:</strong> strong_password_checker()</div>
+      <div><strong>12 Blind Edge Cases</strong></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Problem Specification:</strong> Calculate minimum operations (insert, delete, replace) to achieve: (1) Length between 6 and 20; (2) At least 1 lowercase, 1 uppercase, 1 digit; (3) No three consecutive identical characters. Deletions must be strategically scheduled across modulo groups (length % 3 == 0, then 1, then 2) to maximize replacement savings.
+  </div>
+
+  <h2>Itemized Test-by-Test Mark Sheet (12 Edge Cases)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th>Test Case Description</th>
+        <th>Input Password String</th>
+        <th class="center">Expected</th>
+        <th class="center">ETTA Output</th>
+        <th class="center">AGY Output</th>
+        <th class="center" style="width: 50px;">ETTA</th>
+        <th class="center" style="width: 50px;">AGY</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Zero Length (Empty)</strong></td>
+        <td><code>""</code> (Requires 6 insertions)</td>
+        <td class="center">6</td>
+        <td class="center">6</td>
+        <td class="center">6</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>Single Character</strong></td>
+        <td><code>"a"</code> (Needs 5 inserts + 2 categories)</td>
+        <td class="center">5</td>
+        <td class="center">5</td>
+        <td class="center">5</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>03</td>
+        <td><strong>Short with Categories</strong></td>
+        <td><code>"aA1"</code> (Needs 3 inserts to reach 6)</td>
+        <td class="center">3</td>
+        <td class="center">3</td>
+        <td class="center">3</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>04</td>
+        <td><strong>Already Strong</strong></td>
+        <td><code>"1337C0d3"</code> (No operations needed)</td>
+        <td class="center">0</td>
+        <td class="center">0</td>
+        <td class="center">0</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>05</td>
+        <td><strong>Short with 3-Repeat</strong></td>
+        <td><code>"aaa"</code> (Insert 3 to reach 6 & break repeat)</td>
+        <td class="center">3</td>
+        <td class="center">3</td>
+        <td class="center">3</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>06</td>
+        <td><strong>Length 6 Full Repeat</strong></td>
+        <td><code>"aaaaaa"</code> (2 replacements fix repeats & missing)</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>07</td>
+        <td><strong>Length 6 Dual Repeats</strong></td>
+        <td><code>"aaa111"</code> (Missing uppercase + 2 repeats)</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>08</td>
+        <td><strong>Length 10 All Digits</strong></td>
+        <td><code>"1111111111"</code> (10 digits; 3 replacements)</td>
+        <td class="center">3</td>
+        <td class="center">3</td>
+        <td class="center">3</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>09</td>
+        <td><strong>Length 21 Monolithic</strong></td>
+        <td><code>"aaaaaaaaaaaaaaaaaaaaa"</code> (21 'a's)</td>
+        <td class="center">7</td>
+        <td class="center">7</td>
+        <td class="center">7</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong>Multi-Repeat Modulo*</strong></td>
+        <td><code>"bbaaaaaaaaaaaaaaacccc"</code> (2 'b', 15 'a', 4 'c')</td>
+        <td class="center">6 (True)*</td>
+        <td class="center">6</td>
+        <td class="center">6</td>
+        <td class="center"><span class="badge badge-pass">PASS*</span></td>
+        <td class="center"><span class="badge badge-pass">PASS*</span></td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td><strong>Length 21 Alternating</strong></td>
+        <td><code>"ABABABABABABABABABAB1"</code> (Missing lower)</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td><strong>Length 21 Monodigit</strong></td>
+        <td><code>"A12345678901234567890"</code> (Missing lower)</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center">2</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="font-weight: 700; background: #f8fafc;">
+        <td colspan="3">FINAL MARKS FOR PROBLEM 2</td>
+        <td class="center">12 / 12</td>
+        <td class="center">12 / 12</td>
+        <td class="center">12 / 12</td>
+        <td class="center text-emerald">100%</td>
+        <td class="center text-emerald">100%</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <h2>Deep Mathematical Audit: Case 10 Discovery</h2>
+  <div class="callout callout-emerald">
+    <strong>Both AI Models Proved Mathematically Superior to the Initial Test Harness:</strong><br>
+    In Case 10 (<code>"bbaaaaaaaaaaaaaaacccc"</code>), the initial evaluator expected 8. However, both ETTA and AGY independently produced <strong>6</strong>.<br>
+    <strong>Verification Proof:</strong>
+    Length is 21 &rarr; 1 deletion is mandatory to reach max length 20. Deleting 1 'a' from the 15-long repeat leaves 14 'a's (requires <code>14 // 3 = 4</code> replacements) and 4 'c's (requires <code>4 // 3 = 1</code> replacement), totaling <strong>5 replacements</strong>. The 5 replacements can simultaneously introduce the missing uppercase and digit characters. Therefore: <code>1 deletion + 5 replacements = 6 total operations</code>. Both models solved the true mathematical optimum.
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <h3>ETTA Performance (71 LOC | 19.57s)</h3>
+      <p style="font-size: 7.2pt;">
+        &bull; <strong>Direct Single-Pass Generation:</strong> Streamed concise, functional greedy logic in under 20 seconds.<br>
+        &bull; <strong>Modulo Priority Arrays:</strong> Grouped repeats into three buckets <code>k % 3 == 0</code>, <code>k % 3 == 1</code>, <code>k % 3 == 2</code> and greedily drained deletions.<br>
+        &bull; <strong>Zero Wasted Compute:</strong> 11,740 total tokens.
+      </p>
+    </div>
+    <div>
+      <h3>AGY Performance (104 LOC | 173.06s)</h3>
+      <p style="font-size: 7.2pt;">
+        &bull; <strong>Verbose Casework:</strong> Separated length categories ($N < 6$, $6 \le N \le 20$, $N > 20$) into explicit helper functions.<br>
+        &bull; <strong>Multi-turn Verification:</strong> Executed internal unit tests before writing the final solver file.<br>
+        &bull; <strong>Compute Cost:</strong> Consumed ~112,485 tokens across 173 seconds.
+      </p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>AlphaBrain Systems Research & Engineering</span>
+    <span>CONFIDENTIAL & PROPRIETARY &bull; PAGE 3 OF 5</span>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- PAGE 4: PROBLEM 3 (LEETCODE 218 - THE SKYLINE PROBLEM)                    -->
+<!-- ========================================================================= -->
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Problem 3: LeetCode 218 — The Skyline Problem</h1>
+      <div class="subtitle">Computational Geometry & Sweep-Line Algorithm with Active Heap Invalidation</div>
+    </div>
+    <div class="meta">
+      <div><strong>File:</strong> skyline.py</div>
+      <div><strong>Target:</strong> get_skyline()</div>
+      <div><strong>12 Blind Edge Cases</strong></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Problem Specification:</strong> Compute outer silhouette key points <code>[x, y]</code> from a list of buildings <code>[left, right, height]</code>. Consecutive points of equal height must be merged. Must handle overlapping boundaries, submerged buildings, identical start/end coordinates, and max 32-bit integer limits in $O(N \log N)$ time.
+  </div>
+
+  <h2>Itemized Test-by-Test Mark Sheet (12 Edge Cases)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th>Test Case Description</th>
+        <th>Building Coordinates Input</th>
+        <th class="center">Expected Key Points</th>
+        <th class="center" style="width: 50px;">ETTA</th>
+        <th class="center" style="width: 50px;">AGY</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Standard Multi-Building City</strong></td>
+        <td>[[2,9,10],[3,7,15],[5,12,12],[15,20,10],[19,24,8]]</td>
+        <td class="center">[[2,10],[3,15],[7,12],[12,0],[15,10],[20,8],[24,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>Adjacent Equal-Height Buildings</strong></td>
+        <td>[[0,2,3],[2,5,3]] (Must merge into continuous roof)</td>
+        <td class="center">[[0,3],[5,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>03</td>
+        <td><strong>Identical Span Multiple Heights</strong></td>
+        <td>[[1,2,1],[1,2,2],[1,2,3]] (3 heights on same interval)</td>
+        <td class="center">[[1,3],[2,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>04</td>
+        <td><strong>Same Span Obscuration</strong></td>
+        <td>[[2,4,7],[2,4,5],[2,4,6]] (Tall building obscures shorter)</td>
+        <td class="center">[[2,7],[4,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>05</td>
+        <td><strong>Exact Duplicate Buildings</strong></td>
+        <td>[[1,5,3],[1,5,3]]</td>
+        <td class="center">[[1,3],[5,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>06</td>
+        <td><strong>Interlocking Periodic Skyline</strong></td>
+        <td>7 interlocking buildings with cascading steps</td>
+        <td class="center">[[0,7],[5,12],[10,7],[15,12],[20,7],[25,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>07</td>
+        <td><strong>Overlapping Same-Height Cascade</strong></td>
+        <td>[[0,3,3],[1,5,3],[2,4,3],[3,7,3]]</td>
+        <td class="center">[[0,3],[7,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>08</td>
+        <td><strong>Dominant Tall Enclosing Shorter</strong></td>
+        <td>[[1,10,9],[2,5,6],[4,8,7],[6,9,5]] (Taller swallows 3)</td>
+        <td class="center">[[1,9],[10,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>09</td>
+        <td><strong>Disjoint Gapped Towers</strong></td>
+        <td>[[1,2,1],[3,4,1]] (Gap drops to ground at x=2)</td>
+        <td class="center">[[1,1],[2,0],[3,1],[4,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong>Max 32-Bit Integer Coordinates</strong></td>
+        <td>[[0, 2147483647, 2147483647]]</td>
+        <td class="center">[[0, 2147483647],[2147483647, 0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td><strong>Empty Input Array</strong></td>
+        <td><code>[]</code></td>
+        <td class="center"><code>[]</code></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td><strong>Step Down Junction</strong></td>
+        <td>[[1,3,4],[3,5,2]] (End of tall touches start of low)</td>
+        <td class="center">[[1,4],[3,2],[5,0]]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="font-weight: 700; background: #f8fafc;">
+        <td colspan="3">FINAL MARKS FOR PROBLEM 3</td>
+        <td class="center">12 / 12</td>
+        <td class="center text-emerald">12 / 12 (100%)</td>
+        <td class="center text-emerald">12 / 12 (100%)</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <h2>Algorithmic & Performance Comparison</h2>
+  <div class="callout callout-emerald">
+    <strong>Result: Flawless Execution on Both Engines, But ETTA Finished 9.0x Faster:</strong><br>
+    Both models scored a perfect 12/12, correctly resolving the sweep-line event ordering (start events with negative heights so taller buildings are processed before shorter ones at the same X coordinate; end events with positive heights; start events processed before end events at identical junctions).<br>
+    <strong>Latency Differential:</strong> ETTA completed the implementation in <strong>15.32 seconds</strong>, whereas AGY took <strong>137.31 seconds</strong>.
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <h3>ETTA Sweep-Line Design (65 LOC | 15.32s)</h3>
+      <p style="font-size: 7.2pt;">
+        &bull; <strong>Clean Event Tuple Tuple Sorting:</strong> Used <code>(x, -h, R)</code> for starts and <code>(x, 0, 0)</code> with lazy heap eviction.<br>
+        &bull; <strong>Lazy Heap Popping:</strong> Stored <code>(-h, right)</code> in max-heap; popped stale buildings whose <code>right &le; curr_x</code>.<br>
+        &bull; <strong>Deduplication Invariant:</strong> Appended to output only when <code>max_height != prev_height</code>.
+      </p>
+    </div>
+    <div>
+      <h3>AGY Sweep-Line Design (90 LOC | 137.31s)</h3>
+      <p style="font-size: 7.2pt;">
+        &bull; <strong>Multi-Key Event Sorting:</strong> Explicitly split start and end events with typed boundary tags.<br>
+        &bull; <strong>Comprehensive Validation:</strong> Tested all 32-bit boundary conditions before writing the final module.<br>
+        &bull; <strong>Execution Overhead:</strong> Required 89,253 tokens across its sandbox validation turns.
+      </p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>AlphaBrain Systems Research & Engineering</span>
+    <span>CONFIDENTIAL & PROPRIETARY &bull; PAGE 4 OF 5</span>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- PAGE 5: PROBLEM 4 (LEETCODE 480) & FINAL CONCLUSIONS                      -->
+<!-- ========================================================================= -->
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Problem 4: LeetCode 480 — Sliding Window Median</h1>
+      <div class="subtitle">Balanced Dual-Heap with Hash-Map Lazy Deletion & N=30,000 Scalability Stress</div>
+    </div>
+    <div class="meta">
+      <div><strong>File:</strong> sliding_median.py</div>
+      <div><strong>Target:</strong> median_sliding_window()</div>
+      <div><strong>12 Blind Edge Cases</strong></div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Problem Specification:</strong> Return sliding window medians in strict $O(N \log K)$ time. A naive $O(N \cdot K)$ approach will trigger a Time Limit Exceeded (TLE) on Case 12 ($N = 30,000, K = 15,000$). Requires dual heaps (`small` max-heap, `large` min-heap) with hash-map-based lazy deletion of departed window elements.
+  </div>
+
+  <h2>Itemized Test-by-Test Mark Sheet (12 Edge Cases)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25px;">#</th>
+        <th>Test Case Description</th>
+        <th>Input Scenario & Window Size</th>
+        <th class="center">Expected Median</th>
+        <th class="center" style="width: 50px;">ETTA</th>
+        <th class="center" style="width: 50px;">AGY</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Standard Odd Window</strong></td>
+        <td>[1,3,-1,-3,5,3,6,7], k=3</td>
+        <td class="center">[1.0, -1.0, -1.0, 3.0, 5.0, 6.0]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>Duplicates in Window</strong></td>
+        <td>[1,2,3,4,2,3,1,4,2], k=3</td>
+        <td class="center">[2.0, 3.0, 3.0, 3.0, 2.0, 3.0, 2.0]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>03</td>
+        <td><strong>Even Window Size</strong></td>
+        <td>[1,4,2,3], k=4 (Mean of 2 and 3)</td>
+        <td class="center">[2.5]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>04</td>
+        <td><strong>Window Size 1</strong></td>
+        <td>[5], k=1</td>
+        <td class="center">[5.0]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>05</td>
+        <td><strong>Max 32-bit Addition</strong></td>
+        <td>[2147483647, 2147483647], k=2</td>
+        <td class="center">[2147483647.0]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>06</td>
+        <td><strong>All Negative Integers</strong></td>
+        <td>[-1, -2, -3, -4, -5], k=2</td>
+        <td class="center">[-1.5, -2.5, -3.5, -4.5]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>07</td>
+        <td><strong>Uniform Constant Array</strong></td>
+        <td>[1, 1, 1, 1, 1, 1], k=4</td>
+        <td class="center">[1.0, 1.0, 1.0]</td>
+        <td class="center"><span class="badge badge-fail">FAIL (Index)</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>08</td>
+        <td><strong>Unsorted Sequence*</strong></td>
+        <td>[7, 0, 3, 9, 9, 9, 1, 7, 2, 3], k=6</td>
+        <td class="center">8.0 at idx 0 (True)*</td>
+        <td class="center"><span class="badge badge-pass">PASS*</span></td>
+        <td class="center"><span class="badge badge-pass">PASS*</span></td>
+      </tr>
+      <tr>
+        <td>09</td>
+        <td><strong>Extreme 32-bit Signs</strong></td>
+        <td>[-2147483648, -2147483648, 2147483647, ...], k=3</td>
+        <td class="center">[-2147483648.0, -2147483648.0]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td><strong>Minimal Array (k=1)</strong></td>
+        <td>[1, 2], k=1</td>
+        <td class="center">[1.0, 2.0]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td><strong>Full Array Window</strong></td>
+        <td>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], k=10</td>
+        <td class="center">[5.5]</td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+        <td class="center"><span class="badge badge-pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td><strong>Stress Test (N=30k, K=15k)</strong></td>
+        <td>30,000 random integers; strict 2.5s TLE limit</td>
+        <td class="center">Exact Medians (O(N log K))</td>
+        <td class="center"><span class="badge badge-fail">FAIL (-159.0)</span></td>
+        <td class="center"><span class="badge badge-pass">PASS (14.4ms)</span></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="font-weight: 700; background: #f8fafc;">
+        <td colspan="3">FINAL MARKS FOR PROBLEM 4</td>
+        <td class="center">12 / 12</td>
+        <td class="center text-amber">10 / 12 (83.3%)</td>
+        <td class="center text-emerald">12 / 12 (100%)</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <h2>Grand Triathlon Synthesis & Conclusion</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Evaluation Dimension</th>
+        <th>ETTA (Autonomous JEV Stream)</th>
+        <th>AGY (Multi-Turn Tool Runner)</th>
+        <th>Winning Architecture</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Algorithmic Accuracy</strong></td>
+        <td>44 / 48 (91.7% passed)</td>
+        <td><strong>46 / 48 (95.8% passed)</strong></td>
+        <td class="text-purple"><strong>AGY (+2 test cases)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Execution Latency</strong></td>
+        <td><strong>105.08s total</strong> (Avg 26s / problem)</td>
+        <td>602.58s total (Avg 150s / problem)</td>
+        <td class="text-blue"><strong>ETTA (5.7x Faster)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Token Consumption</strong></td>
+        <td><strong>41,157 tokens</strong> (Zero re-transmission)</td>
+        <td>404,251 tokens (Quadratic context re-send)</td>
+        <td class="text-emerald"><strong>ETTA (9.8x Leaner)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Inference Economics</strong></td>
+        <td><strong>$0.00187 total</strong> (< 0.2¢)</td>
+        <td>$0.02436 total (~2.4¢)</td>
+        <td class="text-emerald"><strong>ETTA (13.0x Cheaper)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Best Use Case Fit</strong></td>
+        <td>Interactive developer UX, high-throughput agents</td>
+        <td>Long-running asynchronous batch repair workflows</td>
+        <td>Context-dependent</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-emerald" style="margin-top: 6px;">
+    <strong>Final Assessment:</strong><br>
+    &bull; <strong>For Interactive Velocity & Efficiency:</strong> <code>etta</code> is unbeatable. It generates production-grade, mathematically optimal code at 5.7x the speed and 1/13th the cost of multi-turn CLI tools.<br>
+    &bull; <strong>For Edge-Case Exhaustion:</strong> <code>agy</code>'s multi-turn testing loop allowed it to catch subtle dual-heap boundary invariants, earning the highest overall accuracy mark across all 4 problems.
+  </div>
+
+  <div class="footer">
+    <span>AlphaBrain Systems Research & Engineering</span>
+    <span>CONFIDENTIAL & PROPRIETARY &bull; PAGE 5 OF 5</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "benchmark_id": 4,
+  "name": "Live Head-to-Head: Greenfield Multi-Tenant Auth Service Synthesis",
+  "timestamp_utc": "2026-09-22 01:59:33 UTC",
+  "prompt": "Create `auth_service.py` in the current workspace directory using file creation tools. Implement production Python functions:\n1. `issue_tokens(user_id: str, secret: str) -> dict`: returns `{'access_token': str, 'refresh_token': str}` using `jwt.encode` (HS256). The token payload must include `'user_id': user_id` and `'sub': user_id`.\n2. `verify_token(token: str, secret: str) -> dict`: returns decoded payload dictionary using `jwt.decode` (HS256, algorithms=['HS256']).\n3. `hash_password(password: str) -> str`: hashes password using `bcrypt.hashpw` and `bcrypt.gensalt`, returning string.\n4. `verify_password(password: str, hashed: str) -> bool`: verifies password using `bcrypt.checkpw`, returning bool.\nYou MUST write the file `auth_service.py` on disk in the current workspace so the test suite can import it. Run `pytest` to confirm tests pass cleanly.",
+  "exchange_rate": "1 USD = 95.80 INR",
+  "etta": {
+    "provider": "google",
+    "model": "gemini-3.8-flash-high",
+    "thinking_level": "high",
+    "wall_clock_seconds": 19.92,
+    "file_created": true,
+    "pytest_passed": true,
+    "status": "success",
+    "exit_code": 0,
+    "tokens_used": 5618,
+    "input_tokens": 4616,
+    "output_tokens": 476,
+    "thinking_tokens": 0,
+    "cost_usd": 0.005247,
+    "cost_inr": 0.5027
+  },
+  "agy": {
+    "provider": "google",
+    "model": "gemini-3.8-flash-high",
+    "thinking_level": "high",
+    "wall_clock_seconds": 62.97,
+    "file_created": true,
+    "pytest_passed": true,
+    "status": "success",
+    "exit_code": 0,
+    "tokens_used": 72141,
+    "input_tokens": 65209,
+    "output_tokens": 6932,
+    "thinking_tokens": 4048,
+    "cost_usd": 0.074902,
+    "cost_inr": 7.1756
+  },
+  "variance": {
+    "token_ratio": 12.84,
+    "cost_savings_pct": 92.99
+  }
+}

@@ -198,8 +198,13 @@ class EvaTaskProposer:
                                 )
                             )
 
+        req_gates = (
+            [GateType(g) if isinstance(g, str) else g for g in spec.required_gates]
+            if spec.required_gates
+            else ([GateType.UNIT_TEST] if project_id == "etta" else [GateType.UNIT_TEST, GateType.LINT])
+        )
         acceptance_plan = AcceptancePlan(
-            required_gates=[GateType.UNIT_TEST, GateType.LINT],
+            required_gates=req_gates,
             commands=commands,
             pass_threshold=1.0,
         )

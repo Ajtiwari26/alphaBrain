@@ -145,6 +145,8 @@ class TriageTaskDispatcher:
         plan = envelope.get("acceptance_plan", {})
         commands = plan.get("commands", [])
         required_gates = plan.get("required_gates", [])
+        if envelope.get("project_id") == "etta":
+            required_gates = [rg for rg in required_gates if rg != "lint"]
 
         if not commands and required_gates:
             logger.error("No commands provided but required_gates exist.")

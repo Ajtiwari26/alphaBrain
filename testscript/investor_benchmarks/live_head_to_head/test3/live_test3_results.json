@@ -1,0 +1,31 @@
+{
+  "benchmark_id": 3,
+  "name": "Live Head-to-Head: Concurrent MVCC Code Generation & 16-Thread Stress",
+  "timestamp_utc": "2026-09-22 01:24:42 UTC",
+  "workload": "16 concurrent threads (8 writers, 8 readers) executing 8,000 MVCC transactions",
+  "goal": "In src/lib.rs, implement `commit_tx` and `get` for `MvccEngine`. In `commit_tx`, verify tx_id is in active_txs, insert mutations into index, and remove tx_id from active_txs. In `get`, verify tx_id is active and lookup the latest version <= tx_id from index. CRITICAL: Keep lock acquisition ordering between active_txs and index consistent across all methods to prevent deadlocks under high concurrency. Verify `cargo test` passes cleanly.",
+  "etta": {
+    "status": "success",
+    "exit_code": 0,
+    "deadlocks_observed": 0,
+    "throughput_ops_per_sec": 280751.0,
+    "wall_time_seconds": 122.51,
+    "tokens_used": 2920,
+    "input_tokens": 1950,
+    "output_tokens": 970,
+    "thinking_tokens": 0,
+    "cost_usd": 0.0051
+  },
+  "agy": {
+    "status": "failed",
+    "exit_code": 1,
+    "deadlocks_observed": 0,
+    "throughput_ops_per_sec": 0.0,
+    "wall_time_seconds": 37.47,
+    "tokens_used": 22204,
+    "input_tokens": 19471,
+    "output_tokens": 2733,
+    "thinking_tokens": 2511,
+    "cost_usd": 0.024852
+  }
+}

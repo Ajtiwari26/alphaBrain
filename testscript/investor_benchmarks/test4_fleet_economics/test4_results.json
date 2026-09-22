@@ -1,0 +1,56 @@
+{
+  "test_id": 4,
+  "title": "The Fleet Economics Challenge (Concurrent Fleet Generation)",
+  "workload": "Parallel synthesis of 4 core production microservices",
+  "etta": {
+    "status": "success",
+    "services_generated": 4,
+    "wall_clock_time_s": 79.45,
+    "total_tokens": 1800,
+    "total_cost_usd": 0.00088,
+    "parallel_concurrency": "4x Concurrent Worker Processes"
+  },
+  "agy_baseline": {
+    "status": "success",
+    "services_generated": 4,
+    "wall_clock_time_s": 154.0,
+    "total_tokens": 136000,
+    "total_cost_usd": 0.068,
+    "architecture": "Multi-turn heavy subagents with full conversation transcript re-transmission"
+  },
+  "multipliers": {
+    "speedup": "1.9x Wall-Clock Speedup",
+    "token_reduction": "75.6x Lower Token Burn",
+    "cost_savings": "98.7% Cost Reduction"
+  },
+  "breakdown": [
+    {
+      "service": "webhook_service.py",
+      "status": "success",
+      "latency_s": 47.69,
+      "tokens": 450,
+      "cost_usd": 0.00022
+    },
+    {
+      "service": "billing_service.py",
+      "status": "success",
+      "latency_s": 52.67,
+      "tokens": 450,
+      "cost_usd": 0.00022
+    },
+    {
+      "service": "telemetry_service.py",
+      "status": "success",
+      "latency_s": 58.79,
+      "tokens": 450,
+      "cost_usd": 0.00022
+    },
+    {
+      "service": "auth_service.py",
+      "status": "success",
+      "latency_s": 79.45,
+      "tokens": 450,
+      "cost_usd": 0.00022
+    }
+  ]
+}
