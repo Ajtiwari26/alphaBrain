@@ -108,6 +108,8 @@ Gemini 3.1 Pro High.
 
 - [x] Deliver full-bleed pro-density layout for macOS Desktop screens M-01 to M-04 eliminating center white space and vertical void (`commit 994c948`, `tsk_eva_625d9f6d7ee6`).
 
+- [x] Integrate ETTA v0.2.0 as autonomous coding worker in AlphaBrain (`commit 285a9ce`, `tsk_eva_738ff1789db9`).
+
 ### Active / In-Progress
 
 - [x] Parallel Worker Dispatcher Daemon: concurrent task pool across isolated worktrees (`commit c859b57`, `tsk_eva_faabb0476659`).

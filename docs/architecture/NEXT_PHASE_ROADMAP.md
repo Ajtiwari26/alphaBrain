@@ -133,6 +133,10 @@ Telephony and voice features (`alpha_meet`, `alpha_voice`, AgentLine, etc.) are 
 - **Status**: `[x] COMPLETED & MERGED` (`commit a8a9a06`, `tsk_eva_705c95a348b8`)
 - **Objective**: Update testscript/test_android_production_release.py to use pytest.skip when production APK is absent in isolated worktree sandbox
 
+### Integrate ETTA v0.2.0 as autonomous coding worker in AlphaBrain
+- **Status**: `[x] COMPLETED & MERGED` (`commit 285a9ce`, `tsk_eva_738ff1789db9`)
+- **Objective**: Integrate ETTA v0.2.0 as autonomous coding worker in AlphaBrain
+
 ---
 
 ## Active Parallel Development Pipeline (Current)
