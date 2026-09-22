@@ -48,7 +48,17 @@ include = ["alpha_core*", "alpha_meet*", "alpha_protocol*", "alpha_voice*", "alp
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["testscript"]
-norecursedirs = ["testscript/dev_artifacts", "testscript/scratch", "scratch"]
+norecursedirs = [
+    "testscript/dev_artifacts",
+    "testscript/scratch",
+    "scratch",
+    "testscript/triathlon_contest",
+    "testscript/grandmaster_contest",
+    "testscript/astar_contest",
+    "testscript/decathlon_contest",
+    "testscript/dual_gauntlet",
+    "testscript/investor_benchmarks",
+]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
@@ -68,6 +78,17 @@ exclude = [
     "testscript/scratch",
     "testscript/dev_artifacts",
     "testscript/archive",
+    "testscript/triathlon_contest",
+    "testscript/grandmaster_contest",
+    "testscript/astar_contest",
+    "testscript/decathlon_contest",
+    "testscript/dual_gauntlet",
+    "testscript/investor_benchmarks",
+    "testscript/splash_preview",
+    "testscript/wireframe_preview",
+    "testscript/evidence",
+    "testscript/research",
+    "testscript/qa_smoke_test.py",
     "pytest-of-*",
 ]
 

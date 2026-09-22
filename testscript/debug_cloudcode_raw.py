@@ -3,6 +3,7 @@ import json
 import urllib.request
 from pathlib import Path
 
+
 def test():
     home = Path.home()
     token_file = home / ".gemini" / "profiles" / "snapthinktrader@gmail.com" / "jetski-standalone-oauth-token"

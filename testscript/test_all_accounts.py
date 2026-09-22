@@ -3,7 +3,6 @@
 Test which saved accounts have a valid Google Cloud Code license.
 """
 
-import os
 import json
 import urllib.request
 from pathlib import Path
