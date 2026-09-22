@@ -3,11 +3,10 @@
 Diagnostic test script to inspect raw Cloud Code SSE response for Challenge 2.
 """
 
-import os
-import sys
 import json
 import urllib.request
 from pathlib import Path
+
 
 def get_token():
     home = Path.home()
@@ -67,9 +66,9 @@ def test_cloud_code():
     ]
 
     for test_model in models_to_test:
-        print(f"\n==========================================")
+        print("\n==========================================")
         print(f"Testing model: {test_model}")
-        print(f"==========================================")
+        print("==========================================")
         payload = {
             "project": "aicode-consumers",
             "model": test_model,
@@ -111,11 +110,6 @@ def test_cloud_code():
                                 parts = c.get("content", {}).get("parts") or c.get("parts", [])
                                 for p in parts:
                                     is_th = p.get("thought", False)
-                                    txt = p.get("text", "")
-                                    preview = txt[:60].replace("\n", " ")
-                                    print(f"  Chunk #{chunk_count} [thought={is_th}] len={len(txt)}: {preview}")
-                        except Exception as e:
-                            print(f"  Chunk #{chunk_count} parse error: {e}")
                                     txt = p.get("text", "")
                                     preview = txt[:60].replace("\n", " ")
                                     print(f"  Chunk #{chunk_count} [thought={is_th}] len={len(txt)}: {preview}")
