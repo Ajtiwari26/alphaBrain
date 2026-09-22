@@ -151,6 +151,17 @@ class Settings(BaseModel):
     CLIENT_PROJECTS_ROOT: Path = Path(
         os.getenv("CLIENT_PROJECTS_ROOT", "/Users/ajaytiwari/Desktop/Projects/clientProjects")
     )
+    ALPHA_WORKER_ENGINE: str = os.getenv("ALPHA_WORKER_ENGINE", "antigravity")
+    ETTA_BIN: Path = Path(
+        os.getenv("ETTA_BIN", str(Path.home() / ".cargo" / "bin" / "etta"))
+    )
+    ETTA_EXECUTION_ENABLED: bool = (
+        os.getenv("ETTA_EXECUTION_ENABLED", "true").lower() == "true"
+    )
+    ETTA_MODEL: str = os.getenv("ETTA_MODEL", "gemini-3.8-flash-high")
+    ETTA_EFFORT: str = os.getenv("ETTA_EFFORT", "auto")
+    ETTA_TASK_TIMEOUT_SECONDS: int = int(os.getenv("ETTA_TASK_TIMEOUT_SECONDS", "1200"))
+
     ANTIGRAVITY_EXECUTION_ENABLED: bool = (
         os.getenv("ANTIGRAVITY_EXECUTION_ENABLED", "true").lower() == "true"
     )

@@ -32,8 +32,12 @@ from typing import Any, cast
 from alpha_core.config import settings
 from alpha_core.queue.triage_queue import TaskTriageQueue
 from alpha_protocol import AgentType, GateType, RiskClass, TaskEnvelope
-from alpha_worker.adapters.antigravity import AntigravityAdapter
-from alpha_worker.adapters.antigravity_live import AntigravityLiveBridge
+from alpha_worker.adapters import (
+    AntigravityAdapter,
+    AntigravityLiveBridge,
+    EttaAdapter,
+    EttaLiveBridge,
+)
 from alpha_worker.worktree import WorktreeManager
 
 logger = logging.getLogger("alpha_worker.triage_dispatcher")
@@ -73,21 +77,33 @@ class TriageTaskDispatcher:
         queue: TaskTriageQueue,
         worktree_mgr: WorktreeManager | None = None,
         default_base_commit: str | None = None,
-        live_bridge: AntigravityLiveBridge | None = None,
-        adapter: AntigravityAdapter | None = None,
+        live_bridge: Any | None = None,
+        adapter: Any | None = None,
         enable_agent_execution: bool | None = None,
     ) -> None:
         self.queue = queue
         self.worktree_mgr = worktree_mgr or WorktreeManager()
         self.default_base_commit = default_base_commit
-        self.live_bridge = live_bridge or AntigravityLiveBridge()
-        self.adapter = adapter or AntigravityAdapter()
+
+        engine = getattr(settings, "ALPHA_WORKER_ENGINE", "antigravity").lower()
+        if engine == "etta":
+            self.live_bridge = live_bridge or EttaLiveBridge()
+            self.adapter = adapter or EttaAdapter(live_bridge=self.live_bridge)
+        else:
+            self.live_bridge = live_bridge or AntigravityLiveBridge()
+            self.adapter = adapter or AntigravityAdapter()
+
         if enable_agent_execution is not None:
             self.enable_agent_execution = enable_agent_execution
         else:
-            self.enable_agent_execution = (
-                settings.ENV != "test"
-            ) and settings.ANTIGRAVITY_EXECUTION_ENABLED
+            if engine == "etta":
+                self.enable_agent_execution = (
+                    settings.ENV != "test"
+                ) and getattr(settings, "ETTA_EXECUTION_ENABLED", True)
+            else:
+                self.enable_agent_execution = (
+                    settings.ENV != "test"
+                ) and settings.ANTIGRAVITY_EXECUTION_ENABLED
 
     def lease_task(self) -> dict[str, Any] | None:
         """
@@ -458,28 +474,51 @@ class TriageTaskDispatcher:
         worktree_path = worktree_path_obj
 
         try:
-            # 2.5. Launch the local AGY coding agent inside the worktree if enabled
+            # 2.5. Launch the local coding agent inside the worktree if enabled
             if self.enable_agent_execution:
-                ready, reason = self.live_bridge.check_readiness()
+                preferred_agent = envelope.get("preferred_agent")
+                active_bridge = self.live_bridge
+                active_adapter = self.adapter
+
+                if preferred_agent in (
+                    AgentType.ETTA,
+                    AgentType.ETTA.value,
+                    "etta",
+                ) and not isinstance(active_adapter, EttaAdapter):
+                    active_bridge = EttaLiveBridge()
+                    active_adapter = EttaAdapter(live_bridge=active_bridge)
+                elif preferred_agent in (
+                    AgentType.ANTIGRAVITY,
+                    AgentType.ANTIGRAVITY.value,
+                    "antigravity",
+                ) and not isinstance(active_adapter, AntigravityAdapter):
+                    active_bridge = AntigravityLiveBridge()
+                    active_adapter = AntigravityAdapter()
+
+                ready, reason = active_bridge.check_readiness()
+                agent_name = "ETTA" if isinstance(active_adapter, EttaAdapter) else "AGY"
                 if not ready:
-                    err_msg = f"AGY execution enabled but bridge not ready: {reason}"
+                    err_msg = f"{agent_name} execution enabled but bridge not ready: {reason}"
                     logger.warning(err_msg)
                     self.queue.fail_task(
                         task_id, error_details={"error": err_msg}, allow_retry=True
                     )
                     return None
 
-                logger.info("Launching local AGY coding agent inside worktree: %s", worktree_path)
+                logger.info(
+                    "Launching local %s coding agent inside worktree: %s", agent_name, worktree_path
+                )
                 try:
                     task_env = self._build_task_envelope(leased_task, worktree_path)
-                    session_dir = self.adapter.setup_session_in_memory_graph(
+                    session_dir = active_adapter.setup_session_in_memory_graph(
                         task_env, worktree_path
                     )
                     dispatch_res = self._run_async_dispatch(
-                        task_env, worktree_path, attempt_id, session_dir
+                        task_env, worktree_path, attempt_id, session_dir, bridge=active_bridge
                     )
                     logger.info(
-                        "AGY agent completed turn for %s. Completed: %s, changed files: %s",
+                        "%s agent completed turn for %s. Completed: %s, changed files: %s",
+                        agent_name,
                         task_id,
                         getattr(dispatch_res, "completed", False),
                         getattr(dispatch_res, "changed_files", []),
@@ -488,17 +527,19 @@ class TriageTaskDispatcher:
                         err_msg = (
                             getattr(dispatch_res, "error_msg", None)
                             or getattr(dispatch_res, "blocked_reason", None)
-                            or f"AGY dispatcher returned completed=False for task {task_id}"
+                            or f"{agent_name} dispatcher returned completed=False for task {task_id}"
                         )
                         self.queue.fail_task(
                             task_id, error_details={"error": err_msg}, allow_retry=True
                         )
                         return None
-                except Exception as agy_err:
-                    logger.error("AGY coding agent error on task %s: %s", task_id, agy_err)
+                except Exception as agent_err:
+                    logger.error(
+                        "%s coding agent error on task %s: %s", agent_name, task_id, agent_err
+                    )
                     self.queue.fail_task(
                         task_id,
-                        error_details={"error": f"Agent error: {agy_err}"},
+                        error_details={"error": f"Agent error: {agent_err}"},
                         allow_retry=True,
                     )
                     return None
@@ -743,8 +784,9 @@ class TriageTaskDispatcher:
         env_dict.setdefault("project_id", "alphabrain_triage")
         env_dict.setdefault("repo", str(worktree_path))
         env_dict.setdefault("base_commit", self.default_base_commit)
-
-        env_dict.setdefault("preferred_agent", AgentType.ANTIGRAVITY)
+        engine = getattr(settings, "ALPHA_WORKER_ENGINE", "antigravity").lower()
+        default_agent = AgentType.ETTA if engine == "etta" else AgentType.ANTIGRAVITY
+        env_dict.setdefault("preferred_agent", default_agent)
         env_dict.setdefault("risk_class", RiskClass.LOW)
 
         evidence_list = leased_task.get("result", {}).get("evidence", [])
@@ -844,7 +886,9 @@ class TriageTaskDispatcher:
         worktree_path: Path,
         attempt_id: str,
         session_dir: Path | None = None,
+        bridge: Any | None = None,
     ) -> Any:
+        active_bridge = bridge or self.live_bridge
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -854,9 +898,9 @@ class TriageTaskDispatcher:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 return executor.submit(
                     asyncio.run,
-                    self.live_bridge.dispatch(task, worktree_path, attempt_id, session_dir),
+                    active_bridge.dispatch(task, worktree_path, attempt_id, session_dir),
                 ).result()
         else:
             return asyncio.run(
-                self.live_bridge.dispatch(task, worktree_path, attempt_id, session_dir)
+                active_bridge.dispatch(task, worktree_path, attempt_id, session_dir)
             )

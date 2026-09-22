@@ -81,9 +81,10 @@ class AgentType(str, Enum):
     CODEX = "codex"
     GEMINI = "gemini"
     STITCH = "stitch"
+    ETTA = "etta"
 
 
-EXECUTION_ENABLED_AGENTS = frozenset({AgentType.ANTIGRAVITY})
+EXECUTION_ENABLED_AGENTS = frozenset({AgentType.ANTIGRAVITY, AgentType.ETTA})
 
 
 class AgentReadiness(str, Enum):
