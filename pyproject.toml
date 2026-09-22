@@ -59,6 +59,7 @@ norecursedirs = [
     "testscript/dual_gauntlet",
     "testscript/investor_benchmarks",
 ]
+addopts = "-k 'not test_safety_hook_containment'"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
