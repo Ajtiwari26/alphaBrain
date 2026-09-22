@@ -26,7 +26,10 @@ def advance_checkout(repo: str, base: str, result: str) -> None:
         raise ValueError("Promotion destination must have main checked out")
     current = git("rev-parse", "HEAD")
     if current not in (base, result):
-        raise ValueError("Destination advanced or diverged; refusing promotion")
+        try:
+            git("merge-base", "--is-ancestor", current, result)
+        except subprocess.CalledProcessError:
+            raise ValueError("Destination advanced or diverged; refusing promotion") from None
     clean()
     git("merge-base", "--is-ancestor", base, result)
     if current != result:
