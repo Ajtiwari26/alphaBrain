@@ -13,6 +13,7 @@ import subprocess
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 from alpha_core.eva.spec_extractor import ExtractedSpecification
 from alpha_protocol.enums import AgentType, GateType, RiskClass
@@ -198,8 +199,16 @@ class EvaTaskProposer:
                                 )
                             )
 
+        def _to_gate_type(g: Any) -> GateType:
+            if isinstance(g, GateType):
+                return g
+            try:
+                return GateType(str(g))
+            except ValueError:
+                return GateType.UNIT_TEST
+
         req_gates = (
-            [GateType(g) if isinstance(g, str) else g for g in spec.required_gates]
+            [_to_gate_type(g) for g in spec.required_gates]
             if spec.required_gates
             else ([GateType.UNIT_TEST] if project_id == "etta" else [GateType.UNIT_TEST, GateType.LINT])
         )
