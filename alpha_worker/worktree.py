@@ -1,3 +1,4 @@
+import fnmatch
 import re
 import shutil
 import subprocess
@@ -87,10 +88,85 @@ class WorktreeManager:
             raise RuntimeError("Insufficient free disk for task worktree")
 
     @staticmethod
-    def find_disallowed_changes(changed_files: list[str], allowed_paths: list[str]) -> list[str]:
+    def find_disallowed_changes(
+        changed_files: list[str],
+        allowed_paths: list[str],
+    ) -> list[str]:
+        """Check changed files against allowed path patterns.
+
+        Supports:
+        - Plain paths: exact match or is_relative_to containment (backward compatible)
+        - Glob patterns: fnmatch-style patterns (*, ?, [seq])
+        - Recursive globs: ** matches any number of directories
+        - Negative patterns: !pattern explicitly denies even if a positive pattern allows
+
+        Args:
+            changed_files: List of relative file paths that were changed.
+            allowed_paths: List of allowed path patterns. May include glob chars
+                (*, ?, **) and negative patterns prefixed with '!'.
+
+        Returns:
+            List of file paths that are NOT allowed (violations).
+        """
         if "." in allowed_paths:
             return []
-        allowed = [PurePath(path) for path in allowed_paths]
+
+        def _is_glob_pattern(pattern: str) -> bool:
+            if "*" in pattern or "?" in pattern:
+                return True
+            if "[" in pattern and "]" in pattern:
+                return True
+            return False
+
+        def _matches_pattern(file_str: str, path: PurePath, pattern: str) -> bool:
+            try:
+                if hasattr(path, "full_match") and path.full_match(pattern):
+                    return True
+                if path.match(pattern):
+                    return True
+                if "**" in pattern:
+                    zero_pat = pattern.replace("/**/", "/")
+                    if zero_pat != pattern:
+                        if hasattr(path, "full_match") and path.full_match(zero_pat):
+                            return True
+                        if path.match(zero_pat):
+                            return True
+                    if pattern.startswith("**/"):
+                        sub_pat = pattern[3:]
+                        if hasattr(path, "full_match") and path.full_match(sub_pat):
+                            return True
+                        if path.match(sub_pat):
+                            return True
+            except Exception:
+                pass
+
+            try:
+                if fnmatch.fnmatch(file_str, pattern):
+                    return True
+            except Exception:
+                pass
+
+            try:
+                pat_path = PurePath(pattern)
+                if path == pat_path or path.is_relative_to(pat_path):
+                    return True
+            except (ValueError, TypeError):
+                pass
+
+            return False
+
+        negative_patterns: list[str] = []
+        positive_plain: list[PurePath] = []
+        positive_globs: list[str] = []
+
+        for raw_path in allowed_paths:
+            if raw_path.startswith("!"):
+                negative_patterns.append(raw_path[1:])
+            elif _is_glob_pattern(raw_path):
+                positive_globs.append(raw_path)
+            else:
+                positive_plain.append(PurePath(raw_path))
+
         violations: list[str] = []
         for changed_file in changed_files:
             changed_path = PurePath(changed_file)
@@ -100,11 +176,31 @@ class WorktreeManager:
             if changed_path.is_absolute() or ".." in changed_path.parts:
                 violations.append(changed_file)
                 continue
-            if not any(
-                changed_path == allowed_path or changed_path.is_relative_to(allowed_path)
-                for allowed_path in allowed
+
+            # Check negative patterns first (preempting any positive match)
+            if any(
+                _matches_pattern(changed_file, changed_path, neg_pat)
+                for neg_pat in negative_patterns
             ):
                 violations.append(changed_file)
+                continue
+
+            # Check positive plain paths (exact match or relative directory containment)
+            if any(
+                changed_path == allowed or changed_path.is_relative_to(allowed)
+                for allowed in positive_plain
+            ):
+                continue
+
+            # Check positive glob patterns
+            if any(
+                _matches_pattern(changed_file, changed_path, glob_pat)
+                for glob_pat in positive_globs
+            ):
+                continue
+
+            violations.append(changed_file)
+
         return violations
 
     def create_worktree(

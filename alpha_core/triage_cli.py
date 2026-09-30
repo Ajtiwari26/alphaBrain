@@ -22,8 +22,6 @@ import sys
 from pathlib import Path
 from typing import cast
 
-from alpha_core.automation.todo_sync import sync_task_completion
-from alpha_core.promotion_checkout import advance_checkout
 from alpha_core.queue.triage_queue import (
     DEFAULT_DB_PATH,
     DEFAULT_EMERGENCY_LOCK,
@@ -537,7 +535,6 @@ def cmd_admit(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
     repo_candidate = getattr(args, "repo", None)
     repo = str(Path(repo_candidate).resolve()) if repo_candidate else str(Path.cwd().resolve())
     proposer = EvaTaskProposer()
-    import subprocess
 
     # Resolve HEAD to strict 40-char SHA
     base_commit_sha = subprocess.run(
@@ -709,6 +706,9 @@ def cmd_senior_review(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
 
 
 def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
+    from alpha_worker.senior_merge_reconciler import MergeReconcilerConfig, SeniorMergeReconciler
+    from alpha_worker.senior_review_engine import SeniorReviewVerdict
+
     task = queue.get_task(args.task_id)
     if not task:
         print(f"Error: Task '{args.task_id}' not found.", file=sys.stderr)
@@ -738,7 +738,6 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         )
         return 1
 
-    worktree_path = task.get("worktree_path")
     branch_name = task.get("branch_name")
     repo_path = task.get("envelope", {}).get("repo", ".")
 
@@ -746,431 +745,41 @@ def cmd_merge(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
         print(f"Error: Missing branch name in task record '{args.task_id}'.", file=sys.stderr)
         return 1
 
-    # A3: SLSA Provenance check - compare branch tip to result_sha
-    result_sha = result.get("result_sha")
-    if not result_sha:
-        result_sha = senior_review.get("result_sha")
+    details = senior_review.get("details") or senior_review
+    verdict_kwargs = {k: v for k, v in details.items() if k in SeniorReviewVerdict.__dataclass_fields__}
+    verdict = SeniorReviewVerdict(**verdict_kwargs)
 
-    if not result_sha:
-        print(
-            "Error: Missing result_sha. Immutable result binding is required for promotion.",
-            file=sys.stderr,
-        )
-        return 1
-
-    attestation_dict = senior_review.get("attestation") or (senior_review.get("details") or {}).get(
-        "attestation"
+    config = MergeReconcilerConfig(
+        repo_path=Path(repo_path),
+        dry_run=getattr(args, "dry_run", False)
     )
-    if not attestation_dict:
-        print("Error: Missing cryptographically signed ReviewAttestation.", file=sys.stderr)
-        return 1
-
-    import os
-
-    import pydantic
-
-    from alpha_protocol.task import ReviewAttestation
-
+    reconciler = SeniorMergeReconciler(config)
     try:
-        att = ReviewAttestation(**attestation_dict)
-    except pydantic.ValidationError as e:
-        if "Attestation has expired" in str(e):
-            print("Error: Review attestation has expired (TTL exceeded).", file=sys.stderr)
+        receipt = reconciler.reconcile(verdict, branch_name, queue=queue)
+
+        if receipt.state.value == "completed" and not getattr(args, "dry_run", False):
+            def _mark_merged(conn):
+                conn.execute("UPDATE tasks SET status = ? WHERE id = ?", ("merged", args.task_id))
+                return True
+            queue._execute_write_with_retry(_mark_merged)
+
+        if getattr(args, "json", False):
+            print(json.dumps(receipt.to_dict()))
         else:
-            print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
-        return 1
+            print("Merge Receipt:")
+            print(f"  Task ID: {receipt.task_id}")
+            print(f"  State: {receipt.state.value}")
+            print(f"  Pre-merge HEAD: {receipt.pre_merge_main_head}")
+            print(f"  Post-merge HEAD: {receipt.post_merge_main_head}")
+            print(f"  Branch HEAD: {receipt.task_branch_head}")
+            print(f"  Gate Output: {receipt.gate_output or 'N/A'}")
+            if receipt.error_message:
+                print(f"  Error: {receipt.error_message}")
+                return 1
+        return 0
     except Exception as e:
-        print(f"Error: Invalid ReviewAttestation format. {e}", file=sys.stderr)
+        print(f"Merge failed: {e}", file=sys.stderr)
         return 1
-
-    from alpha_protocol.task import REGISTERED_REVIEW_KEYS
-
-    if att.key_id not in REGISTERED_REVIEW_KEYS:
-        print(f"Error: Unknown or unregistered key_id '{att.key_id}'.", file=sys.stderr)
-        return 1
-
-    revoked_keys = os.environ.get("ALPHA_REVOKED_KEYS", "").split(",")
-    if att.key_id in revoked_keys:
-        print(f"Error: Attestation signed with a revoked key_id '{att.key_id}'.", file=sys.stderr)
-        return 1
-
-    signing_secret = os.environ.get(f"ALPHA_SIGNING_SECRET_{att.key_id}")
-    if not signing_secret:
-        print(f"Error: Missing specific signing secret for key_id '{att.key_id}'.", file=sys.stderr)
-        return 1
-
-    if not att.verify(signing_secret):
-        print("Error: ReviewAttestation signature verification failed.", file=sys.stderr)
-        return 1
-
-    legacy_nonce_file = Path(repo_path) / ".alphabrain" / "seen_nonces.txt"
-    promotions_dir = Path(repo_path) / ".alphabrain" / "promotions"
-
-    if att.task_id != args.task_id:
-        print(
-            f"Error: Attestation task_id '{att.task_id}' does not match target task_id '{args.task_id}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    if att.result_sha != result_sha:
-        print(
-            f"Error: Attestation result_sha '{att.result_sha}' does not match expected result_sha '{result_sha}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    expected_base_commit = task.get("envelope", {}).get("base_commit")
-    if att.base_commit != expected_base_commit:
-        print(
-            f"Error: Attestation base_commit '{att.base_commit}' does not match task base_commit '{expected_base_commit}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    if not att.approved or att.pro_verdict != "APPROVE" or att.opus_verdict != "FINAL_APPROVAL":
-        print(
-            "Error: Attestation indicates senior review was not approved or contains inconsistent verdicts.",
-            file=sys.stderr,
-        )
-        return 1
-
-    expected_evidence_digest = ReviewAttestation.compute_evidence_digest(result.get("evidence", {}))
-    if att.evidence_digest != expected_evidence_digest:
-        print(
-            f"Error: Attestation evidence_digest '{att.evidence_digest}' does not match task evidence_digest '{expected_evidence_digest}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    lease_meta = (task.get("provenance") or {}).get("lease_metadata") or {}
-    auth_attempt_id = lease_meta.get("attempt_id")
-    auth_worker_id = lease_meta.get("worker_id")
-
-    if not auth_attempt_id or auth_attempt_id in ("att_unknown", "None", ""):
-        print(
-            "Error: Task provenance is missing or has invalid authoritative lease attempt_id.",
-            file=sys.stderr,
-        )
-        return 1
-
-    if not auth_worker_id or auth_worker_id in ("worker_unknown", "None", ""):
-        print(
-            "Error: Task provenance is missing or has invalid authoritative lease worker_id.",
-            file=sys.stderr,
-        )
-        return 1
-
-    expected_attempt_id = result.get("attempt_id")
-    expected_worker_id = result.get("worker_id")
-
-    if not expected_attempt_id or expected_attempt_id in ("att_unknown", "None", ""):
-        print("Error: Task result is missing or has invalid attempt_id.", file=sys.stderr)
-        return 1
-
-    if not expected_worker_id or expected_worker_id in ("worker_unknown", "None", ""):
-        print("Error: Task result is missing or has invalid worker_id.", file=sys.stderr)
-        return 1
-
-    if expected_attempt_id != auth_attempt_id:
-        print(
-            f"Error: Task result attempt_id '{expected_attempt_id}' does not match authoritative lease metadata '{auth_attempt_id}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    if expected_worker_id != auth_worker_id:
-        print(
-            f"Error: Task result worker_id '{expected_worker_id}' does not match authoritative lease metadata '{auth_worker_id}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    if att.attempt_id != auth_attempt_id:
-        print(
-            f"Error: Attestation attempt_id '{att.attempt_id}' does not match authoritative lease metadata '{auth_attempt_id}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    if att.executor_id != auth_worker_id:
-        print(
-            f"Error: Attestation executor_id '{att.executor_id}' does not match authoritative lease metadata '{auth_worker_id}'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    import time
-
-    now = time.time()
-    if now >= att.expires_at or now < att.issued_at - 60.0:
-        print(
-            "Error: Attestation freshness validation failed just before promotion.", file=sys.stderr
-        )
-        return 1
-
-    print(f"Verifying gates passed and senior review for '{args.task_id}'... OK")
-    print(f"Executing fast-forward merge of '{branch_name}' into 'main'...")
-
-    import fcntl
-
-    lock_file_path = Path(repo_path) / ".alphabrain" / "promotion.lock"
-    lock_file_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(lock_file_path, "w") as lock_file:
-        try:
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            print(
-                "Error: Another promotion is currently in progress. Lock acquisition failed.",
-                file=sys.stderr,
-            )
-            return 1
-
-        now_crit = time.time()
-        if now_crit >= att.expires_at or now_crit < att.issued_at - 60.0:
-            print(
-                "Error: Attestation freshness validation failed inside promotion critical section.",
-                file=sys.stderr,
-            )
-            return 1
-
-        # 1. Legacy nonce check
-        if legacy_nonce_file.exists():
-            with open(legacy_nonce_file) as f:
-                if att.nonce in f.read().splitlines():
-                    print(
-                        f"Error: Replay attack detected. Nonce '{att.nonce}' has already been used.",
-                        file=sys.stderr,
-                    )
-                    return 1
-
-        promotions_dir.mkdir(parents=True, exist_ok=True)
-        nonce_state_file = promotions_dir / f"{att.nonce}.json"
-
-        # 2. State machine check
-        if nonce_state_file.exists():
-            with open(nonce_state_file) as f:
-                try:
-                    state_data = json.load(f)
-                except json.JSONDecodeError:
-                    print("Error: Corrupt durable state found.", file=sys.stderr)
-                    return 1
-
-            if (
-                state_data.get("task_id") != args.task_id
-                or state_data.get("result_sha") != result_sha
-                or state_data.get("attempt_id") != auth_attempt_id
-                or state_data.get("base_commit") != expected_base_commit
-                or state_data.get("evidence_digest") != expected_evidence_digest
-                or state_data.get("tree_digest") != att.tree_digest
-            ):
-                print(
-                    f"Error: Replay attack detected. Nonce '{att.nonce}' was used for a different request. "
-                    f"State: {state_data.get('tree_digest')}, Att: {att.tree_digest}, "
-                    f"State task: {state_data.get('task_id')}, Args task: {args.task_id}, "
-                    f"State result: {state_data.get('result_sha')}, Result: {result_sha}, "
-                    f"State attempt: {state_data.get('attempt_id')}, Auth attempt: {auth_attempt_id}, "
-                    f"State base: {state_data.get('base_commit')}, Expected base: {expected_base_commit}, "
-                    f"State evidence: {state_data.get('evidence_digest')}, Expected evidence: {expected_evidence_digest}",
-                    file=sys.stderr,
-                )
-                return 1
-
-            if state_data.get("state") == "FINALIZED":
-                try:
-                    advance_checkout(repo_path, expected_base_commit, result_sha)
-                    queue.record_task_promotion(args.task_id, result_sha)
-                except Exception as e:
-                    print(f"Error: Finalized promotion cannot be verified: {e}", file=sys.stderr)
-                    return 1
-                try:
-                    sync_task_completion(
-                        repo_path=repo_path,
-                        task_id=args.task_id,
-                        commit_sha=result_sha,
-                        task=task,
-                    )
-                except Exception as e:
-                    print(f"Warning: TODO/Roadmap synchronization failed: {e}", file=sys.stderr)
-                if getattr(args, "json", False):
-                    print(json.dumps({"task_id": args.task_id, "status": "merged"}))
-                else:
-                    print(
-                        f"✅ Successfully resumed idempotent promotion. Task '{args.task_id}' was already merged."
-                    )
-                return 0
-
-            if state_data.get("state") in ("RESERVED", "APPLIED"):
-                # Recover from crash
-                if state_data.get("state") == "RESERVED":
-                    try:
-                        tip_res = subprocess.run(
-                            ["git", "rev-parse", "main"],
-                            cwd=repo_path,
-                            capture_output=True,
-                            text=True,
-                            check=True,
-                        )
-                        if tip_res.stdout.strip() == result_sha:
-                            state_data["state"] = "APPLIED"
-                            _atomic_write_json(nonce_state_file, state_data)
-                    except subprocess.CalledProcessError:
-                        pass
-
-                if state_data.get("state") == "APPLIED":
-                    try:
-                        advance_checkout(repo_path, expected_base_commit, result_sha)
-                        queue.record_task_promotion(args.task_id, result_sha)
-                    except Exception as e:
-                        print(f"Error: Recovery refused: {e}", file=sys.stderr)
-                        return 1
-
-                    state_data["state"] = "FINALIZED"
-                    _atomic_write_json(nonce_state_file, state_data)
-
-                    try:
-                        sync_task_completion(
-                            repo_path=repo_path,
-                            task_id=args.task_id,
-                            commit_sha=result_sha,
-                            task=task,
-                        )
-                    except Exception as e:
-                        print(f"Warning: TODO/Roadmap synchronization failed: {e}", file=sys.stderr)
-
-                    if getattr(args, "json", False):
-                        print(json.dumps({"task_id": args.task_id, "status": "merged"}))
-                    else:
-                        print(
-                            f"✅ Successfully recovered from crash. Task '{args.task_id}' was already merged."
-                        )
-                    return 0
-        else:
-            # 3. Reserve nonce
-            state_data = {
-                "nonce": att.nonce,
-                "task_id": args.task_id,
-                "result_sha": result_sha,
-                "attempt_id": auth_attempt_id,
-                "base_commit": expected_base_commit,
-                "evidence_digest": expected_evidence_digest,
-                "tree_digest": att.tree_digest,
-                "state": "RESERVED",
-            }
-            _atomic_write_json(nonce_state_file, state_data)
-
-        # 4. Verify branch tips and trees now that we are in the reservation lock and guaranteed not to be a replay
-        try:
-            tip_res = subprocess.run(
-                ["git", "rev-parse", branch_name],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            branch_tip = tip_res.stdout.strip()
-            if branch_tip != result_sha:
-                print(
-                    f"Error: SLSA Provenance Failure. Branch tip {branch_tip} does not match approved result_sha {result_sha}.",
-                    file=sys.stderr,
-                )
-                return 1
-
-            tree_res = subprocess.run(
-                ["git", "rev-parse", f"{branch_name}^{{tree}}"],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            branch_tree = tree_res.stdout.strip()
-            if branch_tree != att.tree_digest:
-                print(
-                    f"Error: SLSA Provenance Failure. Branch tree {branch_tree} does not match attestation tree_digest {att.tree_digest}.",
-                    file=sys.stderr,
-                )
-                return 1
-        except subprocess.CalledProcessError:
-            print(f"Error: Could not resolve branch {branch_name} or its tree.", file=sys.stderr)
-            return 1
-
-        # 4.5. Fast-forward Ancestry Check
-        try:
-            ancestry_res = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", expected_base_commit, result_sha],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-            )
-            if ancestry_res.returncode != 0:
-                print(
-                    f"Error: SLSA Provenance Failure. Result commit {result_sha} is not a fast-forward of base {expected_base_commit}.",
-                    file=sys.stderr,
-                )
-                return 1
-        except subprocess.CalledProcessError as e:
-            print(f"Error: Git ancestry check failed.\n{e.stderr}", file=sys.stderr)
-            return 1
-
-        # Advance branch and checkout together before recording success.
-        try:
-            advance_checkout(repo_path, expected_base_commit, result_sha)
-            state_data["state"] = "APPLIED"
-            _atomic_write_json(nonce_state_file, state_data)
-            queue.record_task_promotion(args.task_id, result_sha)
-        except Exception as e:
-            print(f"Error: Promotion refused: {e}", file=sys.stderr)
-            return 1
-
-        # 6. Finalize state
-        state_data["state"] = "FINALIZED"
-        _atomic_write_json(nonce_state_file, state_data)
-
-        try:
-            sync_task_completion(
-                repo_path=repo_path,
-                task_id=args.task_id,
-                commit_sha=result_sha,
-                task=task,
-            )
-        except Exception as e:
-            print(f"Warning: TODO/Roadmap synchronization failed: {e}", file=sys.stderr)
-
-        if worktree_path and Path(worktree_path).exists():
-            print(f"Pruning git worktree '{worktree_path}'...")
-            try:
-                subprocess.run(
-                    ["git", "worktree", "remove", "--force", worktree_path],
-                    cwd=repo_path,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-            except subprocess.CalledProcessError as e:
-                print(
-                    f"Warning: Failed to prune worktree '{worktree_path}'.\n{e.stderr}",
-                    file=sys.stderr,
-                )
-
-        print(f"Deleting task branch '{branch_name}'...")
-        try:
-            subprocess.run(
-                ["git", "branch", "-d", branch_name],
-                cwd=repo_path,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"Warning: Failed to delete branch '{branch_name}'.\n{e.stderr}", file=sys.stderr)
-
-    if getattr(args, "json", False):
-        print(json.dumps({"task_id": args.task_id, "status": "merged"}))
-    else:
-        print(f"✅ Successfully merged and pruned task '{args.task_id}'.")
-
-    return 0
 
 
 def cmd_dag(args: argparse.Namespace, queue: TaskTriageQueue) -> int:
@@ -1421,6 +1030,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_merge.add_argument(
         "--skip-senior-review", action="store_true", help="Bypass mandatory 2-round senior review"
     )
+    p_merge.add_argument("--dry-run", action="store_true", help="Dry run without modifying main")
     p_merge.add_argument("--json", action="store_true", help="Output JSON format")
 
     # export-audit

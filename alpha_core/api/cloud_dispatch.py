@@ -130,6 +130,8 @@ class ProvisionSessionResponse(BaseModel):
     expires_in_seconds: int
     expires_at: float
     status: str
+    claimed_by_device_id: str | None = None
+    claimed_at: float | None = None
 
 
 class ClaimSessionRequest(BaseModel):
@@ -369,6 +371,31 @@ class ProvisioningSessionStore:
                     )
 
         return await asyncio.to_thread(_claim)
+
+    async def get_session(self, session_id: str) -> ProvisioningSession | None:
+        def _get() -> ProvisioningSession | None:
+            with closing(self._get_conn()) as conn:
+                row = conn.execute(
+                    "SELECT * FROM provisioning_sessions WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()
+                if not row:
+                    return None
+                return ProvisioningSession(
+                    session_id=row["session_id"],
+                    pairing_code=row["pairing_code"],
+                    provision_token=row["provision_token"],
+                    created_by=row["created_by_principal"],
+                    created_at=row["created_at"],
+                    expires_at=row["expires_at"],
+                    ttl_seconds=int(row["expires_at"] - row["created_at"]),
+                    status=row["status"],
+                    claimed_by_device_id=row["claimed_by_device_id"],
+                    claimed_at=row["claimed_at"],
+                    metadata=json.loads(row["metadata_json"]),
+                )
+
+        return await asyncio.to_thread(_get)
 
 
 class RegisteredDevice:
@@ -901,6 +928,40 @@ async def provision_session(
         expires_in_seconds=300,
         expires_at=session.expires_at,
         status=session.status,
+    )
+
+
+@router.get(
+    "/api/auth/provision-session/{session_id}",
+    response_model=ProvisionSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_provision_session(
+    session_id: str,
+    store: ProvisioningSessionStore = Depends(get_provisioning_store),
+) -> ProvisionSessionResponse:
+    session = await store.get_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Provisioning session '{session_id}' not found",
+        )
+    return ProvisionSessionResponse(
+        session_id=session.session_id,
+        pairing_code=session.pairing_code,
+        provision_token=session.provision_token,
+        qr_payload=json.dumps({
+            "session_id": session.session_id,
+            "pairing_code": session.pairing_code,
+            "provision_token": session.provision_token,
+            "expires_at": session.expires_at,
+            "version": "2.0",
+        }),
+        expires_in_seconds=max(0, int(session.expires_at - time.time())),
+        expires_at=session.expires_at,
+        status=session.status,
+        claimed_by_device_id=session.claimed_by_device_id,
+        claimed_at=session.claimed_at,
     )
 
 

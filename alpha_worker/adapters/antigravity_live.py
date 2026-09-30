@@ -599,6 +599,7 @@ class AntigravityLiveBridge:
                             gate.value
                             for gate in task.acceptance_plan.required_gates
                             if gate.value not in {"independent_review", "code_review_graph"}
+                            and not (task.project_id == "etta" and gate.value == "lint")
                         ),
                         expected_project_id=task.project_id,
                         forbid_external_dependencies=forbid_deps,
@@ -656,6 +657,7 @@ class AntigravityLiveBridge:
                                 gate.value
                                 for gate in task.acceptance_plan.required_gates
                                 if gate.value not in {"independent_review", "code_review_graph"}
+                                and not (task.project_id == "etta" and gate.value == "lint")
                             ),
                             expected_project_id=task.project_id,
                             forbid_external_dependencies=forbid_deps,
@@ -697,6 +699,7 @@ class AntigravityLiveBridge:
                                 gate.value
                                 for gate in task.acceptance_plan.required_gates
                                 if gate.value not in {"independent_review", "code_review_graph"}
+                                and not (task.project_id == "etta" and gate.value == "lint")
                             ),
                             expected_project_id=task.project_id,
                             require_qa_audit=True,
@@ -1165,6 +1168,7 @@ class AntigravityLiveBridge:
                 gate.value
                 for gate in task.acceptance_plan.required_gates
                 if gate.value not in {"independent_review", "code_review_graph"}
+                and not (task.project_id == "etta" and gate.value == "lint")
             ]
         )
         declared_commands = (

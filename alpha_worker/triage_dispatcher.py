@@ -26,7 +26,7 @@ import re
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, cast
 
 from alpha_core.config import settings
@@ -38,6 +38,7 @@ from alpha_worker.adapters import (
     EttaAdapter,
     EttaLiveBridge,
 )
+from alpha_worker.inito_node_keeper import InitoNodeKeeper
 from alpha_worker.worktree import WorktreeManager
 
 logger = logging.getLogger("alpha_worker.triage_dispatcher")
@@ -80,10 +81,12 @@ class TriageTaskDispatcher:
         live_bridge: Any | None = None,
         adapter: Any | None = None,
         enable_agent_execution: bool | None = None,
+        node_keeper: InitoNodeKeeper | None = None,
     ) -> None:
         self.queue = queue
         self.worktree_mgr = worktree_mgr or WorktreeManager()
         self.default_base_commit = default_base_commit
+        self.node_keeper = node_keeper or InitoNodeKeeper()
 
         engine = getattr(settings, "ALPHA_WORKER_ENGINE", "antigravity").lower()
         if engine == "etta":
@@ -112,6 +115,11 @@ class TriageTaskDispatcher:
         """
         if self.queue.is_emergency_stopped():
             logger.warning("Emergency stop tombstone active. Worker leasing suspended.")
+            return None
+
+        eligible, reason = self.node_keeper.check_execution_eligibility()
+        if not eligible:
+            logger.warning("Hardware execution guard active: %s. Worker leasing suspended.", reason)
             return None
 
         leased = self.queue.lease_next_approved_task()
@@ -239,6 +247,22 @@ class TriageTaskDispatcher:
                     return mb
         return base_commit
 
+    @staticmethod
+    def _is_transient_runtime_artifact(path_str: str) -> bool:
+        """Returns True if the path belongs to internal agent scratch, caches, or virtualenv state."""
+        parts = PurePath(path_str).parts
+        if not parts:
+            return False
+        if parts[0] in (".etta", ".gemini", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".venv"):
+            return True
+        if "__pycache__" in parts or path_str.endswith((".pyc", ".pyo")):
+            return True
+        if parts[0] == ".agents" and (len(parts) <= 1 or parts[1] in ("hooks.json", "settings.json", "tasks")):
+            return True
+        if path_str in ("code_review_graph.md", "uv.lock"):
+            return True
+        return False
+
     def get_git_diff_and_changed_files(
         self, worktree_path: Path, base_commit: str
     ) -> tuple[list[str], str]:
@@ -251,7 +275,9 @@ class TriageTaskDispatcher:
         changed_files: list[str] = []
         if ret == 0 and out.strip():
             for line in out.strip().splitlines():
-                changed_files.append(line.strip('"'))
+                f = line.strip('"')
+                if not self._is_transient_runtime_artifact(f):
+                    changed_files.append(f)
 
         # Also include uncommitted changes in the worktree
         ret2, out2, _ = self.run_command_in_worktree(
@@ -262,7 +288,7 @@ class TriageTaskDispatcher:
                 parts = line.strip().split(maxsplit=1)
                 if len(parts) == 2:
                     f = parts[1].strip('"')
-                    if f not in changed_files and f not in ("code_review_graph.md",):
+                    if f not in changed_files and not self._is_transient_runtime_artifact(f):
                         changed_files.append(f)
 
         # 2. Diff stat
@@ -583,6 +609,8 @@ class TriageTaskDispatcher:
                         parts = line.strip().split(maxsplit=1)
                         if len(parts) == 2:
                             status_flag, f_path = parts[0], parts[1].strip('"')
+                            if self._is_transient_runtime_artifact(f_path):
+                                continue
                             if WorktreeManager.find_disallowed_changes([f_path], allowed_paths):
                                 logger.warning(
                                     "Cleaning transient gate artifact outside allowed_paths: %s",
@@ -904,3 +932,8 @@ class TriageTaskDispatcher:
             return asyncio.run(
                 active_bridge.dispatch(task, worktree_path, attempt_id, session_dir)
             )
+
+
+# Alias for backward compatibility and worker naming conventions
+TriageDispatcher = TriageTaskDispatcher
+

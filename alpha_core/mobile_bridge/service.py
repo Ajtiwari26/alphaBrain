@@ -73,6 +73,13 @@ from alpha_core.queue.triage_queue import (
 )
 from alpha_core.security import AuthPrincipal, PrincipalRole
 
+try:
+    from alpha_worker.inito_node_keeper import InitoNodeKeeper
+except ImportError:
+    class InitoNodeKeeper:  # type: ignore[no-redef]
+        def get_hardware_telemetry_snapshot(self) -> dict[str, Any]:
+            return {}
+
 logger = logging.getLogger("alphabrain.mobile_bridge.service")
 
 _QUOTA_CACHE: dict[str, Any] = {"timestamp": 0.0, "scores": []}
@@ -83,9 +90,11 @@ class MobileBridgeService:
         self,
         db_path: Path | str = DEFAULT_DB_PATH,
         emergency_lock: Path | str = DEFAULT_EMERGENCY_LOCK,
+        node_keeper: Any = None,
     ) -> None:
         self.db_path = Path(db_path)
         self.emergency_lock = Path(emergency_lock)
+        self.node_keeper = node_keeper or InitoNodeKeeper()
         self._audit_log: list[AuditLogEntry] = []
         self._seed_initial_audit_log()
 
@@ -160,39 +169,56 @@ class MobileBridgeService:
         return self.get_emergency_stop_state()
 
     def get_hardware_telemetry(self) -> HardwareTelemetry:
-        cpu_percent = 25.0
-        ram_percent = 50.0
-        ram_used = 8.0
-        ram_total = 16.0
-        battery_pct = 100.0
-        battery_chg = True
-
         try:
-            import psutil
-            vm = psutil.virtual_memory()
-            cpu_percent = round(psutil.cpu_percent(interval=None) or 22.0, 1)
-            ram_percent = round(vm.percent, 1)
-            ram_used = round(vm.used / (1024**3), 1)
-            ram_total = round(vm.total / (1024**3), 1)
-            batt = psutil.sensors_battery()
-            if batt:
-                battery_pct = round(batt.percent, 1)
-                battery_chg = bool(batt.power_plugged)
-        except Exception as e:
-            logger.debug(f"psutil hardware telemetry fallback: {e}")
+            snap = self.node_keeper.get_hardware_telemetry_snapshot()
+            return HardwareTelemetry(
+                host_cpu_percent=snap.get("host_cpu_percent", 0.0),
+                host_ram_percent=snap.get("host_ram_percent", 0.0),
+                host_ram_used_gb=snap.get("host_ram_used_gb", 0.0),
+                host_ram_total_gb=snap.get("host_ram_total_gb", 16.0),
+                thermal_pressure=snap.get("thermal_pressure", "nominal"),
+                battery_level_percent=snap.get("battery_level_percent", 100.0),
+                battery_charging=snap.get("battery_charging", True),
+                usb_device_connected=snap.get("usb_device_connected", True),
+                usb_device_serial=snap.get("usb_device_serial", "10BF5P2AZF0010T"),
+                usb_device_name=snap.get("usb_device_name", "iQOO 12 Flagship"),
+            )
+        except Exception as exc:
+            logger.warning("Error getting hardware telemetry from node_keeper: %s", exc)
+            cpu_percent = 25.0
+            ram_percent = 50.0
+            ram_used = 8.0
+            ram_total = 16.0
+            battery_pct = 100.0
+            battery_chg = True
 
-        return HardwareTelemetry(
-            host_cpu_percent=cpu_percent,
-            host_ram_percent=ram_percent,
-            host_ram_used_gb=ram_used,
-            host_ram_total_gb=ram_total,
-            thermal_pressure="nominal",
-            battery_level_percent=battery_pct,
-            battery_charging=battery_chg,
-            usb_device_connected=True,
-            usb_device_serial="10BF5P2AZF0010T",
-            usb_device_name="iQOO 12 Flagship (USB Debugging)",
-        )
+            try:
+                import psutil
+
+                vm = psutil.virtual_memory()
+                cpu_percent = round(psutil.cpu_percent(interval=None) or 22.0, 1)
+                ram_percent = round(vm.percent, 1)
+                ram_used = round(vm.used / (1024**3), 1)
+                ram_total = round(vm.total / (1024**3), 1)
+                batt = psutil.sensors_battery()
+                if batt:
+                    battery_pct = round(batt.percent, 1)
+                    battery_chg = bool(batt.power_plugged)
+            except Exception as e:
+                logger.debug(f"psutil hardware telemetry fallback: {e}")
+
+            return HardwareTelemetry(
+                host_cpu_percent=cpu_percent,
+                host_ram_percent=ram_percent,
+                host_ram_used_gb=ram_used,
+                host_ram_total_gb=ram_total,
+                thermal_pressure="nominal",
+                battery_level_percent=battery_pct,
+                battery_charging=battery_chg,
+                usb_device_connected=True,
+                usb_device_serial="10BF5P2AZF0010T",
+                usb_device_name="iQOO 12 Flagship (USB Debugging)",
+            )
 
     def list_triage_tasks(self, status_filter: str | None = None) -> list[TaskSummary]:
         tasks: list[TaskSummary] = []
@@ -2052,3 +2078,31 @@ class MobileBridgeService:
 
         self._save_feedback(items)
         return target
+
+    def get_active_incoming_call(self) -> dict[str, Any] | None:
+        from alpha_voice.agentline_bridge import AgentLineVoiceBridge
+
+        return AgentLineVoiceBridge().get_active_call()
+
+    def respond_incoming_call(self, call_id: str, action: str) -> dict[str, Any]:
+        from alpha_voice.agentline_bridge import AgentLineVoiceBridge
+
+        return AgentLineVoiceBridge().respond_to_call(call_id, action)
+
+    def trigger_inapp_call(
+        self,
+        caller_name: str,
+        caller_role: str,
+        title: str,
+        prompt_summary: str,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        from alpha_voice.agentline_bridge import AgentLineVoiceBridge
+
+        return AgentLineVoiceBridge().dispatch_inapp_call(
+            caller_name=caller_name,
+            caller_role=caller_role,
+            title=title,
+            prompt_summary=prompt_summary,
+            task_id=task_id,
+        )

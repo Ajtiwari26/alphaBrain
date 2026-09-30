@@ -422,7 +422,7 @@ class SeniorReviewEngine:
             return {"response": str(e), "verdict": "BYPASSED_UNAVAILABLE", "bypassed": True}
 
     def execute_senior_review(
-        self, task_id: str, codex_subcommand: str | None = None
+        self, task_id: str, codex_subcommand: str | None = None, auto_merge: bool = False
     ) -> SeniorReviewVerdict:
         task = self.queue.get_task(task_id)
         if not task:
@@ -589,7 +589,7 @@ Code Review Graph (Dependency Impacts):
 
 Review Instructions:
 1. Verify overall system design and AlphaBrain Invariant compliance based on the Git Diff above.
-2. Do not attempt to use tools to read files or execute commands. Rely entirely on the diff provided above.
+2. CRITICAL CONSTRAINT: You are executing in a non-interactive read-only review sandbox. ALL tool execution, file edits, and writes (including updating SENIOR_DIRECTIVE_AND_SYSTEM_DESIGN.md) are strictly disabled. Do NOT attempt to call any tools. Produce your full architectural assessment directly in your response text.
 3. Render your authoritative final ruling explicitly by outputting a strict one-line JSON verdict on the absolute last line of your response. Format: {{"verdict": "FINAL_APPROVAL"}} or {{"verdict": "REJECT"}}. Do not output any other JSON.
 """
         claude_model = os.getenv("ALPHA_SENIOR_REVIEW_MODEL", "claude-opus-4-6-thinking")
@@ -854,5 +854,23 @@ Review Instructions:
             repair_packet = "".join(repair_packet_parts)
             self.queue.queue_task_for_senior_repair(task_id, repair_packet)
             logger.info("Task %s queued for autonomous senior repair turn in worktree.", task_id)
+        else:
+            is_auto_merge = auto_merge or os.getenv("ALPHA_AUTO_MERGE", "0") == "1"
+            if is_auto_merge:
+                from alpha_worker.senior_merge_reconciler import (
+                    MergeReconcilerConfig,
+                    SeniorMergeReconciler,
+                )
+                repo_path = task.get("envelope", {}).get("repo", ".")
+                branch_name = task.get("branch_name")
+                if branch_name:
+                    logger.info(f"Auto-merge enabled. Proceeding to merge branch '{branch_name}'.")
+                    try:
+                        config = MergeReconcilerConfig(repo_path=Path(repo_path))
+                        SeniorMergeReconciler(config).reconcile(verdict, branch_name, queue=self.queue)
+                    except Exception as e:
+                        logger.error(f"Auto-merge failed for task {task_id}: {e}")
+                else:
+                    logger.warning(f"Auto-merge requested but no branch_name found for task {task_id}.")
 
         return verdict

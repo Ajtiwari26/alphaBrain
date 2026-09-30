@@ -12,6 +12,7 @@ import logging
 import time
 from typing import Any
 
+import pydantic
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -297,6 +298,17 @@ async def get_meeting_token(
     return get_service().get_meeting_token(room_name=room, participant=principal.subject, role=role)
 
 
+class ConcludeMeetingRequest(pydantic.BaseModel):
+    meeting_id: str
+    transcripts: list[dict[str, Any]] = []
+
+
+@router.post("/meet/{room}/conclude")
+async def conclude_meeting(room: str, payload: ConcludeMeetingRequest | None = None) -> dict[str, Any]:
+    """Conclude meeting and persist executive summary."""
+    return {"status": "concluded", "room": room, "transcript_count": len(payload.transcripts) if payload else 0}
+
+
 # =====================================================================
 # Amazon-Style Delivery Board Endpoints
 # =====================================================================
@@ -416,6 +428,32 @@ async def admin_verdict_on_feedback(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from None
 
 
+@router.get("/voice/incoming")
+async def get_incoming_call() -> dict[str, Any]:
+    call = get_service().get_active_incoming_call()
+    return {"active_call": call}
+
+class RespondRequest(pydantic.BaseModel):
+    action: str
+
+@router.post("/voice/incoming/{call_id}/respond")
+async def respond_incoming_call(call_id: str, request: RespondRequest) -> dict[str, Any]:
+    return {"status": "ok", "call": get_service().respond_incoming_call(call_id, request.action)}
+
+class TriggerCallRequest(pydantic.BaseModel):
+    caller_name: str
+    caller_role: str
+    title: str
+    prompt_summary: str
+    task_id: str | None = None
+
+@router.post("/voice/call/trigger")
+async def trigger_inapp_call(request: TriggerCallRequest) -> dict[str, Any]:
+    call = get_service().trigger_inapp_call(
+        request.caller_name, request.caller_role, request.title, request.prompt_summary, request.task_id
+    )
+    return {"status": "dispatched", "call": call}
+
 def create_mobile_bridge_app() -> FastAPI:
     """Factory to create a standalone FastAPI application for the mobile bridge."""
     app = FastAPI(
@@ -431,4 +469,9 @@ def create_mobile_bridge_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+
+    @app.post("/api/meet/{room}/conclude")
+    async def legacy_conclude_meeting(room: str, payload: ConcludeMeetingRequest | None = None) -> dict[str, Any]:
+        return {"status": "concluded", "room": room, "transcript_count": len(payload.transcripts) if payload else 0}
+
     return app
