@@ -10,7 +10,7 @@ services:
     plan: free
     region: singapore
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn alpha_core.api.app:app --host 0.0.0.0 --port $PORT"
+    startCommand: "alembic upgrade head && uvicorn alpha_core.api.app:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health/ready
     autoDeploy: false
     envVars:

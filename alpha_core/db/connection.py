@@ -83,7 +83,7 @@ async def init_db() -> None:
     In development and test environments, uses schema creation.
     """
     if settings.is_production or settings.is_staging:
-        pass
+        await run_alembic_migrations()
     elif settings.DATABASE_URL.startswith("sqlite+aiosqlite:///:memory:"):
         engine = get_engine()
         async with engine.begin() as conn:
