@@ -22,7 +22,7 @@ def test_readiness_exact_match(mock_get_session_factory):
     mock_session = AsyncMock()
     # Mocking rows returned by SELECT version_num FROM alembic_version
     mock_res = MagicMock()
-    mock_res.scalars.return_value.all.return_value = ["ea716532600e"]
+    mock_res.scalars.return_value.all.return_value = [settings.EXPECTED_ALEMBIC_REVISION]
     mock_session.execute.side_effect = [None, mock_res]
 
     mock_factory = MagicMock()
