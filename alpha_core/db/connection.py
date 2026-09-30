@@ -67,7 +67,7 @@ def run_alembic_migrations_sync(database_url: str | None = None) -> None:
     root_dir = Path(__file__).resolve().parent.parent.parent
     ini_path = root_dir / "alembic.ini"
     alembic_cfg = Config(str(ini_path))
-    alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
+    alembic_cfg.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
     command.upgrade(alembic_cfg, "head")
 
 
@@ -83,7 +83,14 @@ async def init_db() -> None:
     In development and test environments, uses schema creation.
     """
     if settings.is_production or settings.is_staging:
-        await run_alembic_migrations()
+        try:
+            await run_alembic_migrations()
+        except Exception as exc:
+            import logging
+
+            logging.getLogger("alphabrain.db").warning(
+                "Alembic auto-migration during init_db encountered an exception: %s", exc
+            )
     elif settings.DATABASE_URL.startswith("sqlite+aiosqlite:///:memory:"):
         engine = get_engine()
         async with engine.begin() as conn:
