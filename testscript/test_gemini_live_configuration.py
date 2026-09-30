@@ -20,11 +20,16 @@ INTENTIONAL_SECRET_FIXTURES = {
 
 
 def test_gemini_live_uses_supported_native_audio_model():
-    assert settings.GEMINI_LIVE_MODEL == "gemini-2.5-flash-native-audio-latest"
+    assert settings.GEMINI_LIVE_MODEL == "gemini-3.8-live"
 
 
 def test_eva_live_agent_enables_resumption_and_context_compression():
     options = EvaRoomManager._model_options()
+    assert options["model"] == "gemini-3.8-live"
+    assert options["api_key"] == (settings.EVA_GEMINI_LIVE_API_KEY or settings.GEMINI_LIVE_API_KEY)
+    assert "enable_affective_dialog" not in options
+    assert "proactivity" not in options
+
     resumption = options["session_resumption"]
     compression = options["context_window_compression"]
 

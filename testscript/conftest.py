@@ -3,6 +3,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from cryptography.fernet import Fernet
@@ -10,6 +11,44 @@ from cryptography.fernet import Fernet
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+# Hermetic test mock for LiveKit WebRTC dependencies
+try:
+    import livekit  # noqa: F401
+except ImportError:
+    from importlib.abc import Loader
+    from importlib.machinery import ModuleSpec
+    from unittest.mock import MagicMock
+
+    class KwargsPreservingMock(MagicMock):
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
+            inst = MagicMock()
+            for k, v in kwargs.items():
+                setattr(inst, k, v)
+            inst.with_identity.return_value = inst
+            inst.with_name.return_value = inst
+            inst.with_grants.return_value = inst
+            inst.with_ttl.return_value = inst
+            inst.to_jwt.return_value = "mock-livekit-jwt-token-string-sample-1234567890"
+            return inst
+
+    class LiveKitMockFinder:
+        def find_spec(self, fullname: str, path: Any = None, target: Any = None) -> ModuleSpec | None:
+            if fullname.startswith("livekit"):
+                class MockLoader(Loader):
+                    def create_module(self, spec: ModuleSpec) -> Any:
+                        m = KwargsPreservingMock()
+                        m.__path__ = []
+                        m.__name__ = fullname
+                        return m
+
+                    def exec_module(self, module: Any) -> None:
+                        pass
+
+                return ModuleSpec(fullname, MockLoader(), is_package=True)
+            return None
+
+    sys.meta_path.insert(0, LiveKitMockFinder())
 
 TEST_STATE_DIR = Path(tempfile.mkdtemp(prefix="alphabrain-tests-"))
 os.environ["ENV"] = "test"

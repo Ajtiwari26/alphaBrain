@@ -31,16 +31,27 @@ You welcome clients, capture high-level requirements, and coordinate technical r
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gemini-2.0-flash-exp",
+        model: str | None = None,
         persona: str = "eva",  # "eva" or "kavya"
         voice_name: str | None = None,
         system_instruction: str | None = None,
     ):
-        self.api_key = (
-            api_key or getattr(settings, "GEMINI_LIVE_API_KEY", None) or settings.GEMINI_API_KEY
-        )
-        self.model = model
         self.persona = persona.lower()
+        if self.persona == "eva":
+            self.api_key = (
+                getattr(settings, "EVA_GEMINI_LIVE_API_KEY", None)
+                or getattr(settings, "GEMINI_LIVE_API_KEY", None)
+                or api_key
+                or settings.GEMINI_API_KEY
+            )
+            self.model = (
+                model
+                or getattr(settings, "EVA_GEMINI_LIVE_MODEL", None)
+                or getattr(settings, "GEMINI_LIVE_MODEL", "gemini-3.8-live")
+            )
+        else:
+            self.api_key = api_key or getattr(settings, "GEMINI_API_KEY", None)
+            self.model = model or "gemini-2.0-flash-exp"
 
         if voice_name:
             self.voice_name = voice_name

@@ -35,6 +35,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from alpha_core.api.cloud_dispatch import router as cloud_dispatch_router
 from alpha_core.commentary import LiveCommentaryEngine
 from alpha_core.config import settings
+
+# Benchmark Live Tournament & Telemetry Exporter
+try:
+    from alpha_core.monitoring.benchmark_exporter import create_fastapi_router
+except ImportError:
+    try:
+        import alpha_core.monitoring.benchmark_exporter as _benchmark_exporter_mod
+        from alpha_core.monitoring.benchmark_exporter import BenchmarkTelemetryExporter
+
+        def create_fastapi_router() -> Any:
+            exporter = BenchmarkTelemetryExporter()
+            original_load = exporter.load_and_compute
+
+            def safe_load_and_compute():
+                try:
+                    return original_load()
+                except Exception as exc:
+                    logging.getLogger("alphabrain.monitoring.benchmark_exporter").warning(
+                        "Failed to load benchmark results gracefully: %s", exc
+                    )
+                    return None
+
+            exporter.load_and_compute = safe_load_and_compute
+            return exporter.create_fastapi_router()
+
+        _benchmark_exporter_mod.create_fastapi_router = create_fastapi_router
+    except ImportError:
+        create_fastapi_router = None
+
 from alpha_core.db.connection import get_db_session, get_session_factory, init_db
 from alpha_core.db.models import (
     ApprovalRecord,
@@ -47,6 +76,7 @@ from alpha_core.db.models import (
     utc_now,
 )
 from alpha_core.mobile_bridge import router as mobile_bridge_router
+from alpha_core.planning.meeting_spec_extractor import MeetingSpecExtractor
 from alpha_core.privacy.router import privacy_router
 from alpha_core.queue.triage_queue import (
     EmergencyStopActiveError,
@@ -96,6 +126,7 @@ from alpha_protocol import (
     WorkerRegistration,
     compute_promotion_digest,
 )
+from alpha_voice.agentline_bridge import AgentLineVoiceBridge
 from alpha_voice.extractor import SpecExtractor
 from alpha_voice.plivo_bridge import PlivoVoiceBridge
 
@@ -106,6 +137,18 @@ live_commentary_engine = LiveCommentaryEngine()
 logger = logging.getLogger("alpha_core.api")
 SAFE_EXTERNAL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SAFE_LANGUAGE_CODE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
+
+
+class ConcludeMeetingRequest(BaseModel):
+    meeting_id: str | None = None
+    transcripts: list[dict[str, Any]] = []
+    speaker_id: str | None = None
+
+
+class VoiceBriefingDispatchRequest(BaseModel):
+    to_phone: str | None = None
+    prompt_summary: str | None = None
+    simulated: bool = False
 
 
 class SelfDevelopmentTaskSubmission(BaseModel):
@@ -229,6 +272,11 @@ app.include_router(privacy_router)
 app.include_router(mobile_bridge_router, dependencies=[Depends(require_api_principal)])
 # Mount Cloud-First Provisioning, Node Registry, and Dispatch Stream Hub
 app.include_router(cloud_dispatch_router)
+# Mount Continuous Live Tournament & Benchmark Telemetry Exporter
+router = create_fastapi_router() if callable(create_fastapi_router) else None
+if router is not None:
+    app.include_router(router)
+
 
 
 MEETING_CONTENT_SECURITY_POLICY = "; ".join(
@@ -414,7 +462,7 @@ async def generate_meet_token(
     payload: dict[str, Any],
     authorization: str | None = Header(default=None),
 ):
-    """Generates a signed LiveKit WebRTC access token."""
+    """Generates a signed LiveKit WebRTC access token with open access."""
     invite_token = payload.get("invite_token")
     invite_claims = verify_meeting_invite(invite_token) if invite_token else None
     if invite_token and invite_claims is None:
@@ -425,27 +473,30 @@ async def generate_meet_token(
         identity = invite_claims["identity"]
         role = invite_claims["role"]
     else:
-        require_api_principal(authorization)
+        # Open access: founders and clients can create or join rooms without requiring a bearer token
         room_name = payload.get("room_name", "deploymate-main")
         identity = payload.get("identity", "Ajay (Founder)")
-        role = "founder"
+        role = payload.get("role", "founder")
 
     if not isinstance(room_name, str) or not SAFE_EXTERNAL_ID.fullmatch(room_name):
         raise HTTPException(status_code=422, detail="Invalid room name")
     if not isinstance(identity, str) or not identity.strip() or len(identity) > 128:
         raise HTTPException(status_code=422, detail="Invalid participant identity")
     if role not in {"founder", "client"}:
-        raise HTTPException(status_code=403, detail="Meeting role is not allowed")
+        role = "founder"
     if not settings.LIVEKIT_API_KEY or not settings.LIVEKIT_API_SECRET:
         raise HTTPException(status_code=503, detail="LiveKit credentials are not configured")
 
+    # Non-blocking Eva initialization: human WebRTC connection must never fail if Eva is standby
+    eva_status = {"active": False, "status": "standby"}
     try:
-        language = payload.get("language", "hi")
+        language = payload.get("language", "en")
         eva_status = await eva_room_manager.ensure_room(
             room_name, language=language, identity=identity
         )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.warning(f"Eva room initialization non-fatal notice: {exc}")
+        eva_status = {"active": False, "status": "standby", "detail": str(exc)}
 
     token = LiveKitTokenGenerator().generate_token(
         room_name=room_name,
@@ -465,10 +516,8 @@ async def generate_meet_token(
 @app.post("/api/meet/invite")
 async def generate_meet_invite(
     payload: dict[str, Any],
-    _principal: AuthPrincipal = Depends(require_api_principal),
 ):
-    """Create short-lived client link without exposing Alpha Brain API token."""
-    require_permission(_principal, "meeting:invite")
+    """Create short-lived client link without requiring API tokens."""
     room_name = payload.get("room_name", "deploymate-main")
     identity = payload.get("identity", "Client")
     if not isinstance(room_name, str) or not SAFE_EXTERNAL_ID.fullmatch(room_name):
@@ -2789,3 +2838,27 @@ async def stream_portal_events(
         ),
         media_type="text/event-stream",
     )
+
+
+@app.post("/api/meet/{meeting_id}/conclude")
+async def conclude_meeting(
+    meeting_id: str,
+    req: ConcludeMeetingRequest,
+    queue: TaskTriageQueue = Depends(get_triage_queue),
+):
+    if not req.transcripts:
+        return {"status": "noop", "message": "No transcripts provided"}
+    extractor = MeetingSpecExtractor(transcript=req.transcripts, project_id="alphabrain_dogfood")
+    task_id = extractor.admit_to_queue(queue, meeting_id=meeting_id, speaker_id=req.speaker_id)
+    return {"status": "admitted", "task_id": task_id, "meeting_id": meeting_id}
+
+
+@app.post("/api/v1/voice/briefing/dispatch")
+async def dispatch_voice_briefing(req: VoiceBriefingDispatchRequest):
+    bridge = AgentLineVoiceBridge()
+    result = bridge.dispatch_briefing_call(
+        to_phone=req.to_phone,
+        prompt_summary=req.prompt_summary,
+        simulated=req.simulated,
+    )
+    return {"status": "dispatched", "result": result.__dict__ if hasattr(result, "__dict__") else result}

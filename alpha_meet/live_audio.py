@@ -21,8 +21,9 @@ class LiveMeetAudioBridge:
     def __init__(self, websocket: WebSocket, persona: str = "eva"):
         self.websocket = websocket
         self.persona = persona
+        eva_key = settings.EVA_GEMINI_LIVE_API_KEY or settings.GEMINI_LIVE_API_KEY
         self.session = GeminiLiveSession(
-            api_key=settings.GEMINI_API_KEY,
+            api_key=eva_key if persona == "eva" else settings.GEMINI_API_KEY,
             persona=persona,
         )
         self.gemini_ws = None

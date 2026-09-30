@@ -3,7 +3,7 @@ from typing import Literal, cast
 
 from alpha_core.config import settings
 
-MeetingRole = Literal["founder", "client", "eva", "translator"]
+MeetingRole = Literal["founder", "client", "eva", "translator", "transcriber"]
 
 
 def _grants_for_role(role: MeetingRole) -> dict[str, bool]:

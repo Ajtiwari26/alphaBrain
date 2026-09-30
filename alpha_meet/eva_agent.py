@@ -48,7 +48,7 @@ Your persona and operational rules:
 
         # 1. Try Gemini API if key is valid
         if settings.GEMINI_API_KEY and len(settings.GEMINI_API_KEY) > 20:
-            for model_name in ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"]:
+            for model_name in [settings.GEMINI_LIVE_MODEL, "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.7-flash"]:
                 try:
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
                     history_prompt = "Recent meeting context:\n"

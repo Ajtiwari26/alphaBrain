@@ -99,6 +99,10 @@ class Settings(BaseModel):
 
     # AI Model Credentials (Provided by User)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    EVA_GEMINI_LIVE_API_KEY: str = os.getenv(
+        "EVA_GEMINI_LIVE_API_KEY",
+        os.getenv("GEMINI_LIVE_API_KEY", os.getenv("GEMINI_API_KEY", "")),
+    )
     GEMINI_LIVE_API_KEY: str = os.getenv(
         "GEMINI_LIVE_API_KEY",
         os.getenv("EVA_GEMINI_LIVE_API_KEY", os.getenv("GEMINI_API_KEY", "")),
@@ -119,8 +123,12 @@ class Settings(BaseModel):
         (
             "gemini-live-2.5-flash-native-audio"
             if USE_VERTEX
-            else "gemini-2.5-flash-native-audio-latest"
+            else "gemini-3.8-live"
         ),
+    )
+    EVA_GEMINI_LIVE_MODEL: str = os.getenv(
+        "EVA_GEMINI_LIVE_MODEL",
+        os.getenv("GEMINI_LIVE_MODEL", "gemini-3.8-live"),
     )
     GEMINI_LIVE_VOICE: str = os.getenv("GEMINI_LIVE_VOICE", "Aoede")
 
@@ -304,6 +312,15 @@ class Settings(BaseModel):
     TRANSLATE_MODEL: str = os.getenv("TRANSLATE_MODEL", "gemini-3.5-live-translate-preview")
     TRANSLATE_ENABLED: bool = os.getenv("TRANSLATE_ENABLED", "true").lower() == "true"
     DEFAULT_FOUNDER_LANGUAGE: str = os.getenv("DEFAULT_FOUNDER_LANGUAGE", "hi")
+
+    # Live Streaming Transcription (Gemini 3.5 Transcribe Live)
+    TRANSCRIBE_MODEL: str = os.getenv("TRANSCRIBE_MODEL", "gemini-3.5-transcribe-live")
+    GEMINI_TRANSCRIBE_MODEL: str = os.getenv(
+        "GEMINI_TRANSCRIBE_MODEL",
+        os.getenv("TRANSCRIBE_MODEL", "gemini-3.5-transcribe-live"),
+    )
+    TRANSCRIBE_MODE: str = os.getenv("TRANSCRIBE_MODE", "smart")
+    TRANSCRIBE_ENABLED: bool = os.getenv("TRANSCRIBE_ENABLED", "true").lower() == "true"
 
     LIVEKIT_URL: str = os.getenv("LIVEKIT_URL", "ws://localhost:7880")
     LIVEKIT_API_KEY: str = os.getenv("LIVEKIT_API_KEY", "")

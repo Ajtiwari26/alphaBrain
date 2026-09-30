@@ -12,6 +12,7 @@ from livekit.plugins import google
 
 from alpha_core.config import settings
 from alpha_meet.tokens import LiveKitTokenGenerator
+from alpha_meet.transcribe_agent import TranscribeAgent
 from alpha_meet.translate_agent import TranslateAgent
 
 logger = logging.getLogger("alpha_meet.eva_live_agent")
@@ -45,6 +46,7 @@ class EvaRoomRuntime:
     human_participants: set[str] = field(default_factory=set)
     participant_languages: dict[str, str] = field(default_factory=dict)
     translate_agents: dict[str, TranslateAgent] = field(default_factory=dict)
+    transcribe_agent: TranscribeAgent | None = None
     translate_mode: str = "transcribe_only"
     ready: asyncio.Event = field(default_factory=asyncio.Event)
     stop: asyncio.Event = field(default_factory=asyncio.Event)
@@ -133,7 +135,7 @@ class EvaRoomManager:
     def _validate_configuration() -> None:
         if settings.GEMINI_USE_VERTEX and not settings.GOOGLE_CLOUD_PROJECT:
             raise RuntimeError("Vertex AI project is not configured")
-        if not settings.GEMINI_USE_VERTEX and not settings.GOOGLE_API_KEY:
+        if not settings.GEMINI_USE_VERTEX and not (settings.EVA_GEMINI_LIVE_API_KEY or settings.GEMINI_LIVE_API_KEY or settings.GOOGLE_API_KEY):
             raise RuntimeError("Gemini Live API key is not configured")
         if not settings.LIVEKIT_API_KEY or not settings.LIVEKIT_API_SECRET:
             raise RuntimeError("LiveKit credentials are not configured")
@@ -160,8 +162,18 @@ class EvaRoomManager:
                 for agent in list(runtime.translate_agents.values()):
                     await agent.stop()
                 runtime.translate_agents.clear()
+
+                # Ensure dedicated Gemini 3.5 Transcribe Live agent is active
+                if settings.TRANSCRIBE_ENABLED and runtime.transcribe_agent is None:
+                    transcriber = TranscribeAgent(room_name=runtime.room_name)
+                    runtime.transcribe_agent = transcriber
+                    await transcriber.start()
             else:
                 runtime.translate_mode = "live_translate"
+                if runtime.transcribe_agent is not None:
+                    await runtime.transcribe_agent.stop()
+                    runtime.transcribe_agent = None
+
                 # Start missing agents
                 for lang in active_langs:
                     if lang not in runtime.translate_agents:
@@ -177,14 +189,13 @@ class EvaRoomManager:
 
     @staticmethod
     def _model_options() -> dict[str, Any]:
+        live_model = getattr(settings, "EVA_GEMINI_LIVE_MODEL", None) or settings.GEMINI_LIVE_MODEL
         options: dict[str, Any] = {
-            "model": settings.GEMINI_LIVE_MODEL,
+            "model": live_model,
             "voice": settings.GEMINI_LIVE_VOICE,
             "instructions": EVA_LIVE_INSTRUCTIONS,
             "input_audio_transcription": types.AudioTranscriptionConfig(),
             "output_audio_transcription": types.AudioTranscriptionConfig(),
-            "enable_affective_dialog": True,
-            "proactivity": True,
             "temperature": 0.6,
             "session_resumption": types.SessionResumptionConfig(transparent=True),
             "context_window_compression": types.ContextWindowCompressionConfig(
@@ -192,6 +203,10 @@ class EvaRoomManager:
                 sliding_window=types.SlidingWindow(target_tokens=12_000),
             ),
         }
+        # Gemini 3.x Live models do not support affective dialog or proactivity flags
+        if not ("gemini-3" in live_model or "gemini-live-3" in live_model):
+            options["enable_affective_dialog"] = True
+            options["proactivity"] = True
         if settings.GEMINI_USE_VERTEX:
             options.update(
                 vertexai=True,
@@ -199,7 +214,11 @@ class EvaRoomManager:
                 location=settings.GOOGLE_CLOUD_LOCATION,
             )
         else:
-            options["api_key"] = settings.GOOGLE_API_KEY
+            options["api_key"] = (
+                settings.EVA_GEMINI_LIVE_API_KEY
+                or settings.GEMINI_LIVE_API_KEY
+                or settings.GOOGLE_API_KEY
+            )
         return options
 
     @staticmethod
@@ -248,7 +267,7 @@ class EvaRoomManager:
 
         def on_participant_connected(participant: rtc.RemoteParticipant) -> None:
             nonlocal initial_join_timeout, empty_room_timeout
-            if participant.identity.startswith("translate-"):
+            if participant.identity.startswith("translate-") or participant.identity.startswith("transcriber-"):
                 return
             runtime.human_participants.add(participant.identity)
             task = asyncio.create_task(self._reconcile_translate_agents(runtime))
@@ -266,7 +285,7 @@ class EvaRoomManager:
 
         def on_participant_disconnected(participant: rtc.RemoteParticipant) -> None:
             nonlocal empty_room_timeout
-            if participant.identity.startswith("translate-"):
+            if participant.identity.startswith("translate-") or participant.identity.startswith("transcriber-"):
                 return
             runtime.human_participants.discard(participant.identity)
             task = asyncio.create_task(self._reconcile_translate_agents(runtime))
@@ -379,6 +398,12 @@ class EvaRoomManager:
                     await asyncio.wait_for(session.aclose(), timeout=10.0)
                 except TimeoutError:
                     logger.warning("Timed out closing Eva session for %s", runtime.room_name)
+            if runtime.transcribe_agent is not None:
+                try:
+                    await runtime.transcribe_agent.stop()
+                except Exception:
+                    pass
+                runtime.transcribe_agent = None
             if room.isconnected():
                 await room.disconnect()
             if runtime.state != "failed":
