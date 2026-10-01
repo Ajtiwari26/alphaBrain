@@ -177,6 +177,28 @@ def get_mac_triage_tasks() -> list:
         return []
 
 
+def execute_remote_command(cmd: dict) -> None:
+    c_type = cmd.get("command")
+    if c_type == "triage_verdict":
+        tid = cmd.get("task_id")
+        action = cmd.get("action")
+        notes = cmd.get("notes") or ""
+        logger.info("Executing remote triage command from cloud: %s -> %s", tid, action)
+        try:
+            from alpha_core.queue.triage_queue import TaskTriageQueue
+
+            queue = TaskTriageQueue(
+                db_path=Path.home() / ".alphabrain" / "task_triage_queue.db"
+            )
+            if action == "approve":
+                queue.approve_task(tid, founder_notes=notes)
+            else:
+                queue.reject_task(tid, rejection_reason=notes)
+            logger.info("Successfully executed triage command for %s", tid)
+        except Exception as e:
+            logger.warning("Failed executing remote triage command: %s", e)
+
+
 def sync_once() -> bool:
     payload = {
         "telemetry": get_mac_telemetry(),
@@ -198,7 +220,18 @@ def sync_once() -> bool:
     )
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status == 200
+            if resp.status == 200:
+                raw_body = resp.read()
+                if raw_body:
+                    try:
+                        resp_data = json.loads(raw_body.decode("utf-8"))
+                        pending_cmds = resp_data.get("pending_commands", [])
+                        for cmd in pending_cmds:
+                            execute_remote_command(cmd)
+                    except Exception as e:
+                        logger.debug("Failed parsing response body: %s", e)
+                return True
+            return False
     except Exception as e:
         logger.warning("Telemetry sync to cloud failed: %s", e)
         return False
