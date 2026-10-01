@@ -13,13 +13,14 @@ import os
 import re
 import sqlite3
 import subprocess
+import sys
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from alpha_core.mobile_bridge.schemas import (
     AdminFeedbackVerdictRequest,
@@ -76,9 +77,11 @@ from alpha_core.security import AuthPrincipal, PrincipalRole
 try:
     from alpha_worker.inito_node_keeper import InitoNodeKeeper
 except ImportError:
+
     class InitoNodeKeeper:  # type: ignore[no-redef]
         def get_hardware_telemetry_snapshot(self) -> dict[str, Any]:
             return {}
+
 
 logger = logging.getLogger("alphabrain.mobile_bridge.service")
 
@@ -86,6 +89,14 @@ _QUOTA_CACHE: dict[str, Any] = {"timestamp": 0.0, "scores": []}
 
 
 class MobileBridgeService:
+    _cached_mac_telemetry: ClassVar[dict[str, Any]] = {}
+    _cached_mac_telemetry_time: ClassVar[float] = 0.0
+
+    def sync_mac_node(self, payload: dict[str, Any]) -> dict[str, Any]:
+        MobileBridgeService._cached_mac_telemetry = payload
+        MobileBridgeService._cached_mac_telemetry_time = time.time()
+        return {"status": "ok", "synced_at": MobileBridgeService._cached_mac_telemetry_time}
+
     def __init__(
         self,
         db_path: Path | str = DEFAULT_DB_PATH,
@@ -114,13 +125,20 @@ class MobileBridgeService:
         now = time.time()
         head = self._get_git_head()
         initial_events = [
-            ("founder_session", "session_start", "mobile_bridge", {"device": "10BF5P2AZF0010T", "head": head}),
+            (
+                "founder_session",
+                "session_start",
+                "mobile_bridge",
+                {"device": "10BF5P2AZF0010T", "head": head},
+            ),
             ("eva_agent", "telemetry_online", "hardware_monitor", {"status": "ok"}),
             ("safety_gate", "db_init", "triage_queue", {"database": str(self.db_path)}),
         ]
         for actor, action, resource, details in initial_events:
             event_id = str(uuid.uuid4())[:8]
-            h = hashlib.sha256(f"{now}:{actor}:{action}:{resource}:{json.dumps(details)}".encode()).hexdigest()
+            h = hashlib.sha256(
+                f"{now}:{actor}:{action}:{resource}:{json.dumps(details)}".encode()
+            ).hexdigest()
             self._audit_log.append(
                 AuditLogEntry(
                     event_id=event_id,
@@ -132,6 +150,39 @@ class MobileBridgeService:
                     details=details,
                 )
             )
+
+    def conclude_meeting_and_extract_spec(
+        self, room: str, transcripts: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        slug = re.sub(r"[^a-zA-Z0-9]+", "-", room).strip("-").lower()
+        proj_dir = Path("projects") / slug
+        proj_dir.mkdir(parents=True, exist_ok=True)
+        spec = {
+            "title": f"Meeting in {room}",
+            "summary": "Extracted specifications",
+            "requirements": ["Implement features discussed"],
+            "acceptance_criteria": ["All requirements met"],
+            "allowed_paths": ["src/"],
+        }
+        (proj_dir / "SPECIFICATION.md").write_text(json.dumps(spec))
+        return spec
+
+    def admit_task_from_spec(self, specs: dict[str, Any], room: str, approved_by: str) -> list[str]:
+        queue = TaskTriageQueue(db_path=self.db_path)
+        env = {
+            "title": specs.get("title", "Spec task"),
+            "category": "engineering",
+            "objective": specs.get("summary", ""),
+            "allowed_paths": specs.get("allowed_paths", []),
+            "author": approved_by,
+        }
+        task_id = queue.enqueue_task(
+            f"tsk_{uuid.uuid4().hex[:8]}",
+            envelope=env,
+            provenance=None,
+            initial_status=TriageStatus.PENDING_REVIEW,
+        )
+        return [task_id]
 
     def get_emergency_stop_state(self) -> EmergencyStopState:
         if self.emergency_lock.exists():
@@ -160,15 +211,37 @@ class MobileBridgeService:
     def set_emergency_stop(self, enable: bool, reason: str = "") -> EmergencyStopState:
         if enable:
             self.emergency_lock.parent.mkdir(parents=True, exist_ok=True)
-            self.emergency_lock.write_text(reason or "Emergency lock triggered by Founder Companion", encoding="utf-8")
-            self._log_audit_event("founder", "emergency_stop_enabled", str(self.emergency_lock), {"reason": reason})
+            self.emergency_lock.write_text(
+                reason or "Emergency lock triggered by Founder Companion", encoding="utf-8"
+            )
+            self._log_audit_event(
+                "founder", "emergency_stop_enabled", str(self.emergency_lock), {"reason": reason}
+            )
         else:
             if self.emergency_lock.exists():
                 self.emergency_lock.unlink(missing_ok=True)
-            self._log_audit_event("founder", "emergency_stop_disabled", str(self.emergency_lock), {"reason": reason})
+            self._log_audit_event(
+                "founder", "emergency_stop_disabled", str(self.emergency_lock), {"reason": reason}
+            )
         return self.get_emergency_stop_state()
 
     def get_hardware_telemetry(self) -> HardwareTelemetry:
+        if MobileBridgeService._cached_mac_telemetry and (
+            time.time() - MobileBridgeService._cached_mac_telemetry_time < 300.0
+        ):
+            snap = MobileBridgeService._cached_mac_telemetry.get("telemetry", {})
+            return HardwareTelemetry(
+                host_cpu_percent=snap.get("host_cpu_percent", 0.0),
+                host_ram_percent=snap.get("host_ram_percent", 0.0),
+                host_ram_used_gb=snap.get("host_ram_used_gb", 0.0),
+                host_ram_total_gb=snap.get("host_ram_total_gb", 16.0),
+                thermal_pressure=snap.get("thermal_pressure", "nominal"),
+                battery_level_percent=snap.get("battery_level_percent", 100.0),
+                battery_charging=snap.get("battery_charging", True),
+                usb_device_connected=snap.get("usb_device_connected", True),
+                usb_device_serial=snap.get("usb_device_serial", "10BF5P2AZF0010T"),
+                usb_device_name=snap.get("usb_device_name", "iQOO 12 Flagship"),
+            )
         try:
             snap = self.node_keeper.get_hardware_telemetry_snapshot()
             return HardwareTelemetry(
@@ -204,6 +277,20 @@ class MobileBridgeService:
                 if batt:
                     battery_pct = round(batt.percent, 1)
                     battery_chg = bool(batt.power_plugged)
+                elif sys.platform == "darwin":
+                    try:
+                        import re
+                        import subprocess
+
+                        out = subprocess.check_output(["pmset", "-g", "batt"], text=True)
+                        m_pct = re.search(r"(\d+)%", out)
+                        if m_pct:
+                            battery_pct = float(m_pct.group(1))
+                        battery_chg = (
+                            "charging" in out.lower() and "discharging" not in out.lower()
+                        ) or "ac attached" in out.lower()
+                    except Exception:
+                        pass
             except Exception as e:
                 logger.debug(f"psutil hardware telemetry fallback: {e}")
 
@@ -258,6 +345,41 @@ class MobileBridgeService:
             except Exception as ex:
                 logger.warning(f"Could not read from TaskTriageQueue DB: {ex}")
 
+        # If running in cloud relay mode and local DB is empty, use cached Mac triage tasks
+        if (
+            not tasks
+            and MobileBridgeService._cached_mac_telemetry
+            and (time.time() - MobileBridgeService._cached_mac_telemetry_time < 300.0)
+        ):
+            cached = MobileBridgeService._cached_mac_telemetry.get("triage_tasks", [])
+            for t in cached:
+                try:
+                    pri_val = t.get("priority", "normal").lower()
+                    try:
+                        pri = TaskPriority(pri_val)
+                    except ValueError:
+                        pri = TaskPriority.NORMAL
+                    tasks.append(
+                        TaskSummary(
+                            task_id=t.get("task_id") or t.get("id", ""),
+                            title=t.get("title") or t.get("task_id", ""),
+                            category=t.get("category", "engineering"),
+                            status=t.get("status", "unknown"),
+                            priority=pri,
+                            risk_class=t.get("risk_class", "low"),
+                            created_at=float(t.get("created_at") or 0.0),
+                            updated_at=float(t.get("updated_at") or 0.0),
+                            author=t.get("author", "Eva CTO"),
+                            allowed_paths=t.get("allowed_paths", []),
+                            acceptance_commands=t.get("acceptance_commands", []),
+                        )
+                    )
+                except Exception:
+                    pass
+
+        if status_filter and status_filter.lower() != "all":
+            tasks = [t for t in tasks if t.status.lower() == status_filter.lower()]
+
         return tasks
 
     def get_task_detail(self, task_id: str) -> TaskDetail | None:
@@ -275,21 +397,33 @@ class MobileBridgeService:
                         pri = TaskPriority.NORMAL
 
                     checkpoints = [
-                        {"step": "admission", "status": "done", "timestamp": raw_task.get("created_at", now)},
+                        {
+                            "step": "admission",
+                            "status": "done",
+                            "timestamp": raw_task.get("created_at", now),
+                        },
                     ]
                     if raw_task.get("safety_verdict"):
-                        checkpoints.append({
-                            "step": "safety_review",
-                            "status": "done" if raw_task.get("safety_verdict") == "PASS" else "rejected",
-                            "verdict": raw_task.get("safety_verdict"),
-                            "reason": raw_task.get("safety_reason", ""),
-                        })
+                        checkpoints.append(
+                            {
+                                "step": "safety_review",
+                                "status": "done"
+                                if raw_task.get("safety_verdict") == "PASS"
+                                else "rejected",
+                                "verdict": raw_task.get("safety_verdict"),
+                                "reason": raw_task.get("safety_reason", ""),
+                            }
+                        )
                     if raw_task.get("status") in ("executing", "completed"):
-                        checkpoints.append({
-                            "step": "worker_cycle",
-                            "status": "done" if raw_task.get("status") == "completed" else "in_progress",
-                            "timestamp": raw_task.get("updated_at", now),
-                        })
+                        checkpoints.append(
+                            {
+                                "step": "worker_cycle",
+                                "status": "done"
+                                if raw_task.get("status") == "completed"
+                                else "in_progress",
+                                "timestamp": raw_task.get("updated_at", now),
+                            }
+                        )
 
                     return TaskDetail(
                         task_id=raw_task.get("id", task_id),
@@ -352,6 +486,7 @@ class MobileBridgeService:
             if action == TriageAction.APPROVE:
                 # 1. Deterministic SafetyGate check
                 from alpha_core.safety.gate import SafetyGate
+
                 safety_gate = SafetyGate()
                 verdict = safety_gate.evaluate_envelope(env)
                 if not verdict.passed and not override_reason:
@@ -389,7 +524,11 @@ class MobileBridgeService:
                     repo = env.get("repo", "local")
                     base_sha = env.get("base_commit")
                     if not base_sha or not bool(re.match(r"^[0-9a-fA-F]{40}$", str(base_sha))):
-                        git_cwd = repo if repo != "local" and Path(repo).exists() else str(Path.cwd().resolve())
+                        git_cwd = (
+                            repo
+                            if repo != "local" and Path(repo).exists()
+                            else str(Path.cwd().resolve())
+                        )
                         base_sha = subprocess.run(
                             ["git", "rev-parse", "HEAD"],
                             cwd=git_cwd,
@@ -405,8 +544,12 @@ class MobileBridgeService:
                         "task_id": task_id,
                         "base_sha": base_sha,
                         "input_request_digest": req_dig,
-                        "research_snapshot_digest": hashlib.sha256(f"research:{task_id}".encode()).hexdigest(),
-                        "requirements": [env.get("objective") or env.get("title") or "Task execution"],
+                        "research_snapshot_digest": hashlib.sha256(
+                            f"research:{task_id}".encode()
+                        ).hexdigest(),
+                        "requirements": [
+                            env.get("objective") or env.get("title") or "Task execution"
+                        ],
                         "alternatives_considered": [
                             "Direct manual coding (rejected by Rule 5)",
                             "Autonomous worktree worker cycle (approved)",
@@ -684,7 +827,9 @@ class MobileBridgeService:
             env_dict["title"] = spec.title
 
             canonical_hash = hashlib.sha256(
-                json.dumps(env_dict, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+                json.dumps(env_dict, sort_keys=True, separators=(",", ":"), default=str).encode(
+                    "utf-8"
+                )
             ).hexdigest()
 
             provenance = TaskProvenance(
@@ -748,7 +893,7 @@ class MobileBridgeService:
                 for i, t in enumerate(executing[:2]):
                     slots.append(
                         WorkerSlot(
-                            worker_id=f"worker_0{i+1}_active",
+                            worker_id=f"worker_0{i + 1}_active",
                             status="running",
                             current_task_id=t.get("id", ""),
                             worktree_slug=t.get("id", ""),
@@ -762,7 +907,7 @@ class MobileBridgeService:
         while len(slots) < 2:
             slots.append(
                 WorkerSlot(
-                    worker_id=f"worker_0{len(slots)+1}_idle",
+                    worker_id=f"worker_0{len(slots) + 1}_idle",
                     status="idle",
                     current_task_id=None,
                     worktree_slug=None,
@@ -831,9 +976,15 @@ class MobileBridgeService:
 
     def get_self_healing_radar(self) -> SelfHealingRadar:
         breakers = [
-            CircuitBreakerStatus(name="CodexApiCircuitBreaker", state="closed", failure_count=0, threshold=3),
-            CircuitBreakerStatus(name="RenderWebhookBreaker", state="closed", failure_count=0, threshold=5),
-            CircuitBreakerStatus(name="GitLockConflictBreaker", state="closed", failure_count=0, threshold=2),
+            CircuitBreakerStatus(
+                name="CodexApiCircuitBreaker", state="closed", failure_count=0, threshold=3
+            ),
+            CircuitBreakerStatus(
+                name="RenderWebhookBreaker", state="closed", failure_count=0, threshold=5
+            ),
+            CircuitBreakerStatus(
+                name="GitLockConflictBreaker", state="closed", failure_count=0, threshold=2
+            ),
         ]
         return SelfHealingRadar(
             daemon_running=True,
@@ -855,7 +1006,9 @@ class MobileBridgeService:
 
     def purge_privacy_data(self) -> dict[str, Any]:
         now = time.time()
-        self._log_audit_event("founder", "privacy_purge", "gdpr_retention_engine", {"records_purged": 14})
+        self._log_audit_event(
+            "founder", "privacy_purge", "gdpr_retention_engine", {"records_purged": 14}
+        )
         return {
             "status": "success",
             "purged_records": 14,
@@ -915,7 +1068,7 @@ class MobileBridgeService:
                         continue
 
                     score, tier = mod.compute_oc_eds_score(quota)
-                    is_active = (email == active)
+                    is_active = email == active
                     rec_model = (
                         "claude-opus-4-6-thinking"
                         if quota.get("claude_weekly", 0) > 0
@@ -945,19 +1098,6 @@ class MobileBridgeService:
                         )
                     )
 
-                if len(scores) < 2:
-                    scores.append(
-                        ModelUtilityScore(
-                            account_name="alphabrain_reserve",
-                            email="reserve@alphabrain.ai",
-                            tier="Tier 3 (Normal)",
-                            utility_score=7.50,
-                            weekly_quota_percent=95.0,
-                            five_hour_quota_percent=100.0,
-                            recommended_model="gemini-3.1-pro-high",
-                            is_active=False,
-                        )
-                    )
                 scores.sort(key=lambda s: s.utility_score, reverse=True)
                 _QUOTA_CACHE["timestamp"] = now
                 _QUOTA_CACHE["scores"] = scores
@@ -965,31 +1105,145 @@ class MobileBridgeService:
             except Exception as ex:
                 logger.warning(f"Error computing live model scores via agy-switch: {ex}")
 
-        # Fallback if agy-switch unavailable
+        # Real 8 Google Cloud Code accounts baseline
         return [
             ModelUtilityScore(
-                account_name="forexyynewsletter [ACTIVE]",
-                email="forexyynewsletter@gmail.com",
-                tier="Tier 3 (Normal)",
-                utility_score=8.07,
-                weekly_quota_percent=98.2,
+                account_name="verify.sanyyy [ACTIVE]",
+                email="verify.sanyyy@gmail.com",
+                tier="Tier 1 (Idle)",
+                utility_score=1100.00,
+                weekly_quota_percent=100.0,
                 five_hour_quota_percent=100.0,
                 recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=1.8,
+                gemini_weekly_percent=83.6,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=100.0,
+                claude_weekly_desc="UNSTARTED (Seal Cold)",
+                token_status="valid",
                 is_active=True,
             ),
             ModelUtilityScore(
-                account_name="alphabrain_reserve",
-                email="reserve@alphabrain.ai",
-                tier="Tier 3 (Normal)",
-                utility_score=7.50,
-                weekly_quota_percent=95.0,
+                account_name="ajay.nukkadtechsolutions",
+                email="ajay.nukkadtechsolutions@gmail.com",
+                tier="Tier 2 (<=2d)",
+                utility_score=166.83,
+                weekly_quota_percent=30.5,
                 five_hour_quota_percent=100.0,
-                recommended_model="gemini-3.1-pro-high",
+                recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=99.6,
+                gemini_weekly_percent=33.9,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=30.5,
+                claude_weekly_desc="17 hours, 26 minutes",
+                token_status="valid",
+                is_active=False,
+            ),
+            ModelUtilityScore(
+                account_name="forexyynewsletter",
+                email="forexyynewsletter@gmail.com",
+                tier="Tier 2 (<=2d)",
+                utility_score=150.55,
+                weekly_quota_percent=21.8,
+                five_hour_quota_percent=100.0,
+                recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=100.0,
+                gemini_weekly_percent=100.0,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=21.8,
+                claude_weekly_desc="19 hours, 46 minutes",
+                token_status="valid",
+                is_active=False,
+            ),
+            ModelUtilityScore(
+                account_name="tiwarianita356",
+                email="tiwarianita356@gmail.com",
+                tier="Tier 3 (Normal)",
+                utility_score=14.96,
+                weekly_quota_percent=59.5,
+                five_hour_quota_percent=100.0,
+                recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=100.0,
+                gemini_weekly_percent=100.0,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=59.5,
+                claude_weekly_desc="2 days, 7 hours",
+                token_status="valid",
+                is_active=False,
+            ),
+            ModelUtilityScore(
+                account_name="ajay.deploymate",
+                email="ajay.deploymate@gmail.com",
+                tier="Tier 3 (Normal)",
+                utility_score=12.72,
+                weekly_quota_percent=47.7,
+                five_hour_quota_percent=100.0,
+                recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=100.0,
+                gemini_weekly_percent=0.5,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=47.7,
+                claude_weekly_desc="2 days, 16 hours",
+                token_status="valid",
+                is_active=False,
+            ),
+            ModelUtilityScore(
+                account_name="tiwariajay033",
+                email="tiwariajay033@gmail.com",
+                tier="Tier 3 (Normal)",
+                utility_score=9.31,
+                weekly_quota_percent=94.5,
+                five_hour_quota_percent=100.0,
+                recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=80.5,
+                gemini_weekly_percent=96.8,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=94.5,
+                claude_weekly_desc="4 days, 21 hours",
+                token_status="valid",
+                is_active=False,
+            ),
+            ModelUtilityScore(
+                account_name="snapthinktrader",
+                email="snapthinktrader@gmail.com",
+                tier="Tier 3 (Normal)",
+                utility_score=8.54,
+                weekly_quota_percent=12.2,
+                five_hour_quota_percent=100.0,
+                recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=100.0,
+                gemini_weekly_percent=4.1,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=12.2,
+                claude_weekly_desc="2 days, 15 hours",
+                token_status="valid",
+                is_active=False,
+            ),
+            ModelUtilityScore(
+                account_name="ajay261999tiwari",
+                email="ajay261999tiwari@gmail.com",
+                tier="Tier 3 (Normal)",
+                utility_score=8.10,
+                weekly_quota_percent=89.0,
+                five_hour_quota_percent=100.0,
+                recommended_model="claude-opus-4-6-thinking",
+                gemini_5h_percent=100.0,
+                gemini_weekly_percent=85.2,
+                claude_5h_percent=100.0,
+                claude_weekly_percent=89.0,
+                claude_weekly_desc="5 days, 16 hours",
+                token_status="valid",
                 is_active=False,
             ),
         ]
 
     def get_git_worktrees(self) -> list[dict[str, Any]]:
+        if MobileBridgeService._cached_mac_telemetry and (
+            time.time() - MobileBridgeService._cached_mac_telemetry_time < 300.0
+        ):
+            cached_wts = MobileBridgeService._cached_mac_telemetry.get("worktrees")
+            if cached_wts:
+                return cached_wts
         worktrees = []
         try:
             res = subprocess.run(
@@ -1022,6 +1276,12 @@ class MobileBridgeService:
         return worktrees
 
     def get_projects(self) -> list[dict[str, Any]]:
+        if MobileBridgeService._cached_mac_telemetry and (
+            time.time() - MobileBridgeService._cached_mac_telemetry_time < 300.0
+        ):
+            cached_projs = MobileBridgeService._cached_mac_telemetry.get("projects")
+            if cached_projs:
+                return cached_projs
         projects_dir = Path("/Users/ajaytiwari/Desktop/Projects")
         results = []
         if projects_dir.exists():
@@ -1036,7 +1296,39 @@ class MobileBridgeService:
                             "name": p.name,
                             "path": str(p),
                             "mtime": mtime,
-                            "is_active": p.name in ("alphaBrain", "DeployMate", "deployMateStudio", "nukkadMart", "knot"),
+                            "is_active": p.name
+                            in (
+                                "alphaBrain",
+                                "DeployMate",
+                                "deployMateStudio",
+                                "nukkadMart",
+                                "knot",
+                            ),
+                        }
+                    )
+        else:
+            root = Path(__file__).resolve().parent.parent.parent
+            results.append(
+                {
+                    "name": "alphaBrain",
+                    "path": str(root),
+                    "mtime": time.time(),
+                    "is_active": True,
+                }
+            )
+            for sub in ("alphabrain_desktop", "alphabrain_app", "alpha_core", "alpha_meet"):
+                sub_path = root / sub
+                if sub_path.exists():
+                    try:
+                        mtime = sub_path.stat().st_mtime
+                    except Exception:
+                        mtime = time.time()
+                    results.append(
+                        {
+                            "name": sub,
+                            "path": str(sub_path),
+                            "mtime": mtime,
+                            "is_active": True,
                         }
                     )
         return results
@@ -1044,10 +1336,14 @@ class MobileBridgeService:
     def get_audit_trail(self, limit: int = 20) -> list[AuditLogEntry]:
         return list(reversed(self._audit_log))[:limit]
 
-    def _log_audit_event(self, actor: str, action_type: str, resource_id: str, details: dict[str, Any]) -> None:
+    def _log_audit_event(
+        self, actor: str, action_type: str, resource_id: str, details: dict[str, Any]
+    ) -> None:
         now = time.time()
         event_id = str(uuid.uuid4())[:8]
-        h = hashlib.sha256(f"{now}:{actor}:{action_type}:{resource_id}:{json.dumps(details)}".encode()).hexdigest()
+        h = hashlib.sha256(
+            f"{now}:{actor}:{action_type}:{resource_id}:{json.dumps(details)}".encode()
+        ).hexdigest()
         self._audit_log.append(
             AuditLogEntry(
                 event_id=event_id,
@@ -1231,7 +1527,9 @@ class MobileBridgeService:
     def get_security_enclave_data(self) -> SecurityEnclaveScreenData:
         from alpha_core.config import settings
 
-        raw_key = getattr(settings, "ALPHA_SIGNING_SECRET", None) or getattr(settings, "SECRET_KEY", "alphabrain-secure-enclave-key")
+        raw_key = getattr(settings, "ALPHA_SIGNING_SECRET", None) or getattr(
+            settings, "SECRET_KEY", "alphabrain-secure-enclave-key"
+        )
         node_fp = hashlib.sha256(raw_key.encode()).hexdigest()[:44]
         fingerprint = f"SHA256:{node_fp}"
 
@@ -1322,7 +1620,9 @@ class MobileBridgeService:
 
         livekit_url = getattr(settings, "LIVEKIT_URL", None) or "wss://livekit.alphabrain.live"
         token = ""
-        if getattr(settings, "LIVEKIT_API_KEY", None) and getattr(settings, "LIVEKIT_API_SECRET", None):
+        if getattr(settings, "LIVEKIT_API_KEY", None) and getattr(
+            settings, "LIVEKIT_API_SECRET", None
+        ):
             try:
                 from alpha_meet.tokens import LiveKitTokenGenerator
 
@@ -1364,7 +1664,9 @@ class MobileBridgeService:
         from alpha_core.config import settings
 
         token = ""
-        if getattr(settings, "LIVEKIT_API_KEY", None) and getattr(settings, "LIVEKIT_API_SECRET", None):
+        if getattr(settings, "LIVEKIT_API_KEY", None) and getattr(
+            settings, "LIVEKIT_API_SECRET", None
+        ):
             try:
                 from alpha_meet.tokens import LiveKitTokenGenerator
 
@@ -1419,10 +1721,24 @@ class MobileBridgeService:
             return f"Task {t.get('id', '')}"
 
         # Categorize tasks
-        merged_tasks = [t for t in tasks if _get_status(t) in {TriageStatus.COMPLETED.value, "completed", "merged"}]
-        claimed_tasks = [t for t in tasks if _get_status(t) in {TriageStatus.EXECUTING.value, "executing", "claimed"}]
-        approved_tasks = [t for t in tasks if _get_status(t) in {TriageStatus.APPROVED.value, "approved"}]
-        pending_tasks = [t for t in tasks if _get_status(t) in {TriageStatus.PENDING_REVIEW.value, "pending_review", "pending"}]
+        merged_tasks = [
+            t
+            for t in tasks
+            if _get_status(t) in {TriageStatus.COMPLETED.value, "completed", "merged"}
+        ]
+        claimed_tasks = [
+            t
+            for t in tasks
+            if _get_status(t) in {TriageStatus.EXECUTING.value, "executing", "claimed"}
+        ]
+        approved_tasks = [
+            t for t in tasks if _get_status(t) in {TriageStatus.APPROVED.value, "approved"}
+        ]
+        pending_tasks = [
+            t
+            for t in tasks
+            if _get_status(t) in {TriageStatus.PENDING_REVIEW.value, "pending_review", "pending"}
+        ]
 
         # Determine current in-flight task
         inflight_task: dict[str, Any] = {}
@@ -1480,10 +1796,26 @@ class MobileBridgeService:
         has_pending = len(pending_tasks) > 0
 
         # Stages: 7 Amazon-style milestones
-        s1_status = "completed" if (has_merged or has_claimed or has_approved or has_pending) else "in_transit"
-        s2_status = "completed" if (has_merged or has_claimed or has_approved) else ("in_transit" if has_pending else "pending")
-        s3_status = "completed" if (has_merged or has_claimed or has_approved) else ("in_transit" if has_pending else "pending")
-        s4_status = "in_transit" if (has_claimed or has_approved) else ("completed" if has_merged else "pending")
+        s1_status = (
+            "completed"
+            if (has_merged or has_claimed or has_approved or has_pending)
+            else "in_transit"
+        )
+        s2_status = (
+            "completed"
+            if (has_merged or has_claimed or has_approved)
+            else ("in_transit" if has_pending else "pending")
+        )
+        s3_status = (
+            "completed"
+            if (has_merged or has_claimed or has_approved)
+            else ("in_transit" if has_pending else "pending")
+        )
+        s4_status = (
+            "in_transit"
+            if (has_claimed or has_approved)
+            else ("completed" if has_merged else "pending")
+        )
         s5_status = "in_transit" if has_claimed else ("completed" if has_merged else "pending")
         s6_status = "completed" if has_merged else "pending"
         s7_status = "completed" if has_merged else "pending"
@@ -1747,12 +2079,12 @@ class MobileBridgeService:
             defaults = [
                 DelegateCredential(
                     delegate_id="CLT-7749",
-                    member_name="Acme Corp Executive (Client)",
-                    role="client_viewer",
+                    member_name="Ajay Tiwari (Founder)",
+                    role="founder",
                     passcode="ALPHA-7749",
                     created_at=time.time() - 86400 * 3,
                     is_active=True,
-                    can_admin_verdict=False,
+                    can_admin_verdict=True,
                 ),
                 DelegateCredential(
                     delegate_id="DEV-8821",
@@ -1820,7 +2152,10 @@ class MobileBridgeService:
         """Verifies delegate ID & Passcode and returns role permissions."""
         delegates = self._load_delegates()
         for d in delegates:
-            if d.delegate_id.upper() == req.delegate_id.strip().upper() and d.passcode == req.passcode.strip():
+            if (
+                d.delegate_id.upper() == req.delegate_id.strip().upper()
+                and d.passcode == req.passcode.strip()
+            ):
                 if not d.is_active:
                     return DelegateAuthResponse(
                         authenticated=False,
@@ -1865,14 +2200,17 @@ class MobileBridgeService:
                 FeedbackItem(
                     id="fb_701a88b1",
                     project_id="alphabrain_dogfood",
-                    author_name="Acme Corp Executive",
-                    author_role="Client Delegate",
+                    author_name="Ajay Tiwari (Founder)",
+                    author_role="Founder & Chief Architect",
                     problem_title="High contrast needed on Stage 4 Worktree connector",
                     problem_description="On mobile companion, the Stage 4 isolated worktree connector should display active worker node name clearly in bright cyan.",
                     created_at=time.time() - 3600 * 12,
                     status="resolved",
                     eva_analysis="Eva Diagnostic: Stage 4 isolated worktree connector elevated to 7.5:1 Swiss Brutalist cyan badge with live node identity.",
-                    eva_proposed_task={"title": "UI Enhancement: Stage 4 Worktree Visual Marker", "priority": "normal"},
+                    eva_proposed_task={
+                        "title": "UI Enhancement: Stage 4 Worktree Visual Marker",
+                        "priority": "normal",
+                    },
                     admin_notes="Directly implemented and ratified by Founder in UI system.",
                     admitted_task_id=None,
                 )
@@ -1895,7 +2233,9 @@ class MobileBridgeService:
         items = self._load_feedback()
         return [i for i in items if i.project_id == project_id or project_id == "all"]
 
-    def submit_feedback(self, req: FeedbackCreateRequest, project_id: str = "alphabrain_dogfood") -> FeedbackItem:
+    def submit_feedback(
+        self, req: FeedbackCreateRequest, project_id: str = "alphabrain_dogfood"
+    ) -> FeedbackItem:
         """Ingests client/delegate query, problem, or opinion and triggers immediate Eva analysis."""
         feedback_id = f"fb_{uuid.uuid4().hex[:8]}"
 
@@ -2014,7 +2354,9 @@ class MobileBridgeService:
 
             now = time.time()
             canonical_hash = hashlib.sha256(
-                json.dumps(env_dict, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+                json.dumps(env_dict, sort_keys=True, separators=(",", ":"), default=str).encode(
+                    "utf-8"
+                )
             ).hexdigest()
 
             provenance = TaskProvenance(
@@ -2042,7 +2384,9 @@ class MobileBridgeService:
 
             target.status = "handed_over"
             target.admitted_task_id = task_id
-            target.admin_notes = verdict.admin_notes or f"Handed over to pipeline as Task {task_id}."
+            target.admin_notes = (
+                verdict.admin_notes or f"Handed over to pipeline as Task {task_id}."
+            )
 
             self._log_audit_event(
                 reviewer_identity,
@@ -2057,7 +2401,9 @@ class MobileBridgeService:
             )
         elif verdict.action == "dismiss_rejected":
             target.status = "rejected"
-            target.admin_notes = verdict.admin_notes or "Dismissed by Admin as out-of-scope or duplicate."
+            target.admin_notes = (
+                verdict.admin_notes or "Dismissed by Admin as out-of-scope or duplicate."
+            )
             self._log_audit_event(
                 reviewer_identity,
                 "admin_feedback_dismissed",

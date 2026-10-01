@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.alphabrain.streamer</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ajaytiwari/Desktop/Projects/alphaBrain/.venv/bin/python</string>
+        <string>/Users/ajaytiwari/Desktop/Projects/alphaBrain/alpha_core/mobile_bridge/mac_streamer.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/ajaytiwari/Desktop/Projects/alphaBrain</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/ajaytiwari/.alphabrain/logs/mac_streamer.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/ajaytiwari/.alphabrain/logs/mac_streamer.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ALPHABRAIN_STAGING_URL</key>
+        <string>https://alpha-brain-staging.onrender.com/api/v1/mobile/sync/mac-node</string>
+        <key>ALPHABRAIN_API_TOKEN</key>
+        <string>ced2a32dd9a568fa22e606fa48381543</string>
+        <key>ALPHABRAIN_TARGET_DEVICE</key>
+        <string>10BF5P2AZF0010T</string>
+    </dict>
+</dict>
+</plist>

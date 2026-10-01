@@ -303,10 +303,22 @@ class ConcludeMeetingRequest(pydantic.BaseModel):
     transcripts: list[dict[str, Any]] = []
 
 
+class AdmitSpecRequest(pydantic.BaseModel):
+    specs: dict[str, Any]
+    room_name: str
+    approved_by: str
+
 @router.post("/meet/{room}/conclude")
 async def conclude_meeting(room: str, payload: ConcludeMeetingRequest | None = None) -> dict[str, Any]:
     """Conclude meeting and persist executive summary."""
-    return {"status": "concluded", "room": room, "transcript_count": len(payload.transcripts) if payload else 0}
+    transcripts = payload.transcripts if payload else []
+    spec_dict = get_service().conclude_meeting_and_extract_spec(room, transcripts)
+    return {"status": "concluded", "room": room, "specs": spec_dict, "project_slug": room}
+
+@router.post("/triage/admit-from-spec")
+async def admit_from_spec(payload: AdmitSpecRequest) -> dict[str, Any]:
+    task_ids = get_service().admit_task_from_spec(payload.specs, payload.room_name, payload.approved_by)
+    return {"status": "admitted", "task_ids": task_ids}
 
 
 # =====================================================================
@@ -453,6 +465,16 @@ async def trigger_inapp_call(request: TriggerCallRequest) -> dict[str, Any]:
         request.caller_name, request.caller_role, request.title, request.prompt_summary, request.task_id
     )
     return {"status": "dispatched", "call": call}
+
+
+@router.post("/sync/mac-node")
+async def sync_mac_node(
+    payload: dict[str, Any],
+    principal: AuthPrincipal = Depends(require_api_principal),
+) -> dict[str, Any]:
+    """Ingest live hardware vitals, worktrees, and projects streamed from Mac host."""
+    return get_service().sync_mac_node(payload)
+
 
 def create_mobile_bridge_app() -> FastAPI:
     """Factory to create a standalone FastAPI application for the mobile bridge."""
