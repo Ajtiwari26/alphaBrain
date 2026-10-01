@@ -517,7 +517,8 @@ class MobileBridgeService:
                     "task_id": task_id,
                     "action": action.value,
                     "notes": founder_notes,
-                    "override_reason": override_reason,
+                    "override_reason": override_reason
+                    or "Founder Mobile Companion Remote Authorization",
                     "timestamp": time.time(),
                 }
             )

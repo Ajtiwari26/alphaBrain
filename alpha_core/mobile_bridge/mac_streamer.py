@@ -183,18 +183,31 @@ def execute_remote_command(cmd: dict) -> None:
         tid = cmd.get("task_id")
         action = cmd.get("action")
         notes = cmd.get("notes") or ""
+        override_reason = cmd.get("override_reason")
         logger.info("Executing remote triage command from cloud: %s -> %s", tid, action)
         try:
-            from alpha_core.queue.triage_queue import TaskTriageQueue
+            from alpha_core.mobile_bridge.schemas import TriageAction
+            from alpha_core.mobile_bridge.service import MobileBridgeService
 
-            queue = TaskTriageQueue(
+            svc = MobileBridgeService(
                 db_path=Path.home() / ".alphabrain" / "task_triage_queue.db"
             )
-            if action == "approve":
-                queue.approve_task(tid, founder_notes=notes)
-            else:
-                queue.reject_task(tid, rejection_reason=notes)
-            logger.info("Successfully executed triage command for %s", tid)
+            action_enum = (
+                TriageAction.APPROVE if action == "approve" else TriageAction.REJECT
+            )
+            res = svc.review_triage_task(
+                task_id=tid,
+                action=action_enum,
+                founder_notes=notes,
+                override_reason=override_reason,
+            )
+            logger.info(
+                "Executed triage review for %s: success=%s, status=%s, msg=%s",
+                tid,
+                res.success,
+                res.new_status,
+                res.message,
+            )
         except Exception as e:
             logger.warning("Failed executing remote triage command: %s", e)
 
