@@ -219,7 +219,7 @@ def sync_once() -> bool:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             if resp.status == 200:
                 raw_body = resp.read()
                 if raw_body:
