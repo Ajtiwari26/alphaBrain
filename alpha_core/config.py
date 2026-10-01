@@ -88,14 +88,14 @@ class Settings(BaseModel):
         return issues
 
     # Authentication and network boundaries
+    CORS_ORIGINS: tuple[str, ...] = _csv_env(
+        "CORS_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173,https://localhost,http://localhost,capacitor://localhost,tauri://localhost,https://tauri.localhost,http://localhost:1420",
+    )
     ALPHA_API_TOKEN: str = os.getenv("ALPHA_API_TOKEN", "")
     ALPHA_WORKER_TOKEN: str = os.getenv("ALPHA_WORKER_TOKEN", "")
     ALPHA_SIGNING_SECRET: str = os.getenv("ALPHA_SIGNING_SECRET", "")
     PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
-    CORS_ORIGINS: tuple[str, ...] = _csv_env(
-        "CORS_ORIGINS",
-        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173,https://localhost,http://localhost,capacitor://localhost",
-    )
 
     # AI Model Credentials (Provided by User)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")

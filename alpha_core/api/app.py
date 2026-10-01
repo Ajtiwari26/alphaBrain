@@ -261,8 +261,12 @@ app.add_middleware(
             "https://localhost",
             "http://localhost",
             "capacitor://localhost",
+            "tauri://localhost",
+            "https://tauri.localhost",
+            "http://localhost:1420",
         }
     ),
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1)(:[0-9]+)?|tauri://localhost|https://tauri\.localhost|capacitor://localhost)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

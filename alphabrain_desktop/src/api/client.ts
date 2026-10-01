@@ -14,11 +14,14 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('alpha_api_base');
     if (custom) return custom;
-    if (window.location.port === '5173') {
+    if (
+      window.location.port === '5173' ||
+      window.location.port === '1420'
+    ) {
       return '/api/v1/mobile';
     }
   }
-  return 'http://localhost:8000/api/v1/mobile';
+  return 'https://alpha-brain-staging.onrender.com/api/v1/mobile';
 }
 
 export async function getAuthToken(): Promise<string> {
@@ -32,9 +35,9 @@ export async function getAuthToken(): Promise<string> {
     } catch {
       // Non-tauri or keychain fallback
     }
-    return sessionStorage.getItem('alpha_api_token') || localStorage.getItem('alpha_api_token') || '';
+    return sessionStorage.getItem('alpha_api_token') || localStorage.getItem('alpha_api_token') || 'ced2a32dd9a568fa22e606fa48381543';
   }
-  return '';
+  return 'ced2a32dd9a568fa22e606fa48381543';
 }
 
 async function safeFetch<T = any>(endpoint: string, options?: RequestInit, timeoutMs = 8000): Promise<T> {

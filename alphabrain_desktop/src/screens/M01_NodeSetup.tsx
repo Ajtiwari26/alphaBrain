@@ -11,7 +11,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
   const [workspacePath, setWorkspacePath] = useState(
     '/Users/ajaytiwari/Desktop/Projects/alphaBrain'
   );
-  const [backendUrl, setBackendUrl] = useState('https://api.alphabrain.live');
+  const [backendUrl, setBackendUrl] = useState('https://alpha-brain-staging.onrender.com');
   const [authToken, setAuthToken] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -21,7 +21,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
     git_version: 'Scanning...',
     node_version: 'Scanning...',
     python_version: 'Scanning...',
-    agy_version: 'Scanning...',
+    etta_version: 'Scanning...',
     all_satisfied: false,
     details: {},
   });
@@ -40,13 +40,13 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
         git_version: 'git version 2.45.2',
         node_version: 'v22.13.0',
         python_version: 'Python 3.14.0',
-        agy_version: 'agy CLI 2.0-ready (builtin)',
+        etta_version: 'Deploymate Etta v2.7.4 (TSAN Proven)',
         all_satisfied: true,
         details: {
           git: '/usr/bin/git',
           node: '/usr/local/bin/node',
           python: '/usr/bin/python3',
-          agy: '/usr/local/bin/agy',
+          etta: '/Users/ajaytiwari/Desktop/Projects/DeploymateCodingAgents/etta/target/release/etta',
         },
       });
     } finally {
@@ -89,7 +89,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
       {/* Header */}
       <div className="border-b border-[#0A0A0A] pb-4 flex justify-between items-end">
         <div>
-          <span className="text-xs font-mono tracking-widest uppercase bg-[#0A0A0A] text-white px-2 py-0.5 font-bold">
+          <span className="text-xs font-mono tracking-widest uppercase border border-[#0A0A0A] bg-zinc-100 text-[#0A0A0A] px-2 py-0.5 font-bold shadow-[1px_1px_0px_#0A0A0A]">
             Screen M-01
           </span>
           <h1 className="text-3xl font-bold font-mono tracking-tight mt-2">
@@ -132,16 +132,17 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
             <p className="text-xs text-neutral-500">
               Root directory of the alphaBrain repository and active task worktrees.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
               <input
                 type="text"
                 value={workspacePath}
                 onChange={(e) => setWorkspacePath(e.target.value)}
-                className="flex-1 font-mono text-xs border border-[#0A0A0A] px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-[#E6391E]"
+                className="min-w-0 flex-1 font-mono text-xs border border-[#0A0A0A] px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-[#E6391E] truncate"
               />
               <button
+                type="button"
                 onClick={() => setWorkspacePath('/Users/ajaytiwari/Desktop/Projects/alphaBrain')}
-                className="px-3 py-2 border border-[#0A0A0A] bg-neutral-100 hover:bg-neutral-200 text-xs font-mono uppercase font-semibold"
+                className="shrink-0 px-3 py-2 border border-[#0A0A0A] bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-xs font-mono uppercase font-semibold transition-colors"
               >
                 Reset
               </button>
@@ -176,19 +177,19 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
                 { name: 'Git Core', ver: depReport.git_version, path: depReport.details.git || '/usr/bin/git' },
                 { name: 'Node.js Runtime', ver: depReport.node_version, path: depReport.details.node || '/usr/local/bin/node' },
                 { name: 'Python 3 Environment', ver: depReport.python_version, path: depReport.details.python || '/usr/bin/python3' },
-                { name: 'AGY Autonomous CLI', ver: depReport.agy_version, path: depReport.details.agy || '/usr/local/bin/agy' },
+                { name: 'Deploymate Etta Engine (TSAN)', ver: depReport.etta_version, path: depReport.details.etta || '/usr/local/bin/etta' },
               ].map((dep) => (
                 <div
                   key={dep.name}
-                  className="flex items-center justify-between p-2.5 border border-neutral-300 bg-neutral-50 font-mono text-xs"
+                  className="flex items-center justify-between p-2.5 border border-neutral-300 bg-neutral-50 font-mono text-xs gap-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="font-semibold">{dep.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span className="font-semibold truncate">{dep.name}</span>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right min-w-0 shrink-0">
                     <div className="text-neutral-900 font-bold">{dep.ver}</div>
-                    <div className="text-[10px] text-neutral-400">{dep.path}</div>
+                    <div className="text-[10px] text-neutral-400 truncate max-w-[140px]" title={dep.path}>{dep.path}</div>
                   </div>
                 </div>
               ))}
@@ -246,7 +247,7 @@ export const M01_NodeSetup: React.FC<Props> = ({ onNavigate }) => {
             <button
               onClick={handleRegister}
               disabled={isRegistering}
-              className="w-full py-3 bg-[#0A0A0A] hover:bg-[#E6391E] text-white text-xs font-mono uppercase font-bold tracking-wider transition-colors disabled:opacity-50"
+              className="w-full py-3 border-2 border-[#0A0A0A] bg-white hover:bg-zinc-100 active:bg-zinc-200 text-[#0A0A0A] text-xs font-mono uppercase font-bold tracking-wider transition-colors shadow-[2px_2px_0px_#0A0A0A] active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
             >
               {isRegistering ? 'Registering Node (Rust IPC)...' : 'Register Node With Cloud'}
             </button>

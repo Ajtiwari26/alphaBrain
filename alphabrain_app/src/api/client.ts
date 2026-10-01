@@ -30,23 +30,19 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('alpha_api_base');
     if (custom) return custom;
-    // When running in Capacitor Android Webview (origin https://localhost)
-    if (window.location.protocol === 'https:' && window.location.hostname === 'localhost') {
-      return 'http://localhost:8000/api/v1/mobile';
-    }
     // When running via Vite dev server proxy
     if (window.location.port === '5173') {
       return '/api/v1/mobile';
     }
   }
-  return 'http://localhost:8000/api/v1/mobile';
+  return 'https://alpha-brain-staging.onrender.com/api/v1/mobile';
 }
 
 export function getAuthToken(): string {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('alpha_api_token') || 'alpha-local-meeting-2026-test-token-32chars';
+    return localStorage.getItem('alpha_api_token') || 'ced2a32dd9a568fa22e606fa48381543';
   }
-  return 'alpha-local-meeting-2026-test-token-32chars';
+  return 'ced2a32dd9a568fa22e606fa48381543';
 }
 
 async function safeFetch<T = any>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -67,6 +63,22 @@ async function safeFetch<T = any>(endpoint: string, options?: RequestInit): Prom
 }
 
 export const mobileApi = {
+  getIncomingCall: async (): Promise<{ active_call: any | null }> => {
+    return safeFetch('/voice/incoming');
+  },
+  respondIncomingCall: async (callId: string, action: 'accept' | 'decline'): Promise<any> => {
+    return safeFetch(`/voice/incoming/${callId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ action })
+    });
+  },
+  triggerSimulatedCall: async (data?: any): Promise<any> => {
+    return safeFetch('/voice/call/trigger', {
+      method: 'POST',
+      body: JSON.stringify(data || {})
+    });
+  },
+
   getOverview: (): Promise<ExecutiveOverview> =>
     safeFetch('/overview'),
 
