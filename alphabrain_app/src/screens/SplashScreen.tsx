@@ -10,7 +10,7 @@ export const SplashScreen: React.FC<Props> = ({ onContinue }) => {
   return (
     <div 
       onClick={onContinue}
-      className="flex-1 flex flex-col justify-between items-center bg-white text-[#0A0A0A] min-h-screen pt-[max(env(safe-area-inset-top),3.5rem)] pb-[max(env(safe-area-inset-bottom),4.5rem)] px-6 select-none relative cursor-pointer"
+      className="flex-1 flex flex-col justify-between items-center bg-white text-[#0A0A0A] min-h-screen pt-[max(env(safe-area-inset-top),var(--android-safe-top,0px),3.5rem)] pb-[max(env(safe-area-inset-bottom),var(--android-safe-bottom,0px),4.5rem)] px-6 select-none relative cursor-pointer"
     >
       {/* Top Status Area Space */}
       <div className="w-full flex justify-between items-center opacity-0 pointer-events-none">

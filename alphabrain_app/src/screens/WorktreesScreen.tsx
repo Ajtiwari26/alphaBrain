@@ -31,8 +31,21 @@ interface WorktreeItem {
 }
 
 export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess, onNavigateToTask }) => {
-  const [worktrees, setWorktrees] = useState<WorktreeItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [worktrees, setWorktrees] = useState<WorktreeItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('swr:worktrees:list');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('swr:worktrees:list');
+    } catch {
+      return true;
+    }
+  });
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'tasks' | 'proof' | 'protected'>('all');
@@ -43,6 +56,11 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess, onNavigateToT
     try {
       const data = await mobileApi.getWorktrees();
       setWorktrees(data);
+      try {
+        localStorage.setItem('swr:worktrees:list', JSON.stringify(data));
+      } catch (e) {
+        console.warn('Failed to cache worktrees:', e);
+      }
     } catch (err) {
       console.error('Failed to fetch worktrees:', err);
     } finally {
@@ -142,7 +160,7 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess, onNavigateToT
           Worktrees
         </h2>
         <p className="font-sans text-xs text-zinc-500 mt-0.5">
-          Isolated file-system checkouts for autonomous AGY coding workers. Zero branch collisions on main.
+          Isolated file-system checkouts for autonomous Etta coding workers. Zero branch collisions on main.
         </p>
       </div>
 
@@ -403,7 +421,7 @@ export const WorktreesScreen: React.FC<Props> = ({ onMergeSuccess, onNavigateToT
                     {extractTaskId(selectedWorktree.branch || selectedWorktree.name)}
                   </p>
                   <p className="text-[10px] text-zinc-600 font-sans">
-                    This worktree is currently or previously leased to an AGY coding agent cycle. Changes are isolated from the main repository.
+                    This worktree is currently or previously leased to an Etta coding agent cycle. Changes are isolated from the main repository.
                   </p>
                 </div>
               )}

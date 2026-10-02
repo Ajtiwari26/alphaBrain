@@ -3,7 +3,7 @@ import { DashboardScreenData, ExecutiveOverview, ScreenId, TaskSummary } from '.
 import { mobileApi } from '../api/client';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { Cpu, Sparkles, GitBranch, ArrowUpRight, Bot, UserCheck, Battery, BatteryCharging } from 'lucide-react';
+import { Cpu, Sparkles, GitBranch, ArrowUpRight, Bot, UserCheck, Battery, BatteryCharging, PhoneCall } from 'lucide-react';
 
 interface Props {
   overview: ExecutiveOverview;
@@ -12,31 +12,105 @@ interface Props {
 }
 
 export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: initialDashboard, onNavigate }) => {
-  const [dashboard, setDashboard] = useState<DashboardScreenData | null>(initialDashboard || null);
-  const [recentTasks, setRecentTasks] = useState<TaskSummary[]>([]);
-  const [activeWorktrees, setActiveWorktrees] = useState<Array<{ name: string; branch: string }>>([]);
-  const [loadingTasks, setLoadingTasks] = useState(true);
+  const [dashboard, setDashboard] = useState<DashboardScreenData | null>(() => {
+    if (initialDashboard) return initialDashboard;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('swr:dashboard');
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const [recentTasks, setRecentTasks] = useState<TaskSummary[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('swr:recentTasks');
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const [activeWorktrees, setActiveWorktrees] = useState<Array<{ name: string; branch: string }>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('swr:recentWorktrees');
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const [loadingTasks, setLoadingTasks] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('swr:recentTasks');
+    }
+    return true;
+  });
 
   useEffect(() => {
     if (initialDashboard) {
       setDashboard(initialDashboard);
+      try {
+        localStorage.setItem('swr:dashboard', JSON.stringify(initialDashboard));
+      } catch {}
     }
   }, [initialDashboard]);
 
+  // Live polling: fetches lightweight paginated chunks (limit=3) every 4 seconds
   useEffect(() => {
-    Promise.all([
-      mobileApi.listTriage(),
-      mobileApi.getWorktrees(),
-    ])
-      .then(([tasks, worktrees]) => {
-        setRecentTasks(tasks.slice(0, 3));
-        setActiveWorktrees(worktrees.slice(0, 3));
-        setLoadingTasks(false);
-      })
-      .catch((err) => {
-        console.warn('Failed to load active sprints/worktrees:', err);
-        setLoadingTasks(false);
-      });
+    let active = true;
+
+    const fetchLiveData = () => {
+      mobileApi
+        .getDashboard()
+        .then((dash) => {
+          if (active && dash) {
+            setDashboard(dash);
+            try {
+              localStorage.setItem('swr:dashboard', JSON.stringify(dash));
+            } catch {}
+          }
+        })
+        .catch((err) => console.warn('Dashboard poll warning:', err));
+
+      Promise.all([
+        mobileApi.listTriage(undefined, 3, 0),
+        mobileApi.getWorktrees(3, 0),
+      ])
+        .then(([tasks, worktrees]) => {
+          if (active) {
+            const topTasks = tasks.slice(0, 3);
+            const topWts = worktrees.slice(0, 3);
+            setRecentTasks(topTasks);
+            setActiveWorktrees(topWts);
+            setLoadingTasks(false);
+            try {
+              localStorage.setItem('swr:recentTasks', JSON.stringify(topTasks));
+              localStorage.setItem('swr:recentWorktrees', JSON.stringify(topWts));
+            } catch {}
+          }
+        })
+        .catch((err) => {
+          console.warn('Live tasks poll warning:', err);
+          if (active) setLoadingTasks(false);
+        });
+    };
+
+    fetchLiveData();
+    const interval = setInterval(fetchLiveData, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const emergencyStopActive = dashboard ? dashboard.emergency_stop.active : (overview?.emergency_stop?.active ?? false);
@@ -44,13 +118,13 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
     host_cpu_percent: 0,
     host_ram_percent: 0,
     host_ram_used_gb: 0,
-    host_ram_total_gb: 0,
+    host_ram_total_gb: 16.0,
     thermal_pressure: 'nominal',
-    battery_level_percent: 0,
-    battery_charging: false,
-    usb_device_connected: false,
-    usb_device_serial: '---',
-    usb_device_name: 'None'
+    battery_level_percent: 100,
+    battery_charging: true,
+    usb_device_connected: true,
+    usb_device_serial: '10BF5P2AZF0010T',
+    usb_device_name: 'iQOO 12 Flagship'
   });
 
   const cpuPercent = Math.round(telemetry.host_cpu_percent || 0);
@@ -59,8 +133,8 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
   const ramTotal = telemetry.host_ram_total_gb ? telemetry.host_ram_total_gb.toFixed(1) : '16.0';
   const batteryPercent = Math.round(telemetry.battery_level_percent ?? 100);
   const batteryCharging = telemetry.battery_charging ?? false;
-  const quotasPercent = dashboard?.ai_quotas_percent ?? 99.1;
-  const quotasSummary = dashboard?.ai_quotas_summary ?? '99.1% LEFT';
+  const quotasPercent = dashboard?.ai_quotas_percent ?? 96.6;
+  const quotasSummary = dashboard?.ai_quotas_summary ?? '96.6% LEFT';
 
   return (
     <div className="flex-1 flex flex-col justify-between bg-white text-[#0A0A0A] animate-screen-enter space-y-4">
@@ -78,12 +152,32 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
             {emergencyStopActive ? 'EMERGENCY LOCKED' : (dashboard?.system_status ? dashboard.system_status.toUpperCase() : 'OPERATIONAL')}
           </span>
         </div>
-        <h2 className="text-3xl font-headline font-bold text-[#0A0A0A] mt-1">
-          Command Center
-        </h2>
-        <p className="font-mono text-[11px] text-zinc-500 mt-0.5">
-          Vitals, AI quotas & active sprints on host Mac
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-headline font-bold text-[#0A0A0A] mt-1">
+              Command Center
+            </h2>
+            <p className="font-mono text-[11px] text-zinc-500 mt-0.5">
+              Vitals, AI quotas & active sprints on host Mac
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              mobileApi.triggerSimulatedCall({
+                caller_name: 'Eva (DeployMate CTO)',
+                caller_role: 'Autonomous AI Architect',
+                title: 'Urgent Architecture Review',
+                prompt_summary: 'Founder sign-off requested for rate-limiting middleware deployment.',
+                task_id: 'tsk_rate_limiter_99',
+              })
+            }
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[11px] font-bold transition-all shadow-sm hover-lift"
+            title="Simulate incoming team VoIP call"
+          >
+            <PhoneCall className="w-3.5 h-3.5 animate-pulse" />
+            <span>TEST TEAM CALL</span>
+          </button>
+        </div>
       </div>
 
       {/* SECTION 1: MAC HOST VITALS */}
@@ -198,6 +292,7 @@ export const DashboardScreen: React.FC<Props> = ({ overview, dashboardData: init
           <span>8 Accounts Synced (Gemini + Claude)</span>
         </div>
       </div>
+
 
       {/* SECTION 3: ACTIVE WORKSPACES & SPRINTS (Started by Eva / Founder) */}
       <div className="border border-[#0A0A0A] p-4 bg-white space-y-3 flex-1 flex flex-col">

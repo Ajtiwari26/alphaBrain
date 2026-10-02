@@ -10,15 +10,20 @@ import {
 } from '../types';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { SkeletonList } from '../components/ui/Skeleton';
+import { FolderGit2, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
 
-type TabMode = 'delivery' | 'docs' | 'portal';
+type TabMode = 'repos' | 'delivery' | 'docs' | 'portal';
 
 export const ProjectsScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabMode>('delivery');
+  const [activeTab, setActiveTab] = useState<TabMode>('repos');
+
+  // Repositories state
+  const [projects, setProjects] = useState<Array<{ name: string; path: string; mtime: number; is_active: boolean }>>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
 
   // Delivery map state
   const [deliveryMap, setDeliveryMap] = useState<DeliveryMapResponse | null>(null);
-  const [loadingDelivery, setLoadingDelivery] = useState(true);
+  const [loadingDelivery, setLoadingDelivery] = useState(false);
 
   // Docs reading room state
   const [docs, setDocs] = useState<ExecutiveDocSummary[]>([]);
@@ -34,14 +39,14 @@ export const ProjectsScreen: React.FC = () => {
   // Invite modal state
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState('client_viewer');
+  const [inviteRole, setInviteRole] = useState('team_delegate');
   const [grantAdmin, setGrantAdmin] = useState(false);
   const [inviteResult, setInviteResult] = useState<DelegateCredential | null>(null);
 
   // Client query submission modal state
   const [showQueryModal, setShowQueryModal] = useState(false);
-  const [queryAuthor, setQueryAuthor] = useState('Acme Corp Executive');
-  const [queryRole, setQueryRole] = useState('Client Delegate');
+  const [queryAuthor, setQueryAuthor] = useState('Ajay Tiwari (Founder)');
+  const [queryRole, setQueryRole] = useState('Founder & Chief Architect');
   const [queryTitle, setQueryTitle] = useState('');
   const [queryDesc, setQueryDesc] = useState('');
   const [submittingQuery, setSubmittingQuery] = useState(false);
@@ -58,9 +63,23 @@ export const ProjectsScreen: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Load delivery map on mount
+  const loadProjectsData = () => {
+    setLoadingProjects(true);
+    mobileApi
+      .getProjects()
+      .then((data) => {
+        setProjects(data);
+        setLoadingProjects(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load projects:', err);
+        setLoadingProjects(false);
+      });
+  };
+
+  // Load repositories on mount
   useEffect(() => {
-    loadDeliveryData();
+    loadProjectsData();
   }, []);
 
   const loadDeliveryData = () => {
@@ -224,40 +243,131 @@ export const ProjectsScreen: React.FC = () => {
           Delivery Board
         </h2>
 
-        {/* 3 Swiss Brutalist Tabs */}
-        <div className="grid grid-cols-3 gap-1 mt-4 p-1 bg-zinc-100 border border-[#0A0A0A]">
+        {/* 4 Swiss Brutalist Tabs */}
+        <div className="grid grid-cols-4 gap-1 mt-4 p-1 bg-zinc-100 border border-[#0A0A0A]">
+          <button
+            onClick={() => handleTabChange('repos')}
+            className={`py-2 text-center font-mono text-[11px] font-bold uppercase transition-colors ${
+              activeTab === 'repos'
+                ? 'bg-[#0A0A0A] text-white shadow-sm'
+                : 'text-zinc-600 hover:text-[#0A0A0A]'
+            }`}
+          >
+            Repos
+          </button>
           <button
             onClick={() => handleTabChange('delivery')}
-            className={`py-2 text-center font-mono text-xs font-bold uppercase transition-colors ${
+            className={`py-2 text-center font-mono text-[11px] font-bold uppercase transition-colors ${
               activeTab === 'delivery'
                 ? 'bg-[#0A0A0A] text-white shadow-sm'
                 : 'text-zinc-600 hover:text-[#0A0A0A]'
             }`}
           >
-            Delivery Map
+            Delivery
           </button>
           <button
             onClick={() => handleTabChange('docs')}
-            className={`py-2 text-center font-mono text-xs font-bold uppercase transition-colors ${
+            className={`py-2 text-center font-mono text-[11px] font-bold uppercase transition-colors ${
               activeTab === 'docs'
                 ? 'bg-[#0A0A0A] text-white shadow-sm'
                 : 'text-zinc-600 hover:text-[#0A0A0A]'
             }`}
           >
-            Reading Room
+            Docs
           </button>
           <button
             onClick={() => handleTabChange('portal')}
-            className={`py-2 text-center font-mono text-xs font-bold uppercase transition-colors ${
+            className={`py-2 text-center font-mono text-[11px] font-bold uppercase transition-colors ${
               activeTab === 'portal'
                 ? 'bg-[#0A0A0A] text-white shadow-sm'
                 : 'text-zinc-600 hover:text-[#0A0A0A]'
             }`}
           >
-            Client Portal
+            Governance
           </button>
         </div>
       </div>
+
+      {/* =================================================================== */}
+      {/* TAB 0: REPOSITORIES (REAL GIT WORKSPACES)                           */}
+      {/* =================================================================== */}
+      {activeTab === 'repos' && (
+        <div className="flex-1 my-4 overflow-y-auto max-h-[65vh] space-y-3 pr-1">
+          <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+            <span className="font-mono text-xs text-zinc-500 font-bold uppercase">
+              {projects.length} Workspace Repositories
+            </span>
+            <button
+              onClick={loadProjectsData}
+              className="flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-1 border border-[#0A0A0A] bg-white hover:bg-zinc-100"
+            >
+              <RefreshCw className={`w-3 h-3 ${loadingProjects ? 'animate-spin' : ''}`} />
+              <span>SYNC</span>
+            </button>
+          </div>
+
+          {loadingProjects ? (
+            <div className="p-8 flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200">
+              <LoadingSpinner size="md" label="Scanning repositories..." />
+              <div className="w-full mt-4">
+                <SkeletonList count={3} />
+              </div>
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="p-8 text-center font-mono text-xs text-zinc-400 border border-dashed border-zinc-300">
+              No repositories detected.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {projects.map((p) => {
+                const ageHours = Math.round((Date.now() / 1000 - p.mtime) / 3600);
+                const timeLabel =
+                  ageHours < 1
+                    ? 'JUST NOW'
+                    : ageHours < 24
+                    ? `${ageHours}H AGO`
+                    : `${Math.round(ageHours / 24)}D AGO`;
+
+                return (
+                  <div
+                    key={p.name}
+                    className="p-3 border border-[#0A0A0A] bg-white space-y-2 hover:bg-zinc-50 transition-colors shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 border border-[#0A0A0A] bg-zinc-100 flex items-center justify-center">
+                          <FolderGit2 className="w-4 h-4 text-[#E6391E]" />
+                        </div>
+                        <h4 className="font-bold text-sm text-[#0A0A0A]">{p.name}</h4>
+                      </div>
+                      {p.is_active ? (
+                        <span className="flex items-center gap-1 font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 px-1.5 py-0.5">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          ACTIVE
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[10px] text-zinc-400 border border-zinc-200 px-1.5 py-0.5">
+                          IDLE
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono text-[11px] text-zinc-500 truncate">
+                      {p.path}
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-zinc-100 font-mono text-[10px] text-zinc-400">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-zinc-400" />
+                        {timeLabel}
+                      </span>
+                      <span className="text-[#E6391E] font-bold">GIT HOST</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* =================================================================== */}
       {/* TAB 1: DELIVERY MAP (AMAZON STYLE)                                   */}
@@ -309,7 +419,7 @@ export const ProjectsScreen: React.FC = () => {
 
               {/* In-Flight Task & Worktree Radar */}
               {deliveryMap.inflight_task && deliveryMap.inflight_task.id !== 'none' && (
-                <div className="p-3 bg-[#0A0A0A] text-white border-2 border-[#E6391E] space-y-2">
+                <div className="p-3 bg-zinc-50 text-[#0A0A0A] border-2 border-[#0A0A0A] space-y-2 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-ping" />
@@ -317,21 +427,21 @@ export const ProjectsScreen: React.FC = () => {
                         In-Flight Worktree Radar
                       </span>
                     </div>
-                    <span className="font-mono text-[10px] text-zinc-400">
+                    <span className="font-mono text-[10px] text-zinc-500 font-bold">
                       TID: {deliveryMap.inflight_task.id}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold font-headline leading-tight">
+                  <h4 className="text-sm font-bold font-headline leading-tight text-[#0A0A0A]">
                     {deliveryMap.inflight_task.title}
                   </h4>
-                  <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[10px] text-zinc-300 border-t border-zinc-800">
+                  <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[10px] text-zinc-700 border-t border-zinc-200">
                     <div>
                       <span className="text-zinc-500 block">BRANCH:</span>
-                      <span className="font-semibold text-cyan-300">{deliveryMap.inflight_task.branch}</span>
+                      <span className="font-semibold text-[#0A0A0A]">{deliveryMap.inflight_task.branch}</span>
                     </div>
                     <div>
                       <span className="text-zinc-500 block">WORKER:</span>
-                      <span className="font-semibold text-zinc-200">{deliveryMap.inflight_task.worker}</span>
+                      <span className="font-semibold text-[#0A0A0A]">{deliveryMap.inflight_task.worker}</span>
                     </div>
                   </div>
                 </div>
@@ -822,7 +932,7 @@ export const ProjectsScreen: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="e.g., Jane Doe (Acme Corp)"
+                    placeholder="e.g., Sarah Chen (Lead Architect)"
                     value={inviteName}
                     onChange={(e) => setInviteName(e.target.value)}
                     className="w-full p-2 border-2 border-[#0A0A0A] bg-white text-[#0A0A0A] focus:outline-none"

@@ -23,6 +23,8 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
   const triggerAuthSuccess = () => {
     setAuthed(true);
     setError(null);
+    localStorage.setItem('alphabrain_session_token', 'active_founder_session');
+    sessionStorage.setItem('alphabrain_session_token', 'active_founder_session');
     const t = window.setTimeout(() => {
       onAuthenticated?.();
     }, 450);
@@ -195,7 +197,7 @@ export const AuthScreen: React.FC<Props> = ({ onAuthenticated, onNavigateEnroll 
       </div>
 
       {/* Keypad with [AUTO], [0], [⌫] */}
-      <div className="space-y-2">
+      <div className="space-y-2 safe-bottom-action">
         <div className="grid grid-cols-3 gap-2">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
             <button

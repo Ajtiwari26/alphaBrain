@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from alpha_core.cache.upstash_cache import UpstashCacheClient
 from alpha_core.mobile_bridge.schemas import (
     # Amazon-style delivery, reading room, delegates, feedback schemas
     AdminFeedbackVerdictRequest,
@@ -52,7 +53,6 @@ from alpha_core.mobile_bridge.schemas import (
     SprintFleetOverview,
     TaskDetail,
     TaskDiffResponse,
-    TaskSummary,
     VoiceBriefing,
 )
 from alpha_core.mobile_bridge.service import MobileBridgeService
@@ -62,10 +62,15 @@ logger = logging.getLogger("alphabrain.mobile_bridge.api")
 
 router = APIRouter(prefix="/api/v1/mobile", tags=["Founder Companion Mobile Bridge"])
 _default_service = MobileBridgeService()
+_cache_client = UpstashCacheClient()
 
 
 def get_service() -> MobileBridgeService:
     return _default_service
+
+
+def get_cache() -> UpstashCacheClient:
+    return _cache_client
 
 
 @router.get("/health", response_model=dict[str, Any])
@@ -86,25 +91,52 @@ async def get_overview() -> ExecutiveOverview:
     return get_service().get_executive_overview()
 
 
-@router.get("/triage", response_model=list[TaskSummary])
+@router.get("/triage")
 async def list_triage(
-    filter_status: str | None = Query(
-        default=None, alias="status", description="Filter by status (pending_review, approved, etc.)"
+    status: str | None = Query(
+        default=None,
+        alias="status",
+        description="Filter by status (pending_review, approved, etc.)",
     ),
-) -> list[TaskSummary]:
-    """Screen 02: Triage Queue tasks list."""
-    return get_service().list_triage_tasks(status_filter=filter_status)
+    limit: int = Query(default=15, ge=1, le=50, description="Items per page"),
+    offset: int = Query(default=0, ge=0, description="Page offset cursor"),
+    format: str | None = Query(
+        default=None,
+        description="Response format: 'paginated' returns metadata, omitted returns items list",
+    ),
+) -> Any:
+    """Screen 02: Triage Queue tasks list with Upstash edge caching and pagination."""
+    cache_key = f"alphabrain:v1:triage:list:{status or 'all'}:{limit}:{offset}"
+    cached = await _cache_client.get(cache_key)
+    if cached is not None:
+        if format != "paginated" and isinstance(cached, dict) and "items" in cached:
+            return cached["items"]
+        return cached
+
+    result = get_service().list_triage_tasks_paginated(
+        status_filter=status, limit=limit, offset=offset
+    )
+    await _cache_client.set(cache_key, result, ttl=30)
+    if format != "paginated":
+        return result["items"]
+    return result
 
 
 @router.post("/triage/{task_id}/review", response_model=ReviewResponse)
-async def review_triage_task(task_id: str, request: ReviewRequest) -> ReviewResponse:
+async def review_triage_task(
+    task_id: str, request: ReviewRequest
+) -> ReviewResponse:
     """Screen 02: Submit founder review decision (approve / reject)."""
-    return get_service().review_triage_task(
+    res = get_service().review_triage_task(
         task_id=task_id,
         action=request.action,
         founder_notes=request.founder_notes,
         override_reason=request.override_reason,
     )
+    # Immediate eviction of triage cache entries (INV-M03)
+    await _cache_client.delete_pattern("alphabrain:v1:triage:*")
+    await _cache_client.delete("alphabrain:v1:dashboard")
+    return res
 
 
 @router.get("/tasks/{task_id}", response_model=TaskDetail)
@@ -192,10 +224,28 @@ async def get_model_scores() -> list[ModelUtilityScore]:
     return get_service().get_model_utility_scores()
 
 
-@router.get("/worktrees", response_model=list[dict[str, Any]])
-async def list_worktrees() -> list[dict[str, Any]]:
-    """Screen 09: Git Worktrees status and active branches."""
-    return get_service().get_git_worktrees()
+@router.get("/worktrees")
+async def list_worktrees(
+    limit: int = Query(default=15, ge=1, le=50, description="Items per page"),
+    offset: int = Query(default=0, ge=0, description="Page offset cursor"),
+    format: str | None = Query(
+        default=None,
+        description="Response format: 'paginated' returns metadata, omitted returns items list",
+    ),
+) -> Any:
+    """Screen 09: Git Worktrees status with Upstash edge caching and pagination."""
+    cache_key = f"alphabrain:v1:worktrees:list:{limit}:{offset}"
+    cached = await _cache_client.get(cache_key)
+    if cached is not None:
+        if format != "paginated" and isinstance(cached, dict) and "items" in cached:
+            return cached["items"]
+        return cached
+
+    result = get_service().get_git_worktrees_paginated(limit=limit, offset=offset)
+    await _cache_client.set(cache_key, result, ttl=30)
+    if format != "paginated":
+        return result["items"]
+    return result
 
 
 @router.get("/projects", response_model=list[dict[str, Any]])
@@ -257,8 +307,21 @@ async def sse_event_stream(request: Request) -> StreamingResponse:
 async def get_dashboard(
     principal: AuthPrincipal = Depends(require_api_principal),
 ) -> DashboardScreenData:
-    """Dashboard Screen: Real production mission kernel and system metrics."""
-    return get_service().get_dashboard_data()
+    """Dashboard Screen: Real production mission kernel and system metrics with edge cache."""
+    cached = await _cache_client.get("alphabrain:v1:dashboard")
+    if cached is not None:
+        try:
+            return DashboardScreenData.model_validate(cached)
+        except Exception:
+            pass
+    data = get_service().get_dashboard_data()
+    try:
+        await _cache_client.set(
+            "alphabrain:v1:dashboard", data.model_dump(mode="json"), ttl=10
+        )
+    except Exception:
+        pass
+    return data
 
 
 @router.get("/command-node", response_model=CommandNodeScreenData)
@@ -473,7 +536,12 @@ async def sync_mac_node(
     principal: AuthPrincipal = Depends(require_api_principal),
 ) -> dict[str, Any]:
     """Ingest live hardware vitals, worktrees, and projects streamed from Mac host."""
-    return get_service().sync_mac_node(payload)
+    res = get_service().sync_mac_node(payload)
+    try:
+        await _cache_client.delete_pattern("alphabrain:v1:*")
+    except Exception:
+        pass
+    return res
 
 
 def create_mobile_bridge_app() -> FastAPI:

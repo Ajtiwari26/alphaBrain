@@ -30,56 +30,52 @@ interface CommentaryEvent {
   type: 'directive' | 'execution' | 'review' | 'security';
 }
 
-const INITIAL_COMMENTARY: CommentaryEvent[] = [
-  {
-    id: 'c-1',
-    timestamp: '03:51:02',
-    source: 'FOUNDER',
-    text: 'Initialized session. Founder authenticated via Master PIN.',
-    type: 'security',
-  },
-  {
-    id: 'c-2',
-    timestamp: '03:51:04',
-    source: 'EVA',
-    text: 'Good evening, Ajay. Eva Conductor active on host Mac. Fleet synchronized.',
-    type: 'directive',
-  },
-  {
-    id: 'c-3',
-    timestamp: '03:51:10',
-    source: 'RESEARCH',
-    text: 'Scanned 8 Google Cloud Code accounts. Reserve quota verified at 99.1%.',
-    type: 'execution',
-  },
-  {
-    id: 'c-4',
-    timestamp: '03:51:15',
-    source: 'WORKER',
-    text: 'Worker AGY-1 executing isolated Git worktree: feat/mobile-env-vault.',
-    type: 'execution',
-  },
-  {
-    id: 'c-5',
-    timestamp: '03:51:22',
-    source: 'OPUS',
-    text: 'Senior architectural invariants verified: docs/architecture design followed.',
-    type: 'review',
-  },
-  {
-    id: 'c-6',
-    timestamp: '03:51:30',
-    source: 'SENTINEL',
-    text: 'Deterministic SafetyGate intact. Zero direct mutations on immutable core.',
-    type: 'security',
-  },
-];
-
 export const AgentCommsScreen: React.FC<Props> = ({ onNavigateEva }) => {
   const [founderInput, setFounderInput] = useState('');
   const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [commentary, setCommentary] = useState<CommentaryEvent[]>(INITIAL_COMMENTARY);
+  const [commentary, setCommentary] = useState<CommentaryEvent[]>([]);
   const commentaryContainerRef = useRef<HTMLDivElement>(null);
+
+  // Load real audit logs from production backend on mount
+  useEffect(() => {
+    mobileApi
+      .getAuditTrail(25)
+      .then((entries) => {
+        if (entries && entries.length > 0) {
+          const liveEvents: CommentaryEvent[] = entries.map((e, idx) => {
+            let src: CommentaryEvent['source'] = 'WORKER';
+            const act = e.actor.toUpperCase();
+            if (act.includes('FOUNDER')) src = 'FOUNDER';
+            else if (act.includes('EVA')) src = 'EVA';
+            else if (act.includes('OPUS')) src = 'OPUS';
+            else if (act.includes('RESEARCH')) src = 'RESEARCH';
+            else if (act.includes('SECURITY') || act.includes('GATE') || act.includes('SENTINEL')) src = 'SENTINEL';
+            else src = 'WORKER';
+
+            let typ: CommentaryEvent['type'] = 'execution';
+            if (e.action_type.includes('review') || e.action_type.includes('verdict')) typ = 'review';
+            else if (e.action_type.includes('security') || e.action_type.includes('auth')) typ = 'security';
+            else if (src === 'EVA' || src === 'FOUNDER') typ = 'directive';
+
+            const timeStr = new Date(e.timestamp * 1000).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
+            const detailMsg = e.details?.message || `${e.action_type.toUpperCase()}: ${e.resource_id}`;
+            return {
+              id: `audit-${idx}-${e.timestamp}`,
+              timestamp: timeStr,
+              source: src,
+              text: detailMsg,
+              type: typ,
+            };
+          });
+          setCommentary(liveEvents);
+        }
+      })
+      .catch((err) => console.warn('Failed to load live audit trail in AgentComms:', err));
+  }, []);
 
   // Auto-scroll commentary container internally without moving window viewport
   useEffect(() => {
@@ -271,12 +267,12 @@ export const AgentCommsScreen: React.FC<Props> = ({ onNavigateEva }) => {
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 font-mono text-[10px]">
-          {/* Agent 1: Worker AGY-1 */}
+          {/* Agent 1: Worker Etta-1 */}
           <div className="border border-[#0A0A0A] p-2.5 bg-white space-y-1.5 relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 font-bold text-[#0A0A0A]">
                 <Terminal className="w-3.5 h-3.5 text-[#E6391E]" />
-                <span>Worker AGY-1</span>
+                <span>Worker Etta-1</span>
               </div>
               <span className="text-[8px] font-bold px-1 bg-emerald-100 text-emerald-800 border border-emerald-300">
                 CODING
@@ -292,12 +288,12 @@ export const AgentCommsScreen: React.FC<Props> = ({ onNavigateEva }) => {
             </div>
           </div>
 
-          {/* Agent 2: Research AGY-2 */}
+          {/* Agent 2: Research Etta-2 */}
           <div className="border border-[#0A0A0A] p-2.5 bg-white space-y-1.5 relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 font-bold text-[#0A0A0A]">
                 <Search className="w-3.5 h-3.5 text-[#E6391E]" />
-                <span>Research AGY-2</span>
+                <span>Research Etta-2</span>
               </div>
               <span className="text-[8px] font-bold px-1 bg-blue-100 text-blue-800 border border-blue-300">
                 SCANNING
@@ -357,10 +353,10 @@ export const AgentCommsScreen: React.FC<Props> = ({ onNavigateEva }) => {
         </div>
       </div>
 
-      {/* LIVE COMMENTARY FEED SCREEN */}
-      <div className="border-2 border-[#0A0A0A] bg-[#0A0A0A] text-white p-3 space-y-2.5">
+      {/* LIVE COMMENTARY FEED SCREEN - Clean White Swiss Aesthetic */}
+      <div className="border-2 border-[#0A0A0A] bg-white text-[#0A0A0A] p-3 space-y-2.5 shadow-sm">
         {/* Commentary Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+        <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-ping" />
             <span className="font-mono text-[10px] font-bold tracking-widest text-[#E6391E] uppercase">
@@ -368,7 +364,7 @@ export const AgentCommsScreen: React.FC<Props> = ({ onNavigateEva }) => {
             </span>
           </div>
 
-          <span className="font-mono text-[9px] text-zinc-400">
+          <span className="font-mono text-[9px] text-zinc-500 font-bold uppercase">
             AUTO-NARRATING
           </span>
         </div>
@@ -379,23 +375,23 @@ export const AgentCommsScreen: React.FC<Props> = ({ onNavigateEva }) => {
           className="max-h-44 overflow-y-auto space-y-2 font-mono text-[11px] pr-1"
         >
           {commentary.map((evt) => {
-            let badgeStyle = 'bg-zinc-800 text-zinc-300 border-zinc-700';
-            if (evt.source === 'FOUNDER') badgeStyle = 'bg-[#E6391E] text-white border-[#E6391E]';
-            if (evt.source === 'EVA') badgeStyle = 'bg-white text-[#0A0A0A] border-white font-bold';
-            if (evt.source === 'WORKER') badgeStyle = 'bg-emerald-950 text-emerald-400 border-emerald-700';
-            if (evt.source === 'OPUS') badgeStyle = 'bg-amber-950 text-amber-300 border-amber-700';
+            let badgeStyle = 'bg-zinc-100 text-zinc-700 border-zinc-300';
+            if (evt.source === 'FOUNDER') badgeStyle = 'bg-red-50 text-[#E6391E] border-[#E6391E]';
+            if (evt.source === 'EVA') badgeStyle = 'bg-[#0A0A0A] text-white border-[#0A0A0A] font-bold';
+            if (evt.source === 'WORKER') badgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-600 font-bold';
+            if (evt.source === 'OPUS') badgeStyle = 'bg-amber-50 text-amber-800 border-amber-400 font-bold';
 
             return (
-              <div key={evt.id} className="leading-snug flex items-start gap-2 border-b border-zinc-900 pb-1.5 last:border-0">
-                <span className="text-zinc-500 text-[9px] shrink-0 pt-0.5">
+              <div key={evt.id} className="leading-snug flex items-start gap-2 border-b border-zinc-100 pb-1.5 last:border-0">
+                <span className="text-zinc-400 text-[9px] shrink-0 pt-0.5">
                   {evt.timestamp}
                 </span>
 
-                <span className={`text-[8px] font-bold px-1 py-0.2 border uppercase shrink-0 ${badgeStyle}`}>
+                <span className={`text-[8px] font-bold px-1.5 py-0.5 border uppercase shrink-0 ${badgeStyle}`}>
                   {evt.source}
                 </span>
 
-                <p className="text-zinc-300 text-[10px] flex-1">
+                <p className="text-zinc-800 text-[10px] flex-1">
                   {evt.text}
                 </p>
               </div>
@@ -404,7 +400,7 @@ export const AgentCommsScreen: React.FC<Props> = ({ onNavigateEva }) => {
         </div>
 
         {/* Footer commentary status */}
-        <div className="border-t border-zinc-800 pt-1.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
+        <div className="border-t border-zinc-200 pt-1.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
           <span>HOST: 127.0.0.1:8000 TELEMETRY</span>
           <span>STREAM ACTIVE • BUFFER 100</span>
         </div>

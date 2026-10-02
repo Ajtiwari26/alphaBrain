@@ -1,1077 +1,935 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { mobileApi } from '../api/client';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
-  PhoneOff,
-  Sparkles,
-  Volume2,
-  Share2,
-  Check,
-  Users,
-  MessageSquare,
-  Hand,
-  MonitorUp,
-  Languages,
-  Moon,
-  Sun,
-  X,
-} from 'lucide-react';
+  Room,
+  RoomEvent,
+  Track,
+  VideoPresets,
+  RemoteParticipant,
+  RemoteTrackPublication,
+  RemoteTrack,
+} from 'livekit-client';
+import {
+  acquireMeetingToken,
+  parseMeetingInput,
+  LIVEKIT_CLOUD_URL,
+} from '../utils/livekitToken';
+import { getApiBaseUrl } from '../api/client';
 
 interface Props {
   onLeave?: () => void;
 }
 
-export const LANGUAGES = [
-  { code: 'hi', name: 'Hindi (हिन्दी)' },
-  { code: 'en', name: 'English' },
-  { code: 'zh', name: 'Chinese (中文)' },
-  { code: 'ja', name: 'Japanese (日本語)' },
-  { code: 'ko', name: 'Korean (한국어)' },
-  { code: 'ar', name: 'Arabic (العربية)' },
-  { code: 'es', name: 'Spanish (Español)' },
-  { code: 'fr', name: 'French (Français)' },
-  { code: 'de', name: 'German (Deutsch)' },
-  { code: 'pt', name: 'Portuguese (Português)' },
-];
-
-export const TRANSLATION_DICTIONARY: Record<string, Record<string, string>> = {
-  't-1': {
-    en: 'Good afternoon Founder Ajay. LiveKit WebRTC bridge is established at 18ms latency.',
-    hi: 'नमस्ते संस्थापक अजय। लाइवकिट वेबआरटीसी ब्रिज 18ms विलंबता पर स्थापित है।',
-    zh: '下午好，创始人 Ajay。LiveKit WebRTC 桥接已建立，延迟 18ms。',
-    ja: 'こんにちは、創業者 Ajay。LiveKit WebRTC ブリッジが 18ms のレイテンシで確立されました。',
-    ko: '안녕하세요 설립자 Ajay 님. LiveKit WebRTC 브리지가 18ms 지연율로 연결되었습니다.',
-    ar: 'مساء الخير أيها المؤسس أجاي. تم إنشاء جسر LiveKit WebRTC بزمن انتقال 18 مللي ثانية.',
-    es: 'Buenas tardes, Fundador Ajay. El puente LiveKit WebRTC está establecido con 18ms de latencia.',
-    fr: 'Bonjour Fondateur Ajay. La passerelle WebRTC LiveKit est établie avec une latence de 18ms.',
-    de: 'Guten Tag Gründer Ajay. Die LiveKit WebRTC-Bridge ist mit 18ms Latenz aufgebaut.',
-    pt: 'Boa tarde Fundador Ajay. Ponte LiveKit WebRTC estabelecida com latência de 18ms.',
-  },
-  't-2': {
-    en: 'Mobile Command Node v2.0 synchronized with cloud execution hub (api.alphabrain.live).',
-    hi: 'मोबाइल कमांड नोड v2.0 क्लाउड निष्पादन केंद्र के साथ समन्वयित है।',
-    zh: '移动命令节点 v2.0 与云端执行中心 (api.alphabrain.live) 同步。',
-    ja: 'モバイルコマンドノード v2.0 がクラウド実行ハブ (api.alphabrain.live) と同期されました。',
-    ko: '모바일 명령 노드 v2.0이 클라우드 허브(api.alphabrain.live)와 동기화되었습니다.',
-    ar: 'تمت مزامنة عقدة أوامر الهاتف المحمول v2.0 مع مركز التنفيذ السحابي (api.alphabrain.live).',
-    es: 'Nodo de comando móvil v2.0 sincronizado con el centro de ejecución en la nube (api.alphabrain.live).',
-    fr: 'Nœud de commande mobile v2.0 synchronisé avec le hub d\'exécution cloud (api.alphabrain.live).',
-    de: 'Mobiles Befehlsknoten v2.0 mit Cloud-Hub synchronisiert.',
-    pt: 'Nó de comando móvel v2.0 sincronizado com hub de nuvem (api.alphabrain.live).',
-  },
-  't-3': {
-    en: 'All 14 departments and triage pipelines are healthy. Sprint fleet has active worker leases.',
-    hi: 'सभी 14 विभाग और ट्राइएज पाइपलाइन स्वस्थ हैं।',
-    zh: '全部 14 个部门和分类管线运行正常。冲刺集群拥有活跃的工作租约。',
-    ja: '14 の部門とトリアージパイプラインはすべて健全です。スプリントフリートにはアクティブなワーカーリースがあります。',
-    ko: '14개 모든 부서와 트리아지 파이프라인이 정상 상태입니다.',
-    ar: 'جميع الأقسام الـ 14 وخطوط الفرز تعمل بصحة جيدة.',
-    es: 'Los 14 departamentos y conductos de triaje están en buen estado.',
-    fr: 'Les 14 départements et pipelines de triage sont opérationnels.',
-    de: 'Alle 14 Abteilungen und Triage-Pipelines sind intakt.',
-    pt: 'Todos os 14 departamentos e pipelines de triagem estão operando perfeitamente.',
-  },
-  't-4': {
-    en: 'Ready for voice instructions or executive directives on mobile.',
-    hi: 'मोबाइल पर ध्वनि निर्देशों या कार्यकारी निर्देशों के लिए तैयार हैं।',
-    zh: '已就绪，可在移动端接收语音指令或高管指令。',
-    ja: 'モバイル上での音声指示またはエグゼクティブ指示の準備が整いました。',
-    ko: '모바일에서 음성 지시 또는 경영진 지침을 받을 준비가 되었습니다.',
-    ar: 'جاهز للتعليمات الصوتية أو التوجيهات التنفيذية على الهاتف المحمول.',
-    es: 'Listo para instrucciones de voz o directivas ejecutivas en móvil.',
-    fr: 'Prêt pour les instructions vocales ou les directives exécutives sur mobile.',
-    de: 'Bereit für Sprachbefehle oder Führungsanweisungen auf dem Mobilgerät.',
-    pt: 'Pronto para instruções de voz ou diretrizes executivas no celular.',
-  },
-  'eva-summary': {
-    en: 'All 14 gates verified. Cloud dispatch running on api.alphabrain.live with zero regressions.',
-    hi: 'सभी 14 गेट्स सत्यापित हैं। शून्य प्रतिगमन के साथ क्लाउड प्रेषण चल रहा है।',
-    zh: '所有 14 个门禁已验证。云端调度在 api.alphabrain.live 上以零回归运行。',
-    ja: '14 のゲートすべてが検証されました。api.alphabrain.live でのリグレッションゼロのクラウドディスパッチ。',
-    ko: '14개 게이트 모두 검증되었습니다. 무결점으로 클라우드 디스패치 실행 중입니다.',
-    ar: 'تم التحقق من جميع البوابات الـ 14. الإرسال السحابي يعمل دون أي تراجع.',
-    es: 'Los 14 controles verificados. Despacho en la nube ejecutándose con cero regresiones.',
-    fr: 'Les 14 barrières sont vérifiées. Répartition cloud active avec zéro régression.',
-    de: 'Alle 14 Gates verifiziert. Cloud-Dispatch läuft ohne Regressionen.',
-    pt: 'Todos os 14 portões verificados. Despacho na nuvem ativo com zero regressões.',
-  },
-  'prompt-question': {
-    en: 'Eva, summarize current deployment status and active gates.',
-    hi: 'ईवा, वर्तमान परिनियोजन स्थिति और सक्रिय गेट्स का संक्षेप दें।',
-    zh: 'Eva，请总结当前的部署状态和活动门禁。',
-    ja: 'Eva、現在のデプロイステータスとアクティブなゲートの概要を説明してください。',
-    ko: 'Eva, 현재 배포 상태와 활성 게이트를 요약해 주세요.',
-    ar: 'إيفا، يرجى تلخيص حالة النشر الحالية والبوابات النشطة.',
-    es: 'Eva, resume el estado de despliegue actual y las compuertas activas.',
-    fr: 'Eva, résumez l\'état actuel du déploiement et les barrières actives.',
-    de: 'Eva, fassen Sie den aktuellen Bereitstellungsstatus und die aktiven Gates zusammen.',
-    pt: 'Eva, resuma o status atual de implantação e os portões ativos.',
-  },
-};
-
-interface TranscriptItem {
+interface TranscriptEntry {
   id: string;
   speaker: string;
   text: string;
+  isEva: boolean;
   time: string;
-  translationKey?: string;
-  customTranslation?: (lang: string) => string;
 }
 
-const INITIAL_TRANSCRIPTS: TranscriptItem[] = [
-  {
-    id: 't-1',
-    speaker: 'Eva (AI Architect)',
-    text: 'Good afternoon Founder Ajay. LiveKit WebRTC bridge is established at 18ms latency.',
-    time: '12:00:04',
-    translationKey: 't-1',
-  },
-  {
-    id: 't-2',
-    speaker: 'Eva (AI Architect)',
-    text: 'Mobile Command Node v2.0 synchronized with cloud execution hub (api.alphabrain.live).',
-    time: '12:00:12',
-    translationKey: 't-2',
-  },
-  {
-    id: 't-3',
-    speaker: 'Eva (AI Architect)',
-    text: 'All 14 departments and triage pipelines are healthy. Sprint fleet has active worker leases.',
-    time: '12:00:20',
-    translationKey: 't-3',
-  },
-  {
-    id: 't-4',
-    speaker: 'Eva (AI Architect)',
-    text: 'Ready for voice instructions or executive directives on mobile.',
-    time: '12:00:28',
-    translationKey: 't-4',
-  },
-];
+const EVA_IDENTITY = 'eva-cto';
+const DEFAULT_ROOM = 'deploymate-main';
+const DEFAULT_BACKEND = getApiBaseUrl().replace('/api/v1/mobile', '');
+const EVA_TARGET_TOPIC = 'alpha.eva.target';
 
 export const EvaMeetingScreen: React.FC<Props> = ({ onLeave }) => {
-  // Lobby State
-  const [inLobby, setInLobby] = useState(false);
-  const [identity, setIdentity] = useState('Ajay (Founder)');
-  const [roomName, setRoomName] = useState('alphabrain-executive-briefing');
-  const [apiToken, setApiToken] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState('hi');
-  const [liveTranslateEnabled, setLiveTranslateEnabled] = useState(true);
+  // Navigation / Lobby
+  const [inLobby, setInLobby] = useState(true);
+  const [lobbyTab, setLobbyTab] = useState<'create' | 'join'>('create');
+  const [isConnecting, setIsConnecting] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
-  // Meeting State
-  const [connected, setConnected] = useState(true);
-  const [micMuted, setMicMuted] = useState(false);
-  const [cameraEnabled, setCameraEnabled] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [evaSpeaking, setEvaSpeaking] = useState(true);
-  const [hasRemoteClient, setHasRemoteClient] = useState(false);
-  const [remoteClientName] = useState('Client');
-  const [transcripts, setTranscripts] = useState<TranscriptItem[]>(INITIAL_TRANSCRIPTS);
-  const [drawerOpen, setDrawerOpen] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [languageModalOpen, setLanguageModalOpen] = useState(false);
-  const [shareToast, setShareToast] = useState<string | null>(null);
-  const [chatInput, setChatInput] = useState('');
-  const [timerSeconds, setTimerSeconds] = useState(0);
+  // Form Fields
+  const [participantName, setParticipantName] = useState('Ajay (Founder)');
+  const [roomNameInput, setRoomNameInput] = useState(DEFAULT_ROOM);
+  const [joinLinkInput, setJoinLinkInput] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('hi');
+  const [translateEnabled, setTranslateEnabled] = useState(true);
 
-  // Hardware Media References
+  // Active Call State
+  const [activeRoomName, setActiveRoomName] = useState('');
+  const [activeParticipant, setActiveParticipant] = useState('Ajay (Founder)');
+  const [participants, setParticipants] = useState<Map<string, RemoteParticipant>>(new Map());
+  const [evaState, setEvaState] = useState<'connected' | 'speaking' | 'listening' | 'reconnecting'>('connected');
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Chat & Transcript
+  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
+  const [chatMessage, setChatMessage] = useState('');
+
+  // Invite Modal
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteClientName, setInviteClientName] = useState('Client');
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
+  // Session Timer
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // DOM Refs
+  const roomRef = useRef<Room | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const screenStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const transcriptListRef = useRef<HTMLDivElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
+  const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
+  const evaAudioRef = useRef<HTMLAudioElement | null>(null);
+  const userManuallyMuted = useRef(false);
+  const antiFeedbackTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Managed Timer Tracking to prevent memory leaks on unmount
-  const timeoutsRef = useRef<Set<number>>(new Set());
-
-  const safeTimeout = (fn: () => void, ms: number): number => {
-    const id = window.setTimeout(() => {
-      timeoutsRef.current.delete(id);
-      fn();
-    }, ms);
-    timeoutsRef.current.add(id);
-    return id;
-  };
-
-  const clearAllTimeouts = () => {
-    timeoutsRef.current.forEach((id) => clearTimeout(id));
-    timeoutsRef.current.clear();
-  };
-
-  // Load meeting setup from mobileApi
+  // Persistent Dedicated Audio Element (Lifecycle-safe for Android WebView)
   useEffect(() => {
-    mobileApi
-      .getMeetingSetup('alphabrain-executive-briefing')
-      .then((setup) => {
-        if (setup) {
-          if (setup.room_name) setRoomName(setup.room_name);
-          if (setup.participant_identity) setIdentity(setup.participant_identity);
-          if (setup.token) setApiToken(setup.token);
-          if (typeof setup.audio_active === 'boolean') setMicMuted(!setup.audio_active);
-          if (typeof setup.video_active === 'boolean') setCameraEnabled(setup.video_active);
-        }
-      })
-      .catch((err) => {
-        console.warn('Production mobile meeting setup fetch notice:', err);
-      });
+    const el = document.createElement('audio');
+    el.autoplay = true;
+    el.setAttribute('playsinline', '');
+    el.setAttribute('webkit-playsinline', '');
+    el.style.display = 'none';
+    document.body.appendChild(el);
+    evaAudioRef.current = el;
+    return () => {
+      el.pause();
+      el.srcObject = null;
+      el.remove();
+      if (antiFeedbackTimeout.current) {
+        clearTimeout(antiFeedbackTimeout.current);
+      }
+    };
   }, []);
 
-  // Session running timer
+  // Timer Tick
   useEffect(() => {
-    if (inLobby) return;
-    const interval = window.setInterval(() => {
-      setTimerSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
+    let interval: NodeJS.Timeout | null = null;
+    if (!inLobby && roomRef.current) {
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [inLobby]);
 
-  // Scroll transcript feed to bottom on new turn
+  const formatTimer = (totalSec: number) => {
+    const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+    const secs = String(totalSec % 60).padStart(2, '0');
+    return `${hrs}:${mins}:${secs}`;
+  };
+
   useEffect(() => {
-    if (transcriptListRef.current) {
-      transcriptListRef.current.scrollTop = transcriptListRef.current.scrollHeight;
+    if (transcriptScrollRef.current) {
+      transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
     }
   }, [transcripts]);
 
-  // Attach local camera stream reliably
-  useEffect(() => {
-    if (localVideoRef.current) {
-      if (cameraEnabled && mediaStreamRef.current) {
-        localVideoRef.current.srcObject = mediaStreamRef.current;
-      } else {
-        localVideoRef.current.srcObject = null;
-      }
+  // Attach local camera video track
+  const attachLocalCamera = useCallback(() => {
+    if (!roomRef.current || !localVideoRef.current) return;
+    const pub = roomRef.current.localParticipant.getTrackPublication(Track.Source.Camera);
+    if (pub?.videoTrack) {
+      pub.videoTrack.attach(localVideoRef.current);
     }
-  }, [cameraEnabled]);
-
-  // Attach screen share stream to PIP preview
-  useEffect(() => {
-    if (screenVideoRef.current) {
-      if (isScreenSharing && screenStreamRef.current) {
-        screenVideoRef.current.srcObject = screenStreamRef.current;
-      } else {
-        screenVideoRef.current.srcObject = null;
-      }
-    }
-  }, [isScreenSharing]);
-
-  // Clean up streams & timers when leaving or unmounting
-  const cleanupMedia = () => {
-    clearAllTimeouts();
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-    }
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach((track) => track.stop());
-      screenStreamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null;
-    }
-    if (screenVideoRef.current) {
-      screenVideoRef.current.srcObject = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => cleanupMedia();
   }, []);
 
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Wire room events
+  const wireRoom = useCallback(
+    (room: Room) => {
+      room
+        .on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+          if (track.kind === Track.Kind.Video && participant.identity !== EVA_IDENTITY) {
+            if (remoteVideoRef.current) {
+              track.attach(remoteVideoRef.current);
+            }
+          } else if (track.kind === Track.Kind.Audio && participant.identity === EVA_IDENTITY) {
+            // Eva audio -> persistent dedicated element (INV-M06, lifecycle-safe)
+            if (evaAudioRef.current) {
+              track.attach(evaAudioRef.current);
+            }
+          } else if (track.kind === Track.Kind.Audio) {
+            const el = track.attach();
+            el.autoplay = true;
+            document.body.appendChild(el);
+          }
+        })
+        .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+          track.detach().forEach((el) => el.remove());
+        })
+        .on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+          setParticipants((prev) => new Map(prev).set(participant.identity, participant));
+          if (participant.identity === EVA_IDENTITY) {
+            setEvaState('connected');
+          }
+        })
+        .on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+          setParticipants((prev) => {
+            const next = new Map(prev);
+            next.delete(participant.identity);
+            return next;
+          });
+          if (participant.identity === EVA_IDENTITY) {
+            setEvaState('reconnecting');
+          }
+        })
+        .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          const evaSpeaking = speakers.some((p) => p.identity === EVA_IDENTITY);
+          if (evaSpeaking) {
+            setEvaState('speaking');
+            // ANTI-FEEDBACK SHIELD (INV-M07): Suppress mic during Eva speech to prevent speaker feedback triggering LiveKit interruption
+            if (!userManuallyMuted.current && roomRef.current) {
+              if (antiFeedbackTimeout.current) {
+                clearTimeout(antiFeedbackTimeout.current);
+                antiFeedbackTimeout.current = null;
+              }
+              const micPub = roomRef.current.localParticipant.getTrackPublication(Track.Source.Microphone);
+              if (micPub?.track?.mediaStreamTrack) {
+                micPub.track.mediaStreamTrack.enabled = false;
+              }
+            }
+          } else if (room.remoteParticipants.has(EVA_IDENTITY)) {
+            setEvaState('listening');
+            // ANTI-FEEDBACK SHIELD: Re-enable mic after 200ms debounce
+            if (!userManuallyMuted.current && roomRef.current) {
+              antiFeedbackTimeout.current = setTimeout(() => {
+                const micPub = roomRef.current?.localParticipant.getTrackPublication(Track.Source.Microphone);
+                if (micPub?.track?.mediaStreamTrack) {
+                  micPub.track.mediaStreamTrack.enabled = true;
+                }
+              }, 200);
+            }
+          }
+        })
+        .on(RoomEvent.TranscriptionReceived, (segments, participant) => {
+          const speakerName = participant?.name || participant?.identity || 'Participant';
+          const isEva = participant?.identity === EVA_IDENTITY;
+          const time = new Date().toTimeString().slice(3, 8);
+
+          segments.forEach((seg) => {
+            setTranscripts((prev) => {
+              const existingIndex = prev.findIndex((e) => e.id === seg.id);
+              if (existingIndex >= 0) {
+                const next = [...prev];
+                next[existingIndex] = {
+                  ...next[existingIndex],
+                  text: seg.text,
+                };
+                return next;
+              }
+              return [
+                ...prev,
+                {
+                  id: seg.id || `seg-${Date.now()}-${Math.random()}`,
+                  speaker: speakerName,
+                  text: seg.text,
+                  isEva,
+                  time,
+                },
+              ];
+            });
+          });
+        })
+        .on(RoomEvent.Disconnected, () => {
+          setInLobby(true);
+        });
+    },
+    []
+  );
+
+  // Connect & Enter Meeting
+  const handleJoinMeeting = async (targetRoom: string, inviteToken?: string) => {
+    setIsConnecting(true);
     setJoinError(null);
 
-    if (apiToken) {
-      try {
-        sessionStorage.setItem('alpha_api_token', apiToken);
-      } catch {
-        // Storage fallback
-      }
-    }
-
     try {
-      try {
-        const tokenData = await mobileApi.getEvaMeetingToken(roomName, identity, apiToken || undefined);
-        if (tokenData?.token) {
-          setConnected(true);
-        }
-      } catch {
-        setConnected(true);
-      }
+      const { token, livekitUrl, roomName: resolvedRoom, identity: resolvedIdentity } = await acquireMeetingToken(
+        DEFAULT_BACKEND,
+        targetRoom,
+        participantName.trim() || 'Ajay (Founder)',
+        'founder',
+        inviteToken
+      );
 
-      setInLobby(false);
-      setTimerSeconds(0);
-
-      if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-          mediaStreamRef.current = stream;
-        } catch {
-          // Permissive fallback
-        }
-      }
-    } catch (err: any) {
-      setJoinError(err?.message || 'Failed to join meeting room');
-    }
-  };
-
-  const toggleMic = () => {
-    const next = !micMuted;
-    setMicMuted(next);
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getAudioTracks().forEach((track) => {
-        track.enabled = !next;
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+        videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+        audioCaptureDefaults: {
+          echoCancellation: true,      // INV-M05: Hardware AEC
+          noiseSuppression: true,      // INV-M05: Noise suppression
+          autoGainControl: true,       // INV-M05: Auto gain control
+          sampleRate: 48000,           // INV-M06: Opus-native rate
+          channelCount: 1,             // Mono voice
+        },
       });
-    }
-  };
 
-  const toggleCamera = async () => {
-    if (cameraEnabled) {
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getVideoTracks().forEach((track) => track.stop());
-      }
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null;
-      }
-      setCameraEnabled(false);
-    } else {
+      roomRef.current = room;
+      wireRoom(room);
+
+      await room.connect(livekitUrl, token);
+
       try {
-        if (navigator.mediaDevices?.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          if (mediaStreamRef.current) {
-            stream.getVideoTracks().forEach((t) => mediaStreamRef.current?.addTrack(t));
-          } else {
-            mediaStreamRef.current = stream;
-          }
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = mediaStreamRef.current;
-          }
-          setCameraEnabled(true);
-        }
-      } catch {
-        setCameraEnabled(true);
-      }
-    }
-  };
+        await room.startAudio();
+      } catch (_) {}
 
-  const toggleScreenShare = async () => {
-    if (isScreenSharing) {
-      if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach((t) => t.stop());
-        screenStreamRef.current = null;
-      }
-      if (screenVideoRef.current) {
-        screenVideoRef.current.srcObject = null;
-      }
-      setIsScreenSharing(false);
-    } else {
       try {
-        if (navigator.mediaDevices?.getDisplayMedia) {
-          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-          screenStreamRef.current = stream;
-          const videoTrack = stream.getVideoTracks()[0];
-          if (videoTrack) {
-            videoTrack.onended = () => {
-              if (screenStreamRef.current) {
-                screenStreamRef.current.getTracks().forEach((t) => t.stop());
-                screenStreamRef.current = null;
-              }
-              if (screenVideoRef.current) {
-                screenVideoRef.current.srcObject = null;
-              }
-              setIsScreenSharing(false);
-            };
-          }
-          if (screenVideoRef.current) {
-            screenVideoRef.current.srcObject = stream;
-          }
-          setIsScreenSharing(true);
-        } else {
-          setIsScreenSharing(true);
-        }
-      } catch {
-        setIsScreenSharing(false);
+        await room.localParticipant.setMicrophoneEnabled(!isAudioMuted);
+      } catch (err) {
+        console.warn('Microphone permission notice:', err);
+        setIsAudioMuted(true);
       }
+
+      try {
+        await room.localParticipant.setCameraEnabled(!isVideoMuted);
+        setTimeout(attachLocalCamera, 300);
+      } catch (err) {
+        console.warn('Camera permission notice:', err);
+        setIsVideoMuted(true);
+      }
+
+      const initialMap = new Map<string, RemoteParticipant>();
+      room.remoteParticipants.forEach((p, id) => {
+        initialMap.set(id, p);
+        if (id === EVA_IDENTITY) setEvaState('connected');
+      });
+      setParticipants(initialMap);
+
+      setActiveRoomName(resolvedRoom);
+      setActiveParticipant(resolvedIdentity);
+      setElapsedSeconds(0);
+      setInLobby(false);
+    } catch (err: any) {
+      console.error('Failed to enter meeting room:', err);
+      setJoinError(err.message || 'Could not join meeting room.');
+    } finally {
+      setIsConnecting(false);
     }
   };
 
-  const handlePromptEva = () => {
-    clearAllTimeouts();
-    setEvaSpeaking(false);
-
-    const newTurn: TranscriptItem = {
-      id: `t-${Date.now()}`,
-      speaker: identity,
-      text: 'Eva, summarize current deployment status and active gates.',
-      translationKey: 'prompt-question',
-      time: formatTime(timerSeconds),
-    };
-    setTranscripts((prev) => [...prev, newTurn]);
-
-    safeTimeout(() => {
-      setEvaSpeaking(true);
-      const evaReply: TranscriptItem = {
-        id: `t-${Date.now() + 1}`,
-        speaker: 'Eva (AI Architect)',
-        text: 'All 14 gates verified. Cloud dispatch running on api.alphabrain.live with zero regressions.',
-        translationKey: 'eva-summary',
-        time: formatTime(timerSeconds + 2),
-      };
-      setTranscripts((prev) => [...prev, evaReply]);
-    }, 1500);
-  };
-
-  const getChatAckTranslation = (text: string, lang: string): string => {
-    switch (lang) {
-      case 'hi':
-        return `स्वीकृत: "${text}"। कार्यकारी बैठक की कार्य सूची में जोड़ा गया।`;
-      case 'zh':
-        return `已确认：“${text}”。已添加到执行会议行动项。`;
-      case 'ja':
-        return `確認しました：「${text}」。エグゼクティブ会議のアクションアイテムに追加されました。`;
-      case 'ko':
-        return `확인됨: "${text}". 회의 조치 항목에 추가되었습니다.`;
-      case 'ar':
-        return `تم التأكيد: "${text}". تمت إضافتها إلى بنود عمل الاجتماع التنفيذي.`;
-      case 'es':
-        return `Reconocido: "${text}". Agregado a los puntos de acción de la reunión ejecutiva.`;
-      case 'fr':
-        return `Reçu : "${text}". Ajouté aux éléments d'action de la réunion.`;
-      case 'de':
-        return `Bestätigt: "${text}". Zu den Aktionspunkten des Meetings hinzugefügt.`;
-      case 'pt':
-        return `Reconhecido: "${text}". Adicionado aos itens de ação da reunião executiva.`;
-      default:
-        return `Acknowledged: "${text}". Added to executive meeting action items.`;
-    }
-  };
-
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const userText = chatInput.trim();
-    const userTurn: TranscriptItem = {
-      id: `t-${Date.now()}`,
-      speaker: identity,
-      text: userText,
-      time: formatTime(timerSeconds),
-    };
-    setTranscripts((prev) => [...prev, userTurn]);
-    setChatInput('');
-
-    safeTimeout(() => {
-      const ackItem: TranscriptItem = {
-        id: `t-${Date.now() + 1}`,
-        speaker: 'Eva (AI Architect)',
-        text: `Acknowledged: "${userText}". Added to executive meeting action items.`,
-        customTranslation: (lang: string) => getChatAckTranslation(userText, lang),
-        time: formatTime(timerSeconds + 1),
-      };
-      setTranscripts((prev) => [...prev, ackItem]);
-    }, 1000);
-  };
-
-  const copyInviteLink = async () => {
-    let inviteUrl = `${window.location.origin}/meet#invite=${encodeURIComponent(roomName)}`;
+  const toggleAudio = async () => {
+    if (!roomRef.current) return;
+    const target = !isAudioMuted;
     try {
-      const inviteData = await mobileApi.createMeetingInvite(roomName, 'Client', apiToken || undefined);
-      if (inviteData?.invite_url) {
-        inviteUrl = inviteData.invite_url.startsWith('http')
-          ? inviteData.invite_url
-          : `${window.location.origin}${inviteData.invite_url.startsWith('/') ? '' : '/'}${inviteData.invite_url}`;
-      }
-    } catch {
-      // Fallback
+      await roomRef.current.localParticipant.setMicrophoneEnabled(!target);
+      setIsAudioMuted(target);
+      userManuallyMuted.current = target;
+    } catch (err) {
+      console.error('Error toggling microphone', err);
     }
-
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(inviteUrl);
-    }
-    setShareToast('Invite link copied to clipboard!');
-    safeTimeout(() => setShareToast(null), 3000);
   };
 
-  const toggleDarkMode = () => {
-    setDarkMode((prev) => {
-      const next = !prev;
-      if (typeof document !== 'undefined') {
-        document.documentElement.classList.toggle('dark', next);
+  const toggleVideo = async () => {
+    if (!roomRef.current) return;
+    const target = !isVideoMuted;
+    try {
+      await roomRef.current.localParticipant.setCameraEnabled(!target);
+      setIsVideoMuted(target);
+      if (!target) {
+        setTimeout(attachLocalCamera, 200);
       }
-      return next;
-    });
+    } catch (err) {
+      console.error('Error toggling camera', err);
+    }
   };
 
   const handleEndCall = () => {
-    cleanupMedia();
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      roomRef.current = null;
+    }
     setInLobby(true);
-    setConnected(false);
-    setIsScreenSharing(false);
-    setCameraEnabled(false);
-    setMicMuted(false);
+    setElapsedSeconds(0);
     if (onLeave) onLeave();
   };
 
-  const formatTime = (totalSec: number) => {
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const handleSendChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = chatMessage.trim();
+    if (!roomRef.current || !text) return;
+
+    try {
+      await roomRef.current.localParticipant.publishData(new TextEncoder().encode('link'), {
+        reliable: true,
+        topic: EVA_TARGET_TOPIC,
+      });
+    } catch (_) {}
+
+    try {
+      await roomRef.current.localParticipant.sendText(text, { topic: 'lk.chat' });
+    } catch (_) {}
+
+    const time = new Date().toTimeString().slice(3, 8);
+    setTranscripts((prev) => [
+      ...prev,
+      {
+        id: `chat-${Date.now()}-${Math.random()}`,
+        speaker: activeParticipant,
+        text,
+        isEva: false,
+        time,
+      },
+    ]);
+    setChatMessage('');
   };
 
-  const getTranslatedLine = (item: TranscriptItem, lang: string): string => {
-    if (item.translationKey && TRANSLATION_DICTIONARY[item.translationKey]) {
-      return TRANSLATION_DICTIONARY[item.translationKey][lang] || TRANSLATION_DICTIONARY[item.translationKey]['en'] || item.text;
-    }
-    if (item.customTranslation) {
-      return item.customTranslation(lang);
-    }
-    return item.text;
+  const handlePromptEva = () => {
+    setIsDrawerOpen(true);
+    setTimeout(() => {
+      if (chatInputRef.current) {
+        chatInputRef.current.focus();
+        if (!chatInputRef.current.value) {
+          setChatMessage('Eva, ');
+        }
+      }
+    }, 150);
   };
 
-  const getStageLayoutClass = () => {
-    if (hasRemoteClient) {
-      return 'stage-grid layout-3';
+  const handleCreateInvite = async () => {
+    setIsGeneratingInvite(true);
+    setCopiedInvite(false);
+    try {
+      const res = await fetch(`${DEFAULT_BACKEND}/api/meet/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_name: activeRoomName,
+          identity: inviteClientName.trim() || 'Client',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setInviteUrl(data.join_url || `${DEFAULT_BACKEND}/meet?room=${activeRoomName}`);
+      } else {
+        setInviteUrl(`${DEFAULT_BACKEND}/meet?room=${activeRoomName}`);
+      }
+    } catch (_) {
+      setInviteUrl(`${DEFAULT_BACKEND}/meet?room=${activeRoomName}`);
+    } finally {
+      setIsGeneratingInvite(false);
     }
-    if (connected || evaSpeaking) {
-      return 'stage-grid layout-2';
-    }
-    return 'stage-grid layout-1';
   };
-  const stageLayoutClass = getStageLayoutClass();
-  const participantCount = (connected ? 1 : 0) + 1 + (hasRemoteClient ? 1 : 0);
 
-  return (
-    <div className={`h-full w-full flex flex-col justify-between overflow-hidden ${darkMode ? 'bg-neutral-950 text-white' : 'bg-white text-black font-sans'}`}>
-      {/* Co-Branding Banner */}
-      <div className="flex items-center justify-between border-b border-[#0A0A0A] bg-neutral-50 px-3 py-1.5 font-mono text-xs shrink-0">
-        <div className="flex items-center gap-2 truncate">
-          <img
-            src="/alphabrain_logo.svg"
-            alt="AlphaBrain Logo"
-            className="w-3.5 h-3.5 object-contain shrink-0"
-          />
-          <span className="font-bold text-[#0A0A0A] tracking-tight text-[10px] sm:text-[11px] truncate">
-            AlphaBrain is powered by DeployMate
-          </span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <img
-            src="/deploymate_logo.svg"
-            alt="DeployMate Logo"
-            className="h-3 sm:h-3.5 object-contain"
-          />
-        </div>
-      </div>
+  const handleCopyInviteUrl = () => {
+    if (!inviteUrl) return;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedInvite(true);
+    setTimeout(() => setCopiedInvite(false), 2000);
+  };
 
-      {/* Toast Notification */}
-      {shareToast && (
-        <div className="fixed top-16 right-4 z-50 bg-[#0A0A0A] text-white px-4 py-2 border border-black shadow-lg flex items-center gap-2 font-mono text-xs animate-bounce">
-          <Check className="w-4 h-4 text-emerald-400" />
-          <span>{shareToast}</span>
-        </div>
-      )}
+  useEffect(() => {
+    return () => {
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+      }
+    };
+  }, []);
 
-      {/* Lobby Join Modal */}
-      {inLobby ? (
-        <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleJoin} className="bg-white w-full max-w-sm border-2 border-black p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-3 pb-3 border-b border-black">
-              {/* AlphaBrain Neural Logo SVG */}
-              <svg className="w-8 h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="6" cy="20" r="2.5" fill="#000000"/>
-                <circle cx="15" cy="11" r="2.5" fill="#000000"/>
-                <circle cx="15" cy="20" r="2.5" fill="#000000"/>
-                <circle cx="15" cy="29" r="2.5" fill="#000000"/>
-                <circle cx="25" cy="14" r="2.5" fill="#000000"/>
-                <circle cx="25" cy="26" r="2.5" fill="#000000"/>
-                <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
-                <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" strokeWidth="1.2"/>
-                <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" strokeWidth="1.2"/>
-                <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" strokeWidth="1.2"/>
-                <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" strokeWidth="1.2"/>
-                <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" strokeWidth="1.2"/>
-                <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" strokeWidth="1.2"/>
-                <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" strokeWidth="1.2"/>
-                <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
-                <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
-              </svg>
-              <span className="font-bold text-xl tracking-tight text-black">AlphaBrain</span>
-            </div>
-
+  // --------------------------------------------------------------------------
+  // LOBBY VIEW (Android Optimized with Dynamic Insets)
+  // --------------------------------------------------------------------------
+  if (inLobby) {
+    return (
+      <div className="min-h-screen w-full bg-white flex flex-col justify-center items-center p-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] font-['Inter']">
+        <div className="bg-white w-full max-w-sm border-2 border-black p-5 space-y-4 shadow-[4px_4px_0px_#000]">
+          {/* Header */}
+          <div className="flex items-center gap-3 pb-3 border-b border-black">
+            <svg className="w-7 h-7 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="6" cy="20" r="2.5" fill="#000000" />
+              <circle cx="15" cy="11" r="2.5" fill="#000000" />
+              <circle cx="15" cy="20" r="2.5" fill="#000000" />
+              <circle cx="15" cy="29" r="2.5" fill="#000000" />
+              <circle cx="25" cy="14" r="2.5" fill="#000000" />
+              <circle cx="25" cy="26" r="2.5" fill="#000000" />
+              <circle cx="34" cy="20" r="3.5" fill="#E6391E" />
+              <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" strokeWidth="1.2" />
+              <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" strokeWidth="1.2" />
+              <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" strokeWidth="1.2" />
+              <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" strokeWidth="1.2" />
+              <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" strokeWidth="1.2" />
+              <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" strokeWidth="1.2" />
+              <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" strokeWidth="1.2" />
+              <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5" />
+              <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5" />
+            </svg>
             <div>
-              <h1 className="text-base font-bold text-black">Join Meeting</h1>
-              <p className="text-xs text-neutral-500 mt-0.5">LiveKit WebRTC meeting room with Eva voice participant.</p>
+              <span className="font-['Space_Grotesk'] font-bold text-lg tracking-tight text-black">AlphaBrain</span>
+              <p className="text-[10px] font-mono text-neutral-500">LiveKit WebRTC · Eva Voice Enclave</p>
             </div>
+          </div>
 
-            <label className="block text-xs font-semibold text-neutral-700">
-              Your Name
-              <input
-                id="identity-input"
-                required
-                maxLength={128}
-                value={identity}
-                onChange={(e) => setIdentity(e.target.value)}
-                className="mt-1 w-full border border-black px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-black"
-              />
-            </label>
-
-            <label className="block text-xs font-semibold text-neutral-700">
-              Room ID
-              <input
-                id="room-input"
-                required
-                value={roomName}
-                onChange={(e) => setRoomName(e.target.value)}
-                className="mt-1 w-full border border-black px-3 py-2 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"
-              />
-            </label>
-
-            <label className="block text-xs font-semibold text-neutral-700">
-              Access Token
-              <input
-                id="api-token-input"
-                type="password"
-                placeholder="Founder bearer token"
-                value={apiToken}
-                onChange={(e) => setApiToken(e.target.value)}
-                className="mt-1 w-full border border-black px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-black"
-              />
-            </label>
-
-            {/* Language Selection */}
-            <label className="block text-xs font-semibold text-neutral-700">
-              Your Language
-              <select
-                id="language-select"
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="mt-1 w-full border border-black px-3 py-2 text-xs bg-white text-black"
-              >
-                {LANGUAGES.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {/* Live Translate Toggle */}
-            <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700">
-              <input
-                id="translate-toggle"
-                type="checkbox"
-                checked={liveTranslateEnabled}
-                onChange={(e) => setLiveTranslateEnabled(e.target.checked)}
-                className="accent-black w-4 h-4 rounded-none border-black"
-              />
-              Enable Live Translation
-            </label>
-
-            {joinError && (
-              <p id="join-error" className="text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert">
-                {joinError}
-              </p>
-            )}
-
+          {/* Two-Tab Navigation: Create vs Join */}
+          <div className="grid grid-cols-2 gap-1 border border-black p-1 bg-neutral-100 text-xs font-mono font-bold uppercase">
             <button
-              id="join-btn"
-              type="submit"
-              className="w-full py-2.5 bg-black text-white font-semibold text-xs hover:bg-neutral-800 active:scale-[0.99] transition-all"
+              type="button"
+              onClick={() => setLobbyTab('create')}
+              className={`py-1.5 transition-colors ${
+                lobbyTab === 'create' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
+              }`}
             >
-              JOIN ROOM
+              Create
             </button>
-          </form>
-        </div>
-      ) : (
-        <>
-          {/* Top Header Navigation */}
-          <header className={`h-12 sm:h-14 border-b ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex items-center justify-between px-3 sm:px-4 shrink-0 z-30`}>
-            {/* Left Logo & Title */}
-            <div className="flex items-center gap-2 shrink-0">
-              <svg className="w-6 h-6 sm:w-7 sm:h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="6" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="15" cy="11" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="15" cy="20" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="15" cy="29" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="25" cy="14" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="25" cy="26" r="2.5" fill={darkMode ? '#FFFFFF' : '#000000'}/>
-                <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
-                <line x1="6" y1="20" x2="15" y2="11" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="6" y1="20" x2="15" y2="20" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="6" y1="20" x2="15" y2="29" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="11" x2="25" y2="14" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="20" x2="25" y2="14" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="20" x2="25" y2="26" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="15" y1="29" x2="25" y2="26" stroke={darkMode ? '#FFFFFF' : '#000000'} strokeWidth="1.2"/>
-                <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
-                <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5"/>
-              </svg>
-              <span className={`text-base sm:text-lg font-bold tracking-tight ${darkMode ? 'text-white' : 'text-black'}`}>AlphaBrain</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setLobbyTab('join')}
+              className={`py-1.5 transition-colors ${
+                lobbyTab === 'join' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
+              }`}
+            >
+              Join / Link
+            </button>
+          </div>
 
-            {/* Right Status & Actions */}
-            <div className="flex items-center h-full">
-              <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-wider font-semibold px-2 sm:px-3 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse"></span>
-                <span>MEETING LIVE</span>
+          {lobbyTab === 'create' ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleJoinMeeting(roomNameInput.trim() || DEFAULT_ROOM);
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700">Your Name</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={128}
+                  value={participantName}
+                  onChange={(e) => setParticipantName(e.target.value)}
+                  className="mt-1 w-full border border-black px-3 py-1.5 text-xs text-black focus:outline-none focus:ring-1 focus:ring-black"
+                />
               </div>
-              <div className={`h-full w-px ${darkMode ? 'border-r border-neutral-800' : 'bg-black'}`}></div>
-              <div className="flex items-center gap-1 px-2 sm:px-2.5">
-                <Users className="w-3.5 h-3.5" />
-                <span id="participant-count" className="font-mono text-xs font-semibold">{participantCount}</span>
-              </div>
-              <div className={`h-full w-px ${darkMode ? 'border-r border-neutral-800' : 'bg-black'}`}></div>
-              <button
-                id="header-invite-btn"
-                type="button"
-                onClick={copyInviteLink}
-                className="flex items-center gap-1 px-2 sm:px-3 h-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors font-mono text-[10px] uppercase font-semibold"
-                title="Copy Invite Link"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>SHARE</span>
-              </button>
-            </div>
-          </header>
 
-          {/* Main Meeting Content Area */}
-          <main className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-            {/* Stage Area: Adaptive Grid */}
-            <div className="flex-1 p-2 sm:p-3 overflow-hidden flex flex-col min-h-0">
-              <div id="stage-grid" className={stageLayoutClass}>
-                {/* Tile 1: Founder (Local) */}
-                <div id="local-tile" className="video-tile-container relative flex items-center justify-center bg-black min-h-0">
-                  <video
-                    ref={localVideoRef}
-                    id="local-video"
-                    className={`w-full h-full object-cover ${cameraEnabled ? 'block' : 'hidden'}`}
-                    autoPlay
-                    playsInline
-                    muted
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700">Room Code</label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="text"
+                    required
+                    pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,127}"
+                    value={roomNameInput}
+                    onChange={(e) => setRoomNameInput(e.target.value)}
+                    className="flex-1 border border-black px-3 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"
                   />
-                  {!cameraEnabled && (
-                    <div className="flex flex-col items-center justify-center text-white/50">
-                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center">
-                        <Users className="w-6 h-6 sm:w-7 sm:h-7 text-white/60" />
-                      </div>
-                      <span className="font-mono text-[10px] mt-1.5 uppercase tracking-wider text-neutral-400">Camera Off</span>
-                    </div>
-                  )}
-
-                  {/* Screen Share Floating PIP Card - positioned top-left to avoid bottom speaker-badge collision */}
-                  {isScreenSharing && (
-                    <div id="screen-share-stage" className="absolute top-2 left-2 w-44 sm:w-52 pip-share-card p-2 z-20">
-                      <div className="flex items-center justify-between border-b border-black/10 pb-1 mb-1">
-                        <span className="font-mono text-[8px] sm:text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
-                        <span className="font-mono text-[8px] sm:text-[9px] uppercase font-bold text-[#E6391E] flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-ping"></span>
-                          LIVE
-                        </span>
-                      </div>
-                      <div className="relative mb-1 w-full h-16 sm:h-20 bg-black overflow-hidden border border-black/10">
-                        <video
-                          ref={screenVideoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <div id="slide-content" className="flex items-center justify-between">
-                        <div className="text-[8px] sm:text-[9px] font-mono text-black font-bold">Screen active</div>
-                        <button
-                          id="stage-screen-btn"
-                          type="button"
-                          onClick={toggleScreenShare}
-                          className="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-1.5 hover:bg-black hover:text-white transition-colors"
-                        >
-                          STOP
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Speaker Name Tag with anti-collision truncation */}
-                  <div className="speaker-badge">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${micMuted ? 'bg-neutral-400' : 'bg-[#E6391E] animate-pulse'}`}></span>
-                    <span id="local-name" className="truncate flex-1 min-w-0">{identity}</span>
-                  </div>
-                </div>
-
-                {/* Tile 2: Eva AI Architect */}
-                <div id="eva-tile" className="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center min-h-0">
-                  {/* Active Waveform Indicator */}
-                  {evaSpeaking && (
-                    <div id="eva-wave" className="absolute top-2.5 right-2.5 z-10">
-                      <div className="active-wave">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Center Graphic for Eva: Circular #E6391E Equalizer */}
-                  <div className="flex flex-col items-center gap-1.5 text-neutral-400">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
-                      <Volume2 className="w-6 h-6 sm:w-7 sm:h-7 text-[#E6391E]" />
-                    </div>
-                    <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-widest text-neutral-400">
-                      Gemini Live Voice Active
-                    </div>
-                  </div>
-
-                  {/* Speaker Tag with anti-collision truncation */}
-                  <div className="speaker-badge">
-                    <span className="w-2 h-2 rounded-full bg-[#E6391E] animate-pulse shrink-0"></span>
-                    <span id="eva-status-text" className="truncate flex-1 min-w-0">Eva (AI Architect)</span>
-                  </div>
-                </div>
-
-                {/* Remote Participants Stack */}
-                {hasRemoteClient && (
-                  <div id="remote-stack" className="flex flex-col gap-2 h-full min-h-0">
-                    <div id="remote-human-tile" className="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center min-h-0">
-                      <div id="remote-human-placeholder" className="text-white/40 flex flex-col items-center">
-                        <Users className="w-7 h-7 sm:w-8 sm:h-8" />
-                      </div>
-                      <div className="speaker-badge">
-                        <span id="remote-human-name" className="truncate flex-1 min-w-0">{remoteClientName}</span>
-                        <Mic className="w-3 h-3 text-white/60 ml-1 shrink-0" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Live Notes / Real-Time Transcript Drawer */}
-            {drawerOpen && (
-              <aside
-                id="transcript-drawer"
-                className={`w-full md:w-80 border-t md:border-t-0 md:border-l ${
-                  darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'
-                } flex flex-col flex-[0.4] md:flex-none md:h-full min-h-0 shrink-0`}
-              >
-                <div className={`px-3 py-2 border-b ${darkMode ? 'border-neutral-800' : 'border-black'} flex items-center justify-between shrink-0`}>
-                  <h2 className="font-mono text-xs uppercase font-bold tracking-wider flex items-center gap-1.5 text-black dark:text-white">
-                    <Sparkles className="w-3.5 h-3.5 text-[#E6391E]" />
-                    <span>LIVE NOTES</span>
-                  </h2>
-                  <span className="font-mono text-[10px] text-neutral-400">PCM 24kHz</span>
-                </div>
-
-                {/* Feed */}
-                <div ref={transcriptListRef} id="transcript-list" className="flex-1 overflow-y-auto divide-y divide-black/10 px-3 py-2 space-y-2 text-xs min-h-0">
-                  {transcripts.map((item) => (
-                    <div key={item.id} className="pt-2 text-left space-y-1">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400">
-                        <span className="font-bold text-[#E6391E]">{item.speaker}</span>
-                        <span>{item.time}</span>
-                      </div>
-                      <p className={`font-sans leading-relaxed font-medium ${darkMode ? 'text-neutral-100' : 'text-[#0A0A0A]'}`}>{item.text}</p>
-                      {liveTranslateEnabled && (
-                        <p className={`font-mono text-[11px] italic p-1.5 border ${
-                          darkMode ? 'bg-neutral-800 border-neutral-700 text-neutral-300' : 'bg-neutral-50 border-neutral-200 text-neutral-600'
-                        }`}>
-                          {getTranslatedLine(item, selectedLanguage)}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Chat / Prompt Input Form */}
-                <div className={`p-2 border-t shrink-0 ${darkMode ? 'border-neutral-800 bg-neutral-950' : 'border-black bg-neutral-50'}`}>
-                  <form onSubmit={handleSendChat} id="chat-form" className="flex gap-1.5">
-                    <input
-                      id="chat-input"
-                      type="text"
-                      placeholder="Type message or ask Eva..."
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      className={`flex-1 border px-2 py-1 text-xs font-mono focus:outline-none ${
-                        darkMode ? 'border-neutral-700 bg-neutral-900 text-white' : 'border-black bg-white text-black'
-                      }`}
-                    />
-                    <button
-                      type="submit"
-                      className={`border px-2.5 py-1 text-xs font-mono font-bold transition-colors ${
-                        darkMode ? 'border-neutral-700 bg-neutral-800 text-white hover:bg-neutral-700' : 'border-black bg-black text-white hover:bg-neutral-800'
-                      }`}
-                    >
-                      ADD
-                    </button>
-                  </form>
-                </div>
-              </aside>
-            )}
-          </main>
-
-          {/* Bottom Bar Control Strip - Ergonomic Two-Tier Mobile Dock (Zero Overflow on 390-430px Viewports) */}
-          <footer className={`border-t ${darkMode ? 'border-neutral-800 bg-neutral-900' : 'border-black bg-white'} flex flex-col shrink-0 z-30`}>
-            {/* Tier 1: Utility & Telemetry Strip */}
-            <div className={`flex items-center justify-between px-3 py-1 border-b text-[10px] font-mono ${darkMode ? 'border-neutral-800/80 bg-neutral-950/60 text-neutral-400' : 'border-black/10 bg-neutral-50/80 text-neutral-600'}`}>
-              <div className="flex items-center gap-1.5">
-                <button
-                  id="screen-btn"
-                  type="button"
-                  onClick={toggleScreenShare}
-                  className={`control-btn-circle control-btn-sm ${isScreenSharing ? 'active' : ''}`}
-                  title="Present Screen"
-                >
-                  <MonitorUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  id="footer-invite-btn"
-                  type="button"
-                  onClick={copyInviteLink}
-                  className="control-btn-circle control-btn-sm"
-                  title="Invite Client"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  id="language-btn"
-                  type="button"
-                  onClick={() => setLanguageModalOpen(!languageModalOpen)}
-                  className="control-btn-circle control-btn-sm"
-                  title="Change Language"
-                >
-                  <Languages className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  id="dark-mode-btn"
-                  type="button"
-                  onClick={toggleDarkMode}
-                  className="control-btn-circle control-btn-sm"
-                  title="Toggle Dark Mode"
-                >
-                  {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {/* Timer */}
-              <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E6391E] animate-pulse"></span>
-                <span id="session-timer">{formatTime(timerSeconds)}</span>
-              </div>
-            </div>
-
-            {/* Tier 2: Primary Interaction & Call Action Strip */}
-            <div className="flex items-center justify-between px-2 sm:px-3 py-2">
-              <div className={`flex items-center gap-1 sm:gap-2 p-1 rounded-full ${darkMode ? 'bg-neutral-800' : 'bg-neutral-100'}`}>
-                <button
-                  id="mic-btn"
-                  type="button"
-                  onClick={toggleMic}
-                  className={`control-btn-circle ${micMuted ? 'active' : ''}`}
-                  title="Mute / Unmute Microphone"
-                >
-                  {micMuted ? <MicOff className="w-4 h-4 text-neutral-600" /> : <Mic className="w-4 h-4" />}
-                </button>
-
-                <button
-                  id="cam-btn"
-                  type="button"
-                  onClick={toggleCamera}
-                  className={`control-btn-circle ${cameraEnabled ? 'active' : ''}`}
-                  title="Turn Camera On / Off"
-                >
-                  {cameraEnabled ? <Video className="w-4 h-4 text-[#E6391E]" /> : <VideoOff className="w-4 h-4" />}
-                </button>
-
-                <button
-                  id="transcript-btn"
-                  type="button"
-                  onClick={() => setDrawerOpen(!drawerOpen)}
-                  className={`control-btn-circle ${drawerOpen ? 'active' : ''}`}
-                  title="Toggle Captions / Live Notes"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                </button>
-
-                <button
-                  id="prompt-eva-btn"
-                  type="button"
-                  onClick={handlePromptEva}
-                  className="control-btn-circle hover:text-[#E6391E]"
-                  title="Ask Eva / Prompt"
-                >
-                  <Hand className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* End Call Red Button */}
-              <button
-                id="end-call-btn"
-                type="button"
-                onClick={handleEndCall}
-                className="control-btn-endcall shrink-0"
-                title="End Call"
-              >
-                <PhoneOff className="w-4 h-4" />
-                <span className="hidden sm:inline">END CALL</span>
-              </button>
-            </div>
-          </footer>
-
-          {/* Language Selection Modal */}
-          {languageModalOpen && (
-            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white border-2 border-black p-6 w-full max-w-xs space-y-4 shadow-xl">
-                <div className="flex items-center justify-between border-b border-black pb-2">
-                  <h3 className="font-bold text-sm text-black">Select Audio Language</h3>
-                  <button onClick={() => setLanguageModalOpen(false)} className="text-neutral-500 hover:text-black">
-                    <X className="w-4 h-4" />
+                  <button
+                    type="button"
+                    onClick={() => setRoomNameInput(`meet-${Math.random().toString(36).substring(2, 6)}`)}
+                    className="border border-black px-2.5 py-1 text-[11px] font-mono font-bold hover:bg-neutral-100"
+                  >
+                    RND
                   </button>
                 </div>
-                <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto">
-                  {LANGUAGES.map((lang) => (
-                    <button
-                      key={lang.code}
-                      onClick={() => {
-                        setSelectedLanguage(lang.code);
-                        setLanguageModalOpen(false);
-                      }}
-                      className={`text-left px-3 py-1.5 text-xs font-mono flex items-center justify-between border transition-colors ${
-                        selectedLanguage === lang.code
-                          ? 'border-[#E6391E] bg-[#E6391E]/10 font-bold text-[#E6391E]'
-                          : 'border-neutral-200 hover:border-black text-black'
-                      }`}
-                    >
-                      <span>{lang.name}</span>
-                      {selectedLanguage === lang.code && <Check className="w-3.5 h-3.5 text-[#E6391E]" />}
-                    </button>
-                  ))}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700">Language</label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="mt-1 w-full border border-black px-3 py-1.5 text-xs bg-white text-black"
+                >
+                  <option value="hi">Hindi (हिन्दी)</option>
+                  <option value="en">English</option>
+                  <option value="zh">Chinese (中文)</option>
+                  <option value="ja">Japanese (日本語)</option>
+                  <option value="ko">Korean (한국어)</option>
+                  <option value="es">Spanish (Español)</option>
+                  <option value="fr">French (Français)</option>
+                  <option value="de">German (Deutsch)</option>
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700 pt-1">
+                <input
+                  type="checkbox"
+                  checked={translateEnabled}
+                  onChange={(e) => setTranslateEnabled(e.target.checked)}
+                  className="accent-black w-4 h-4 rounded-none border-black"
+                />
+                Live Translation (Gemini Audio)
+              </label>
+
+              {joinError && (
+                <p className="text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert">
+                  {joinError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isConnecting}
+                className="w-full py-2.5 bg-black text-white font-semibold text-xs tracking-wider uppercase hover:bg-neutral-800 transition-all disabled:opacity-50"
+              >
+                {isConnecting ? 'CONNECTING…' : 'JOIN ROOM'}
+              </button>
+            </form>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const parsed = parseMeetingInput(joinLinkInput);
+                handleJoinMeeting(parsed.roomName || DEFAULT_ROOM, parsed.inviteToken);
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700">Paste Link or Room Code</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="https://.../meet#invite=... or room code"
+                  value={joinLinkInput}
+                  onChange={(e) => setJoinLinkInput(e.target.value)}
+                  className="mt-1 w-full border border-black px-3 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700">Your Name</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={128}
+                  value={participantName}
+                  onChange={(e) => setParticipantName(e.target.value)}
+                  className="mt-1 w-full border border-black px-3 py-1.5 text-xs text-black focus:outline-none focus:ring-1 focus:ring-black"
+                />
+              </div>
+
+              {joinError && (
+                <p className="text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert">
+                  {joinError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isConnecting || !joinLinkInput.trim()}
+                className="w-full py-2.5 bg-black text-white font-semibold text-xs tracking-wider uppercase hover:bg-neutral-800 transition-all disabled:opacity-50"
+              >
+                {isConnecting ? 'CONNECTING…' : 'JOIN ROOM'}
+              </button>
+            </form>
+          )}
+
+          <div className="pt-2 border-t border-neutral-200 flex items-center justify-between text-[10px] font-mono text-neutral-400">
+            <span>Direct WebRTC Engine</span>
+            <span className="text-emerald-600 font-bold">NO TOKEN NEEDED</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // ACTIVE WEBRTC MEETING VIEW (Android Margin & Layout Optimized)
+  // --------------------------------------------------------------------------
+  const humanRemotes = Array.from(participants.values()).filter((p) => p.identity !== EVA_IDENTITY);
+
+  return (
+    <div
+      className={`h-screen w-screen flex flex-col justify-between overflow-hidden font-['Inter'] pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(1.75rem,env(safe-area-inset-bottom))] ${
+        isDarkMode ? 'dark bg-neutral-950 text-white' : 'bg-white text-black'
+      }`}
+    >
+      {/* Mobile Header Bar */}
+      <header className="h-14 border-b border-black flex items-center justify-between px-4 shrink-0 bg-white z-30">
+        <div className="flex items-center gap-2">
+          <svg className="w-6 h-6 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="6" cy="20" r="2.5" fill="#000000" />
+            <circle cx="15" cy="11" r="2.5" fill="#000000" />
+            <circle cx="15" cy="20" r="2.5" fill="#000000" />
+            <circle cx="15" cy="29" r="2.5" fill="#000000" />
+            <circle cx="25" cy="14" r="2.5" fill="#000000" />
+            <circle cx="25" cy="26" r="2.5" fill="#000000" />
+            <circle cx="34" cy="20" r="3.5" fill="#E6391E" />
+            <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" strokeWidth="1.2" />
+            <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" strokeWidth="1.2" />
+            <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" strokeWidth="1.2" />
+            <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" strokeWidth="1.2" />
+            <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" strokeWidth="1.2" />
+            <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" strokeWidth="1.2" />
+            <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" strokeWidth="1.2" />
+            <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5" />
+            <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" strokeWidth="1.5" />
+          </svg>
+          <span className="font-['Space_Grotesk'] text-lg font-bold tracking-tight text-black">AlphaBrain</span>
+          <span className="font-mono text-[10px] text-neutral-400 truncate max-w-[90px]">/{activeRoomName}</span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 text-black font-mono text-xs font-semibold">
+            <span className="material-symbols-outlined text-[16px]">group</span>
+            <span>{participants.size + 1}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowInviteModal(true);
+              handleCreateInvite();
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 border border-black text-black hover:bg-neutral-50 font-mono text-[11px] uppercase font-bold"
+          >
+            <span className="material-symbols-outlined text-[14px]">upload</span>
+            <span>SHARE</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Video Stage Area */}
+      <main className="flex-1 p-2 overflow-hidden flex flex-col relative">
+        <div className="stage-grid layout-2 flex-1 min-h-0">
+          {/* Tile 1: Founder (Local) */}
+          <div className="video-tile-container relative flex items-center justify-center bg-black border border-black min-h-0">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${isVideoMuted ? 'hidden' : 'block'}`}
+            />
+            {isVideoMuted && (
+              <div className="flex flex-col items-center gap-1 text-neutral-500 font-mono text-xs">
+                <span className="material-symbols-outlined text-[28px]">videocam_off</span>
+                <span>CAMERA OFF</span>
+              </div>
+            )}
+            <div className="speaker-badge">
+              <span className="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+              <span className="truncate max-w-[120px]">{activeParticipant}</span>
+            </div>
+          </div>
+
+          {/* Tile 2: Eva AI Architect */}
+          <div className="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center border border-black min-h-0">
+            {evaState === 'speaking' && (
+              <div className="absolute top-2 right-2 z-10">
+                <div className="active-wave">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
                 </div>
-                <label className="flex items-center gap-2 text-xs font-mono text-neutral-700 pt-2 border-t border-neutral-200">
-                  <input
-                    type="checkbox"
-                    checked={liveTranslateEnabled}
-                    onChange={(e) => setLiveTranslateEnabled(e.target.checked)}
-                    className="accent-black"
-                  />
-                  Live Translation Active
-                </label>
+              </div>
+            )}
+            <div className="flex flex-col items-center gap-2 text-neutral-400">
+              <div
+                className={`w-12 h-12 rounded-full border flex items-center justify-center shadow-md transition-all ${
+                  evaState === 'speaking'
+                    ? 'border-[#E6391E] shadow-[0_0_15px_#E6391E] scale-105'
+                    : 'border-neutral-700 bg-neutral-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[22px] text-[#E6391E]">graphic_eq</span>
+              </div>
+              <div className="font-['Fira_Code'] text-[9px] uppercase tracking-widest text-neutral-400">
+                Gemini Live Voice Active
+              </div>
+            </div>
+            <div className="speaker-badge">
+              <span className="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+              <span>Eva (AI Architect)</span>
+            </div>
+          </div>
+
+          {/* Remote Client Tile */}
+          {humanRemotes.length > 0 && (
+            <div className="video-tile-container relative bg-neutral-900 flex items-center justify-center border border-black min-h-0">
+              <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <div className="speaker-badge">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>{humanRemotes[0].name || humanRemotes[0].identity}</span>
               </div>
             </div>
           )}
-        </>
+        </div>
+
+        {/* Mobile Slide-Up Live Notes Drawer */}
+        {isDrawerOpen && (
+          <aside className="absolute inset-x-2 bottom-2 top-2 z-40 bg-white border-2 border-black flex flex-col shadow-2xl">
+            <div className="p-3 border-b border-black flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="font-['Fira_Code'] text-xs uppercase font-bold tracking-wider text-black">LIVE NOTES</h2>
+                <span className="font-mono text-[9px] text-neutral-400">PCM 24kHz</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDrawerOpen(false)}
+                className="font-mono font-bold text-sm px-2 py-0.5 border border-black hover:bg-neutral-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto divide-y divide-black/10 text-xs p-2">
+              {transcripts.length === 0 ? (
+                <div className="p-4 text-center font-mono text-neutral-400 text-xs">
+                  Speech will transcribe here live...
+                </div>
+              ) : (
+                transcripts.map((item) => (
+                  <div key={item.id} className="py-2 px-1 flex gap-2">
+                    <span className="font-mono text-neutral-400 text-[10px] shrink-0">{item.time}</span>
+                    <div className="space-y-0.5 flex-1">
+                      <div className={`font-mono font-bold text-xs ${item.isEva ? 'text-[#E6391E]' : 'text-black'}`}>
+                        {item.speaker}
+                      </div>
+                      <p className="font-mono text-neutral-800 leading-relaxed text-xs">{item.text}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-2 border-t border-black bg-neutral-50">
+              <form onSubmit={handleSendChat} className="flex gap-2">
+                <input
+                  ref={chatInputRef}
+                  type="text"
+                  placeholder="Ask Eva..."
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  className="flex-1 border border-black px-2.5 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black bg-white"
+                />
+                <button
+                  type="submit"
+                  className="border border-black px-3 py-1.5 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800"
+                >
+                  SEND
+                </button>
+              </form>
+            </div>
+          </aside>
+        )}
+      </main>
+
+      {/* Bottom Bar Control Strip (Protected Above Android 3-Button Navbar) */}
+      <footer className="h-16 border-t border-black bg-white flex items-center justify-between px-4 shrink-0 z-30">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mic */}
+          <button
+            type="button"
+            onClick={toggleAudio}
+            className={`w-9 h-9 rounded-full border border-black flex items-center justify-center transition-all ${
+              isAudioMuted ? 'bg-rose-500 text-white' : 'bg-black text-white'
+            }`}
+            title="Mute / Unmute Mic"
+          >
+            <span className="material-symbols-outlined text-[18px]">{isAudioMuted ? 'mic_off' : 'mic'}</span>
+          </button>
+
+          {/* Cam */}
+          <button
+            type="button"
+            onClick={toggleVideo}
+            className={`w-9 h-9 rounded-full border border-black flex items-center justify-center transition-all ${
+              isVideoMuted ? 'bg-rose-500 text-white' : 'bg-black text-white'
+            }`}
+            title="Toggle Video"
+          >
+            <span className="material-symbols-outlined text-[18px]">{isVideoMuted ? 'videocam_off' : 'videocam'}</span>
+          </button>
+
+          {/* Transcript Drawer */}
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+            className={`w-9 h-9 rounded-full border border-black flex items-center justify-center transition-all ${
+              isDrawerOpen ? 'bg-[#E6391E] text-white' : 'bg-black text-white'
+            }`}
+            title="Toggle Notes / Captions"
+          >
+            <span className="material-symbols-outlined text-[18px]">closed_caption</span>
+          </button>
+
+          {/* Prompt Eva */}
+          <button
+            type="button"
+            onClick={handlePromptEva}
+            className="w-9 h-9 rounded-full bg-black text-white border border-black flex items-center justify-center"
+            title="Prompt Eva"
+          >
+            <span className="material-symbols-outlined text-[18px]">front_hand</span>
+          </button>
+
+          {/* End Call Red Button */}
+          <button
+            type="button"
+            onClick={handleEndCall}
+            className="h-9 px-3 rounded bg-[#E6391E] text-white flex items-center justify-center gap-1 font-mono text-xs font-bold"
+            title="End Call"
+          >
+            <span className="material-symbols-outlined text-[18px]">call_end</span>
+          </button>
+        </div>
+
+        {/* Digital Timer */}
+        <div className="font-mono text-xs font-bold text-black pl-2">
+          {formatTimer(elapsedSeconds)}
+        </div>
+      </footer>
+
+      {/* Share / Invite Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-black p-5 w-full max-w-sm shadow-2xl space-y-3">
+            <div className="flex items-center justify-between border-b border-black pb-2">
+              <span className="font-['Space_Grotesk'] font-bold text-sm text-black">Invite Client</span>
+              <button
+                type="button"
+                onClick={() => setShowInviteModal(false)}
+                className="font-mono font-bold text-sm hover:text-[#E6391E]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700">Client Name</label>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  value={inviteClientName}
+                  onChange={(e) => setInviteClientName(e.target.value)}
+                  className="flex-1 border border-black px-2.5 py-1 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateInvite}
+                  disabled={isGeneratingInvite}
+                  className="border border-black px-2.5 py-1 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800"
+                >
+                  {isGeneratingInvite ? 'GEN…' : 'UPDATE'}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700">Client Web Link</label>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  readOnly
+                  value={inviteUrl || 'Generating link...'}
+                  className="flex-1 border border-black px-2.5 py-1 text-xs text-neutral-700 bg-neutral-50 font-mono truncate"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyInviteUrl}
+                  disabled={!inviteUrl}
+                  className="border border-black px-2.5 py-1 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800"
+                >
+                  {copiedInvite ? 'COPIED' : 'COPY'}
+                </button>
+              </div>
+              <p className="text-[10px] text-neutral-500 mt-1 font-mono">
+                Open in any browser to join with Eva voice enclave.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 };
-
-export default EvaMeetingScreen;

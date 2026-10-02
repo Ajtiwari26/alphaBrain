@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { mobileApi } from '../api/client';
+import { mobileApi, getApiBaseUrl } from '../api/client';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import {
   ShieldAlert,
@@ -28,6 +28,30 @@ export const SettingsScreen: React.FC<Props> = ({ onNavigateToScreen }) => {
   const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const [togglingEmergency, setTogglingEmergency] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [apiBase, setApiBase] = useState(() => getApiBaseUrl());
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'connected' | 'error'>('idle');
+  const [connectionMsg, setConnectionMsg] = useState('');
+
+  const testConnection = async () => {
+    setConnectionStatus('testing');
+    try {
+      const res = await mobileApi.getHealth();
+      setConnectionStatus('connected');
+      setConnectionMsg(`Online (${res.companion_version || '200 OK'})`);
+    } catch (e: any) {
+      setConnectionStatus('error');
+      setConnectionMsg('Connection failed');
+    }
+  };
+
+  const switchApiBase = (newUrl: string) => {
+    const clean = newUrl.trim().replace(/\/+$/, '');
+    const normalized = clean.endsWith('/api/v1/mobile') ? clean : `${clean}/api/v1/mobile`;
+    localStorage.setItem('alpha_api_base', normalized);
+    setApiBase(normalized);
+    setConnectionStatus('idle');
+  };
 
   const [settings, setSettings] = useState({
     safetyGate: true,
@@ -284,10 +308,78 @@ export const SettingsScreen: React.FC<Props> = ({ onNavigateToScreen }) => {
         </div>
       </div>
 
+      {/* Backend API Connection & Node Sync Panel */}
+      <div className="border border-[#0A0A0A] p-4 bg-white space-y-3">
+        <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
+          <div className="flex items-center gap-2">
+            <Server className="w-4 h-4 text-[#0A0A0A]" />
+            <span className="font-headline text-sm font-bold uppercase tracking-tight">
+              Backend Bridge Node
+            </span>
+          </div>
+          <span
+            className={`font-mono text-[10px] font-bold px-2 py-0.5 border ${
+              connectionStatus === 'connected'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-400'
+                : connectionStatus === 'error'
+                ? 'bg-red-50 text-[#E6391E] border-[#E6391E]'
+                : 'bg-zinc-50 text-zinc-600 border-zinc-300'
+            }`}
+          >
+            {connectionStatus === 'testing'
+              ? 'PINGING...'
+              : connectionStatus === 'connected'
+              ? connectionMsg.toUpperCase()
+              : connectionStatus === 'error'
+              ? 'FAILED'
+              : 'CONFIGURED'}
+          </span>
+        </div>
+
+        <div className="space-y-1.5 font-mono text-xs">
+          <label className="text-[10px] text-zinc-500 uppercase block">ACTIVE API BASE URL:</label>
+          <div className="p-2 bg-zinc-50 border border-zinc-300 text-[11px] break-all text-[#0A0A0A]">
+            {apiBase}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-xs">
+          <button
+            onClick={() => switchApiBase('https://alpha-brain-staging.onrender.com/api/v1/mobile')}
+            className={`py-2 px-2 border text-[10px] font-bold uppercase transition-colors ${
+              apiBase.includes('onrender.com')
+                ? 'bg-[#0A0A0A] text-white border-[#0A0A0A]'
+                : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
+            }`}
+          >
+            Cloud Staging
+          </button>
+          <button
+            onClick={() => switchApiBase('http://localhost:8000/api/v1/mobile')}
+            className={`py-2 px-2 border text-[10px] font-bold uppercase transition-colors ${
+              apiBase.includes('localhost')
+                ? 'bg-[#0A0A0A] text-white border-[#0A0A0A]'
+                : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
+            }`}
+          >
+            Mac USB (tcp:8000)
+          </button>
+        </div>
+
+        <button
+          onClick={testConnection}
+          className="w-full py-2 bg-zinc-100 border border-[#0A0A0A] font-mono text-xs font-bold text-[#0A0A0A] hover:bg-zinc-200 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <Check className="w-3.5 h-3.5 text-emerald-600" />
+          <span>TEST LIVE CONNECTION</span>
+        </button>
+      </div>
+
       {/* Replay Onboarding Button & Footer */}
       <div className="border-t border-[#0A0A0A] pt-3 space-y-2">
         <button
           onClick={() => {
+            localStorage.removeItem('alphabrain_session_token');
             sessionStorage.removeItem('alphabrain_session_token');
             sessionStorage.removeItem('alpha_session_stage');
             window.location.reload();
@@ -295,7 +387,7 @@ export const SettingsScreen: React.FC<Props> = ({ onNavigateToScreen }) => {
           className="w-full py-3 border border-[#0A0A0A] font-mono text-xs font-bold text-[#E6391E] hover:bg-black hover:text-white flex items-center justify-center gap-2 btn-tactile bg-white transition-colors"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>REPLAY ONBOARDING & SECURITY BOOT ↗</span>
+          <span>RESET SESSION & RETURN TO ONBOARDING ↗</span>
         </button>
 
         <div className="flex items-center justify-between font-mono text-[11px] text-zinc-500 px-1">
@@ -327,7 +419,7 @@ export const SettingsScreen: React.FC<Props> = ({ onNavigateToScreen }) => {
               <p className="font-sans text-xs text-zinc-700">
                 {emergencyActive
                   ? 'Disengaging the emergency stop will remove ~/.alphabrain/emergency_stop.lock and re-enable autonomous swarm triage and worker execution cycles.'
-                  : 'Engaging the emergency stop writes an atomic lock tombstone at ~/.alphabrain/emergency_stop.lock, immediately halting all autonomous AGY workers, triage queue leases, and external API dispatches.'}
+                  : 'Engaging the emergency stop writes an atomic lock tombstone at ~/.alphabrain/emergency_stop.lock, immediately halting all autonomous Etta workers, triage queue leases, and external API dispatches.'}
               </p>
 
               <div>

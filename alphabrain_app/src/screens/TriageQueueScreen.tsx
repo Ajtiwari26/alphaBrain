@@ -24,8 +24,21 @@ interface Props {
 type StatusFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'EXECUTING' | 'COMPLETED' | 'REJECTED';
 
 export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
-  const [tasks, setTasks] = useState<TaskSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<TaskSummary[]>(() => {
+    try {
+      const cached = localStorage.getItem('swr:triage:tasks');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('swr:triage:tasks');
+    } catch {
+      return true;
+    }
+  });
   const [filter, setFilter] = useState<StatusFilter>('ALL');
   const [selectedTask, setSelectedTask] = useState<TaskSummary | null>(null);
   const [founderNotes, setFounderNotes] = useState('');
@@ -34,10 +47,14 @@ export const TriageQueueScreen: React.FC<Props> = ({ onSelectTask }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchTasks = useCallback(async () => {
-    setLoading(true);
     try {
       const data = await mobileApi.listTriage();
       setTasks(data);
+      try {
+        localStorage.setItem('swr:triage:tasks', JSON.stringify(data));
+      } catch (e) {
+        console.warn('Failed to cache triage tasks:', e);
+      }
     } catch (err) {
       console.error('Error fetching triage tasks:', err);
     } finally {

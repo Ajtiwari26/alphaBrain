@@ -1,6 +1,6 @@
 {
   "name": "alphabrain-founder-companion",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,6 +14,8 @@
     "@capacitor/cli": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "clsx": "^2.1.1",
+    "jsqr": "^1.4.0",
+    "livekit-client": "^2.22.3",
     "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

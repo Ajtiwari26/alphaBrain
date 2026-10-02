@@ -29,50 +29,50 @@ const INITIAL_SECRETS: EnvSecret[] = [
   {
     id: 'sec_1',
     key: 'ANTHROPIC_API_KEY',
-    value: 'sk-ant-api03-live-alpha-prod-98741b8a9c2e4f01',
+    value: 'sk-ant-api03-••••••••••••••••••••••••••••••••••••',
     comment: 'Primary production key used by Claude Opus 4.6 for architectural reviews and OC-EDS multi-agent governance.',
     department: 'Engineering & Tech',
-    updatedAt: '2026-09-15T14:30:00Z',
+    updatedAt: '2026-10-01T04:00:00Z',
   },
   {
     id: 'sec_2',
     key: 'GEMINI_API_KEY',
-    value: 'AIzaSyA4Q9xK1b8N6_alphaBrain_worker_live',
+    value: 'AIzaSy••••••••••••••••••••••••••••••••',
     comment: 'Token for Gemini 3.1 Pro worker daemons and automated triage code repair cycles.',
     department: 'Engineering & Tech',
-    updatedAt: '2026-09-15T16:00:00Z',
+    updatedAt: '2026-10-01T04:00:00Z',
   },
   {
     id: 'sec_3',
     key: 'STITCH_API_KEY',
-    value: 'AQ.Ab8RN6_ajay_stitch_mcp_master_token_2026',
-    comment: "Ajay's Stitch MCP account key for automated design tokens, UI variant generation, and screen mocking.",
+    value: 'AQ.Ab8RN6••••••••••••••••••••••••••••••••',
+    comment: "Ajay's Stitch MCP account key for automated design tokens, UI variant generation, and screen synthesis.",
     department: 'Engineering & Tech',
-    updatedAt: '2026-09-14T10:15:00Z',
+    updatedAt: '2026-10-01T04:00:00Z',
   },
   {
     id: 'sec_4',
     key: 'MONGODB_URI',
-    value: 'mongodb+srv://alphabrain:cluster0.live.mongodb.net/alphabrain_prod?retryWrites=true&w=majority',
+    value: 'mongodb+srv://••••••••:••••••••@cluster0.live.mongodb.net/alphabrain_prod',
     comment: 'Production MongoDB Atlas connection string for multi-agent knowledge graph, sessions, and telemetry.',
     department: 'All Departments',
-    updatedAt: '2026-09-13T08:20:00Z',
+    updatedAt: '2026-10-01T04:00:00Z',
   },
   {
     id: 'sec_5',
     key: 'GITHUB_TOKEN',
-    value: 'ghp_AlphaBrainAutoWorkerWorktreeDeploy998124',
+    value: 'ghp_••••••••••••••••••••••••••••••••••••',
     comment: 'Fine-grained Personal Access Token for headless Git worktree commits, PR creation, and branch merging.',
     department: 'Engineering & Tech',
-    updatedAt: '2026-09-16T01:00:00Z',
+    updatedAt: '2026-10-01T04:00:00Z',
   },
   {
     id: 'sec_6',
     key: 'LIVEKIT_API_SECRET',
-    value: 'env_livekit_sec_eva_voice_bridge_audio_synthesis',
+    value: 'livekit_sec_••••••••••••••••••••••••••••••••',
     comment: 'WebRTC audio synthesis secret for Eva Voice CTO low-latency bidirectional telephony room.',
     department: 'Executive & Eva',
-    updatedAt: '2026-09-12T19:45:00Z',
+    updatedAt: '2026-10-01T04:00:00Z',
   },
 ];
 
@@ -326,7 +326,7 @@ export const EnvVaultScreen: React.FC = () => {
         </div>
 
         <p className="font-mono text-[10px] text-zinc-600 leading-relaxed">
-          Only the Founder can <strong>create, edit, or delete</strong> secrets. All autonomous agents (Worker AGY-1, Research AGY-2, Reviewer Opus, Eva) have strictly verified <strong>READ-ONLY</strong> access to inject variables into isolated Git worktrees as needed. Agents cannot mutate or destroy keys.
+          Only the Founder can <strong>create, edit, or delete</strong> secrets. All autonomous agents (Worker Etta-1, Research Etta-2, Reviewer Opus, Eva) have strictly verified <strong>READ-ONLY</strong> access to inject variables into isolated Git worktrees as needed. Agents cannot mutate or destroy keys.
         </p>
       </div>
 

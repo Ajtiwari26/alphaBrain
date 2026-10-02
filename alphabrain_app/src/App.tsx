@@ -30,8 +30,10 @@ import { LiveStreamScreen } from './screens/LiveStreamScreen';
 import { DeploymentsScreen } from './screens/DeploymentsScreen';
 import { ProjectsScreen } from './screens/ProjectsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { VoiceBriefingScreen } from './screens/VoiceBriefingScreen';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 import { SkeletonCard, SkeletonList } from './components/ui/Skeleton';
+import { IncomingCallModal } from './components/IncomingCallModal';
 
 type SessionStage = 'splash' | 'auth' | 'instance_sync' | 'authenticated';
 
@@ -56,16 +58,41 @@ const ALL_SCREENS: Array<{ id: ScreenId; num: string; title: string; category: s
 export function App() {
   const [sessionStage, setSessionStage] = useState<SessionStage>(() => {
     try {
-      const saved = sessionStorage.getItem('alphabrain_session_token');
+      const saved = localStorage.getItem('alphabrain_session_token') || sessionStorage.getItem('alphabrain_session_token');
       return saved ? 'authenticated' : 'splash';
     } catch {
       return 'splash';
     }
   });
 
+  const [activeCall, setActiveCall] = useState<any>(null);
+  useEffect(() => {
+    if (sessionStage === 'authenticated') {
+      const interval = setInterval(async () => {
+        try {
+          const res = await mobileApi.getIncomingCall();
+          if (res?.active_call) setActiveCall(res.active_call);
+        } catch (e) {}
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [sessionStage]);
+  const handleAcceptCall = async () => {
+    if (activeCall) {
+      await mobileApi.respondIncomingCall(activeCall.call_id, 'accept').catch(() => {});
+      setCurrentScreen('voice_briefing');
+      setActiveCall(null);
+    }
+  };
+  const handleDeclineCall = async () => {
+    if (activeCall) {
+      await mobileApi.respondIncomingCall(activeCall.call_id, 'decline').catch(() => {});
+      setActiveCall(null);
+    }
+  };
   const [currentScreen, setCurrentScreen] = useState<ScreenId>(() => {
     try {
-      const saved = sessionStorage.getItem('alphabrain_session_token');
+      const saved = localStorage.getItem('alphabrain_session_token') || sessionStorage.getItem('alphabrain_session_token');
       return saved ? 'overview' : 'splash';
     } catch {
       return 'splash';
@@ -140,6 +167,7 @@ export function App() {
     setSessionStage('authenticated');
     setCurrentScreen('overview');
     try {
+      localStorage.setItem('alphabrain_session_token', 'active_founder_session');
       sessionStorage.setItem('alphabrain_session_token', 'active_founder_session');
     } catch {
       // Ignore storage restrictions in sandboxed runs
@@ -170,6 +198,13 @@ export function App() {
     setMenuOpen(false);
   };
 
+  useEffect(() => {
+    (window as any).__navigateTo = (s: ScreenId) => {
+      setSessionStage('authenticated');
+      setCurrentScreen(s);
+    };
+  }, []);
+
   return (
     <div
       className={`min-h-screen ${
@@ -178,7 +213,7 @@ export function App() {
     >
       {/* Top Header Bar with Safe-Area Notch Inset (Hidden on Splash and Eva Meeting) */}
       {currentScreen !== 'splash' && currentScreen !== 'eva_meeting' && (
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#0A0A0A] px-4 pt-[max(env(safe-area-inset-top),2.5rem)] pb-3 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#0A0A0A] px-4 pt-[max(env(safe-area-inset-top),var(--android-safe-top,0px),2.5rem)] pb-3 flex items-center justify-between">
           <div
             onClick={() => navigateTo('splash')}
             className="flex items-center gap-2.5 cursor-pointer"
@@ -274,8 +309,8 @@ export function App() {
           currentScreen === 'eva_meeting'
             ? 'pb-0'
             : sessionStage === 'authenticated'
-            ? 'pb-24'
-            : 'pb-[max(env(safe-area-inset-bottom),2.5rem)]'
+            ? 'pb-28'
+            : 'pb-[max(env(safe-area-inset-bottom),var(--android-safe-bottom,0px),2.5rem)]'
         }`}
       >
         {currentScreen === 'splash' && (
@@ -283,13 +318,13 @@ export function App() {
         )}
         {currentScreen === 'enrollment' && (
           <EnrollmentScreen
-            onCompleted={() => setCurrentScreen('instance_sync')}
+            onCompleted={() => setCurrentScreen('qr_provisioning')}
             onCancel={() => setCurrentScreen('splash')}
           />
         )}
         {currentScreen === 'auth' && (
           <AuthScreen
-            onAuthenticated={handleAuthenticated}
+            onAuthenticated={() => setCurrentScreen('qr_provisioning')}
             onNavigateEnroll={() => setCurrentScreen('enrollment')}
           />
         )}
@@ -353,11 +388,12 @@ export function App() {
         {currentScreen === 'eva_meeting' && (
           <EvaMeetingScreen onLeave={() => navigateTo('overview')} />
         )}
+        {currentScreen === 'voice_briefing' && <VoiceBriefingScreen />}
       </main>
 
       {/* Bottom Sticky Locomotive Navigation (Only when Authenticated and Not on Eva Meeting) */}
       {sessionStage === 'authenticated' && currentScreen !== 'eva_meeting' && (
-        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-[#0A0A0A] px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-center justify-around z-30">
+        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-[#0A0A0A] px-3 pt-2 pb-[max(env(safe-area-inset-bottom),var(--android-safe-bottom,0px),0.75rem)] flex items-center justify-around z-30">
           <button
             onClick={() => navigateTo('overview')}
             className={`flex flex-col items-center gap-1 font-mono text-[10px] btn-tactile hover-lift transition-smooth ${
@@ -430,6 +466,14 @@ export function App() {
             <span>{ALL_SCREENS.length} Screens</span>
           </button>
         </nav>
+      )}
+
+      {activeCall && (
+        <IncomingCallModal
+          call={activeCall}
+          onAccept={handleAcceptCall}
+          onDecline={handleDeclineCall}
+        />
       )}
     </div>
   );

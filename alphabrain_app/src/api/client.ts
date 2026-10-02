@@ -25,11 +25,24 @@ import {
   FeedbackCreateRequest,
   AdminFeedbackVerdictRequest,
 } from '../types';
+import { useState, useEffect } from 'react';
 
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('alpha_api_base');
-    if (custom) return custom;
+    if (custom) {
+      const clean = custom.trim().replace(/\/+$/, '');
+      // Prevent native phone app from getting trapped on localhost loopback
+      if (clean.includes('localhost') || clean.includes('127.0.0.1')) {
+        if (window.location.port !== '5173') {
+          return 'https://alpha-brain-staging.onrender.com/api/v1/mobile';
+        }
+      }
+      if (clean.endsWith('/api/v1/mobile')) {
+        return clean;
+      }
+      return `${clean}/api/v1/mobile`;
+    }
     // When running via Vite dev server proxy
     if (window.location.port === '5173') {
       return '/api/v1/mobile';
@@ -40,7 +53,11 @@ export function getApiBaseUrl(): string {
 
 export function getAuthToken(): string {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('alpha_api_token') || 'ced2a32dd9a568fa22e606fa48381543';
+    const stored = localStorage.getItem('alpha_api_token');
+    if (stored && !stored.startsWith('jwt_founder_')) {
+      return stored;
+    }
+    return 'ced2a32dd9a568fa22e606fa48381543';
   }
   return 'ced2a32dd9a568fa22e606fa48381543';
 }
@@ -63,6 +80,9 @@ async function safeFetch<T = any>(endpoint: string, options?: RequestInit): Prom
 }
 
 export const mobileApi = {
+  getHealth: async (): Promise<{ status: string; service: string; companion_version?: string }> => {
+    return safeFetch('/health');
+  },
   getIncomingCall: async (): Promise<{ active_call: any | null }> => {
     return safeFetch('/voice/incoming');
   },
@@ -91,12 +111,40 @@ export const mobileApi = {
   getMeetingToken: (room = 'alphabrain-executive-briefing'): Promise<MeetingTokenResponse> =>
     safeFetch(`/meet/token?room=${encodeURIComponent(room)}`),
 
-  listTriage: async (status?: string): Promise<TaskSummary[]> => {
+  listTriage: async (status?: string, limit: number = 15, offset: number = 0): Promise<TaskSummary[]> => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
     try {
-      return await safeFetch(status ? `/triage?status=${status}` : '/triage');
+      const res = await safeFetch(`/triage?${params.toString()}`);
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray((res as any).items)) return (res as any).items;
+      return [];
     } catch (e) {
       console.warn('Failed to list triage tasks:', e);
       return [];
+    }
+  },
+
+  listTriagePaginated: async (
+    status?: string,
+    limit: number = 15,
+    offset: number = 0
+  ): Promise<{ items: TaskSummary[]; total: number; limit: number; offset: number; has_more: boolean }> => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    params.set('format', 'paginated');
+    try {
+      const res = await safeFetch<any>(`/triage?${params.toString()}`);
+      if (res && Array.isArray(res.items)) return res;
+      if (Array.isArray(res)) return { items: res, total: res.length, limit, offset, has_more: false };
+      return { items: [], total: 0, limit, offset, has_more: false };
+    } catch (e) {
+      console.warn('Failed to list paginated triage tasks:', e);
+      return { items: [], total: 0, limit, offset, has_more: false };
     }
   },
 
@@ -177,12 +225,40 @@ export const mobileApi = {
       body: JSON.stringify({ enable_stop: enable, reason }),
     }),
 
-  getWorktrees: async (): Promise<Array<{ path: string; name: string; commit: string; branch: string }>> => {
+  getWorktrees: async (
+    limit: number = 15,
+    offset: number = 0
+  ): Promise<Array<{ path: string; name: string; commit: string; branch: string }>> => {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
     try {
-      return await safeFetch('/worktrees');
+      const res = await safeFetch(`/worktrees?${params.toString()}`);
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray((res as any).items)) return (res as any).items;
+      return [];
     } catch (e) {
       console.warn('Failed to fetch git worktrees:', e);
       return [];
+    }
+  },
+
+  getWorktreesPaginated: async (
+    limit: number = 15,
+    offset: number = 0
+  ): Promise<{ items: Array<{ path: string; name: string; commit: string; branch: string }>; total: number; limit: number; offset: number; has_more: boolean }> => {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    params.set('format', 'paginated');
+    try {
+      const res = await safeFetch<any>(`/worktrees?${params.toString()}`);
+      if (res && Array.isArray(res.items)) return res;
+      if (Array.isArray(res)) return { items: res, total: res.length, limit, offset, has_more: false };
+      return { items: [], total: 0, limit, offset, has_more: false };
+    } catch (e) {
+      console.warn('Failed to fetch paginated worktrees:', e);
+      return { items: [], total: 0, limit, offset, has_more: false };
     }
   },
 
@@ -311,4 +387,84 @@ export const mobileApi = {
     });
   },
 };
+
+// =========================================================================
+// Stale-While-Revalidate (SWR) Local Cache Hook (INV-M01)
+// Synchronously reads from localStorage on mount (<30ms instant first paint)
+// Revalidates in background and updates localStorage atomically
+// =========================================================================
+export type SWRState<T> = {
+  data: T | null;
+  isLoading: boolean;
+  isValidating: boolean;
+  error: Error | null;
+  isStale: boolean;
+};
+
+export function useSWRCache<T>(
+  cacheKey: string,
+  fetcher: () => Promise<T>,
+  options?: { refreshInterval?: number }
+): SWRState<T> {
+  const cachedRaw = typeof window !== 'undefined' ? localStorage.getItem(`swr:${cacheKey}`) : null;
+  const initialData: T | null = cachedRaw ? (() => {
+    try {
+      return JSON.parse(cachedRaw);
+    } catch {
+      return null;
+    }
+  })() : null;
+
+  const [state, setState] = useState<SWRState<T>>({
+    data: initialData,
+    isLoading: !initialData,
+    isValidating: true,
+    error: null,
+    isStale: !!initialData,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const revalidate = async () => {
+      try {
+        const fresh = await fetcher();
+        if (!cancelled && fresh !== undefined && fresh !== null) {
+          setState({
+            data: fresh,
+            isLoading: false,
+            isValidating: false,
+            error: null,
+            isStale: false,
+          });
+          try {
+            localStorage.setItem(`swr:${cacheKey}`, JSON.stringify(fresh));
+          } catch {
+            // Storage quota exceeded or disabled
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setState((prev) => ({
+            ...prev,
+            isLoading: false,
+            isValidating: false,
+            error: err as Error,
+          }));
+        }
+      }
+    };
+
+    revalidate();
+    const interval = options?.refreshInterval
+      ? setInterval(revalidate, options.refreshInterval)
+      : null;
+
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
+  }, [cacheKey]);
+
+  return state;
+}
 

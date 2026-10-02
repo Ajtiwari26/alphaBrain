@@ -389,6 +389,33 @@ class MobileBridgeService:
 
         return tasks
 
+    def list_triage_tasks_paginated(
+        self,
+        status_filter: str | None = None,
+        limit: int = 15,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Paginated triage task listing with total count and has_more flag.
+
+        Returns:
+            {"items": [...], "total": N, "limit": L, "offset": O, "has_more": bool}
+        """
+        limit = max(1, min(limit, 50))
+        offset = max(0, offset)
+        all_tasks = self.list_triage_tasks(status_filter=status_filter)
+        total = len(all_tasks)
+        page = all_tasks[offset : offset + limit]
+        return {
+            "items": [
+                t.model_dump(mode="json") if hasattr(t, "model_dump") else t.__dict__
+                for t in page
+            ],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(page) < total,
+        }
+
     def get_task_detail(self, task_id: str) -> TaskDetail | None:
         now = time.time()
         if self.db_path.exists():
@@ -1339,6 +1366,29 @@ class MobileBridgeService:
         except Exception as e:
             logger.warning(f"Error reading git worktrees: {e}")
         return worktrees
+
+    def get_git_worktrees_paginated(
+        self,
+        limit: int = 15,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Paginated worktrees listing with total count and has_more flag.
+
+        Returns:
+            {"items": [...], "total": N, "limit": L, "offset": O, "has_more": bool}
+        """
+        limit = max(1, min(limit, 50))
+        offset = max(0, offset)
+        all_wts = self.get_git_worktrees()
+        total = len(all_wts)
+        page = all_wts[offset : offset + limit]
+        return {
+            "items": page,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(page) < total,
+        }
 
     def get_projects(self) -> list[dict[str, Any]]:
         if MobileBridgeService._cached_mac_telemetry and (

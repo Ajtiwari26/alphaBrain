@@ -149,7 +149,7 @@ export const EnrollmentScreen: React.FC<Props> = ({ onCompleted, onCancel }) => 
       </div>
 
       {/* Keypad with [AUTO], [0], [⌫] */}
-      <div className="space-y-2">
+      <div className="space-y-2 safe-bottom-action">
         <div className="grid grid-cols-3 gap-2">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
             <button

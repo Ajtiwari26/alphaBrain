@@ -243,12 +243,12 @@ export const DepartmentsScreen: React.FC<Props> = ({ onSelectDept }) => {
           <div className="flex items-center gap-2 flex-wrap font-mono text-[10px]">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 border border-zinc-200 text-zinc-800">
               <Bot className="w-3 h-3 text-zinc-500" />
-              <strong>Worker AGY-1</strong>
+              <strong>Worker Etta-1</strong>
               <span className="text-zinc-500">(Gemini 3.1 Pro)</span>
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 border border-zinc-200 text-zinc-800">
               <Bot className="w-3 h-3 text-zinc-500" />
-              <strong>Research AGY-2</strong>
+              <strong>Research Etta-2</strong>
               <span className="text-zinc-500">(Flash High)</span>
             </span>
           </div>
