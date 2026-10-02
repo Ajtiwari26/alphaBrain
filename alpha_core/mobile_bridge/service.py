@@ -1109,6 +1109,19 @@ class MobileBridgeService:
         }
 
     def get_model_utility_scores(self) -> list[ModelUtilityScore]:
+        if (
+            MobileBridgeService._cached_mac_telemetry
+            and "model_scores" in MobileBridgeService._cached_mac_telemetry
+            and MobileBridgeService._cached_mac_telemetry["model_scores"]
+        ):
+            raw_scores = MobileBridgeService._cached_mac_telemetry["model_scores"]
+            return [
+                ModelUtilityScore.model_validate(s)
+                if isinstance(s, dict)
+                else s
+                for s in raw_scores
+            ]
+
         global _QUOTA_CACHE
         now = time.time()
         if _QUOTA_CACHE["scores"] and (now - _QUOTA_CACHE["timestamp"]) < 60.0:

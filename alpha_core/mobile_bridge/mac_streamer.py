@@ -13,6 +13,7 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("mac_streamer")
@@ -212,12 +213,102 @@ def execute_remote_command(cmd: dict) -> None:
             logger.warning("Failed executing remote triage command: %s", e)
 
 
+_MAC_QUOTA_CACHE: dict[str, Any] = {"timestamp": 0.0, "scores": []}
+
+
+def get_mac_model_scores() -> list[dict[str, Any]]:
+    global _MAC_QUOTA_CACHE
+    now = time.time()
+    if _MAC_QUOTA_CACHE["scores"] and (now - _MAC_QUOTA_CACHE["timestamp"]) < 30.0:
+        return _MAC_QUOTA_CACHE["scores"]
+
+    switch_script = Path.home() / ".local" / "bin" / "agy-switch"
+    profiles_dir = Path.home() / ".gemini" / "profiles"
+    if not (switch_script.exists() and profiles_dir.exists()):
+        return []
+
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+        from importlib.machinery import SourceFileLoader
+
+        mod = SourceFileLoader("agy_switch", str(switch_script)).load_module()
+        profiles = sorted([p.name for p in profiles_dir.iterdir() if p.is_dir()])
+        active = mod.get_active_profile_name()
+
+        def fetch_one(p: str) -> tuple[str, dict[str, Any] | None]:
+            try:
+                return p, mod.fetch_live_quota(p)
+            except Exception:
+                return p, None
+
+        with ThreadPoolExecutor(max_workers=min(8, len(profiles) or 1)) as executor:
+            results = list(executor.map(fetch_one, profiles))
+
+        scores = []
+        for email, quota in results:
+            if not quota or not quota.get("valid"):
+                scores.append({
+                    "account_name": f"{email.split('@')[0]} (Exhausted)",
+                    "email": email,
+                    "tier": "Tier 4 (Disqualified)",
+                    "utility_score": -1.0,
+                    "weekly_quota_percent": 0.0,
+                    "five_hour_quota_percent": 0.0,
+                    "recommended_model": "gemini-3.1-pro-high",
+                    "gemini_5h_percent": 0.0,
+                    "gemini_weekly_percent": 0.0,
+                    "gemini_5h_desc": "Token expired or invalid",
+                    "gemini_weekly_desc": "",
+                    "claude_5h_percent": 0.0,
+                    "claude_weekly_percent": 0.0,
+                    "claude_5h_desc": "",
+                    "claude_weekly_desc": "",
+                    "token_status": "invalid",
+                    "is_active": (email == active),
+                })
+                continue
+
+            score, tier = mod.compute_oc_eds_score(quota)
+            is_active = (email == active)
+            rec_model = "claude-opus-4-6-thinking" if quota.get("claude_weekly", 0) > 0 else "gemini-3.1-pro-high"
+            acct_label = f"{email.split('@')[0]} {'[ACTIVE]' if is_active else ''}".strip()
+
+            scores.append({
+                "account_name": acct_label,
+                "email": email,
+                "tier": tier,
+                "utility_score": float(score) if score != -float("inf") else -1.0,
+                "weekly_quota_percent": float(quota.get("gemini_weekly", 0.0)),
+                "five_hour_quota_percent": float(quota.get("gemini_5h", 0.0)),
+                "recommended_model": rec_model,
+                "gemini_5h_percent": float(quota.get("gemini_5h", 0.0)),
+                "gemini_weekly_percent": float(quota.get("gemini_weekly", 0.0)),
+                "gemini_5h_desc": str(quota.get("gemini_5h_desc", "")),
+                "gemini_weekly_desc": str(quota.get("gemini_weekly_desc", "")),
+                "claude_5h_percent": float(quota.get("claude_5h", 0.0)),
+                "claude_weekly_percent": float(quota.get("claude_weekly", 0.0)),
+                "claude_5h_desc": str(quota.get("claude_5h_desc", "")),
+                "claude_weekly_desc": str(quota.get("claude_weekly_desc", "")),
+                "token_status": "valid",
+                "is_active": is_active,
+            })
+
+        scores.sort(key=lambda s: s["utility_score"], reverse=True)
+        _MAC_QUOTA_CACHE["timestamp"] = now
+        _MAC_QUOTA_CACHE["scores"] = scores
+        return scores
+    except Exception as e:
+        logger.debug("Model scores read warning: %s", e)
+        return []
+
+
 def sync_once() -> bool:
     payload = {
         "telemetry": get_mac_telemetry(),
         "worktrees": get_mac_worktrees(),
         "projects": get_mac_projects(),
         "triage_tasks": get_mac_triage_tasks(),
+        "model_scores": get_mac_model_scores(),
         "timestamp": time.time(),
     }
     data = json.dumps(payload).encode("utf-8")

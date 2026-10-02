@@ -1,6 +1,6 @@
 [package]
 name = "alphabrain-desktop"
-version = "1.0.3"
+version = "1.0.4"
 description = "AlphaBrain Founder Command Node Desktop Application"
 authors = ["AlphaBrain Core Team"]
 edition = "2021"

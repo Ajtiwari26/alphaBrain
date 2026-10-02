@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { mobileApi } from '../api/client';
 import { ModelUtilityScore } from '../types';
+import { useLiveSWR } from '../utils/useLiveSWR';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { SkeletonCard, SkeletonList } from '../components/ui/Skeleton';
 import { 
@@ -16,39 +17,22 @@ import {
 } from 'lucide-react';
 
 export const ModelRouterScreen: React.FC = () => {
-  const [scores, setScores] = useState<ModelUtilityScore[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<ModelUtilityScore | null>(null);
+  const [selectedAccountEmail, setSelectedAccountEmail] = useState<string | null>(null);
 
-  const fetchScores = () => {
-    mobileApi
-      .getModelScores()
-      .then((data) => {
-        setScores(data);
-        setLoading(false);
-        setRefreshing(false);
-        // If an account is currently selected, refresh its reference
-        if (selectedAccount) {
-          const updated = data.find((d) => d.email === selectedAccount.email);
-          if (updated) setSelectedAccount(updated);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load model scores:', err);
-        setLoading(false);
-        setRefreshing(false);
-      });
-  };
+  const {
+    data: scores,
+    isLoading: loading,
+    isValidating: refreshing,
+    lastRefreshedAt,
+    refresh: handleManualRefresh,
+  } = useLiveSWR<ModelUtilityScore[]>({
+    key: 'model:scores',
+    fetcher: mobileApi.getModelScores,
+    refreshInterval: 10000,
+    initialData: [],
+  });
 
-  useEffect(() => {
-    fetchScores();
-  }, []);
-
-  const handleManualRefresh = () => {
-    setRefreshing(true);
-    fetchScores();
-  };
+  const selectedAccount = scores.find((s) => s.email === selectedAccountEmail) || null;
 
   const activeAccount = scores.find((s) => s.is_active || s.account_name.includes('[ACTIVE]')) || scores[0];
 
@@ -85,7 +69,7 @@ export const ModelRouterScreen: React.FC = () => {
         {/* Detail Top Bar */}
         <div className="border-b border-[#0A0A0A] pb-3 flex items-center justify-between">
           <button
-            onClick={() => setSelectedAccount(null)}
+            onClick={() => setSelectedAccountEmail(null)}
             className="flex items-center gap-1.5 font-mono text-xs font-bold text-[#0A0A0A] hover:text-[#E6391E] transition-colors py-1"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -241,9 +225,10 @@ export const ModelRouterScreen: React.FC = () => {
           <h2 className="text-3xl font-headline font-bold mt-1 text-[#0A0A0A]">
             AI Model Quotas
           </h2>
-          <p className="font-mono text-[11px] text-zinc-500 mt-0.5">
-            Real-time Gemini & Claude 5h & weekly limits across 8 accounts
-          </p>
+          <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[10px] text-zinc-500">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Auto-refreshing every 10s • Last sync {lastRefreshedAt.toLocaleTimeString()}</span>
+          </div>
         </div>
         <button
           onClick={handleManualRefresh}
@@ -258,7 +243,7 @@ export const ModelRouterScreen: React.FC = () => {
       {/* Active Account Quick Banner */}
       {activeAccount && (
         <div 
-          onClick={() => setSelectedAccount(activeAccount)}
+          onClick={() => setSelectedAccountEmail(activeAccount.email)}
           className="border-2 border-[#0A0A0A] p-3 bg-zinc-50 flex items-center justify-between cursor-pointer hover:bg-zinc-100 card-tactile hover-lift transition-colors group"
         >
           <div className="space-y-0.5">
@@ -310,7 +295,7 @@ export const ModelRouterScreen: React.FC = () => {
                 <button
                   key={s.email}
                   type="button"
-                  onClick={() => setSelectedAccount(s)}
+                  onClick={() => setSelectedAccountEmail(s.email)}
                   className={`w-full text-left py-2.5 px-3 grid grid-cols-12 gap-1 items-center border transition-all cursor-pointer hover:bg-zinc-100 card-tactile hover-lift ${
                     isActive
                       ? 'border-[#0A0A0A] bg-zinc-50 border-2 font-bold'
