@@ -70,17 +70,18 @@ class UpstashCacheClient:
             return None
         try:
             client = await self._get_client()
-            resp = await client.get(f"/get/{key}")
+            resp = await client.post("/pipeline", json=[["get", key]])
             if resp.status_code == 200:
                 data = resp.json()
-                result = data.get("result")
-                if result is not None:
-                    if isinstance(result, str):
-                        try:
-                            return json.loads(result)
-                        except Exception:
-                            return result
-                    return result
+                if data and isinstance(data, list):
+                    result = data[0].get("result")
+                    if result is not None:
+                        if isinstance(result, str):
+                            try:
+                                return json.loads(result)
+                            except Exception:
+                                return result
+                        return result
             return None
         except Exception as exc:
             logger.debug(
