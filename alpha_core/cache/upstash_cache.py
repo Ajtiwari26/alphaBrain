@@ -6,6 +6,7 @@ Uses standard HTTP/REST requests against Upstash without native binary driver de
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -56,12 +57,27 @@ class UpstashCacheClient:
             )
 
     async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        if (
+            self._client is None
+            or self._client.is_closed
+            or getattr(self, "_loop", None) is not current_loop
+        ):
+            if self._client is not None and not self._client.is_closed:
+                try:
+                    await self._client.aclose()
+                except Exception:
+                    pass
             self._client = httpx.AsyncClient(
                 base_url=self._url,
                 headers={"Authorization": f"Bearer {self._token}"},
                 timeout=self._timeout,
             )
+            self._loop = current_loop
         return self._client
 
     async def get(self, key: str) -> Any | None:
@@ -84,7 +100,7 @@ class UpstashCacheClient:
                         return result
             return None
         except Exception as exc:
-            logger.debug(
+            logger.warning(
                 "Upstash GET %s failed (graceful degradation): %s", key, exc
             )
             return None
@@ -107,7 +123,7 @@ class UpstashCacheClient:
                 return bool(data and data[0].get("result") == "OK")
             return False
         except Exception as exc:
-            logger.debug(
+            logger.warning(
                 "Upstash SET %s failed (graceful degradation): %s", key, exc
             )
             return False
@@ -122,7 +138,7 @@ class UpstashCacheClient:
             resp = await client.post("/pipeline", json=payload)
             return resp.status_code == 200
         except Exception as exc:
-            logger.debug(
+            logger.warning(
                 "Upstash DEL %s failed (graceful degradation): %s", keys, exc
             )
             return False
@@ -149,7 +165,7 @@ class UpstashCacheClient:
             )
             return len(matching_keys) if del_resp.status_code == 200 else 0
         except Exception as exc:
-            logger.debug("Upstash pattern delete %s failed: %s", pattern, exc)
+            logger.warning("Upstash pattern delete %s failed: %s", pattern, exc)
             return 0
 
     async def ping(self) -> bool:
